@@ -15,6 +15,11 @@ export type Variables = {
   userId: string;
 };
 
+export function getJWTSecret(): Uint8Array {
+  const secret = process.env.JWT_SECRET || '94cram-secret-change-in-prod';
+  return new TextEncoder().encode(secret);
+}
+
 /**
  * JWT Authentication Middleware
  * schoolId = tenantId（inclass 歷史命名）
