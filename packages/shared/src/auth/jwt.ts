@@ -1,27 +1,73 @@
-// JWT Auth utilities
-import jwt from 'jsonwebtoken';
-
-const DEFAULT_SECRET = process.env.JWT_SECRET || '94cram-secret-change-in-prod';
+/**
+ * JWT Auth utilities — 統一使用 jose library
+ * 三個系統共用：manage / inclass / stock
+ */
+import { SignJWT, jwtVerify, type JWTPayload as JosePayload } from 'jose';
 
 export interface JWTPayload {
+  sub?: string;       // = userId（標準 claim）
   userId: string;
   tenantId: string;
   email: string;
   name: string;
   role: string;
-  permissions: string[];
-  systems: string[]; // ['94manage', '94inclass', '94stock']
+  permissions?: string[];
+  systems?: string[]; // ['manage', 'inclass', 'stock']
 }
 
-export function sign(payload: JWTPayload, secret: string = DEFAULT_SECRET): string {
-  return jwt.sign(payload, secret, { expiresIn: '7d' });
+function getSecret(secret?: string): Uint8Array {
+  const s = secret || process.env.JWT_SECRET || '94cram-secret-change-in-prod';
+  return new TextEncoder().encode(s);
 }
 
-export function verify(token: string, secret: string = DEFAULT_SECRET): JWTPayload {
-  return jwt.verify(token, secret) as JWTPayload;
+export async function sign(payload: Omit<JWTPayload, 'sub'>, secret?: string): Promise<string> {
+  const jwt = new SignJWT({
+    userId: payload.userId,
+    tenantId: payload.tenantId,
+    email: payload.email,
+    name: payload.name,
+    role: payload.role,
+    permissions: payload.permissions || [],
+    systems: payload.systems || [],
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(payload.userId)
+    .setIssuedAt()
+    .setExpirationTime('7d');
+
+  return jwt.sign(getSecret(secret));
+}
+
+export async function verify(token: string, secret?: string): Promise<JWTPayload> {
+  const { payload } = await jwtVerify(token, getSecret(secret));
+  return {
+    sub: payload.sub,
+    userId: (payload.userId as string) || payload.sub || '',
+    tenantId: (payload.tenantId as string) || '',
+    email: (payload.email as string) || '',
+    name: (payload.name as string) || '',
+    role: (payload.role as string) || '',
+    permissions: (payload.permissions as string[]) || [],
+    systems: (payload.systems as string[]) || [],
+  };
 }
 
 export function decode(token: string): JWTPayload | null {
-  const decoded = jwt.decode(token);
-  return decoded as JWTPayload | null;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+    return {
+      sub: payload.sub,
+      userId: payload.userId || payload.sub || '',
+      tenantId: payload.tenantId || '',
+      email: payload.email || '',
+      name: payload.name || '',
+      role: payload.role || '',
+      permissions: payload.permissions || [],
+      systems: payload.systems || [],
+    };
+  } catch {
+    return null;
+  }
 }

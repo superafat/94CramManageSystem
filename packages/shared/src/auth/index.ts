@@ -1,3 +1,2 @@
-// Auth exports
-export * from './jwt';
-export * from './middleware';
+export { sign, verify, decode, type JWTPayload } from './jwt';
+export { createAuthMiddleware, createInternalKeyMiddleware, getAuthUser, verifyInternalKey } from './middleware';

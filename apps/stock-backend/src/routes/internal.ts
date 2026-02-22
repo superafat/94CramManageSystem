@@ -12,7 +12,7 @@ app.use('*', async (c, next) => {
 });
 
 app.get('/health', (c) => {
-  return c.json({ service: '94inclass', status: 'ok', timestamp: Date.now() });
+  return c.json({ service: '94stock', status: 'ok', timestamp: Date.now() });
 });
 
 export default app;

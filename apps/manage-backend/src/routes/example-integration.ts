@@ -1,7 +1,7 @@
 /**
  * 統一錯誤處理模組整合示範
  * 
- * 此檔案展示如何在現有的 backend 中使用 @94manage/errors 模組
+ * 此檔案展示如何在現有的 backend 中使用 @94cram/errors 模組
  * 
  * 選項 1: 完全遷移到錯誤類（推薦用於新路由）
  * 選項 2: 與現有 response utilities 並存（用於逐步遷移）
@@ -15,7 +15,7 @@ import {
   NotFoundError,
   ForbiddenError,
   ConflictError 
-} from '@94manage/errors'
+} from '@94cram/errors'
 import { success } from '../utils/response'
 import { defaultCache, cacheable } from '../lib/cache'
 

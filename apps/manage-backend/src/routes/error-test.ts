@@ -6,7 +6,7 @@ import {
   ForbiddenError,
   ConflictError,
   InternalServerError,
-} from '@94manage/errors'
+} from '@94cram/errors'
 
 export const errorTestRoutes = new Hono()
 

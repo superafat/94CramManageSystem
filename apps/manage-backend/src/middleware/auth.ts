@@ -1,13 +1,11 @@
 /**
  * JWT Authentication Middleware
- * Verifies Bearer token → sets c.var.user + c.var.permissions
+ * 使用 @94cram/shared/auth 統一驗證
+ * 保留 RBAC（getUserPermissions）
  */
 import type { Context, Next } from 'hono'
-import * as jose from 'jose'
-import { config } from '../config'
+import { verify } from '@94cram/shared/auth'
 import { getUserPermissions, Role, type RBACVariables } from './rbac'
-
-const secret = new TextEncoder().encode(config.JWT_SECRET)
 
 interface AuthVariables extends RBACVariables {
   tenantId: string
@@ -24,22 +22,20 @@ export async function authMiddleware(c: Context<{ Variables: AuthVariables }>, n
 
   const token = authHeader.slice(7)
   try {
-    const { payload } = await jose.jwtVerify(token, secret)
+    const payload = await verify(token)
 
     const user = {
-      id: payload.sub as string,
-      tenant_id: (payload.tenant_id as string) || '38068f5a-6bad-4edc-b26b-66bc6ac90fb3',
-      branch_id: (payload.branch_id as string) || null,
-      email: (payload.email as string) || '',
-      name: (payload.name as string) || '',
+      id: payload.userId || payload.sub || '',
+      tenant_id: payload.tenantId || '38068f5a-6bad-4edc-b26b-66bc6ac90fb3',
+      branch_id: null as string | null,
+      email: payload.email || '',
+      name: payload.name || '',
       role: (payload.role as Role) || Role.PARENT,
     }
 
     const permissions = getUserPermissions(user.role)
     c.set('user', user as any)
     c.set('permissions', permissions)
-
-    // Also set tenantId for backward compat with getTenantId()
     c.set('tenantId', user.tenant_id)
 
     await next()
@@ -56,20 +52,20 @@ export async function optionalAuth(c: Context<{ Variables: AuthVariables }>, nex
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7)
     try {
-      const { payload } = await jose.jwtVerify(token, secret)
+      const payload = await verify(token)
       const user = {
-        id: payload.sub as string,
-        tenant_id: (payload.tenant_id as string) || '38068f5a-6bad-4edc-b26b-66bc6ac90fb3',
-        branch_id: (payload.branch_id as string) || null,
-        email: (payload.email as string) || '',
-        name: (payload.name as string) || '',
+        id: payload.userId || payload.sub || '',
+        tenant_id: payload.tenantId || '38068f5a-6bad-4edc-b26b-66bc6ac90fb3',
+        branch_id: null as string | null,
+        email: payload.email || '',
+        name: payload.name || '',
         role: (payload.role as Role) || Role.PARENT,
       }
       c.set('user', user as any)
       c.set('permissions', getUserPermissions(user.role))
       c.set('tenantId', user.tenant_id)
     } catch {
-      // Token invalid — continue without user
+      // Token 無效 — 繼續但不設 user
     }
   }
   await next()

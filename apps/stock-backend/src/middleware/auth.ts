@@ -1,7 +1,9 @@
+/**
+ * Stock Backend Auth Middleware
+ * 統一使用 @94cram/shared/auth
+ */
 import type { Context, Next } from 'hono';
-import { verify } from 'hono/jwt';
-
-const DEFAULT_JWT_SECRET = '94stock-secret-key-change-in-prod';
+import { verify, type JWTPayload } from '@94cram/shared/auth';
 
 export interface AuthUser {
   id: string;
@@ -20,13 +22,13 @@ export async function authMiddleware(c: Context, next: Next) {
   }
 
   try {
-    const payload = await verify(token, process.env.JWT_SECRET || DEFAULT_JWT_SECRET, 'HS256');
+    const payload = await verify(token);
     const authUser: AuthUser = {
-      id: String(payload.userId || payload.id || ''),
-      tenantId: String(payload.tenantId || ''),
-      role: String(payload.role || 'viewer'),
-      email: String(payload.email || ''),
-      name: String(payload.name || ''),
+      id: payload.userId || payload.sub || '',
+      tenantId: payload.tenantId || '',
+      role: payload.role || 'viewer',
+      email: payload.email || '',
+      name: payload.name || '',
     };
 
     if (!authUser.id || !authUser.tenantId) {

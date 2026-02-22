@@ -1,4 +1,4 @@
-import { createErrorHandler } from '@94manage/errors'
+import { createErrorHandler } from '@94cram/errors'
 import { logger } from '../utils/logger'
 
 // Custom logger function for error handler
