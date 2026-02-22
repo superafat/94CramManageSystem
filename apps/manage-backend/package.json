@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --env-file=.env src/index.ts",
-    "build": "tsc",
+    "build": "tsup",
     "start": "node dist/index.js",
     "test": "vitest",
     "db:migrate": "psql $DATABASE_URL -f src/db/migrate.sql"
@@ -16,6 +16,7 @@
   "license": "MIT",
   "dependencies": {
     "@94cram/errors": "workspace:*",
+    "@94cram/shared": "workspace:*",
     "@google/generative-ai": "^0.24.1",
     "@hono/node-server": "^1.19.9",
     "@upstash/ratelimit": "^2.0.8",
@@ -33,8 +34,7 @@
     "uuid": "^13.0.0",
     "winston": "^3.19.0",
     "xlsx": "^0.18.5",
-    "zod": "^4.3.6",
-    "@94cram/shared": "workspace:*"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@hono/zod-validator": "^0.7.6",
@@ -42,6 +42,7 @@
     "@types/node-schedule": "^2.1.8",
     "@types/uuid": "^11.0.0",
     "drizzle-kit": "^0.31.9",
+    "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
