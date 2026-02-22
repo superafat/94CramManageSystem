@@ -7,6 +7,6 @@ export default defineConfig({
   outDir: 'dist',
   clean: true,
   sourcemap: true,
-  external: [/node_modules/],
-  noExternal: [/^@94cram\//],
+  // Bundle everything (including npm packages) for zero-dependency production
+  noExternal: [/.*/],
 });
