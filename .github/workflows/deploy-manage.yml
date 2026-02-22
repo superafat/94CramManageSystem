@@ -42,7 +42,7 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy 94manage-backend \
+          gcloud run deploy cram94-manage-backend \
             --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-backend:${{ github.sha }} \
             --region=${{ env.REGION }} \
             --platform=managed \
@@ -52,7 +52,7 @@ jobs:
             --min-instances=0 \
             --max-instances=3 \
             --set-env-vars="NODE_ENV=production" \
-            --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest" \
+            --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,INTERNAL_API_KEY=INTERNAL_API_KEY:latest" \
             --add-cloudsql-instances=cram94-manage-system:asia-east1:platform94-db
 
   deploy-dashboard:
@@ -81,7 +81,7 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy 94manage-dashboard \
+          gcloud run deploy cram94-manage-dashboard \
             --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-dashboard:${{ github.sha }} \
             --region=${{ env.REGION }} \
             --platform=managed \

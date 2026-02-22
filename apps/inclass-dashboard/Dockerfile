@@ -15,18 +15,16 @@ COPY apps/inclass-dashboard/ apps/inclass-dashboard/
 WORKDIR /app/apps/inclass-dashboard
 RUN pnpm build
 
-# --- Production ---
-FROM node:20-slim
+FROM node:20-alpine AS runner
 WORKDIR /app
-
-COPY --from=builder /app/apps/inclass-dashboard/.next .next
-COPY --from=builder /app/apps/inclass-dashboard/public public/
-COPY --from=builder /app/apps/inclass-dashboard/package.json ./
-COPY --from=builder /app/apps/inclass-dashboard/node_modules node_modules/
-COPY --from=builder /app/apps/inclass-dashboard/next.config.* ./
-
 ENV NODE_ENV=production
-ENV PORT=3201
-EXPOSE 3201
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
-CMD ["npx", "next", "start", "--port", "3201"]
+COPY --from=builder /app/apps/inclass-dashboard/.next/standalone ./
+COPY --from=builder /app/apps/inclass-dashboard/.next/static ./apps/inclass-dashboard/.next/static
+COPY --from=builder /app/apps/inclass-dashboard/public ./apps/inclass-dashboard/public
+
+USER nextjs
+EXPOSE 3201
+ENV PORT=3201
+CMD ["node", "apps/inclass-dashboard/server.js"]
