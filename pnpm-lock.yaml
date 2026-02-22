@@ -57,6 +57,9 @@ importers:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.33
+      '@types/pg':
+        specifier: ^8.16.0
+        version: 8.16.0
       drizzle-kit:
         specifier: ^0.31.9
         version: 0.31.9
@@ -7181,7 +7184,6 @@ snapshots:
       '@types/node': 25.3.0
       pg-protocol: 1.11.0
       pg-types: 2.2.0
-    optional: true
 
   '@types/prop-types@15.7.15': {}
 
