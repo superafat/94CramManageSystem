@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://beeclass-dashboard-heu66kjjxa-de.a.run.app/sitemap.xml

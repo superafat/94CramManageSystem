@@ -1,13 +1,13 @@
-name: Deploy 94Stock
+name: Deploy 94inClass
 
 on:
   push:
     branches: [main]
     paths:
-      - 'apps/stock-backend/**'
-      - 'apps/stock-dashboard/**'
+      - 'apps/inclass-backend/**'
+      - 'apps/inclass-dashboard/**'
       - 'packages/shared/**'
-      - '.github/workflows/deploy-stock.yml'
+      - '.github/workflows/deploy-inclass.yml'
 
 env:
   PROJECT_ID: cram94-manage-system
@@ -33,20 +33,20 @@ jobs:
 
       - name: Build & Push
         run: |
-          docker build -f apps/stock-backend/Dockerfile \
-            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-backend:${{ github.sha }} \
-            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-backend:latest \
+          docker build -f apps/inclass-backend/Dockerfile \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/inclass-backend:${{ github.sha }} \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/inclass-backend:latest \
             .
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-backend --all-tags
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/inclass-backend --all-tags
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy 94stock-backend \
-            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-backend:${{ github.sha }} \
+          gcloud run deploy 94inclass-backend \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/inclass-backend:${{ github.sha }} \
             --region=${{ env.REGION }} \
             --platform=managed \
             --allow-unauthenticated \
-            --port=3101 \
+            --port=3102 \
             --memory=256Mi \
             --min-instances=0 \
             --max-instances=2 \
@@ -72,20 +72,20 @@ jobs:
 
       - name: Build & Push
         run: |
-          docker build -f apps/stock-dashboard/Dockerfile \
-            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-dashboard:${{ github.sha }} \
-            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-dashboard:latest \
+          docker build -f apps/inclass-dashboard/Dockerfile \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/inclass-dashboard:${{ github.sha }} \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/inclass-dashboard:latest \
             .
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-dashboard --all-tags
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/inclass-dashboard --all-tags
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy 94stock-dashboard \
-            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-dashboard:${{ github.sha }} \
+          gcloud run deploy 94inclass-dashboard \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/inclass-dashboard:${{ github.sha }} \
             --region=${{ env.REGION }} \
             --platform=managed \
             --allow-unauthenticated \
-            --port=3000 \
+            --port=3201 \
             --memory=256Mi \
             --min-instances=0 \
             --max-instances=2 \

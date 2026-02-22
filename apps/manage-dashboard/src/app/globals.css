@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+/* 莫蘭迪色系 (Morandi Color Palette) */
+@theme {
+  --color-morandi-sage: #A8B5A2;
+  --color-morandi-rose: #C4A4A0;
+  --color-morandi-blue: #9DAEBB;
+  --color-morandi-sand: #C8BFA9;
+  --color-morandi-mauve: #B5A4B8;
+  --color-morandi-cream: #F5F0EB;
+  --color-morandi-stone: #B0A99F;
+  --color-morandi-fog: #E8E4DF;
+  --color-morandi-dark: #5A5550;
+  --color-morandi-text: #4A4540;
+  --color-morandi-muted: #8A857F;
+
+  /* Semantic colors */
+  --color-primary: #9DAEBB;
+  --color-primary-hover: #8A9DAA;
+  --color-secondary: #A8B5A2;
+  --color-accent: #C4A4A0;
+  --color-background: #F5F0EB;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #F0EBE6;
+  --color-border: #E0DBD5;
+  --color-text: #4A4540;
+  --color-text-muted: #8A857F;
+  --color-success: #A8B5A2;
+  --color-warning: #C8BFA9;
+  --color-danger: #C4A4A0;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: 'Noto Sans TC', system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Safe area for iPhone notch/home indicator */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Mobile-first touch targets */
+@media (max-width: 1023px) {
+  button, a {
+    min-height: 44px;
+  }
+}
+
+/* Slide up animation for mobile menus */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.2s ease-out;
+}
+
+/* Hide scrollbar but keep functionality */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Float animation for landing page */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}

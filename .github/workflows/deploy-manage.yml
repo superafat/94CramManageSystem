@@ -1,13 +1,14 @@
-name: Deploy 94Stock
+name: Deploy 94Manage
 
 on:
   push:
     branches: [main]
     paths:
-      - 'apps/stock-backend/**'
-      - 'apps/stock-dashboard/**'
+      - 'apps/manage-backend/**'
+      - 'apps/manage-dashboard/**'
       - 'packages/shared/**'
-      - '.github/workflows/deploy-stock.yml'
+      - 'packages/manage-errors/**'
+      - '.github/workflows/deploy-manage.yml'
 
 env:
   PROJECT_ID: cram94-manage-system
@@ -33,23 +34,23 @@ jobs:
 
       - name: Build & Push
         run: |
-          docker build -f apps/stock-backend/Dockerfile \
-            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-backend:${{ github.sha }} \
-            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-backend:latest \
+          docker build -f apps/manage-backend/Dockerfile \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-backend:${{ github.sha }} \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-backend:latest \
             .
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-backend --all-tags
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-backend --all-tags
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy 94stock-backend \
-            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-backend:${{ github.sha }} \
+          gcloud run deploy 94manage-backend \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-backend:${{ github.sha }} \
             --region=${{ env.REGION }} \
             --platform=managed \
             --allow-unauthenticated \
-            --port=3101 \
-            --memory=256Mi \
+            --port=3100 \
+            --memory=512Mi \
             --min-instances=0 \
-            --max-instances=2 \
+            --max-instances=3 \
             --set-env-vars="NODE_ENV=production" \
             --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest" \
             --add-cloudsql-instances=cram94-manage-system:asia-east1:platform94-db
@@ -72,20 +73,20 @@ jobs:
 
       - name: Build & Push
         run: |
-          docker build -f apps/stock-dashboard/Dockerfile \
-            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-dashboard:${{ github.sha }} \
-            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-dashboard:latest \
+          docker build -f apps/manage-dashboard/Dockerfile \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-dashboard:${{ github.sha }} \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-dashboard:latest \
             .
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-dashboard --all-tags
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-dashboard --all-tags
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy 94stock-dashboard \
-            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-dashboard:${{ github.sha }} \
+          gcloud run deploy 94manage-dashboard \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-dashboard:${{ github.sha }} \
             --region=${{ env.REGION }} \
             --platform=managed \
             --allow-unauthenticated \
-            --port=3000 \
+            --port=3200 \
             --memory=256Mi \
             --min-instances=0 \
             --max-instances=2 \

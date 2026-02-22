@@ -1,0 +1,440 @@
+/**
+ * Auth Routes - 認證 API
+ * 
+ * 修復項目：
+ * 1. ✅ Firebase token 需驗證簽名，而非只是 decode
+ * 2. ✅ 統一 API response format
+ * 3. ✅ 改善 input validation
+ * 4. ✅ 增加 rate limiting（防止暴力破解）
+ * 5. ✅ 密碼複雜度檢查
+ */
+import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
+import * as jose from 'jose'
+import { config } from '../config'
+import { db } from '../db'
+import { sql } from 'drizzle-orm'
+import { getUserPermissions, Role } from '../middleware/rbac'
+import { createHash } from 'crypto'
+import { rateLimit } from '../middleware/rateLimit'
+
+// Simple UUID v4 generator
+function generateId(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+import { loginSchema, telegramLoginSchema, trialSignupSchema } from '../utils/validation'
+import { 
+  success, 
+  badRequest, 
+  unauthorized, 
+  forbidden, 
+  internalError 
+} from '../utils/response'
+
+export const authRoutes = new Hono()
+
+const secret = new TextEncoder().encode(config.JWT_SECRET)
+
+// Firebase public key cache (should be refreshed periodically in production)
+let firebasePublicKeys: Record<string, string> = {}
+let firebaseKeysFetchedAt = 0
+const FIREBASE_KEYS_TTL = 3600000 // 1 hour
+
+/** Fetch Firebase public keys for JWT verification */
+async function getFirebasePublicKeys(): Promise<Record<string, string>> {
+  const now = Date.now()
+  if (firebasePublicKeys && Object.keys(firebasePublicKeys).length > 0 && 
+      now - firebaseKeysFetchedAt < FIREBASE_KEYS_TTL) {
+    return firebasePublicKeys
+  }
+
+  try {
+    const response = await fetch(
+      'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com'
+    )
+    if (response.ok) {
+      firebasePublicKeys = await response.json()
+      firebaseKeysFetchedAt = now
+    }
+  } catch (error) {
+    console.error('Failed to fetch Firebase public keys:', error)
+  }
+  return firebasePublicKeys
+}
+
+/** Verify password against sha256+salt hash stored as "salt:hash" */
+function verifyPassword(password: string, stored: string): boolean {
+  if (!stored || !stored.includes(':')) return false
+  const [salt, hash] = stored.split(':')
+  if (!salt || !hash) return false
+  const check = createHash('sha256').update(password + salt).digest('hex')
+  // 使用 constant-time comparison 防止 timing attack
+  return crypto.subtle ? timingSafeEqual(check, hash) : check === hash
+}
+
+/** Timing-safe string comparison */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let result = 0
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  }
+  return result === 0
+}
+
+/** Generate JWT token */
+async function generateToken(payload: {
+  sub: string
+  name?: string
+  email?: string
+  role: string
+  tenant_id: string
+  branch_id?: string | null
+}): Promise<string> {
+  return new jose.SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('7d')
+    .sign(secret)
+}
+
+// ========================================================================
+// POST /login - Username/Password or Firebase Token Login
+// ========================================================================
+authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), async (c) => {
+  const body = c.req.valid('json')
+
+  // === Username/password login ===
+  if (body.username && body.password) {
+    try {
+      const rows = await db.execute(sql`
+        SELECT id, username, full_name, email, password_hash, role, tenant_id, branch_id, is_active
+        FROM users
+        WHERE username = ${body.username}
+          AND deleted_at IS NULL
+        LIMIT 1
+      `) as any[]
+
+      const dbUser = Array.isArray(rows) ? rows[0] : (rows as any).rows?.[0] ?? null
+      
+      // 不要洩露帳號是否存在
+      if (!dbUser || !dbUser.password_hash) {
+        return unauthorized(c, '帳號或密碼錯誤')
+      }
+
+      if (!dbUser.is_active) {
+        return forbidden(c, '帳號已停用')
+      }
+
+      if (!verifyPassword(body.password, dbUser.password_hash)) {
+        return unauthorized(c, '帳號或密碼錯誤')
+      }
+
+      const role = dbUser.role as Role
+      const permissions = getUserPermissions(role)
+
+      const jwt = await generateToken({
+        sub: dbUser.id,
+        name: dbUser.full_name ?? dbUser.username,
+        email: dbUser.email,
+        role: role,
+        tenant_id: dbUser.tenant_id,
+        branch_id: dbUser.branch_id ?? null,
+      })
+
+      // Update last_login_at (non-blocking)
+      db.execute(sql`UPDATE users SET last_login_at = NOW() WHERE id = ${dbUser.id}`)
+        .catch(() => { /* non-critical */ })
+
+      return success(c, {
+        token: jwt,
+        user: {
+          id: dbUser.id,
+          name: dbUser.full_name ?? dbUser.username,
+          email: dbUser.email,
+          role: role,
+          permissions,
+        },
+      })
+    } catch (err: any) {
+      console.error('Login DB error:', err.message)
+      return internalError(c, err)
+    }
+  }
+
+  // === Firebase token login ===
+  if (body.firebaseToken) {
+    try {
+      // 解碼 header 取得 kid
+      const tokenParts = body.firebaseToken.split('.')
+      if (tokenParts.length !== 3) {
+        return badRequest(c, 'Invalid Firebase token format')
+      }
+
+      const header = JSON.parse(
+        Buffer.from(tokenParts[0], 'base64url').toString()
+      )
+      const kid = header.kid
+
+      // 取得 Firebase public keys 並驗證
+      const publicKeys = await getFirebasePublicKeys()
+      const publicKey = publicKeys[kid]
+
+      if (!publicKey) {
+        return unauthorized(c, 'Invalid Firebase token: unknown key')
+      }
+
+      // 驗證 Firebase token
+      const key = await jose.importX509(publicKey, 'RS256')
+      const { payload } = await jose.jwtVerify(body.firebaseToken, key, {
+        issuer: `https://securetoken.google.com/${config.FIREBASE_PROJECT_ID || ''}`,
+        audience: config.FIREBASE_PROJECT_ID || '',
+      })
+
+      // 檢查是否已有綁定用戶
+      const rows = await db.execute(sql`
+        SELECT id, username, full_name, email, role, tenant_id, branch_id, is_active
+        FROM users
+        WHERE firebase_uid = ${payload.sub}
+          AND deleted_at IS NULL
+        LIMIT 1
+      `) as any[]
+
+      const dbUser = Array.isArray(rows) ? rows[0] : (rows as any).rows?.[0] ?? null
+
+      if (dbUser) {
+        if (!dbUser.is_active) {
+          return forbidden(c, '帳號已停用')
+        }
+
+        const role = dbUser.role as Role
+        const permissions = getUserPermissions(role)
+
+        const jwt = await generateToken({
+          sub: dbUser.id,
+          name: dbUser.full_name ?? dbUser.username,
+          email: dbUser.email,
+          role: role,
+          tenant_id: dbUser.tenant_id,
+          branch_id: dbUser.branch_id ?? null,
+        })
+
+        return success(c, {
+          token: jwt,
+          user: {
+            id: dbUser.id,
+            name: dbUser.full_name ?? dbUser.username,
+            email: dbUser.email,
+            role: role,
+            permissions,
+          },
+        })
+      }
+
+      // 建立訪客 token
+      const jwt = await generateToken({
+        sub: payload.sub as string,
+        email: payload.email as string,
+        role: 'parent',
+        tenant_id: '38068f5a-6bad-4edc-b26b-66bc6ac90fb3', // 預設 tenant
+      })
+
+      return success(c, {
+        token: jwt,
+        user: {
+          id: payload.sub,
+          email: payload.email,
+          role: 'parent',
+          permissions: getUserPermissions(Role.PARENT),
+        },
+        isGuest: true,
+      })
+    } catch (err: any) {
+      console.error('Firebase login error:', err.message)
+      if (err.code === 'ERR_JWT_EXPIRED') {
+        return unauthorized(c, 'Firebase token expired')
+      }
+      return unauthorized(c, 'Invalid Firebase token')
+    }
+  }
+
+  return badRequest(c, '請提供帳號密碼或 Firebase Token')
+})
+
+// ========================================================================
+// POST /telegram - Telegram Mini App Auto-Login
+// ========================================================================
+authRoutes.post('/telegram', zValidator('json', telegramLoginSchema), async (c) => {
+  const body = c.req.valid('json')
+  const telegramId = body.telegram_id
+
+  try {
+    // 1. 嘗試用 telegram_id 找已綁定的 user
+    const rows = await db.execute(sql`
+      SELECT id, username, full_name, email, role, tenant_id, branch_id, is_active
+      FROM users
+      WHERE telegram_id = ${String(telegramId)}
+        AND deleted_at IS NULL
+      LIMIT 1
+    `) as any[]
+
+    const dbUser = Array.isArray(rows) ? rows[0] : (rows as any).rows?.[0] ?? null
+
+    if (dbUser) {
+      if (!dbUser.is_active) {
+        return forbidden(c, '帳號已停用')
+      }
+
+      const role = dbUser.role as Role
+      const permissions = getUserPermissions(role)
+
+      const jwt = await generateToken({
+        sub: dbUser.id,
+        name: dbUser.full_name ?? dbUser.username,
+        email: dbUser.email,
+        role: role,
+        tenant_id: dbUser.tenant_id,
+        branch_id: dbUser.branch_id ?? null,
+      })
+
+      return success(c, {
+        token: jwt,
+        user: {
+          id: dbUser.id,
+          name: dbUser.full_name ?? dbUser.username,
+          email: dbUser.email,
+          role: role,
+          permissions,
+        },
+      })
+    }
+
+    // 2. 未綁定的 Telegram 用戶 → 建立訪客 token (parent role, 唯讀)
+    const guestName = [body.first_name, body.last_name].filter(Boolean).join(' ') || `TG${telegramId}`
+
+    const jwt = await generateToken({
+      sub: `tg-${telegramId}`,
+      name: guestName,
+      role: 'parent',
+      tenant_id: '11111111-1111-1111-1111-111111111111',
+      branch_id: 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d',
+    })
+
+    return success(c, {
+      token: jwt,
+      user: {
+        id: `tg-${telegramId}`,
+        name: guestName,
+        role: 'parent',
+        permissions: getUserPermissions(Role.PARENT),
+      },
+      isGuest: true,
+    })
+  } catch (err: any) {
+    console.error('Telegram login error:', err.message)
+    return internalError(c, err)
+  }
+})
+
+// ========================================================================
+// POST /trial-signup - Apply for 30-day Trial
+// ========================================================================
+authRoutes.post('/trial-signup', rateLimit('trial-signup'), zValidator('json', trialSignupSchema), async (c) => {
+  const body = c.req.valid('json')
+  
+  try {
+    // Check if slug already exists
+    const [existing] = await db.execute(sql`
+      SELECT id FROM tenants WHERE slug = ${body.tenantSlug}
+    `) as any[]
+    
+    if (existing) {
+      return badRequest(c, 'This URL is already taken. Please choose another.')
+    }
+    
+    // Check if email already registered
+    const [existingEmail] = await db.execute(sql`
+      SELECT id FROM users WHERE email = ${body.adminEmail}
+    `) as any[]
+    
+    if (existingEmail) {
+      return badRequest(c, 'This email is already registered.')
+    }
+    
+    // Create tenant with pending trial status
+    const tenantId = generateId()
+    const userId = generateId()
+    const now = new Date().toISOString()
+    
+    // Hash password - use simple random hex
+    const salt = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map(b => b.toString(16).padStart(2, '0')).join('')
+    const hash = createHash('sha256').update(body.password + salt).digest('hex')
+    const passwordHash = `${salt}:${hash}`
+    
+    // Create tenant
+    await db.execute(sql`
+      INSERT INTO tenants (id, name, slug, plan, trial_status, active, created_at, updated_at)
+      VALUES (${tenantId}, ${body.tenantName}, ${body.tenantSlug}, 'free', 'pending', true, ${now}, ${now})
+    `)
+    
+    // Create default branch
+    const branchId = generateId()
+    await db.execute(sql`
+      INSERT INTO branches (id, tenant_id, name, code, created_at)
+      VALUES (${branchId}, ${tenantId}, ${body.tenantName}, ${body.tenantSlug}, ${now})
+    `)
+    
+    // Create admin user
+    await db.execute(sql`
+      INSERT INTO users (id, tenant_id, branch_id, name, email, phone, password, role, created_at, updated_at)
+      VALUES (${userId}, ${tenantId}, ${branchId}, ${body.adminName}, ${body.adminEmail}, ${body.adminPhone || null}, ${passwordHash}, 'admin', ${now}, ${now})
+    `)
+    
+    return success(c, {
+      message: 'Trial application submitted! We will review and get back to you within 24 hours.',
+      tenantId,
+    })
+  } catch (err: any) {
+    console.error('Trial signup error:', err.message)
+    return internalError(c, err)
+  }
+})
+
+// ========================================================================
+// GET /me - Get Current User Info
+// ========================================================================
+authRoutes.get('/me', async (c) => {
+  const authHeader = c.req.header('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return unauthorized(c, 'Missing Bearer token')
+  }
+
+  const token = authHeader.slice(7)
+  try {
+    const { payload } = await jose.jwtVerify(token, secret)
+    const role = payload.role as Role
+    const permissions = getUserPermissions(role)
+    
+    return success(c, {
+      user: {
+        id: payload.sub,
+        name: payload.name,
+        email: payload.email,
+        role: role,
+        tenant_id: payload.tenant_id,
+        branch_id: payload.branch_id,
+      },
+      permissions,
+    })
+  } catch (err) {
+    if ((err as any).code === 'ERR_JWT_EXPIRED') {
+      return unauthorized(c, 'Token expired')
+    }
+    return unauthorized(c, 'Invalid token')
+  }
+})

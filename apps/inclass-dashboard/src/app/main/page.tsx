@@ -1,0 +1,592 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { useRouter } from 'next/navigation'
+import api from '@/lib/api'
+
+interface Student {
+  id: string
+  name: string
+  grade?: string
+  nfcId?: string
+  classId?: string
+}
+
+interface Stats {
+  total: number
+  arrived: number
+  late: number
+  absent: number
+}
+
+interface Attendance {
+  id: string
+  studentId: string
+  studentName: string
+  status: 'arrived' | 'late' | 'absent'
+  checkInTime: string
+}
+
+interface ClassInfo {
+  id: string
+  name: string
+  feeMonthly?: number
+  feeQuarterly?: number
+  feeSemester?: number
+  feeYearly?: number
+}
+
+interface PaymentRecord {
+  id: string
+  studentId: string
+  periodMonth: string
+  status: string
+}
+
+export default function Home() {
+  const { user, school, logout } = useAuth()
+  const router = useRouter()
+  const [students, setStudents] = useState<Student[]>([])
+  const [stats, setStats] = useState<Stats>({ total: 0, arrived: 0, late: 0, absent: 0 })
+  const [attendances, setAttendances] = useState<Attendance[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showAddStudent, setShowAddStudent] = useState(false)
+  const [showFaceCheckin, setShowFaceCheckin] = useState(false)
+  const [newStudent, setNewStudent] = useState({ name: '', grade: '', nfcId: '' })
+  const [nfcInput, setNfcInput] = useState('')
+  const [message, setMessage] = useState('')
+  const [stream, setStream] = useState<MediaStream | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  
+  // 繳費相關
+  const [showPayment, setShowPayment] = useState(false)
+  const [paymentStudent, setPaymentStudent] = useState<Student | null>(null)
+  const [classes, setClasses] = useState<ClassInfo[]>([])
+  const [selectedClass, setSelectedClass] = useState<string>('')
+  const [paymentAmount, setPaymentAmount] = useState(0)
+  const [paymentType, setPaymentType] = useState<'monthly' | 'quarterly' | 'semester' | 'yearly'>('monthly')
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
+  const [paymentNotes, setPaymentNotes] = useState('')
+  const [submittingPayment, setSubmittingPayment] = useState(false)
+  
+  // 警示通知
+  const [alerts, setAlerts] = useState<any[]>([])
+  const [showAlerts, setShowAlerts] = useState(false)
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://beeclass-backend-855393865280.asia-east1.run.app'
+
+  const fetchAlerts = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const data = await fetch(`${API_BASE}/api/alerts`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(r => r.json())
+      if (data.alerts) {
+        setAlerts(data.alerts)
+      }
+    } catch (e) {
+      console.error('Failed to fetch alerts:', e)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+    fetchAlerts()
+    // Cleanup camera on unmount
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop())
+      }
+    }
+  }, [])
+
+  const fetchData = async () => {
+    setLoading(true)
+    await Promise.all([fetchStudents(), fetchAttendance()])
+    setLoading(false)
+  }
+
+  const fetchStudents = async () => {
+    try {
+      const data = await api.getStudents()
+      setStudents(data.students || [])
+    } catch (e) {
+      console.error('Failed to fetch students:', e)
+      showMessage('❌ 讀取學生失敗')
+    }
+  }
+
+  const fetchAttendance = async () => {
+    try {
+      const data = await api.getTodayAttendance()
+      setStats(data.stats || { total: 0, arrived: 0, late: 0, absent: 0 })
+      setAttendances(data.attendances || [])
+    } catch (e) {
+      console.error('Failed to fetch attendance:', e)
+      showMessage('❌ 讀取點名紀錄失敗')
+    }
+  }
+
+  const fetchClasses = async () => {
+    try {
+      const data = await api.getClasses()
+      setClasses(data.classes || [])
+    } catch (e) {
+      console.error('Failed to fetch classes:', e)
+    }
+  }
+
+  const openPaymentModal = async (student: Student) => {
+    setPaymentStudent(student)
+    const data = await api.getClasses().catch(() => ({ classes: [] }))
+    const fetchedClasses = data.classes || []
+    setClasses(fetchedClasses)
+    
+    // 嘗試找到學生的班級
+    if (student.classId) {
+      setSelectedClass(student.classId)
+      const cls = fetchedClasses.find((c: ClassInfo) => c.id === student.classId)
+      if (cls) {
+        setPaymentAmount(cls.feeMonthly || 0)
+      }
+    } else if (fetchedClasses.length > 0) {
+      setSelectedClass(fetchedClasses[0].id)
+      setPaymentAmount(fetchedClasses[0].feeMonthly || 0)
+    }
+    
+    setShowPayment(true)
+  }
+
+  const handlePaymentTypeChange = (type: 'monthly' | 'quarterly' | 'semester' | 'yearly') => {
+    setPaymentType(type)
+    const cls = classes.find((c: ClassInfo) => c.id === selectedClass)
+    if (cls) {
+      switch (type) {
+        case 'monthly': setPaymentAmount(cls.feeMonthly || 0); break
+        case 'quarterly': setPaymentAmount(cls.feeQuarterly || 0); break
+        case 'semester': setPaymentAmount(cls.feeSemester || 0); break
+        case 'yearly': setPaymentAmount(cls.feeYearly || 0); break
+      }
+    }
+  }
+
+  const submitPayment = async () => {
+    if (!paymentStudent || !selectedClass || paymentAmount <= 0) {
+      showMessage('❌ 請填寫完整繳費資料')
+      return
+    }
+    
+    setSubmittingPayment(true)
+    try {
+      const periodMonth = new Date().toISOString().substring(0, 7)
+      await api.createPaymentRecordsBatch([{
+        studentId: paymentStudent.id,
+        classId: selectedClass,
+        paymentType,
+        amount: paymentAmount,
+        periodMonth,
+        paymentDate,
+        notes: paymentNotes
+      }])
+      showMessage('✅ 繳費記錄成功！')
+      setShowPayment(false)
+      setPaymentStudent(null)
+      setPaymentNotes('')
+    } catch (e) {
+      console.error('Payment failed:', e)
+      showMessage('❌ 繳費記錄失敗')
+    }
+    setSubmittingPayment(false)
+  }
+
+  const addStudent = async () => {
+    if (!newStudent.name) return showMessage('❌ 請輸入姓名')
+    try {
+      await api.createStudent(newStudent)
+      showMessage('✅ 新增成功！')
+      setNewStudent({ name: '', grade: '', nfcId: '' })
+      setShowAddStudent(false)
+      fetchData()
+    } catch (e: unknown) {
+      showMessage(`❌ ${e instanceof Error ? e.message : '新增失敗'}`)
+    }
+  }
+
+  const deleteStudent = async (id: string) => {
+    if (!confirm('確定要刪除嗎？')) return
+    try {
+      await api.deleteStudent(id)
+      showMessage('✅ 刪除成功')
+      fetchData()
+    } catch (e: unknown) {
+      showMessage(`❌ ${e instanceof Error ? e.message : '刪除失敗'}`)
+    }
+  }
+
+  const checkinByNFC = async () => {
+    if (!nfcInput) return showMessage('❌ 請輸入 NFC 卡號')
+    try {
+      await api.checkin({ nfcId: nfcInput, method: 'nfc', status: 'arrived' })
+      showMessage('✅ 點名成功！')
+      setNfcInput('')
+      fetchAttendance()
+    } catch (e: unknown) {
+      showMessage(`❌ ${e instanceof Error ? e.message : '點名失敗'}`)
+    }
+  }
+
+  const startCamera = async () => {
+    setShowFaceCheckin(true)
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+      setStream(mediaStream)
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream
+      }
+    } catch (e) {
+      showMessage('❌ 無法開啟攝影機')
+    }
+  }
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop())
+      setStream(null)
+    }
+    setShowFaceCheckin(false)
+  }
+
+  const capturePhoto = () => {
+    showMessage('📸 拍照成功！（辨識功能開發中）')
+    // TODO: 整合 蜂神榜視覺辨識系統
+  }
+
+  const showMessage = (msg: string) => {
+    setMessage(msg)
+    setTimeout(() => setMessage(''), 3000)
+  }
+
+  const attendanceRate = stats.total > 0 ? Math.round(((stats.arrived + stats.late) / stats.total) * 100) : 0
+
+  return (
+    <main style={{ padding: '16px', maxWidth: '100vw', minHeight: '100vh', background: 'var(--background)', paddingBottom: '80px' }}>
+      {/* 整合提示橫幅 */}
+      <div style={{ background: 'linear-gradient(135deg, #E8F4F8 0%, #D4E8F0 100%)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: '12px', border: '1px solid #B8D4E0', boxShadow: 'var(--shadow-sm)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+          <span style={{ fontSize: '16px', marginTop: '2px' }}>💡</span>
+          <div style={{ flex: 1, fontSize: '12px', color: '#4A7C98', lineHeight: 1.5 }}>
+            <strong>提示：</strong>學生資料建議使用 <a href="https://hivemind-dashboard-855393865280.asia-east1.run.app" target="_blank" rel="noopener" style={{ color: '#3A6C88', textDecoration: 'underline', fontWeight: '500' }}>蜂神榜 Ai 管理系統</a> 統一管理。<br/>
+            蜂神榜 Ai 點名系統 專注於<strong>教學前線</strong>（點名、成績）。
+          </div>
+        </div>
+      </div>
+
+      {/* Header with School Info */}
+      <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+        <div style={{ fontSize: '48px' }} className="animate-bounce">🐝</div>
+        <h1 style={{ fontSize: '24px', color: 'var(--primary)', fontWeight: 'bold', margin: 0 }}>
+          🎒 {school?.name || '蜂神榜 Ai 點名系統'}
+        </h1>
+        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+          {user?.name} · {user?.email}
+        </p>
+        <button 
+          onClick={logout}
+          style={{ marginTop: '8px', padding: '6px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--error)', color: 'white', border: 'none', fontSize: '12px', cursor: 'pointer' }}
+        >
+          登出
+        </button>
+      </div>
+
+      {/* Stats Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '16px' }}>
+        <StatCard emoji="👥" label="總人數" value={stats.total} color="var(--primary-light)" />
+        <StatCard emoji="✅" label="已到" value={stats.arrived} color="var(--success)" />
+        <StatCard emoji="⏰" label="遲到" value={stats.late} color="var(--warning)" />
+        <StatCard emoji="❌" label="未到" value={stats.absent} color="var(--error)" />
+      </div>
+
+      {/* Attendance Rate */}
+      <div style={{ background: 'var(--primary)', borderRadius: '16px', padding: '16px', textAlign: 'center', color: 'white', marginBottom: '16px', boxShadow: 'var(--shadow-md)' }}>
+        <div style={{ fontSize: '14px', opacity: 0.9 }}>今日出勤率</div>
+        <div style={{ fontSize: '42px', fontWeight: 'bold' }}>{attendanceRate}%</div>
+      </div>
+
+      {/* Alerts Notification */}
+      {alerts.length > 0 && (
+        <div style={{ background: '#FEF3C7', borderRadius: '16px', padding: '16px', marginBottom: '16px', border: '2px solid #F59E0B', cursor: 'pointer' }} onClick={() => setShowAlerts(!showAlerts)}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '24px' }}>⚠️</span>
+              <div>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#92400E' }}>收到 {alerts.length} 筆資料異動通知</div>
+                <div style={{ fontSize: '12px', color: '#B45309' }}>點擊查看詳情</div>
+              </div>
+            </div>
+            <span style={{ fontSize: '20px' }}>{showAlerts ? '▼' : '▶'}</span>
+          </div>
+          {showAlerts && (
+            <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {alerts.slice(0, 5).map((alert) => (
+                <div key={alert.id} style={{ background: 'white', padding: '10px', borderRadius: '8px', fontSize: '13px' }}>
+                  <div style={{ fontWeight: 'bold', color: '#374151' }}>{alert.change_summary || `${alert.action} ${alert.table_name}`}</div>
+                  <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>{alert.user_name} · {new Date(alert.created_at).toLocaleString('zh-TW')}</div>
+                </div>
+              ))}
+              {alerts.length > 5 && (
+                <div style={{ fontSize: '12px', color: '#92400E', textAlign: 'center' }}>還有 {alerts.length - 5} 筆...</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* NFC Checkin */}
+      <div style={{ background: 'var(--surface)', borderRadius: '16px', padding: '12px', marginBottom: '16px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)' }}>
+        <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--primary)', marginBottom: '8px' }}>⚡ NFC 刷卡點名</div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <input
+            type="text"
+            value={nfcInput}
+            onChange={(e) => setNfcInput(e.target.value)}
+            placeholder="輸入 NFC 卡號"
+            style={{ flex: 1, padding: '10px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '14px', outline: 'none' }}
+            onKeyDown={(e) => e.key === 'Enter' && checkinByNFC()}
+            onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
+            onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
+          />
+          <button onClick={checkinByNFC} style={{ padding: '10px 20px', borderRadius: 'var(--radius-sm)', background: 'var(--accent)', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer' }}>
+            點名
+          </button>
+        </div>
+      </div>
+
+      {/* Student List & Attendance */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+        {/* Students */}
+        <div style={{ background: 'var(--surface)', borderRadius: '16px', padding: '12px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--primary)', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>📋 學生名單 ({students.length})</span>
+            <button onClick={() => setShowAddStudent(true)} style={{ fontSize: '20px', background: 'none', border: 'none', cursor: 'pointer' }}>➕</button>
+          </div>
+          <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+            {students.map(s => (
+              <div key={s.id} style={{ padding: '8px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px' }}>
+                <div>
+                  <div style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{s.name}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{s.grade} {s.nfcId && `· ${s.nfcId}`}</div>
+                </div>
+                <button onClick={() => deleteStudent(s.id)} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer' }}>🗑️</button>
+              </div>
+            ))}
+            {students.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)', fontSize: '14px' }}>🌸 還沒有學生</div>
+            )}
+          </div>
+        </div>
+
+        {/* Today Attendance */}
+        <div style={{ background: 'var(--surface)', borderRadius: '16px', padding: '12px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--primary)', marginBottom: '8px' }}>📍 今日到校</div>
+          <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+            {attendances.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)', fontSize: '14px' }}>🌸 還沒有人到校</div>
+            ) : (
+              attendances.map((a: Attendance) => (
+                <div key={a.id} style={{ padding: '8px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px' }}>
+                  <span style={{ color: 'var(--text-primary)' }}>{a.studentName}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', background: a.status === 'arrived' ? 'var(--success)' : a.status === 'late' ? 'var(--warning)' : 'var(--error)', color: 'white' }}>
+                      {a.status === 'arrived' ? '✅' : a.status === 'late' ? '⏰' : '❌'}
+                    </span>
+                    {a.status !== 'absent' && (
+                      <button 
+                        onClick={() => {
+                          const student = students.find((s: Student) => s.name === a.studentName)
+                          if (student) openPaymentModal(student)
+                        }}
+                        style={{ padding: '4px 10px', borderRadius: '8px', fontSize: '11px', background: 'var(--accent)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                      >
+                        💰
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Fixed Toolbar */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'var(--surface)', borderTop: '2px solid var(--border)', padding: '12px', display: 'flex', justifyContent: 'space-around', boxShadow: 'var(--shadow-lg)', zIndex: 100 }}>
+        <ToolButton emoji="📸" label="刷臉" onClick={startCamera} />
+        <ToolButton emoji="📋" label="名單" onClick={() => setShowAddStudent(true)} />
+        <ToolButton emoji="📊" label="儀表板" onClick={() => router.push('/dashboard')} />
+        <ToolButton emoji="📝" label="成績" onClick={() => router.push('/grades')} />
+        <ToolButton emoji="📈" label="報表" onClick={() => router.push('/reports')} />
+        <ToolButton emoji="💰" label="繳費" onClick={() => router.push('/billing')} />
+        <ToolButton emoji="📚" label="說明" onClick={() => router.push('/guide')} />
+        {(user?.role === 'admin') && <ToolButton emoji="⚙️" label="管理" onClick={() => router.push('/admin')} />}
+      </div>
+
+      {/* Add Student Modal */}
+      {showAddStudent && (
+        <Modal title="➕ 新增學生" onClose={() => setShowAddStudent(false)}>
+          <FormField label="姓名" value={newStudent.name} onChange={(v) => setNewStudent({...newStudent, name: v})} placeholder="王小明" />
+          <FormField label="年級" value={newStudent.grade || ''} onChange={(v) => setNewStudent({...newStudent, grade: v})} placeholder="一年級" />
+          <FormField label="NFC 卡號" value={newStudent.nfcId || ''} onChange={(v) => setNewStudent({...newStudent, nfcId: v})} placeholder="NFC001" />
+          <button onClick={addStudent} style={{ width: '100%', padding: '14px', borderRadius: 'var(--radius-md)', background: 'var(--accent)', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '16px', marginTop: '12px', cursor: 'pointer' }}>
+            ✅ 新增
+          </button>
+        </Modal>
+      )}
+
+      {/* Payment Modal */}
+      {showPayment && paymentStudent && (
+        <Modal title="💰 繳費記錄" onClose={() => setShowPayment(false)}>
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>學生</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--primary)' }}>{paymentStudent.name}</div>
+          </div>
+          
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>班級</div>
+            <select 
+              value={selectedClass} 
+              onChange={(e) => {
+                setSelectedClass(e.target.value)
+                const cls = classes.find((c: ClassInfo) => c.id === e.target.value)
+                if (cls) handlePaymentTypeChange(paymentType)
+              }}
+              style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '14px' }}
+            >
+              {classes.map((c: ClassInfo) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>費用類型</div>
+            <select 
+              value={paymentType} 
+              onChange={(e) => handlePaymentTypeChange(e.target.value as any)}
+              style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '14px' }}
+            >
+              <option value="monthly">月費</option>
+              <option value="quarterly">季費</option>
+              <option value="semester">學期費</option>
+              <option value="yearly">學年費</option>
+            </select>
+          </div>
+
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>實收金額</div>
+            <input 
+              type="number" 
+              value={paymentAmount} 
+              onChange={(e) => setPaymentAmount(Number(e.target.value))}
+              style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '16px', fontWeight: 'bold' }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>繳費日期</div>
+            <input 
+              type="date" 
+              value={paymentDate} 
+              onChange={(e) => setPaymentDate(e.target.value)}
+              style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '14px' }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>備註（選填）</div>
+            <input 
+              type="text" 
+              value={paymentNotes} 
+              onChange={(e) => setPaymentNotes(e.target.value)}
+              placeholder="例如：減免、優惠..."
+              style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '14px' }}
+            />
+          </div>
+
+          <button 
+            onClick={submitPayment}
+            disabled={submittingPayment}
+            style={{ width: '100%', padding: '14px', borderRadius: 'var(--radius-md)', background: 'var(--accent)', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer', opacity: submittingPayment ? 0.6 : 1 }}
+          >
+            {submittingPayment ? '處理中...' : '✅ 確認繳費'}
+          </button>
+        </Modal>
+      )}
+
+      {/* Face Checkin Modal */}
+      {showFaceCheckin && (
+        <Modal title="📸 刷臉點名" onClose={stopCamera} wide>
+          <video ref={videoRef} autoPlay playsInline style={{ width: '100%', borderRadius: 'var(--radius-md)', background: '#000', marginBottom: '12px' }} />
+          <button onClick={capturePhoto} style={{ width: '100%', padding: '14px', borderRadius: 'var(--radius-md)', background: 'var(--primary)', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>
+            📸 拍照辨識
+          </button>
+        </Modal>
+      )}
+
+      {/* Toast Message */}
+      {message && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(74, 74, 74, 0.9)', color: 'white', padding: '16px 32px', borderRadius: 'var(--radius-md)', fontSize: '16px', fontWeight: 'bold', zIndex: 200, boxShadow: 'var(--shadow-lg)' }}>
+          {message}
+        </div>
+      )}
+    </main>
+  )
+}
+
+function StatCard({ emoji, label, value, color }: { emoji: string; label: string; value: number; color: string }) {
+  return (
+    <div style={{ background: color, borderRadius: '12px', padding: '12px', textAlign: 'center', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)' }}>
+      <div style={{ fontSize: '24px' }}>{emoji}</div>
+      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>{label}</div>
+      <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '4px' }}>{value}</div>
+    </div>
+  )
+}
+
+function ToolButton({ emoji, label, onClick }: { emoji: string; label: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '8px', gap: '4px' }}>
+      <div style={{ fontSize: '28px' }}>{emoji}</div>
+      <div style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 'bold' }}>{label}</div>
+    </button>
+  )
+}
+
+function Modal({ title, children, onClose, wide }: { title: string; children: React.ReactNode; onClose: () => void; wide?: boolean }) {
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(74, 74, 74, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }} onClick={onClose}>
+      <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: '24px', maxWidth: wide ? '500px' : '400px', width: '100%', boxShadow: 'var(--shadow-lg)', border: '2px solid var(--border)', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} style={{ position: 'absolute', top: '12px', right: '12px', background: 'var(--error)', border: 'none', width: '32px', height: '32px', borderRadius: '50%', color: 'white', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold' }}>×</button>
+        <h3 style={{ fontSize: '20px', color: 'var(--primary)', fontWeight: 'bold', marginBottom: '16px' }}>{title}</h3>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function FormField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+  return (
+    <div style={{ marginBottom: '12px' }}>
+      <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '14px' }}>{label}</label>
+      <input 
+        type="text" 
+        value={value} 
+        onChange={(e) => onChange(e.target.value)} 
+        placeholder={placeholder} 
+        style={{ width: '100%', padding: '12px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '14px', outline: 'none' }}
+        onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
+        onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
+      />
+    </div>
+  )
+}

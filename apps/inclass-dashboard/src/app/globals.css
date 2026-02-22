@@ -1,0 +1,136 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* 莫蘭迪色系 - 柔和低飽和度 */
+  --primary: #8FA9B8;        /* 灰藍 */
+  --primary-light: #C4D4DE;  /* 淺灰藍 */
+  --secondary: #B8A99F;      /* 灰棕 */
+  --accent: #A8C5AF;         /* 灰綠 */
+  --background: #F5F3F0;     /* 米白 */
+  --surface: #FFFFFF;
+  --text-primary: #4A4A4A;
+  --text-secondary: #888888;
+  --border: #E0DDD9;
+  --success: #A8C5AF;
+  --warning: #D4B896;
+  --error: #C89B9B;
+  
+  /* Typography - WCAG AAA */
+  --font-base: 16px;
+  --font-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  
+  /* Border Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  
+  /* Shadow - 柔和陰影 */
+  --shadow-sm: 0 2px 4px rgba(143, 169, 184, 0.08);
+  --shadow-md: 0 4px 8px rgba(143, 169, 184, 0.12);
+  --shadow-lg: 0 8px 16px rgba(143, 169, 184, 0.16);
+}
+
+body {
+  font-family: var(--font-system);
+  background: var(--background);
+  color: var(--text-primary);
+  line-height: 1.6;
+  font-size: var(--font-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+/* Focus 可訪問性 - WCAG AAA */
+*:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* 捲軸 - 莫蘭迪風格 */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-light);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* 柔和動畫 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Reduced Motion Support - WCAG */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

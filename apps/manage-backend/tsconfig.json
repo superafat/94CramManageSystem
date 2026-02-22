@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": true,
+    "resolveJsonModule": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "scripts/**", "src/ai/churn-v2.ts", "src/ai/churn-scanner.ts", "src/routes/churn-v2.ts", "src/bot/enrollment.ts", "src/bot/notifications.ts", "src/routes/enrollment.ts", "src/db/schema-v5.ts", "src/routes/example-integration.ts", "src/routes/validation-examples.ts"]
+}
