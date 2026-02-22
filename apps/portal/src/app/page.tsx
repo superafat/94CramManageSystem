@@ -43,7 +43,7 @@ export default function HomePage() {
       {/* System Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl w-full">
         {systems.map((sys) => (
-          <SystemCard key={sys.key} {...sys} />
+          <SystemCard key={sys.key} emoji={sys.emoji} name={sys.name} description={sys.description} url={sys.url} color={sys.color} />
         ))}
       </div>
 
