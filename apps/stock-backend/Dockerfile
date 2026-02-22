@@ -22,7 +22,7 @@ COPY --from=builder /app/apps/stock-backend/dist ./dist
 COPY --from=builder /app/apps/stock-backend/package.json ./
 
 ENV NODE_ENV=production
-ENV PORT=PORT=3101
-EXPOSE PORT=3101
+ENV PORT=3101
+EXPOSE 3101
 
 CMD ["node", "dist/index.js"]
