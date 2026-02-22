@@ -1,0 +1,49 @@
+name: Deploy 94Portal
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/portal/**'
+      - 'packages/shared/**'
+
+env:
+  PROJECT_ID: cram94-manage-system
+  REGION: asia-east1
+  REGISTRY: asia-east1-docker.pkg.dev/cram94-manage-system/cram94
+
+jobs:
+  deploy-portal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auth GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker asia-east1-docker.pkg.dev --quiet
+
+      - name: Build & Push
+        run: |
+          docker build -t ${{ env.REGISTRY }}/94portal:${{ github.sha }} apps/portal/
+          docker push ${{ env.REGISTRY }}/94portal:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy 94portal \
+            --image ${{ env.REGISTRY }}/94portal:${{ github.sha }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --allow-unauthenticated \
+            --port 3300 \
+            --memory 256Mi \
+            --cpu 1 \
+            --min-instances 0 \
+            --max-instances 2 \
+            --set-env-vars "NODE_ENV=production"
