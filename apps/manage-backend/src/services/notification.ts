@@ -9,7 +9,7 @@ import { notifications, notificationPreferences, users } from '../db/schema'
 import type { NotificationType, NotificationChannel, NotificationStatus } from '../db/schema'
 import { sendLinePushMessage } from './line'
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8497754195:AAHkZcV3vXNnAv3UlM9QGe_FsnUioDvBtxg'
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 
 /**
  * 發送 Telegram 訊息
@@ -20,6 +20,10 @@ export async function sendTelegramMessage(
   metadata?: Record<string, any>
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!TELEGRAM_BOT_TOKEN) {
+      return { success: false, error: 'TELEGRAM_BOT_TOKEN is not configured' }
+    }
+
     const response = await fetch(
       `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
       {
