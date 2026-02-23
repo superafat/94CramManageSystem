@@ -36,10 +36,16 @@ const requireSchoolId = (schoolId: string | undefined) => {
   return typeof schoolId === 'string' && schoolId.trim().length > 0 ? schoolId : null
 }
 
+const ok = <T>(data: T) =>
+  ({ success: true, data, error: null } as const)
+
+const fail = (error: string, data: unknown = null) =>
+  ({ success: false, data, error } as const)
+
 examsRouter.get('/', async (c) => {
   try {
     const schoolId = requireSchoolId(c.get('schoolId'))
-    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
+    if (!schoolId) return c.json(fail('Unauthorized'), 401)
     const schoolExams = await db
       .select({
         id: exams.id, classId: exams.classId, name: exams.name,
@@ -50,22 +56,22 @@ examsRouter.get('/', async (c) => {
       .innerJoin(classes, eq(exams.classId, classes.id))
       .where(eq(classes.schoolId, schoolId))
 
-    return c.json({ exams: schoolExams })
+    return c.json(ok({ exams: schoolExams }))
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error fetching exams:', e instanceof Error ? e.message : 'Unknown error')
-    return c.json({ error: 'Failed to fetch exams' }, 500)
+    return c.json(fail('Failed to fetch exams'), 500)
   }
 })
 
 examsRouter.post('/', zValidator('json', examSchema), async (c) => {
   try {
     const schoolId = requireSchoolId(c.get('schoolId'))
-    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
+    if (!schoolId) return c.json(fail('Unauthorized'), 401)
     const body = c.req.valid('json')
 
     const [classData] = await db.select().from(classes).where(eq(classes.id, body.classId))
     if (!classData || classData.schoolId !== schoolId) {
-      return c.json({ error: 'Class not found' }, 404)
+      return c.json(fail('Class not found'), 404)
     }
 
     const [newExam] = await db.insert(exams).values({
@@ -73,10 +79,10 @@ examsRouter.post('/', zValidator('json', examSchema), async (c) => {
       maxScore: body.maxScore, examDate: body.examDate,
     }).returning()
 
-    return c.json({ success: true, exam: newExam }, 201)
+    return c.json(ok({ exam: newExam }), 201)
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Create exam error:', e instanceof Error ? e.message : 'Unknown error')
-    return c.json({ error: 'Failed to create exam' }, 500)
+    return c.json(fail('Failed to create exam'), 500)
   }
 })
 
@@ -84,13 +90,13 @@ examsRouter.get('/:examId/scores', zValidator('param', examIdParamSchema), async
   try {
     const { examId } = c.req.valid('param')
     const schoolId = requireSchoolId(c.get('schoolId'))
-    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
+    if (!schoolId) return c.json(fail('Unauthorized'), 401)
 
     const [exam] = await db.select().from(exams).where(eq(exams.id, examId))
-    if (!exam) return c.json({ error: 'Exam not found' }, 404)
+    if (!exam) return c.json(fail('Exam not found'), 404)
 
     const [examClass] = await db.select().from(classes).where(eq(classes.id, exam.classId))
-    if (!examClass || examClass.schoolId !== schoolId) return c.json({ error: 'Unauthorized' }, 403)
+    if (!examClass || examClass.schoolId !== schoolId) return c.json(fail('Unauthorized'), 403)
 
     const scoresWithStudents = await db
       .select({
@@ -107,14 +113,14 @@ examsRouter.get('/:examId/scores', zValidator('param', examIdParamSchema), async
     const highest = scores.length > 0 ? Math.max(...scores) : 0
     const lowest = scores.length > 0 ? Math.min(...scores) : 0
 
-    return c.json({
+    return c.json(ok({
       exam,
       scores: sortedScores,
       stats: { average, highest, lowest, total: scores.length }
-    })
+    }))
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Get exam scores error:', e instanceof Error ? e.message : 'Unknown error')
-    return c.json({ error: 'Failed to get scores' }, 500)
+    return c.json(fail('Failed to get scores'), 500)
   }
 })
 
@@ -126,20 +132,20 @@ examsRouter.post(
   try {
     const { examId } = c.req.valid('param')
     const schoolId = requireSchoolId(c.get('schoolId'))
-    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
+    if (!schoolId) return c.json(fail('Unauthorized'), 401)
     const body = c.req.valid('json')
 
     const [exam] = await db.select().from(exams).where(eq(exams.id, examId))
-    if (!exam) return c.json({ error: 'Exam not found' }, 404)
+    if (!exam) return c.json(fail('Exam not found'), 404)
 
     const [examClass] = await db.select().from(classes).where(eq(classes.id, exam.classId))
-    if (!examClass || examClass.schoolId !== schoolId) return c.json({ error: 'Unauthorized' }, 403)
+    if (!examClass || examClass.schoolId !== schoolId) return c.json(fail('Unauthorized'), 403)
 
     const [student] = await db.select().from(students).where(eq(students.id, body.studentId))
-    if (!student || student.schoolId !== schoolId) return c.json({ error: 'Student not found' }, 404)
+    if (!student || student.schoolId !== schoolId) return c.json(fail('Student not found'), 404)
 
     if (body.score > exam.maxScore) {
-      return c.json({ error: `Score cannot exceed maximum score of ${exam.maxScore}`, maxScore: exam.maxScore }, 400)
+      return c.json(fail(`Score cannot exceed maximum score of ${exam.maxScore}`, { maxScore: exam.maxScore }), 400)
     }
 
     const [existing] = await db.select().from(examScores)
@@ -147,14 +153,14 @@ examsRouter.post(
 
     if (existing) {
       const [updated] = await db.update(examScores).set({ score: body.score }).where(eq(examScores.id, existing.id)).returning()
-      return c.json({ success: true, score: updated })
+      return c.json(ok({ score: updated }))
     } else {
       const [newScore] = await db.insert(examScores).values({ examId, studentId: body.studentId, score: body.score }).returning()
-      return c.json({ success: true, score: newScore }, 201)
+      return c.json(ok({ score: newScore }), 201)
     }
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Add score error:', e instanceof Error ? e.message : 'Unknown error')
-    return c.json({ error: 'Failed to add score' }, 500)
+    return c.json(fail('Failed to add score'), 500)
   }
 })
 
@@ -163,10 +169,10 @@ examsRouter.get('/scores/:studentId', zValidator('param', studentIdParamSchema),
   try {
     const { studentId } = c.req.valid('param')
     const schoolId = requireSchoolId(c.get('schoolId'))
-    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
+    if (!schoolId) return c.json(fail('Unauthorized'), 401)
 
     const [student] = await db.select().from(students).where(eq(students.id, studentId))
-    if (!student || student.schoolId !== schoolId) return c.json({ error: 'Student not found' }, 404)
+    if (!student || student.schoolId !== schoolId) return c.json(fail('Student not found'), 404)
 
     const studentScores = await db
       .select({
@@ -183,10 +189,10 @@ examsRouter.get('/scores/:studentId', zValidator('param', studentIdParamSchema),
       new Date(b.examDate).getTime() - new Date(a.examDate).getTime()
     )
 
-    return c.json({ scores: sortedScores })
+    return c.json(ok({ scores: sortedScores }))
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error fetching student scores:', e instanceof Error ? e.message : 'Unknown error')
-    return c.json({ error: 'Failed to fetch scores' }, 500)
+    return c.json(fail('Failed to fetch scores'), 500)
   }
 })
 
