@@ -7,9 +7,9 @@ import { users } from '../db/schema.js'
 import { eq } from 'drizzle-orm'
 import { adminOnly } from '../middleware/auth.js'
 import { getFailedLogins, getBlockedIPs } from '../middleware/rateLimit.js'
-import type { Variables } from '../middleware/auth.js'
+import type { AdminVariables } from '../middleware/auth.js'
 
-const adminRouter = new Hono<{ Variables: Variables & { adminUser: any } }>()
+const adminRouter = new Hono<{ Variables: AdminVariables }>()
 
 // Apply admin-only middleware to all routes
 adminRouter.use('*', adminOnly())

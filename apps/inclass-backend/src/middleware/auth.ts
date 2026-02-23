@@ -15,6 +15,11 @@ export type Variables = {
   userId: string;
 };
 
+export type AdminUser = typeof users.$inferSelect;
+export type AdminVariables = Variables & {
+  adminUser: AdminUser;
+};
+
 export function getJWTSecret(): Uint8Array {
   const secret = process.env.JWT_SECRET || '94cram-secret-change-in-prod';
   return new TextEncoder().encode(secret);
@@ -25,7 +30,7 @@ export function getJWTSecret(): Uint8Array {
  * schoolId = tenantId（inclass 歷史命名）
  */
 export function jwtAuth() {
-  return async (c: any, next: () => Promise<void>) => {
+  return async (c: Context<{ Variables: Variables }>, next: Next) => {
     if (c.req.method === 'OPTIONS') return next();
     if (c.req.path.startsWith('/api/auth/') && c.req.path !== '/api/auth/me') {
       return next();
@@ -39,8 +44,9 @@ export function jwtAuth() {
     const token = authHeader.substring(7);
     try {
       const payload = await verify(token);
+      const legacyPayload = payload as JWTPayload & { schoolId?: string };
       // inclass 用 schoolId = tenantId
-      c.set('schoolId', payload.tenantId || (payload as any).schoolId || '');
+      c.set('schoolId', payload.tenantId || legacyPayload.schoolId || '');
       c.set('userId', payload.userId || payload.sub || '');
       await next();
     } catch {
@@ -53,7 +59,7 @@ export function jwtAuth() {
  * Admin-only Middleware
  */
 export function adminOnly() {
-  return async (c: any, next: () => Promise<void>) => {
+  return async (c: Context<{ Variables: AdminVariables }>, next: Next) => {
     const userId = c.get('userId');
     const [adminUser] = await db.select().from(users).where(eq(users.id, userId));
     if (!adminUser || adminUser.role !== 'admin') {
