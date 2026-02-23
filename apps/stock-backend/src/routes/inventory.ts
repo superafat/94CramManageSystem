@@ -67,31 +67,19 @@ app.post('/in', async (c) => {
     return c.json({ error: 'Invalid input' }, 400);
   }
 
-  // Update or create inventory record
-  const [existing] = await db.select()
-    .from(stockInventory)
-      .where(and(
-        eq(stockInventory.tenantId, tenantId),
-        eq(stockInventory.warehouseId, warehouseId),
-        eq(stockInventory.itemId, itemId)
-      ));
-
-  if (existing) {
-    await db.update(stockInventory)
-      .set({ 
-        quantity: existing.quantity + quantity,
-        lastUpdatedAt: new Date()
-      })
-      .where(eq(stockInventory.id, existing.id));
-  } else {
-    await db.insert(stockInventory).values({
-      tenantId,
-      warehouseId,
-      itemId,
-      quantity,
+  await db.insert(stockInventory).values({
+    tenantId,
+    warehouseId,
+    itemId,
+    quantity,
+    lastUpdatedAt: new Date()
+  }).onConflictDoUpdate({
+    target: [stockInventory.warehouseId, stockInventory.itemId],
+    set: {
+      quantity: sql`${stockInventory.quantity} + ${quantity}`,
       lastUpdatedAt: new Date()
-    });
-  }
+    }
+  });
 
   // Record transaction
   await db.insert(stockTransactions).values({
