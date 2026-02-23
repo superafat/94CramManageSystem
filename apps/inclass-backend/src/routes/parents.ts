@@ -13,11 +13,15 @@ const parentsRouter = new Hono<{ Variables: Variables }>()
 
 const parentSchema = z.object({
   studentId: z.string().uuid(),
-  name: z.string().min(1).max(100),
-  phone: z.string().regex(/^[0-9+\-() ]{8,20}$/, 'Invalid phone number format'),
-  lineUserId: z.string().max(100).optional(),
-  relationship: z.string().max(50).optional(),
-})
+  name: z.string().trim().min(1).max(100),
+  phone: z.string().trim().regex(/^[0-9+\-() ]{8,20}$/, 'Invalid phone number format'),
+  lineUserId: z.string().trim().min(1).max(100).optional(),
+  relationship: z.string().trim().min(1).max(50).optional(),
+}).strict()
+
+const parentUpdateSchema = parentSchema
+  .partial()
+  .refine((data) => Object.keys(data).length > 0, { message: 'At least one field is required' })
 
 const parentIdParamSchema = z.object({
   id: z.string().uuid('Invalid parent ID format'),
@@ -94,9 +98,9 @@ parentsRouter.post('/', zValidator('json', parentSchema), async (c) => {
 // LINE 綁定
 const lineBindSchema = z.object({
   studentId: z.string().uuid(),
-  lineUserId: z.string().min(1).max(100),
-  phone: z.string().regex(/^[0-9+\-() ]{8,20}$/, 'Invalid phone number format'),
-})
+  lineUserId: z.string().trim().min(1).max(100),
+  phone: z.string().trim().regex(/^[0-9+\-() ]{8,20}$/, 'Invalid phone number format'),
+}).strict()
 
 parentsRouter.post('/line-bind', zValidator('json', lineBindSchema), async (c) => {
   try {
@@ -158,7 +162,7 @@ parentsRouter.get('/:id', zValidator('param', parentIdParamSchema), async (c) =>
 parentsRouter.put(
   '/:id',
   zValidator('param', parentIdParamSchema),
-  zValidator('json', parentSchema.partial()),
+  zValidator('json', parentUpdateSchema),
   async (c) => {
   try {
     const { id } = c.req.valid('param')
