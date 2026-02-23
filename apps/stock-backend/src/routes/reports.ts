@@ -1,12 +1,20 @@
 import { Hono } from 'hono';
-import { and, desc, eq, gte, lte, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte, lt, sql } from 'drizzle-orm';
 import { db } from '../db/index';
 import { stockInventory, stockItems, stockPurchaseItems, stockPurchaseOrders, stockSuppliers, stockTransactions, stockWarehouses } from '../db/schema';
 import { authMiddleware } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
+import { z } from 'zod';
 
 const app = new Hono();
 app.use('*', authMiddleware, tenantMiddleware);
+const purchasesQuerySchema = z.object({
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+}).refine(
+  ({ from, to }) => !from || !to || from <= to,
+  { message: '`from` must be earlier than or equal to `to`' },
+);
 
 app.get('/low-stock', async (c) => {
   const tenantId = getTenantId(c);
@@ -139,15 +147,21 @@ app.get('/turnover', async (c) => {
 
 app.get('/purchases', async (c) => {
   const tenantId = getTenantId(c);
-  const from = c.req.query('from');
-  const to = c.req.query('to');
+  const parsedQuery = purchasesQuerySchema.safeParse({
+    from: c.req.query('from'),
+    to: c.req.query('to'),
+  });
+  if (!parsedQuery.success) {
+    return c.json({ error: 'Invalid query parameters' }, 400);
+  }
+  const { from, to } = parsedQuery.data;
 
   const conditions: Array<ReturnType<typeof eq> | ReturnType<typeof gte> | ReturnType<typeof lte>> = [
     eq(stockPurchaseOrders.tenantId, tenantId),
     eq(stockPurchaseOrders.status, 'received'),
   ];
-  if (from) conditions.push(gte(stockPurchaseOrders.orderDate, new Date(from)));
-  if (to) conditions.push(lte(stockPurchaseOrders.orderDate, new Date(to)));
+  if (from) conditions.push(gte(stockPurchaseOrders.orderDate, from));
+  if (to) conditions.push(lte(stockPurchaseOrders.orderDate, to));
 
   const orders = await db.select().from(stockPurchaseOrders).where(and(...conditions));
   const orderIds = orders.map((order) => order.id);
@@ -173,7 +187,7 @@ app.get('/purchases', async (c) => {
     })
       .from(stockPurchaseItems)
       .innerJoin(stockItems, eq(stockPurchaseItems.itemId, stockItems.id))
-      .where(sql`${stockPurchaseItems.purchaseOrderId} = ANY(${sql.raw(`'{${orderIds.join(',')}}'::uuid[]`)})`)
+      .where(inArray(stockPurchaseItems.purchaseOrderId, orderIds))
       .groupBy(stockPurchaseItems.itemId, stockItems.name),
   ]);
 
