@@ -72,9 +72,12 @@ class TelegramEventHandler implements EventHandler {
           continue
         }
 
-        // 4. 查詢用戶的 telegram_id
+        // 4. 查詢用戶的 telegram_id（限制在同一 tenant）
         const user = await db.query.users.findFirst({
-          where: eq(users.id, recipientId)
+          where: and(
+            eq(users.id, recipientId),
+            eq(users.tenantId, tenantId)
+          )
         })
 
         if (!user?.telegramId) {
