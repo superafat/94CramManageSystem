@@ -182,67 +182,71 @@ app.post('/transfer', async (c) => {
     return c.json({ error: 'Invalid input' }, 400);
   }
 
-  // Deduct from source atomically to prevent concurrent negative stock
-  const [sourceInventory] = await db.update(stockInventory)
-    .set({
-      quantity: sql`${stockInventory.quantity} - ${quantity}`,
-      lastUpdatedAt: new Date()
-    })
-    .where(and(
-      eq(stockInventory.tenantId, tenantId),
-      eq(stockInventory.warehouseId, fromWarehouseId),
-      eq(stockInventory.itemId, itemId),
-      gte(stockInventory.quantity, quantity)
-    ))
-    .returning();
+  const transferResult = await db.transaction(async (tx) => {
+    const [sourceInventory] = await tx.update(stockInventory)
+      .set({
+        quantity: sql`${stockInventory.quantity} - ${quantity}`,
+        lastUpdatedAt: new Date()
+      })
+      .where(and(
+        eq(stockInventory.tenantId, tenantId),
+        eq(stockInventory.warehouseId, fromWarehouseId),
+        eq(stockInventory.itemId, itemId),
+        gte(stockInventory.quantity, quantity)
+      ))
+      .returning();
 
-  if (!sourceInventory) {
+    if (!sourceInventory) {
+      return null;
+    }
+
+    await tx.insert(stockInventory).values({
+      tenantId,
+      warehouseId: toWarehouseId,
+      itemId,
+      quantity,
+      lastUpdatedAt: new Date()
+    }).onConflictDoUpdate({
+      target: [stockInventory.warehouseId, stockInventory.itemId],
+      set: {
+        quantity: sql`${stockInventory.quantity} + ${quantity}`,
+        lastUpdatedAt: new Date()
+      }
+    });
+
+    const transferId = crypto.randomUUID();
+    await tx.insert(stockTransactions).values({
+      tenantId,
+      warehouseId: fromWarehouseId,
+      itemId,
+      transactionType: 'transfer_out',
+      quantity: -quantity,
+      referenceId: transferId,
+      referenceType: 'transfer',
+      performedBy: 'system',
+      createdAt: new Date()
+    });
+
+    await tx.insert(stockTransactions).values({
+      tenantId,
+      warehouseId: toWarehouseId,
+      itemId,
+      transactionType: 'transfer_in',
+      quantity,
+      referenceId: transferId,
+      referenceType: 'transfer',
+      performedBy: 'system',
+      createdAt: new Date()
+    });
+
+    return { transferId };
+  });
+
+  if (!transferResult) {
     return c.json({ error: 'Insufficient stock at source warehouse' }, 400);
   }
 
-  // Add to destination with upsert to avoid concurrent duplicate insert/update races
-  await db.insert(stockInventory).values({
-    tenantId,
-    warehouseId: toWarehouseId,
-    itemId,
-    quantity,
-    lastUpdatedAt: new Date()
-  }).onConflictDoUpdate({
-    target: [stockInventory.warehouseId, stockInventory.itemId],
-    set: {
-      quantity: sql`${stockInventory.quantity} + ${quantity}`,
-      lastUpdatedAt: new Date()
-    }
-  });
-
-  // Record transactions
-  const transferId = crypto.randomUUID();
-  
-  await db.insert(stockTransactions).values({
-    tenantId,
-    warehouseId: fromWarehouseId,
-    itemId,
-    transactionType: 'transfer_out',
-    quantity: -quantity,
-    referenceId: transferId,
-    referenceType: 'transfer',
-    performedBy: 'system',
-    createdAt: new Date()
-  });
-
-  await db.insert(stockTransactions).values({
-    tenantId,
-    warehouseId: toWarehouseId,
-    itemId,
-    transactionType: 'transfer_in',
-    quantity,
-    referenceId: transferId,
-    referenceType: 'transfer',
-    performedBy: 'system',
-    createdAt: new Date()
-  });
-
-  return c.json({ message: 'Transfer completed', quantity, transferId });
+  return c.json({ message: 'Transfer completed', quantity, transferId: transferResult.transferId });
 });
 
 // GET transaction history
