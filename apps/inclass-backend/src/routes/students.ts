@@ -11,17 +11,6 @@ import type { Variables } from '../middleware/auth.js'
 
 const studentsRouter = new Hono<{ Variables: Variables }>()
 
-const parseBoundedIntQuery = (
-  rawValue: string | undefined,
-  fallback: number,
-  min: number,
-  max: number
-) => {
-  const parsed = Number.parseInt(rawValue ?? '', 10)
-  if (Number.isNaN(parsed)) return fallback
-  return Math.max(min, Math.min(max, parsed))
-}
-
 const isValidISODate = (value: string) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
   const parsed = new Date(`${value}T00:00:00.000Z`)
@@ -55,8 +44,8 @@ type StudentUpdatePayload = Partial<
 >
 
 const listStudentsQuerySchema = z.object({
-  page: z.string().regex(/^\d+$/).optional(),
-  limit: z.string().regex(/^\d+$/).optional(),
+  page: z.coerce.number().int().min(1).max(1000).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
 })
 
 const requireSchoolId = (schoolId: string | undefined) => {
@@ -68,9 +57,7 @@ studentsRouter.get('/', zValidator('query', listStudentsQuerySchema), async (c) 
   try {
     const schoolId = requireSchoolId(c.get('schoolId'))
     if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
-    const query = c.req.valid('query')
-    const page = parseBoundedIntQuery(query.page, 1, 1, 1000)
-    const limit = parseBoundedIntQuery(query.limit, 50, 1, 100)
+    const { page, limit } = c.req.valid('query')
     const offset = (page - 1) * limit
 
     const [countResult] = await db
