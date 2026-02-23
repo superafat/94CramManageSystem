@@ -223,7 +223,12 @@ app.put('/admin/users/:id/role', requireRole(Role.ADMIN),
           role: body.role,
           updatedAt: new Date(),
         })
-        .where(eq(users.id, userId))
+        .where(
+          and(
+            eq(users.id, userId),
+            eq(users.tenantId, currentUser.tenant_id)
+          )
+        )
         .returning({
           id: users.id,
           email: users.email,
@@ -280,7 +285,12 @@ app.delete('/admin/users/:id', requireRole(Role.ADMIN),
       
       // For now, assuming soft delete via updatedAt or a deleted_at field
       // If no deleted_at, do hard delete
-      await db.delete(users).where(eq(users.id, userId))
+      await db.delete(users).where(
+        and(
+          eq(users.id, userId),
+          eq(users.tenantId, currentUser.tenant_id)
+        )
+      )
       
       return success(c, { message: 'User deleted successfully' })
     } catch (error: any) {
@@ -355,7 +365,12 @@ app.put('/auth/password', zValidator('json', changePasswordSchema), async (c) =>
     const [dbUser] = await db
       .select()
       .from(users)
-      .where(eq(users.id, user.id))
+      .where(
+        and(
+          eq(users.id, user.id),
+          eq(users.tenantId, user.tenant_id)
+        )
+      )
       .limit(1)
     
     if (!dbUser || !dbUser.password) {
@@ -381,7 +396,12 @@ app.put('/auth/password', zValidator('json', changePasswordSchema), async (c) =>
         password: hashedPassword,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, user.id))
+      .where(
+        and(
+          eq(users.id, user.id),
+          eq(users.tenantId, user.tenant_id)
+        )
+      )
     
     return success(c, { message: 'Password changed successfully' })
   } catch (error: any) {
