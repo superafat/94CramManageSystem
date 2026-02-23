@@ -4,9 +4,37 @@ import { stockBarcodes, stockInventory, stockTransactions, stockItems, stockWare
 import { eq, and, desc, gte, sql } from 'drizzle-orm';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { sendLowStockAlert } from '../services/notifications';
+import { z } from 'zod';
 
 const app = new Hono();
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
+const positiveNumber = z.number().positive();
+const nonEmptyString = z.string().trim().min(1);
+const stockInSchema = z.object({
+  warehouseId: nonEmptyString,
+  itemId: nonEmptyString.optional(),
+  quantity: positiveNumber,
+  referenceId: z.string().optional(),
+  referenceType: z.string().optional(),
+  barcode: z.string().optional()
+});
+const stockOutSchema = z.object({
+  warehouseId: nonEmptyString,
+  itemId: nonEmptyString.optional(),
+  quantity: positiveNumber,
+  transactionType: z.string().optional(),
+  referenceId: z.string().optional(),
+  recipientName: z.string().optional(),
+  recipientNote: z.string().optional(),
+  barcode: z.string().optional()
+});
+const transferSchema = z.object({
+  fromWarehouseId: nonEmptyString,
+  toWarehouseId: nonEmptyString,
+  itemId: nonEmptyString,
+  quantity: positiveNumber,
+  notes: z.string().optional()
+});
 
 app.use('*', tenantMiddleware);
 
@@ -51,10 +79,13 @@ app.get('/', async (c) => {
 // POST stock in (purchase receipt)
 app.post('/in', async (c) => {
   const tenantId = getTenantId(c);
-  const body = await c.req.json();
-  
-  const { warehouseId, quantity, referenceId, referenceType, barcode } = body;
-  let itemId = body.itemId as string | undefined;
+  const parsedBody = stockInSchema.safeParse(await c.req.json());
+  if (!parsedBody.success) {
+    return c.json({ error: 'Invalid input' }, 400);
+  }
+
+  const { warehouseId, quantity, referenceId, referenceType, barcode } = parsedBody.data;
+  let itemId = parsedBody.data.itemId;
 
   if (!itemId && typeof barcode === 'string' && barcode.trim()) {
     const [barcodeRow] = await db.select().from(stockBarcodes).where(and(
@@ -64,7 +95,7 @@ app.post('/in', async (c) => {
     itemId = barcodeRow?.itemId;
   }
 
-  if (!warehouseId || !itemId || !quantity || quantity <= 0) {
+  if (!itemId) {
     return c.json({ error: 'Invalid input' }, 400);
   }
 
@@ -101,10 +132,13 @@ app.post('/in', async (c) => {
 // POST stock out (sale/issue)
 app.post('/out', async (c) => {
   const tenantId = getTenantId(c);
-  const body = await c.req.json();
-  
-  const { warehouseId, quantity, transactionType, referenceId, recipientName, recipientNote, barcode } = body;
-  let itemId = body.itemId as string | undefined;
+  const parsedBody = stockOutSchema.safeParse(await c.req.json());
+  if (!parsedBody.success) {
+    return c.json({ error: 'Invalid input' }, 400);
+  }
+
+  const { warehouseId, quantity, transactionType, referenceId, recipientName, recipientNote, barcode } = parsedBody.data;
+  let itemId = parsedBody.data.itemId;
 
   if (!itemId && typeof barcode === 'string' && barcode.trim()) {
     const [barcodeRow] = await db.select().from(stockBarcodes).where(and(
@@ -114,7 +148,7 @@ app.post('/out', async (c) => {
     itemId = barcodeRow?.itemId;
   }
 
-  if (!warehouseId || !itemId || !quantity || quantity <= 0) {
+  if (!itemId) {
     return c.json({ error: 'Invalid input' }, 400);
   }
 
@@ -163,13 +197,11 @@ app.post('/out', async (c) => {
 // POST transfer between warehouses
 app.post('/transfer', async (c) => {
   const tenantId = getTenantId(c);
-  const body = await c.req.json();
-  
-  const { fromWarehouseId, toWarehouseId, itemId, quantity, notes } = body;
-
-  if (!fromWarehouseId || !toWarehouseId || !itemId || !quantity || quantity <= 0) {
+  const parsedBody = transferSchema.safeParse(await c.req.json());
+  if (!parsedBody.success) {
     return c.json({ error: 'Invalid input' }, 400);
   }
+  const { fromWarehouseId, toWarehouseId, itemId, quantity, notes } = parsedBody.data;
 
   const transferResult = await db.transaction(async (tx) => {
     const [sourceInventory] = await tx.update(stockInventory)
