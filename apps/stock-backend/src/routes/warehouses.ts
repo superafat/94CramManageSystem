@@ -10,7 +10,7 @@ const uuidParamSchema = z.object({ id: z.string().uuid() });
 const warehouseCreateSchema = z.object({
   name: z.string().trim().min(1),
   code: z.string().trim().min(1),
-  address: z.string().optional(),
+  address: z.string().trim().min(1).optional(),
   isHeadquarters: z.boolean().optional(),
 }).strict();
 const warehouseUpdateSchema = warehouseCreateSchema.partial().refine(
@@ -89,14 +89,20 @@ app.put('/:id', async (c) => {
   }
   const { id } = parsedParams.data;
   const body = parsedBody.data;
+  const updateData: {
+    name?: string;
+    code?: string;
+    address?: string;
+    isHeadquarters?: boolean;
+  } = {};
+
+  if ('name' in body) updateData.name = body.name;
+  if ('code' in body) updateData.code = body.code;
+  if ('address' in body) updateData.address = body.address;
+  if ('isHeadquarters' in body) updateData.isHeadquarters = body.isHeadquarters;
 
   const [warehouse] = await db.update(stockWarehouses)
-    .set({
-      name: body.name,
-      code: body.code,
-      address: body.address,
-      isHeadquarters: body.isHeadquarters,
-    })
+    .set(updateData)
     .where(and(
       eq(stockWarehouses.id, id),
       eq(stockWarehouses.tenantId, tenantId),
