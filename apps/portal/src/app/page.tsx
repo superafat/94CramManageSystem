@@ -1,5 +1,7 @@
 import { SystemCard } from '@/components/SystemCard';
 
+export const dynamic = 'force-dynamic';
+
 const systems = [
   {
     key: 'manage',
