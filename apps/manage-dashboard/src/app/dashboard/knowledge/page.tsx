@@ -120,8 +120,72 @@ export default function KnowledgePage() {
         </p>
       )}
 
+      {/* Loading State */}
+      {searching && (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-surface rounded-2xl border border-border p-5 animate-pulse">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-5 w-20 bg-surface-hover rounded" />
+                <div className="h-5 w-16 bg-surface-hover rounded" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 w-full bg-surface-hover rounded" />
+                <div className="h-3 w-4/5 bg-surface-hover rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Empty State - No search yet */}
+      {!searching && results.length === 0 && !message && (
+        <div className="bg-surface rounded-2xl border border-border p-12 text-center">
+          <div className="text-5xl mb-4">📚</div>
+          <h3 className="text-lg font-medium text-text mb-2">搜尋知識庫</h3>
+          <p className="text-sm text-text-muted mb-4">輸入關鍵字，AI 會幫您找到相關資料</p>
+          <div className="flex items-center justify-center gap-3 text-xs text-text-muted">
+            <span>🔍 語意搜尋</span>
+            <span>•</span>
+            <span>⚡ 毫秒回應</span>
+            <span>•</span>
+            <span>🧠 智慧理解</span>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State - No results found */}
+      {!searching && results.length === 0 && message === '找不到相關資料' && (
+        <div className="bg-surface rounded-2xl border border-border p-12 text-center">
+          <div className="text-5xl mb-4">🔍</div>
+          <h3 className="text-lg font-medium text-text mb-2">找不到相關資料</h3>
+          <p className="text-sm text-text-muted mb-4">試試其他關鍵字，或新增知識到資料庫</p>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="px-4 py-2 bg-primary text-white rounded-xl text-sm hover:bg-primary-hover transition-colors"
+          >
+            + 新增知識
+          </button>
+        </div>
+      )}
+
+      {/* Error State */}
+      {!searching && message === '搜尋失敗' && (
+        <div className="bg-surface rounded-2xl border border-border p-12 text-center">
+          <div className="text-5xl mb-4">😵</div>
+          <h3 className="text-lg font-medium text-text mb-2">搜尋失敗</h3>
+          <p className="text-sm text-text-muted mb-4">請檢查網路連線或稍後再試</p>
+          <button
+            onClick={handleSearch}
+            className="px-4 py-2 bg-primary text-white rounded-xl text-sm hover:bg-primary-hover transition-colors"
+          >
+            重試
+          </button>
+        </div>
+      )}
+
       {/* Search Results */}
-      {results.length > 0 && (
+      {!searching && results.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-text-muted">搜尋結果（{results.length} 筆）</h3>
           {results.map((source, i) => (
