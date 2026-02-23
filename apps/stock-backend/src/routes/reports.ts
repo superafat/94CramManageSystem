@@ -58,7 +58,7 @@ app.get('/reorder-suggestions', async (c) => {
   }).from(stockInventory)
     .innerJoin(stockItems, eq(stockInventory.itemId, stockItems.id))
     .innerJoin(stockWarehouses, eq(stockInventory.warehouseId, stockWarehouses.id))
-    .where(and(eq(stockInventory.tenantId, tenantId), lte(stockInventory.quantity, stockItems.safetyStock)));
+    .where(and(eq(stockInventory.tenantId, tenantId), lte(stockInventory.quantity, sql<number>`COALESCE(${stockItems.safetyStock}, 0)`)));
 
   return c.json(rows.map((row) => ({
     item: row.item,
