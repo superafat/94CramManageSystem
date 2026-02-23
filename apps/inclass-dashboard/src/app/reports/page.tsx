@@ -98,8 +98,20 @@ export default function AttendanceReportPage() {
     URL.revokeObjectURL(url)
   }
 
+  const isEmptyReport =
+    !!report &&
+    report.studentStats.length === 0 &&
+    Object.keys(report.dailyStats).length === 0 &&
+    report.summary.totalAttendances === 0
+
   if (loading) {
-    return <div style={{ padding: '20px', textAlign: 'center' }}>載入中...</div>
+    return (
+      <main style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+        <h1 style={{ fontSize: '22px', color: 'var(--primary)', marginBottom: '8px' }}>📊 出勤報表</h1>
+        <div style={{ marginBottom: '8px' }}>載入中...</div>
+        <div style={{ fontSize: '13px' }}>正在整理本月出勤資料</div>
+      </main>
+    )
   }
 
   if (error) {
@@ -116,10 +128,27 @@ export default function AttendanceReportPage() {
     )
   }
 
-  if (!report) {
+  if (!report || isEmptyReport) {
     return (
-      <main style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-        目前沒有可顯示的報表資料
+      <main style={{ padding: '20px', textAlign: 'center', color: 'var(--text-primary)' }}>
+        <h1 style={{ fontSize: '22px', color: 'var(--primary)', marginBottom: '8px' }}>📊 出勤報表</h1>
+        <div style={{ color: 'var(--text-secondary)', marginBottom: '12px' }}>
+          目前沒有可顯示的報表資料，完成點名後即可查看統計
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            onClick={fetchReport}
+            style={{ padding: '8px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--primary)', color: 'white', border: 'none', fontSize: '13px', cursor: 'pointer' }}
+          >
+            重新載入
+          </button>
+          <button
+            onClick={() => router.push('/main')}
+            style={{ padding: '8px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)', fontSize: '13px', cursor: 'pointer' }}
+          >
+            前往主控台
+          </button>
+        </div>
       </main>
     )
   }
