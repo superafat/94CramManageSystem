@@ -92,11 +92,15 @@ w8Routes.get('/teachers', requirePermission(Permission.SCHEDULE_READ), zValidato
 w8Routes.get('/teachers/:id', requirePermission(Permission.SCHEDULE_READ), zValidator('param', z.object({ id: uuidSchema })), async (c) => {
   try {
     const { id } = c.req.valid('param')
+    const user = c.get('user')
+    if (!user?.tenant_id) {
+      return badRequest(c, 'Missing tenant context')
+    }
     const result = await db.execute(sql`
       SELECT t.*, u.username, u.email
       FROM teachers t
       LEFT JOIN users u ON t.user_id = u.id
-      WHERE t.id = ${id}
+      WHERE t.id = ${id} AND t.tenant_id = ${user.tenant_id}
     `)
     
     const teacher = first(result)
