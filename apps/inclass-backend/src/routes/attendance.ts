@@ -32,13 +32,14 @@ attendanceRouter.post('/checkin', zValidator('json', checkinSchema), async (c) =
 
     let student: typeof students.$inferSelect | undefined
     if (body.studentId) {
-      [student] = await db.select().from(students).where(eq(students.id, body.studentId))
+      [student] = await db.select().from(students)
+        .where(and(eq(students.id, body.studentId), eq(students.schoolId, schoolId)))
     } else if (body.nfcId) {
-      [student] = await db.select().from(students).where(eq(students.nfcId, body.nfcId))
+      [student] = await db.select().from(students)
+        .where(and(eq(students.nfcId, body.nfcId), eq(students.schoolId, schoolId)))
     }
 
     if (!student) return c.json({ error: 'Student not found' }, 404)
-    if (student.schoolId !== schoolId) return c.json({ error: 'Student not found' }, 404)
 
     const [existingRecord] = await db.select().from(attendances)
       .where(and(eq(attendances.studentId, student.id), eq(attendances.date, today)))
