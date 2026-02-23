@@ -41,6 +41,13 @@ const studentIdParamSchema = z.object({
   id: z.string().uuid('Invalid student ID format'),
 })
 
+type StudentUpdatePayload = Partial<
+  Pick<
+    typeof students.$inferInsert,
+    'name' | 'classId' | 'nfcId' | 'birthDate' | 'schoolName' | 'grade' | 'notes'
+  >
+>
+
 const listStudentsQuerySchema = z.object({
   page: z.string().regex(/^\d+$/).optional(),
   limit: z.string().regex(/^\d+$/).optional(),
@@ -183,13 +190,18 @@ studentsRouter.put(
       }
     }
 
+    const updateData: StudentUpdatePayload = {}
+    if (body.name !== undefined) updateData.name = body.name
+    if (body.classId !== undefined) updateData.classId = body.classId
+    if (body.nfcId !== undefined) updateData.nfcId = body.nfcId
+    if (body.birthDate !== undefined) updateData.birthDate = body.birthDate
+    if (body.schoolName !== undefined) updateData.schoolName = body.schoolName
+    if (body.grade !== undefined) updateData.grade = body.grade
+    if (body.notes !== undefined) updateData.notes = body.notes
+
     const [updated] = await db
       .update(students)
-      .set(
-        Object.fromEntries(
-          Object.entries(body).filter(([, value]) => value !== undefined)
-        )
-      )
+      .set(updateData)
       .where(and(eq(students.id, id), eq(students.schoolId, schoolId)))
       .returning()
     return c.json({ success: true, student: updated })
