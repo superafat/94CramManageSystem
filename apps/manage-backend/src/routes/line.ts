@@ -253,16 +253,18 @@ async function processBinding(lineUserId: string, studentName: string, phoneLast
     // 檢查此 LINE ID 是否已綁定
     const existingBinding = await db.select()
       .from(users)
-      .where(
-        and(
-          eq(users.tenantId, DEFAULT_TENANT_ID),
-          eq(users.lineUserId, lineUserId)
-        )
-      )
+      .where(eq(users.lineUserId, lineUserId))
       .limit(1)
     
     if (existingBinding.length > 0) {
       const boundUser = existingBinding[0]
+      if (boundUser.tenantId !== DEFAULT_TENANT_ID) {
+        console.warn('[LINE Binding] lineUserId bound to another tenant:', boundUser.tenantId)
+        return {
+          success: false,
+          message: '此 LINE 帳號已綁定其他補習班，請聯繫客服協助'
+        }
+      }
       return { 
         success: false, 
         message: `你已經綁定帳號 ${boundUser.name} 囉！如需更換請聯繫客服` 
