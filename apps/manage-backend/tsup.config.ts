@@ -7,6 +7,7 @@ export default defineConfig({
   outDir: 'dist',
   clean: true,
   sourcemap: true,
-  // Bundle everything (including npm packages) for zero-dependency production
-  noExternal: [/.*/],
+  // Bundle @94cram packages, keep dotenv and other ESM-problematic deps external
+  noExternal: [/^@94cram\//],
+  external: [/^(?:dotenv|.*\/dotenv)$/],
 });
