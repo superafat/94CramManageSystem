@@ -182,4 +182,8 @@ const serve = async () => {
   serve({ port, fetch: app.fetch })
   console.log(`✅ BeeClass Backend running at http://localhost:${port}`)
 }
-serve()
+
+serve().catch((error) => {
+  console.error('[Startup] Failed to start BeeClass Backend:', error)
+  process.exit(1)
+})
