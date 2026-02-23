@@ -57,7 +57,13 @@ app.get('/:id', async (c) => {
 // POST create warehouse
 app.post('/', async (c) => {
   const tenantId = getTenantId(c);
-  const parsedBody = warehouseCreateSchema.safeParse(await c.req.json());
+  let requestBody: unknown;
+  try {
+    requestBody = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+  const parsedBody = warehouseCreateSchema.safeParse(requestBody);
   if (!parsedBody.success) {
     return c.json({ error: 'Invalid input' }, 400);
   }
@@ -83,7 +89,13 @@ app.put('/:id', async (c) => {
   if (!parsedParams.success) {
     return c.json({ error: 'Invalid warehouse id' }, 400);
   }
-  const parsedBody = warehouseUpdateSchema.safeParse(await c.req.json());
+  let requestBody: unknown;
+  try {
+    requestBody = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+  const parsedBody = warehouseUpdateSchema.safeParse(requestBody);
   if (!parsedBody.success) {
     return c.json({ error: 'Invalid input' }, 400);
   }
