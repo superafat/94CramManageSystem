@@ -1,8 +1,49 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { BackButton } from '@/components/ui/BackButton'
 
+interface SettingsData {
+  aiMode: string
+  aiEngine: string
+  searchThreshold: number
+  maxResults: number
+  telegramToken: string
+  defaultBranchId: string
+}
+
 export default function SettingsPage() {
+  const [settings, setSettings] = useState<SettingsData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // TODO: 後端尚未提供 settings API
+    // 等待後端實作：GET /api/admin/settings?tenantId=xxx&branchId=xxx
+    const loadSettings = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 800))
+        // Demo data
+        setSettings({
+          aiMode: '標準模式（推薦）',
+          aiEngine: '蜂神榜 AI（預設）',
+          searchThreshold: 0.7,
+          maxResults: 3,
+          telegramToken: '',
+          defaultBranchId: 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d',
+        })
+      } catch (err) {
+        setError('載入設定失敗')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadSettings()
+  }, [])
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -13,6 +54,59 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Loading State */}
+      {isLoading && (
+        <div className="space-y-6">
+          <div className="bg-surface rounded-2xl border border-border p-6 space-y-4 animate-pulse">
+            <div className="h-6 w-32 bg-surface-hover rounded" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="space-y-2">
+                  <div className="h-4 w-24 bg-surface-hover rounded" />
+                  <div className="h-10 w-full bg-surface-hover rounded-xl" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-surface rounded-2xl border border-border p-6 animate-pulse">
+            <div className="h-6 w-24 bg-surface-hover rounded mb-4" />
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-12 w-full bg-surface-hover rounded" />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && !isLoading && (
+        <div className="bg-surface rounded-2xl border border-border p-12 text-center">
+          <div className="text-5xl mb-4">😵</div>
+          <h3 className="text-lg font-medium text-text mb-2">{error}</h3>
+          <p className="text-sm text-text-muted mb-4">請檢查網路連線或稍後再試</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-white rounded-xl text-sm hover:bg-primary-hover transition-colors"
+          >
+            重新載入
+          </button>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && !error && !settings && (
+        <div className="bg-surface rounded-2xl border border-border p-12 text-center">
+          <div className="text-5xl mb-4">⚙️</div>
+          <h3 className="text-lg font-medium text-text mb-2">尚未設定</h3>
+          <p className="text-sm text-text-muted">請先完成系統初始化設定</p>
+        </div>
+      )}
+
+      {/* Content */}
+      {!isLoading && !error && settings && (
+        <>
+
       {/* AI Engine Config */}
       <div className="bg-surface rounded-2xl border border-border p-6 space-y-4">
         <h2 className="text-lg font-semibold text-text">蜂神榜 AI 設定</h2>
@@ -20,7 +114,11 @@ export default function SettingsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm text-text-muted mb-1">AI 回覆模式</label>
-            <select className="w-full px-4 py-2 rounded-xl border border-border bg-background text-text">
+            <select
+              value={settings.aiMode}
+              onChange={(e) => setSettings({ ...settings, aiMode: e.target.value })}
+              className="w-full px-4 py-2 rounded-xl border border-border bg-background text-text"
+            >
               <option>標準模式（推薦）</option>
               <option>快速模式（省流量）</option>
               <option>精準模式（高品質）</option>
@@ -28,7 +126,11 @@ export default function SettingsPage() {
           </div>
           <div>
             <label className="block text-sm text-text-muted mb-1">智慧理解引擎</label>
-            <select className="w-full px-4 py-2 rounded-xl border border-border bg-background text-text">
+            <select
+              value={settings.aiEngine}
+              onChange={(e) => setSettings({ ...settings, aiEngine: e.target.value })}
+              className="w-full px-4 py-2 rounded-xl border border-border bg-background text-text"
+            >
               <option>蜂神榜 AI（預設）</option>
             </select>
           </div>
@@ -36,7 +138,8 @@ export default function SettingsPage() {
             <label className="block text-sm text-text-muted mb-1">搜尋精準度（越高越嚴格）</label>
             <input
               type="number"
-              defaultValue={0.7}
+              value={settings.searchThreshold}
+              onChange={(e) => setSettings({ ...settings, searchThreshold: parseFloat(e.target.value) })}
               step={0.05}
               min={0}
               max={1}
@@ -47,7 +150,8 @@ export default function SettingsPage() {
             <label className="block text-sm text-text-muted mb-1">每次搜尋最多顯示幾筆</label>
             <input
               type="number"
-              defaultValue={3}
+              value={settings.maxResults}
+              onChange={(e) => setSettings({ ...settings, maxResults: parseInt(e.target.value) })}
               min={1}
               max={10}
               className="w-full px-4 py-2 rounded-xl border border-border bg-background text-text"
@@ -104,6 +208,8 @@ export default function SettingsPage() {
           <label className="block text-sm text-text-muted mb-1">Bot Token</label>
           <input
             type="password"
+            value={settings.telegramToken}
+            onChange={(e) => setSettings({ ...settings, telegramToken: e.target.value })}
             placeholder="輸入 Telegram Bot Token..."
             className="w-full px-4 py-2 rounded-xl border border-border bg-background text-text"
           />
@@ -112,7 +218,8 @@ export default function SettingsPage() {
           <label className="block text-sm text-text-muted mb-1">預設分校 ID</label>
           <input
             type="text"
-            defaultValue="a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d"
+            value={settings.defaultBranchId}
+            onChange={(e) => setSettings({ ...settings, defaultBranchId: e.target.value })}
             className="w-full px-4 py-2 rounded-xl border border-border bg-background text-text font-mono text-xs"
           />
         </div>
@@ -120,6 +227,8 @@ export default function SettingsPage() {
           儲存設定
         </button>
       </div>
+      </>
+      )}
     </div>
   )
 }
