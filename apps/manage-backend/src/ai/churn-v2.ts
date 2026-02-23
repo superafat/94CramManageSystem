@@ -72,12 +72,14 @@ export function getTimeWindows(): TimeWindow {
  */
 async function getAttendanceData(
   studentId: string,
+  tenantId: string,
   windows: TimeWindow
 ): Promise<AttendanceData> {
   // 近 2 週的出席記錄
   const recentAttendances = await db.attendance.findMany({
     where: {
       studentId,
+      tenantId,
       date: { gte: windows.recent },
     },
   });
@@ -86,6 +88,7 @@ async function getAttendanceData(
   const baselineAttendances = await db.attendance.findMany({
     where: {
       studentId,
+      tenantId,
       date: { gte: windows.baseline },
     },
   });
@@ -126,11 +129,13 @@ async function getAttendanceData(
  */
 async function getGradeData(
   studentId: string,
+  tenantId: string,
   windows: TimeWindow
 ): Promise<GradeData> {
   const recentGrades = await db.grade.findMany({
     where: {
       studentId,
+      tenantId,
       date: { gte: windows.recent },
     },
   });
@@ -138,6 +143,7 @@ async function getGradeData(
   const baselineGrades = await db.grade.findMany({
     where: {
       studentId,
+      tenantId,
       date: { gte: windows.baseline, lt: windows.recent },
     },
   });
@@ -166,11 +172,12 @@ async function getGradeData(
 /**
  * 收集繳費資料
  */
-async function getPaymentData(studentId: string): Promise<PaymentData> {
+async function getPaymentData(studentId: string, tenantId: string): Promise<PaymentData> {
   const now = new Date();
   const overduePayments = await db.payment.findMany({
     where: {
       studentId,
+      tenantId,
       status: 'overdue',
     },
     orderBy: { dueDate: 'desc' },
@@ -192,11 +199,13 @@ async function getPaymentData(studentId: string): Promise<PaymentData> {
  */
 async function getInteractionData(
   studentId: string,
+  tenantId: string,
   windows: TimeWindow
 ): Promise<InteractionData> {
   const recentInteractions = await db.interaction.findMany({
     where: {
       studentId,
+      tenantId,
       date: { gte: windows.recent },
     },
   });
@@ -204,6 +213,7 @@ async function getInteractionData(
   const baselineInteractions = await db.interaction.findMany({
     where: {
       studentId,
+      tenantId,
       date: { gte: windows.baseline },
     },
   });
@@ -444,14 +454,29 @@ export async function calculateChurnRisk(
   studentId: string,
   studentName: string
 ): Promise<ChurnRiskScore> {
+  const student = await db.student.findUnique({
+    where: { id: studentId },
+    select: { tenantId: true },
+  });
+  if (!student) {
+    throw new Error(`Student not found: ${studentId}`);
+  }
+  return calculateChurnRiskWithTenant(studentId, studentName, student.tenantId);
+}
+
+async function calculateChurnRiskWithTenant(
+  studentId: string,
+  studentName: string,
+  tenantId: string
+): Promise<ChurnRiskScore> {
   const windows = getTimeWindows();
 
   // 收集所有維度資料
   const [attendanceData, gradeData, paymentData, interactionData] = await Promise.all([
-    getAttendanceData(studentId, windows),
-    getGradeData(studentId, windows),
-    getPaymentData(studentId),
-    getInteractionData(studentId, windows),
+    getAttendanceData(studentId, tenantId, windows),
+    getGradeData(studentId, tenantId, windows),
+    getPaymentData(studentId, tenantId),
+    getInteractionData(studentId, tenantId, windows),
   ]);
 
   // 計算各維度分數
@@ -499,12 +524,18 @@ export async function calculateBranchChurnRisks(
     select: {
       id: true,
       name: true,
+      tenantId: true,
     },
   });
 
+  const tenantIds = new Set(students.map(student => student.tenantId));
+  if (tenantIds.size > 1) {
+    throw new Error(`Cross-tenant branch scope detected for branch ${branchId}`);
+  }
+
   // 並行計算所有學生風險
   const risks = await Promise.all(
-    students.map(student => calculateChurnRisk(student.id, student.name))
+    students.map(student => calculateChurnRiskWithTenant(student.id, student.name, student.tenantId))
   );
 
   // 依風險分數排序（高到低）
