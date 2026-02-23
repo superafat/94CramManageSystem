@@ -20,6 +20,7 @@ interface StockItem {
 export default function ItemsPage() {
   const [items, setItems] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<StockItem | undefined>();
   const [searchTerm, setSearchTerm] = useState('');
@@ -31,10 +32,12 @@ export default function ItemsPage() {
   const fetchItems = async () => {
     try {
       setLoading(true);
+      setError(null);
       const res = await api.get('/items');
       setItems(res.data);
     } catch (error) {
       console.error('Failed to fetch items', error);
+      setError('載入品項資料失敗');
       toast.error('無法載入資料');
     } finally {
       setLoading(false);
@@ -109,7 +112,53 @@ export default function ItemsPage() {
         </div>
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <div className="bg-white shadow-sm border border-gray-100 rounded-lg p-8 text-center">
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-[#8FA895] mb-3"></div>
+          <p className="text-sm text-gray-500">載入品項資料中...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {!loading && error && (
+        <div className="bg-white shadow-sm border border-gray-100 rounded-lg p-12 text-center">
+          <div className="text-5xl mb-4">😵</div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">{error}</h3>
+          <p className="text-sm text-gray-500 mb-4">請檢查網路連線或稍後再試</p>
+          <button
+            onClick={fetchItems}
+            className="px-4 py-2 bg-[#8FA895] text-white rounded hover:bg-[#7a9280] transition-colors"
+          >
+            重新載入
+          </button>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && !error && filteredItems.length === 0 && (
+        <div className="bg-white shadow-sm border border-gray-100 rounded-lg p-12 text-center">
+          <div className="text-5xl mb-4">📦</div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            {searchTerm ? '找不到符合條件的品項' : '尚未建立任何品項'}
+          </h3>
+          <p className="text-sm text-gray-500 mb-4">
+            {searchTerm ? '試試其他關鍵字' : '點擊「新增品項」建立第一個品項'}
+          </p>
+          {!searchTerm && (
+            <button
+              onClick={handleCreate}
+              className="inline-flex items-center px-4 py-2 bg-[#8FA895] text-white rounded hover:bg-[#7a9280] transition-colors"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              新增品項
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Data Table */}
+      {!loading && !error && filteredItems.length > 0 && (
       <div className="bg-white shadow-sm border border-gray-100 rounded-lg overflow-hidden flex-1">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -124,20 +173,8 @@ export default function ItemsPage() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {loading ? (
-              <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-500">
-                  載入中...
-                </td>
-              </tr>
-            ) : filteredItems.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-500">
-                  {searchTerm ? '找不到符合條件的品項' : '目前沒有任何品項，點擊「新增品項」開始建立。'}
-                </td>
-              </tr>
-            ) : (
-              filteredItems.map((item) => (
+            {(
+            filteredItems.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.sku || '-'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{item.name}</td>
@@ -177,6 +214,7 @@ export default function ItemsPage() {
           </tbody>
         </table>
       </div>
+      )}
 
       <ItemFormModal 
         isOpen={isModalOpen}
