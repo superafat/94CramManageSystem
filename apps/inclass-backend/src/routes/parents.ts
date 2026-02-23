@@ -7,7 +7,6 @@ import { zValidator } from '@hono/zod-validator'
 import { db } from '../db/index.js'
 import { parents, students } from '../db/schema.js'
 import { eq, and } from 'drizzle-orm'
-import { isValidUUID } from '../utils/date.js'
 import type { Variables } from '../middleware/auth.js'
 
 const parentsRouter = new Hono<{ Variables: Variables }>()
@@ -20,9 +19,18 @@ const parentSchema = z.object({
   relationship: z.string().max(50).optional(),
 })
 
+const parentIdParamSchema = z.object({
+  id: z.string().uuid('Invalid parent ID format'),
+})
+
+const requireSchoolId = (schoolId: string | undefined) => {
+  return typeof schoolId === 'string' && schoolId.trim().length > 0 ? schoolId : null
+}
+
 parentsRouter.get('/', async (c) => {
   try {
-    const schoolId = c.get('schoolId')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
     const filteredParents = await db
       .select({
         id: parents.id,
@@ -48,7 +56,8 @@ parentsRouter.get('/', async (c) => {
 parentsRouter.post('/', zValidator('json', parentSchema), async (c) => {
   try {
     const body = c.req.valid('json')
-    const schoolId = c.get('schoolId')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
 
     const [student] = await db.select().from(students).where(eq(students.id, body.studentId))
     if (!student || student.schoolId !== schoolId) {
@@ -80,7 +89,8 @@ const lineBindSchema = z.object({
 parentsRouter.post('/line-bind', zValidator('json', lineBindSchema), async (c) => {
   try {
     const body = c.req.valid('json')
-    const schoolId = c.get('schoolId')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
 
     const [student] = await db.select().from(students).where(eq(students.id, body.studentId))
     if (!student || student.schoolId !== schoolId) {
@@ -114,11 +124,11 @@ parentsRouter.post('/line-bind', zValidator('json', lineBindSchema), async (c) =
   }
 })
 
-parentsRouter.get('/:id', async (c) => {
+parentsRouter.get('/:id', zValidator('param', parentIdParamSchema), async (c) => {
   try {
-    const id = c.req.param('id')
-    const schoolId = c.get('schoolId')
-    if (!isValidUUID(id)) return c.json({ error: 'Invalid parent ID format' }, 400)
+    const { id } = c.req.valid('param')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
 
     const [parent] = await db.select().from(parents).where(eq(parents.id, id))
     if (!parent) return c.json({ error: 'Parent not found' }, 404)
@@ -133,12 +143,16 @@ parentsRouter.get('/:id', async (c) => {
   }
 })
 
-parentsRouter.put('/:id', zValidator('json', parentSchema.partial()), async (c) => {
+parentsRouter.put(
+  '/:id',
+  zValidator('param', parentIdParamSchema),
+  zValidator('json', parentSchema.partial()),
+  async (c) => {
   try {
-    const id = c.req.param('id')
-    const schoolId = c.get('schoolId')
+    const { id } = c.req.valid('param')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
     const body = c.req.valid('json')
-    if (!isValidUUID(id)) return c.json({ error: 'Invalid parent ID format' }, 400)
 
     const [parent] = await db.select().from(parents).where(eq(parents.id, id))
     if (!parent) return c.json({ error: 'Parent not found' }, 404)
@@ -168,11 +182,11 @@ parentsRouter.put('/:id', zValidator('json', parentSchema.partial()), async (c) 
   }
 })
 
-parentsRouter.delete('/:id', async (c) => {
+parentsRouter.delete('/:id', zValidator('param', parentIdParamSchema), async (c) => {
   try {
-    const id = c.req.param('id')
-    const schoolId = c.get('schoolId')
-    if (!isValidUUID(id)) return c.json({ error: 'Invalid parent ID format' }, 400)
+    const { id } = c.req.valid('param')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
 
     const [parent] = await db.select().from(parents).where(eq(parents.id, id))
     if (!parent) return c.json({ error: 'Parent not found' }, 404)
