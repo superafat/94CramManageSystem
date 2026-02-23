@@ -320,6 +320,20 @@ async function processBinding(lineUserId: string, studentName: string, phoneLast
   }
 }
 
+async function findCrossTenantBinding(lineUserId: string): Promise<string | null> {
+  const rows = await db.select({ tenantId: users.tenantId })
+    .from(users)
+    .where(
+      and(
+        eq(users.lineUserId, lineUserId),
+        sql`${users.tenantId} <> ${DEFAULT_TENANT_ID}`
+      )
+    )
+    .limit(1)
+
+  return rows[0]?.tenantId ?? null
+}
+
 /**
  * 從 DB 撈最近對話歷史（同一個 LINE user）
  * 
@@ -574,6 +588,19 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
     console.error('[LINE] Missing or invalid replyToken')
     return
   }
+
+  const crossTenantId = await findCrossTenantBinding(lineUserId)
+  if (crossTenantId) {
+    console.warn('[LINE] lineUserId bound to another tenant:', crossTenantId)
+    try {
+      await sendLineReplyMessage(replyToken, [
+        { type: 'text', text: '此 LINE 帳號已綁定其他補習班，請聯繫客服協助' }
+      ])
+    } catch (e: any) {
+      console.error('[LINE] Failed to send cross-tenant message:', e.message)
+    }
+    return
+  }
   
   const messageText = (event.message.text || '').trim()
   
@@ -792,6 +819,19 @@ async function handleFollowEvent(event: LineEvent): Promise<void> {
   }
   
   try {
+    const crossTenantId = await findCrossTenantBinding(userId)
+    if (crossTenantId) {
+      console.warn('[LINE] lineUserId bound to another tenant in follow:', crossTenantId)
+      try {
+        await sendLineReplyMessage(replyToken, [
+          { type: 'text', text: '此 LINE 帳號已綁定其他補習班，請聯繫客服協助' }
+        ])
+      } catch (e: any) {
+        console.error('[LINE] Failed to send cross-tenant follow message:', e.message)
+      }
+      return
+    }
+
     let name = ''
     try {
       const profileResult = await getLineProfile(userId)
