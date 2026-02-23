@@ -7,7 +7,7 @@ import { zValidator } from '@hono/zod-validator'
 import { db } from '../db/index.js'
 import { students, classes, teachers, schedules, attendances, parents, notifications, payments, exams, examScores, auditLogs } from '../db/schema.js'
 import { eq, sql, and, inArray } from 'drizzle-orm'
-import { getTodayTW, getThisMonthTW } from '../utils/date.js'
+import { getTodayTW, getThisMonthTW, isValidUUID } from '../utils/date.js'
 import type { Variables } from '../middleware/auth.js'
 
 const miscRouter = new Hono<{ Variables: Variables }>()
@@ -300,6 +300,9 @@ miscRouter.get('/alerts', async (c) => {
 miscRouter.post('/alerts/:id/confirm', async (c) => {
   const schoolId = c.get('schoolId')
   const alertId = c.req.param('id')
+  if (!isValidUUID(alertId)) {
+    return c.json({ error: 'Invalid alert ID format' }, 400)
+  }
   try {
     await db.update(auditLogs)
       .set({ alertConfirmedAt: new Date() })
