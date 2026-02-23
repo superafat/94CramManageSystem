@@ -1,5 +1,5 @@
 // src/routes/enrollment.ts - 招生 API
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
@@ -10,6 +10,7 @@ import type { RBACVariables } from '../middleware/rbac';
 
 interface Lead {
   id: number;
+  tenant_id: string;
   name: string;
   phone: string;
   student_name: string;
@@ -75,6 +76,13 @@ const toIntInRange = (input: string | undefined, min: number, max: number, def: 
   if (!Number.isFinite(n) || n < min || n > max) return def;
   return n;
 };
+const toPercentage = (num: number, den: number) => den > 0 ? Math.round((num / den) * 100) : 0;
+const getTenantId = (c: Context<{ Variables: RBACVariables }>): string | null => {
+  const user = c.get('user');
+  if (!user?.tenant_id || typeof user.tenant_id !== 'string' || user.tenant_id.trim().length === 0) return null;
+  return user.tenant_id;
+};
+const tenantLeads = (tenantId: string) => mockLeads.filter((lead) => lead.tenant_id === tenantId);
 
 // ==================== 路由設定 ====================
 
@@ -91,6 +99,7 @@ enrollment.use('/*', authMiddleware);
 let mockLeads: Lead[] = [
   {
     id: 1,
+    tenant_id: 'demo-tenant',
     name: '王小明',
     phone: '0912345678',
     student_name: '王大寶',
@@ -104,6 +113,7 @@ let mockLeads: Lead[] = [
   },
   {
     id: 2,
+    tenant_id: 'demo-tenant',
     name: '李美華',
     phone: '0923456789',
     student_name: '李小花',
@@ -123,6 +133,8 @@ let mockLeads: Lead[] = [
  */
 enrollment.get('/funnel', async (c) => {
   try {
+    const currentTenantId = getTenantId(c);
+    if (!currentTenantId) return c.json({ success: false, error: 'Missing tenant context' }, 400);
     const { period } = c.req.query();
     const per: Period = period && (validPeriods as readonly string[]).includes(period) ? (period as Period) : 'month';
     
@@ -146,14 +158,15 @@ enrollment.get('/funnel', async (c) => {
     // const leads = await db.query('SELECT * FROM leads WHERE created_at >= ? AND created_at <= ?', [startDate, endDate]);
     
     // 模擬數據
-    const totalLeads = mockLeads.length;
+    const leads = tenantLeads(currentTenantId);
+    const totalLeads = leads.length;
     const statusCounts = {
-      new: mockLeads.filter(l => l.status === 'new').length,
-      contacted: mockLeads.filter(l => l.status === 'contacted').length,
-      trial_scheduled: mockLeads.filter(l => l.status === 'trial_scheduled').length,
-      trial_completed: mockLeads.filter(l => l.status === 'trial_completed').length,
-      enrolled: mockLeads.filter(l => l.status === 'enrolled').length,
-      lost: mockLeads.filter(l => l.status === 'lost').length
+      new: leads.filter(l => l.status === 'new').length,
+      contacted: leads.filter(l => l.status === 'contacted').length,
+      trial_scheduled: leads.filter(l => l.status === 'trial_scheduled').length,
+      trial_completed: leads.filter(l => l.status === 'trial_completed').length,
+      enrolled: leads.filter(l => l.status === 'enrolled').length,
+      lost: leads.filter(l => l.status === 'lost').length
     };
     
     const funnelData: FunnelData[] = [
@@ -165,22 +178,22 @@ enrollment.get('/funnel', async (c) => {
       {
         stage: '已聯絡',
         count: totalLeads - statusCounts.new,
-        percentage: Math.round(((totalLeads - statusCounts.new) / totalLeads) * 100)
+        percentage: toPercentage(totalLeads - statusCounts.new, totalLeads)
       },
       {
         stage: '預約試聽',
         count: statusCounts.trial_scheduled + statusCounts.trial_completed + statusCounts.enrolled,
-        percentage: Math.round(((statusCounts.trial_scheduled + statusCounts.trial_completed + statusCounts.enrolled) / totalLeads) * 100)
+        percentage: toPercentage(statusCounts.trial_scheduled + statusCounts.trial_completed + statusCounts.enrolled, totalLeads)
       },
       {
         stage: '完成試聽',
         count: statusCounts.trial_completed + statusCounts.enrolled,
-        percentage: Math.round(((statusCounts.trial_completed + statusCounts.enrolled) / totalLeads) * 100)
+        percentage: toPercentage(statusCounts.trial_completed + statusCounts.enrolled, totalLeads)
       },
       {
         stage: '正式報名',
         count: statusCounts.enrolled,
-        percentage: Math.round((statusCounts.enrolled / totalLeads) * 100)
+        percentage: toPercentage(statusCounts.enrolled, totalLeads)
       }
     ];
     
@@ -207,6 +220,8 @@ enrollment.get('/funnel', async (c) => {
  */
 enrollment.get('/conversion', async (c) => {
   try {
+    const currentTenantId = getTenantId(c);
+    if (!currentTenantId) return c.json({ success: false, error: 'Missing tenant context' }, 400);
     const { period } = c.req.query();
     const per: Period = period && (validPeriods as readonly string[]).includes(period) ? (period as Period) : 'month';
     
@@ -229,12 +244,13 @@ enrollment.get('/conversion', async (c) => {
     // 實際應該查詢資料庫並計算轉換天數
     // const leads = await db.query('SELECT * FROM leads WHERE created_at >= ? AND created_at <= ?', [startDate, endDate]);
     
-    const newLeads = mockLeads.length;
-    const contacted = mockLeads.filter(l => ['contacted', 'trial_scheduled', 'trial_completed', 'enrolled'].includes(l.status)).length;
-    const trialScheduled = mockLeads.filter(l => ['trial_scheduled', 'trial_completed', 'enrolled'].includes(l.status)).length;
-    const trialCompleted = mockLeads.filter(l => ['trial_completed', 'enrolled'].includes(l.status)).length;
-    const enrolled = mockLeads.filter(l => l.status === 'enrolled').length;
-    const lost = mockLeads.filter(l => l.status === 'lost').length;
+    const leads = tenantLeads(currentTenantId);
+    const newLeads = leads.length;
+    const contacted = leads.filter(l => ['contacted', 'trial_scheduled', 'trial_completed', 'enrolled'].includes(l.status)).length;
+    const trialScheduled = leads.filter(l => ['trial_scheduled', 'trial_completed', 'enrolled'].includes(l.status)).length;
+    const trialCompleted = leads.filter(l => ['trial_completed', 'enrolled'].includes(l.status)).length;
+    const enrolled = leads.filter(l => l.status === 'enrolled').length;
+    const lost = leads.filter(l => l.status === 'lost').length;
     
     const stats: ConversionStats = {
       period: per,
@@ -270,6 +286,8 @@ enrollment.get('/conversion', async (c) => {
  */
 enrollment.post('/trial', zValidator('json', trialRequestSchema), async (c) => {
   try {
+    const currentTenantId = getTenantId(c);
+    if (!currentTenantId) return c.json({ success: false, error: 'Missing tenant context' }, 400);
     const body = c.req.valid('json');
     const name = sanitizeString(body.name);
     const studentName = sanitizeString(body.student_name);
@@ -292,6 +310,7 @@ enrollment.post('/trial', zValidator('json', trialRequestSchema), async (c) => {
     // 建立新 lead
     const newLead: Lead = {
       id: mockLeads.length + 1,
+      tenant_id: currentTenantId,
       name: name,
       phone: phone,
       student_name: studentName,
@@ -336,6 +355,8 @@ enrollment.post('/trial', zValidator('json', trialRequestSchema), async (c) => {
  */
 enrollment.get('/trial/available-slots', async (c) => {
   try {
+    const currentTenantId = getTenantId(c);
+    if (!currentTenantId) return c.json({ success: false, error: 'Missing tenant context' }, 400);
     const { date } = c.req.query();
     if (date && !isValidISODate(date)) {
       return c.json({ success: false, error: '日期格式錯誤（YYYY-MM-DD）' }, 400);
@@ -357,7 +378,7 @@ enrollment.get('/trial/available-slots', async (c) => {
       // const bookedSlots = await db.query('SELECT trial_time FROM leads WHERE trial_date = ?', [date]);
       
       const bookedSlots = mockLeads
-        .filter(l => l.trial_date === date)
+        .filter(l => l.tenant_id === currentTenantId && l.trial_date === date)
         .map(l => l.trial_time);
       
       allSlots.forEach(slot => {
@@ -386,8 +407,11 @@ enrollment.get('/trial/available-slots', async (c) => {
  */
 enrollment.get('/stats/daily', async (c) => {
   try {
+    const currentTenantId = getTenantId(c);
+    if (!currentTenantId) return c.json({ success: false, error: 'Missing tenant context' }, 400);
     const { days } = c.req.query();
     const numDays = toIntInRange(days, 1, 30, 7);
+    const leads = tenantLeads(currentTenantId);
     
     const dailyStats = [];
     
@@ -397,7 +421,7 @@ enrollment.get('/stats/daily', async (c) => {
       const dateString = date.toISOString().split('T')[0];
       
       // 實際應該查詢資料庫
-      const dayLeads = mockLeads.filter(l => l.created_at.startsWith(dateString));
+      const dayLeads = leads.filter(l => l.created_at.startsWith(dateString));
       
       dailyStats.push({
         date: dateString,
@@ -426,11 +450,13 @@ enrollment.patch('/lead/:id/status',
   zValidator('json', leadStatusUpdateSchema),
   async (c) => {
   try {
+    const currentTenantId = getTenantId(c);
+    if (!currentTenantId) return c.json({ success: false, error: 'Missing tenant context' }, 400);
     const { id: leadId } = c.req.valid('param');
     const { status, follow_up_date } = c.req.valid('json');
     
     // 尋找 lead
-    const leadIndex = mockLeads.findIndex(l => l.id === leadId);
+    const leadIndex = mockLeads.findIndex(l => l.id === leadId && l.tenant_id === currentTenantId);
     if (leadIndex === -1) {
       return c.json({
         success: false,
@@ -468,7 +494,10 @@ enrollment.patch('/lead/:id/status',
  */
 enrollment.get('/performance', async (c) => {
   try {
+    const currentTenantId = getTenantId(c);
+    if (!currentTenantId) return c.json({ success: false, error: 'Missing tenant context' }, 400);
     const { period = 'month', advisor_id } = c.req.query();
+    const leads = tenantLeads(currentTenantId);
     
     // 這裡應該根據顧問統計業績
     // 暫時回傳總體數據
@@ -477,12 +506,12 @@ enrollment.get('/performance', async (c) => {
       advisor: advisor_id || 'all',
       period,
       metrics: {
-        totalLeads: mockLeads.length,
+        totalLeads: leads.length,
         conversionRate: 0.3,
         avgResponseTime: '2.5 小時',
-        trialsScheduled: mockLeads.filter(l => l.status === 'trial_scheduled').length,
-        enrollments: mockLeads.filter(l => l.status === 'enrolled').length,
-        revenue: mockLeads.filter(l => l.status === 'enrolled').length * 5000 // 假設平均學費
+        trialsScheduled: leads.filter(l => l.status === 'trial_scheduled').length,
+        enrollments: leads.filter(l => l.status === 'enrolled').length,
+        revenue: leads.filter(l => l.status === 'enrolled').length * 5000 // 假設平均學費
       }
     };
     
