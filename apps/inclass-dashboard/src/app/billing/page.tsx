@@ -49,6 +49,7 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
   
   // 勾選狀態與實際金額
   const [selected, setSelected] = useState<Record<string, boolean>>({})
@@ -66,15 +67,20 @@ export default function BillingPage() {
   }, [selectedClassId, selectedMonth])
 
   const fetchClasses = async () => {
+    setError('')
     setLoading(true)
     try {
       const data = await api.getClasses()
       setClasses(data.classes || [])
       if (data.classes?.length > 0) {
         setSelectedClassId(data.classes[0].id)
+      } else {
+        setSelectedClassId('')
+        setBillingData(null)
       }
     } catch (e) {
       console.error(e)
+      setError('讀取班級失敗，請稍後再試')
       showMessage('❌ 讀取班級失敗')
     }
     setLoading(false)
@@ -82,6 +88,7 @@ export default function BillingPage() {
 
   const fetchBilling = async () => {
     if (!selectedClassId) return
+    setError('')
     setLoading(true)
     try {
       const data = await api.getClassBilling(selectedClassId, selectedMonth)
@@ -101,6 +108,8 @@ export default function BillingPage() {
       setAmounts(newAmounts)
     } catch (e) {
       console.error(e)
+      setBillingData(null)
+      setError('讀取繳費資料失敗，請稍後再試')
       showMessage('❌ 讀取繳費資料失敗')
     }
     setLoading(false)
@@ -194,6 +203,21 @@ export default function BillingPage() {
     return <div style={{ padding: '20px', textAlign: 'center' }}>載入中...</div>
   }
 
+  if (!loading && classes.length === 0) {
+    return (
+      <main style={{ padding: '20px', textAlign: 'center', color: 'var(--text-primary)' }}>
+        <h1 style={{ fontSize: '22px', color: 'var(--primary)', marginBottom: '8px' }}>💰 學費繳費管理</h1>
+        <div style={{ color: 'var(--text-secondary)', marginBottom: '12px' }}>目前沒有可用班級，請先建立班級資料</div>
+        <button
+          onClick={fetchClasses}
+          style={{ padding: '8px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--primary)', color: 'white', border: 'none', fontSize: '13px', cursor: 'pointer' }}
+        >
+          重新載入
+        </button>
+      </main>
+    )
+  }
+
   return (
     <main style={{ padding: '16px', background: 'var(--background)', minHeight: '100vh', paddingBottom: '80px' }}>
       {/* Header */}
@@ -264,6 +288,24 @@ export default function BillingPage() {
           </div>
         </div>
       </div>
+
+      {error && (
+        <div style={{ background: 'rgba(220,53,69,0.08)', border: '1px solid rgba(220,53,69,0.35)', color: 'var(--error)', borderRadius: 'var(--radius-md)', padding: '12px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{error}</span>
+          <button
+            onClick={() => (selectedClassId ? fetchBilling() : fetchClasses())}
+            style={{ padding: '6px 10px', borderRadius: 'var(--radius-sm)', background: 'var(--primary)', color: 'white', border: 'none', fontSize: '12px', cursor: 'pointer' }}
+          >
+            重試
+          </button>
+        </div>
+      )}
+
+      {loading && classes.length > 0 && (
+        <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-md)', padding: '12px', marginBottom: '16px', border: '1px solid var(--border)', color: 'var(--text-secondary)', textAlign: 'center' }}>
+          載入繳費資料中...
+        </div>
+      )}
 
       {/* 學費資訊 */}
       {billingData && (
