@@ -47,7 +47,7 @@ export async function sendScheduleChangeNotification(
   try {
     // 使用原始 SQL 查詢課程資訊
     const scheduleResult = await db.execute(sql`
-      SELECT s.id, s.start_time, s.end_time, c.name as course_name, u.name as teacher_name
+      SELECT s.id, s.tenant_id, s.course_id, s.start_time, s.end_time, c.name as course_name, u.name as teacher_name
       FROM schedules s
       JOIN courses c ON s.course_id = c.id
       LEFT JOIN users u ON s.teacher_id = u.id
@@ -70,6 +70,7 @@ export async function sendScheduleChangeNotification(
       JOIN students s ON ce.student_id = s.id
       LEFT JOIN parent_students ps ON s.id = ps.student_id
       WHERE ce.course_id = ${schedule.course_id}
+        AND s.tenant_id = ${schedule.tenant_id}
     `)
 
     if ((recipientsResult as any[]).length === 0) {
@@ -97,7 +98,7 @@ export async function sendScheduleChangeNotification(
 
     // 批次發送
     const result = await sendBulkNotifications({
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: schedule.tenant_id,
       type: 'schedule_change' as NotificationType,
       recipientIds,
       studentId,
@@ -133,7 +134,7 @@ export async function sendBillingReminder(
   try {
     // 查詢帳單資訊
     const invoiceResult = await db.execute(sql`
-      SELECT i.id, i.amount, i.due_date, i.student_id, s.name as student_name
+      SELECT i.id, i.tenant_id, i.amount, i.due_date, i.student_id, s.name as student_name
       FROM invoices i
       JOIN students s ON i.student_id = s.id
       WHERE i.id = ${invoiceId}
@@ -147,9 +148,11 @@ export async function sendBillingReminder(
 
     // 查詢家長
     const parentsResult = await db.execute(sql`
-      SELECT parent_id
-      FROM parent_students
-      WHERE student_id = ${invoice.student_id}
+      SELECT ps.parent_id
+      FROM parent_students ps
+      JOIN students s ON ps.student_id = s.id
+      WHERE ps.student_id = ${invoice.student_id}
+        AND s.tenant_id = ${invoice.tenant_id}
     `)
 
     const recipientIds = (parentsResult as any[]).map((r: any) => r.parent_id)
@@ -176,7 +179,7 @@ export async function sendBillingReminder(
     `.trim()
 
     const result = await sendBulkNotifications({
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: invoice.tenant_id,
       type: 'billing_reminder' as NotificationType,
       recipientIds,
       studentId: invoice.student_id,
@@ -236,7 +239,7 @@ export async function checkAndSendAttendanceAlert(
 
     // 查詢學生資訊
     const studentResult = await db.execute(sql`
-      SELECT name FROM students WHERE id = ${studentId}
+      SELECT name, tenant_id FROM students WHERE id = ${studentId}
     `)
 
     if ((studentResult as any[]).length === 0) {
@@ -244,12 +247,15 @@ export async function checkAndSendAttendanceAlert(
     }
 
     const studentName = (studentResult as any[])[0].name
+    const tenantId = (studentResult as any[])[0].tenant_id
 
     // 查詢家長
     const parentsResult = await db.execute(sql`
-      SELECT parent_id
-      FROM parent_students
-      WHERE student_id = ${studentId}
+      SELECT ps.parent_id
+      FROM parent_students ps
+      JOIN students s ON ps.student_id = s.id
+      WHERE ps.student_id = ${studentId}
+        AND s.tenant_id = ${tenantId}
     `)
 
     const recipientIds = (parentsResult as any[]).map((r: any) => r.parent_id)
@@ -267,7 +273,7 @@ export async function checkAndSendAttendanceAlert(
     `.trim()
 
     const result = await sendBulkNotifications({
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId,
       type: 'attendance_alert' as NotificationType,
       recipientIds,
       studentId: studentId,
@@ -301,7 +307,7 @@ export async function sendGradeNotification(
   try {
     // 查詢成績資訊
     const gradeResult = await db.execute(sql`
-      SELECT g.id, g.score, g.exam_type, g.student_id, 
+      SELECT g.id, g.tenant_id, g.score, g.exam_type, g.student_id, 
              s.name as student_name, c.name as course_name
       FROM grades g
       JOIN students s ON g.student_id = s.id
@@ -317,9 +323,11 @@ export async function sendGradeNotification(
 
     // 查詢家長
     const parentsResult = await db.execute(sql`
-      SELECT parent_id
-      FROM parent_students
-      WHERE student_id = ${grade.student_id}
+      SELECT ps.parent_id
+      FROM parent_students ps
+      JOIN students s ON ps.student_id = s.id
+      WHERE ps.student_id = ${grade.student_id}
+        AND s.tenant_id = ${grade.tenant_id}
     `)
 
     const recipientIds = (parentsResult as any[]).map((r: any) => r.parent_id)
@@ -349,7 +357,7 @@ export async function sendGradeNotification(
     `.trim()
 
     const result = await sendBulkNotifications({
-      tenantId: DEFAULT_TENANT_ID,
+      tenantId: grade.tenant_id,
       type: 'grade_notification' as NotificationType,
       recipientIds,
       studentId: grade.student_id,
@@ -406,6 +414,12 @@ export async function sendScheduleChangeNotifications(
 
   let sent = 0
   let failed = 0
+  const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN
+
+  if (!telegramBotToken) {
+    console.error('sendScheduleChangeNotifications error: TELEGRAM_BOT_TOKEN is not configured')
+    return { sent: 0, failed: recipients.length }
+  }
 
   for (const recipient of recipients) {
     if (!recipient.parent_telegram_id) {
@@ -415,7 +429,7 @@ export async function sendScheduleChangeNotifications(
 
     try {
       const result = await fetch(
-        `https://api.telegram.org/bot8497754195:AAHkZcV3vXNnAv3UlM9QGe_FsnUioDvBtxg/sendMessage`,
+        `https://api.telegram.org/bot${telegramBotToken}/sendMessage`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
