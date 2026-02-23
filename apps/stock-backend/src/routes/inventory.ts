@@ -10,11 +10,12 @@ const app = new Hono();
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 const positiveNumber = z.number().positive();
 const nonEmptyString = z.string().trim().min(1);
+const optionalUuid = z.string().uuid().optional();
 const stockInSchema = z.object({
   warehouseId: nonEmptyString,
   itemId: nonEmptyString.optional(),
   quantity: positiveNumber,
-  referenceId: z.string().optional(),
+  referenceId: optionalUuid,
   referenceType: z.string().optional(),
   barcode: z.string().optional()
 });
@@ -23,7 +24,7 @@ const stockOutSchema = z.object({
   itemId: nonEmptyString.optional(),
   quantity: positiveNumber,
   transactionType: z.string().optional(),
-  referenceId: z.string().optional(),
+  referenceId: optionalUuid,
   recipientName: z.string().optional(),
   recipientNote: z.string().optional(),
   barcode: z.string().optional()
@@ -34,7 +35,10 @@ const transferSchema = z.object({
   itemId: nonEmptyString,
   quantity: positiveNumber,
   notes: z.string().optional()
-});
+}).refine(
+  (data) => data.fromWarehouseId !== data.toWarehouseId,
+  { message: 'Source and destination warehouse must be different' }
+);
 
 app.use('*', tenantMiddleware);
 
