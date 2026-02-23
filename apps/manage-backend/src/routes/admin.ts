@@ -1431,12 +1431,17 @@ async function createAuditLog(
   const webhookUrl = process.env.BEE_CLASS_WEBHOOK_URL
   if (webhookUrl) {
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      const webhookSecret = process.env.WEBHOOK_SECRET
+      if (webhookSecret) {
+        headers['X-Webhook-Secret'] = webhookSecret
+      }
+
       await fetch(webhookUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Webhook-Secret': process.env.WEBHOOK_SECRET || 'beeclass-sync-secret'
-        },
+        headers,
         body: JSON.stringify({
           action,
           tableName,
