@@ -55,6 +55,15 @@ const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 /** Convert result to array */
 const rows = (result: any): any[] => Array.isArray(result) ? result : (result?.rows ?? [])
 const first = (result: any) => rows(result)[0]
+const isBranchInTenant = async (branchId: string, tenantId: string): Promise<boolean> => {
+  const result = await db.execute(sql`
+    SELECT 1
+    FROM branches
+    WHERE id = ${branchId} AND tenant_id = ${tenantId}
+    LIMIT 1
+  `)
+  return Boolean(first(result))
+}
 
 /** Check if request wants markdown response */
 function wantsMd(c: any): boolean {
@@ -425,6 +434,10 @@ adminRoutes.post('/students',
     const body = c.req.valid('json')
     
     try {
+      if (body.branchId && !(await isBranchInTenant(body.branchId, tenantId))) {
+        return badRequest(c, 'Invalid branchId for current tenant')
+      }
+
       const studentCode = body.studentCode || ('S' + Date.now().toString(36).toUpperCase())
       
       const [result] = await db.execute(sql`
@@ -455,10 +468,15 @@ adminRoutes.put('/students/:id',
     const body = c.req.valid('json')
     
     try {
+      if (body.branchId && !(await isBranchInTenant(body.branchId, tenantId))) {
+        return badRequest(c, 'Invalid branchId for current tenant')
+      }
+
       const result = await db.execute(sql`
         UPDATE students SET
           full_name = COALESCE(${body.fullName ?? null}, full_name),
           nickname = COALESCE(${body.nickname ?? null}, nickname),
+          branch_id = COALESCE(${body.branchId ?? null}, branch_id),
           grade_level = COALESCE(${body.gradeLevel ?? null}, grade_level),
           school_name = COALESCE(${body.schoolName ?? null}, school_name),
           phone = COALESCE(${body.phone ?? null}, phone),
