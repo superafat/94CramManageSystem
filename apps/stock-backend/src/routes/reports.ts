@@ -142,9 +142,12 @@ app.get('/purchases', async (c) => {
   const from = c.req.query('from');
   const to = c.req.query('to');
 
-  const conditions = [eq(stockPurchaseOrders.tenantId, tenantId), eq(stockPurchaseOrders.status, 'received')];
-  if (from) conditions.push(gte(stockPurchaseOrders.orderDate, new Date(from)) as any);
-  if (to) conditions.push(lte(stockPurchaseOrders.orderDate, new Date(to)) as any);
+  const conditions: Array<ReturnType<typeof eq> | ReturnType<typeof gte> | ReturnType<typeof lte>> = [
+    eq(stockPurchaseOrders.tenantId, tenantId),
+    eq(stockPurchaseOrders.status, 'received'),
+  ];
+  if (from) conditions.push(gte(stockPurchaseOrders.orderDate, new Date(from)));
+  if (to) conditions.push(lte(stockPurchaseOrders.orderDate, new Date(to)));
 
   const orders = await db.select().from(stockPurchaseOrders).where(and(...conditions));
   const orderIds = orders.map((order) => order.id);
