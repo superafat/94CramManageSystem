@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, desc, eq, gte, inArray, lte, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte, lt, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db/index';
 import { stockInventory, stockItems, stockPurchaseItems, stockPurchaseOrders, stockSuppliers, stockTransactions, stockWarehouses } from '../db/schema';
 import { authMiddleware } from '../middleware/auth';
@@ -164,12 +164,13 @@ app.get('/purchases', async (c) => {
     toDate.setHours(23, 59, 59, 999);
   }
 
-  const conditions: Array<ReturnType<typeof eq> | ReturnType<typeof gte> | ReturnType<typeof lte>> = [
+  const conditions: SQL[] = [
     eq(stockPurchaseOrders.tenantId, tenantId),
     eq(stockPurchaseOrders.status, 'received'),
   ];
-  if (fromDate) conditions.push(gte(stockPurchaseOrders.orderDate, fromDate));
-  if (toDate) conditions.push(lte(stockPurchaseOrders.orderDate, toDate));
+  const purchaseDate = sql`COALESCE(${stockPurchaseOrders.receivedDate}, ${stockPurchaseOrders.orderDate})`;
+  if (fromDate) conditions.push(gte(purchaseDate, fromDate));
+  if (toDate) conditions.push(lte(purchaseDate, toDate));
 
   const orders = await db.select().from(stockPurchaseOrders).where(and(...conditions));
   const orderIds = orders.map((order) => order.id);
