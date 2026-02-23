@@ -10,18 +10,19 @@ const app = new Hono();
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 const positiveNumber = z.number().positive();
 const nonEmptyString = z.string().trim().min(1);
+const uuidString = z.string().uuid();
 const optionalUuid = z.string().uuid().optional();
 const stockInSchema = z.object({
-  warehouseId: nonEmptyString,
-  itemId: nonEmptyString.optional(),
+  warehouseId: uuidString,
+  itemId: uuidString.optional(),
   quantity: positiveNumber,
   referenceId: optionalUuid,
   referenceType: z.string().optional(),
   barcode: z.string().optional()
 });
 const stockOutSchema = z.object({
-  warehouseId: nonEmptyString,
-  itemId: nonEmptyString.optional(),
+  warehouseId: uuidString,
+  itemId: uuidString.optional(),
   quantity: positiveNumber,
   transactionType: z.string().optional(),
   referenceId: optionalUuid,
@@ -30,9 +31,9 @@ const stockOutSchema = z.object({
   barcode: z.string().optional()
 });
 const transferSchema = z.object({
-  fromWarehouseId: nonEmptyString,
-  toWarehouseId: nonEmptyString,
-  itemId: nonEmptyString,
+  fromWarehouseId: uuidString,
+  toWarehouseId: uuidString,
+  itemId: uuidString,
   quantity: positiveNumber,
   notes: z.string().optional()
 }).refine(
