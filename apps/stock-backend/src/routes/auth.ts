@@ -6,10 +6,11 @@ import { db } from '../db/index';
 import { stockTenants, stockUsers } from '../db/schema';
 import { authMiddleware, getAuthUser } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
+import { config } from '../config';
 import { z } from 'zod';
 
 const app = new Hono();
-const JWT_SECRET = process.env.JWT_SECRET || '94stock-secret-key-change-in-prod';
+const JWT_SECRET = config.JWT_SECRET;
 const registerSchema = z.object({
   tenantName: z.string().trim().min(1),
   slug: z.string().trim().min(1),
