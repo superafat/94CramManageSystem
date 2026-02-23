@@ -12,19 +12,33 @@ import type { Variables } from '../middleware/auth.js'
 
 const paymentsRouter = new Hono<{ Variables: Variables }>()
 
+const paymentRecordsQuerySchema = z.object({
+  classId: z.string().uuid().optional(),
+  periodMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+})
+
 // 查詢繳費記錄
-paymentsRouter.get('/records', async (c) => {
+paymentsRouter.get('/records', zValidator('query', paymentRecordsQuerySchema), async (c) => {
   try {
     const schoolId = c.get('schoolId')
-    const classId = c.req.query('classId')
-    const periodMonth = c.req.query('periodMonth')
+    const { classId, periodMonth } = c.req.valid('query')
 
     const schoolClasses = await db.select().from(classes).where(eq(classes.schoolId, schoolId))
     const classIds = schoolClasses.map(cls => cls.id)
 
     if (classIds.length === 0) return c.json({ records: [] })
 
-    let records = await db.select({
+    let filterClause = inArray(paymentRecords.classId, classIds)
+    if (classId) {
+      const nextFilter = and(filterClause, eq(paymentRecords.classId, classId))
+      filterClause = nextFilter ?? filterClause
+    }
+    if (periodMonth) {
+      const nextFilter = and(filterClause, eq(paymentRecords.periodMonth, periodMonth))
+      filterClause = nextFilter ?? filterClause
+    }
+
+    const records = await db.select({
       id: paymentRecords.id, studentId: paymentRecords.studentId,
       classId: paymentRecords.classId, paymentType: paymentRecords.paymentType,
       amount: paymentRecords.amount, paymentDate: paymentRecords.paymentDate,
@@ -35,10 +49,7 @@ paymentsRouter.get('/records', async (c) => {
     .from(paymentRecords)
     .innerJoin(students, eq(paymentRecords.studentId, students.id))
     .innerJoin(classes, eq(paymentRecords.classId, classes.id))
-    .where(inArray(paymentRecords.classId, classIds))
-
-    if (classId) records = records.filter(r => r.classId === classId)
-    if (periodMonth) records = records.filter(r => r.periodMonth === periodMonth)
+    .where(filterClause)
 
     return c.json({ records })
   } catch (e) {
