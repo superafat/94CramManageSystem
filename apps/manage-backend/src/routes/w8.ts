@@ -294,8 +294,13 @@ const scheduleQuerySchema = z.object({
 w8Routes.get('/schedules', requirePermission(Permission.SCHEDULE_READ), zValidator('query', scheduleQuerySchema), async (c) => {
   try {
     const query = c.req.valid('query')
+    const user = c.get('user')
+    if (!user?.tenant_id) {
+      return badRequest(c, 'Missing tenant context')
+    }
     
     const conditions = [sql`1=1`]
+    conditions.push(sql`c.tenant_id = ${user.tenant_id}`)
     if (query.teacher_id) conditions.push(sql`s.teacher_id = ${query.teacher_id}`)
     if (query.course_id) conditions.push(sql`s.course_id = ${query.course_id}`)
     if (query.start_date) conditions.push(sql`s.scheduled_date >= ${query.start_date}::date`)
