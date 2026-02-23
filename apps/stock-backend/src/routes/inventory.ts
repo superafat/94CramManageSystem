@@ -6,6 +6,7 @@ import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { sendLowStockAlert } from '../services/notifications';
 
 const app = new Hono();
+const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 
 app.use('*', tenantMiddleware);
 
@@ -90,7 +91,7 @@ app.post('/in', async (c) => {
     quantity,
     referenceId,
     referenceType,
-    performedBy: 'system', // TODO: get from auth
+    performedBy: SYSTEM_USER_ID, // TODO: get from auth
     createdAt: new Date()
   });
 
@@ -146,7 +147,7 @@ app.post('/out', async (c) => {
     referenceId,
     recipientName,
     recipientNote,
-    performedBy: 'system',
+    performedBy: SYSTEM_USER_ID,
     createdAt: new Date()
   });
 
@@ -211,7 +212,7 @@ app.post('/transfer', async (c) => {
       quantity: -quantity,
       referenceId: transferId,
       referenceType: 'transfer',
-      performedBy: 'system',
+      performedBy: SYSTEM_USER_ID,
       createdAt: new Date()
     });
 
@@ -223,7 +224,7 @@ app.post('/transfer', async (c) => {
       quantity,
       referenceId: transferId,
       referenceType: 'transfer',
-      performedBy: 'system',
+      performedBy: SYSTEM_USER_ID,
       createdAt: new Date()
     });
 
