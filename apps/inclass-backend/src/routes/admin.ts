@@ -7,6 +7,7 @@ import { users } from '../db/schema.js'
 import { eq } from 'drizzle-orm'
 import { adminOnly } from '../middleware/auth.js'
 import { getFailedLogins, getBlockedIPs } from '../middleware/rateLimit.js'
+import { isValidUUID } from '../utils/date.js'
 import type { AdminVariables } from '../middleware/auth.js'
 
 const adminRouter = new Hono<{ Variables: AdminVariables }>()
@@ -34,6 +35,7 @@ adminRouter.post('/users/:id/approve', async (c) => {
   try {
     const adminUser = c.get('adminUser')
     const targetId = c.req.param('id')
+    if (!isValidUUID(targetId)) return c.json({ error: 'Invalid user ID format' }, 400)
 
     const [updated] = await db.update(users)
       .set({
@@ -57,6 +59,7 @@ adminRouter.post('/users/:id/reject', async (c) => {
   try {
     const adminUser = c.get('adminUser')
     const targetId = c.req.param('id')
+    if (!isValidUUID(targetId)) return c.json({ error: 'Invalid user ID format' }, 400)
 
     const [updated] = await db.update(users)
       .set({
