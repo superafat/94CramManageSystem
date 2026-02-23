@@ -10,6 +10,7 @@ import type { NotificationType, NotificationChannel, NotificationStatus } from '
 import { sendLinePushMessage } from './line'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
+const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN
 
 /**
  * 發送 Telegram 訊息
@@ -149,15 +150,37 @@ export async function createAndSendNotification(params: {
         return { success: false, notificationId: notification.id, error: 'User has no line_user_id' }
       }
 
-      result = await sendLinePushMessage(
-        user.lineUserId,
-        [
-          {
-            type: 'text',
-            text: `${params.title}\n\n${params.body}`
-          }
-        ]
-      )
+      if (!LINE_CHANNEL_ACCESS_TOKEN) {
+        await db.update(notifications)
+          .set({
+            status: 'failed' as NotificationStatus,
+            errorMessage: 'LINE_CHANNEL_ACCESS_TOKEN is not configured'
+          })
+          .where(eq(notifications.id, notification.id))
+
+        return {
+          success: false,
+          notificationId: notification.id,
+          error: 'LINE_CHANNEL_ACCESS_TOKEN is not configured'
+        }
+      }
+
+      try {
+        result = await sendLinePushMessage(
+          user.lineUserId,
+          [
+            {
+              type: 'text',
+              text: `${params.title}\n\n${params.body}`
+            }
+          ]
+        )
+      } catch (error: any) {
+        result = {
+          success: false,
+          error: error?.message || 'LINE push message failed'
+        }
+      }
     } else {
       // email or other channels not implemented yet
       await db.update(notifications)
