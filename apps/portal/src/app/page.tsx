@@ -6,7 +6,7 @@ const systems = [
     emoji: '📚',
     name: '學員管理',
     description: '學員資料、課程排班、繳費紀錄',
-    url: process.env.NEXT_PUBLIC_MANAGE_URL || 'http://localhost:3200',
+    url: process.env.MANAGE_URL || 'http://localhost:3200',
     color: '#A8B5A2',
   },
   {
@@ -14,7 +14,7 @@ const systems = [
     emoji: '✋',
     name: '點名系統',
     description: '上課點名、出勤統計、家長通知',
-    url: process.env.NEXT_PUBLIC_INCLASS_URL || 'http://localhost:3201',
+    url: process.env.INCLASS_URL || 'http://localhost:3201',
     color: '#C4A9A1',
   },
   {
@@ -22,7 +22,7 @@ const systems = [
     emoji: '📦',
     name: '庫存管理',
     description: '教材庫存、進貨管理、發放紀錄',
-    url: process.env.NEXT_PUBLIC_STOCK_URL || 'http://localhost:3000',
+    url: process.env.STOCK_URL || 'http://localhost:3000',
     color: '#9CADB7',
   },
 ];
