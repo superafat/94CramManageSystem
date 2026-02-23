@@ -92,6 +92,7 @@ interface LineMessageObject {
 }
 
 const app = new Hono()
+const DEFAULT_TENANT_ID = '11111111-1111-1111-1111-111111111111'
 
 // ===== Rate Limiting Config =====
 // 
@@ -252,7 +253,12 @@ async function processBinding(lineUserId: string, studentName: string, phoneLast
     // 檢查此 LINE ID 是否已綁定
     const existingBinding = await db.select()
       .from(users)
-      .where(eq(users.lineUserId, lineUserId))
+      .where(
+        and(
+          eq(users.tenantId, DEFAULT_TENANT_ID),
+          eq(users.lineUserId, lineUserId)
+        )
+      )
       .limit(1)
     
     if (existingBinding.length > 0) {
@@ -269,6 +275,7 @@ async function processBinding(lineUserId: string, studentName: string, phoneLast
       .from(users)
       .where(
         and(
+          eq(users.tenantId, DEFAULT_TENANT_ID),
           eq(users.role, 'parent'),
           sql`${users.phone} LIKE ${'%' + phoneLast4}`,
           sql`${users.lineUserId} IS NULL` // 只找未綁定的帳號
@@ -293,7 +300,12 @@ async function processBinding(lineUserId: string, studentName: string, phoneLast
         lineUserId,
         updatedAt: sql`NOW()`
       })
-      .where(eq(users.id, matched.id))
+      .where(
+        and(
+          eq(users.id, matched.id),
+          eq(users.tenantId, DEFAULT_TENANT_ID)
+        )
+      )
     
     return {
       success: true,
@@ -626,7 +638,12 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
     // ===== 一般訊息處理 =====
     
     // 1. 查用戶
-    const userRows = await db.select().from(users).where(eq(users.lineUserId, lineUserId)).limit(1)
+    const userRows = await db.select().from(users).where(
+      and(
+        eq(users.tenantId, DEFAULT_TENANT_ID),
+        eq(users.lineUserId, lineUserId)
+      )
+    ).limit(1)
     const user = userRows.length > 0 ? userRows[0] : null
 
     let systemPrompt = WENZHONG_DEFAULT_PROMPT
@@ -686,9 +703,12 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
     const intent = classifyIntent(messageText)
     
     // 驗證和清理 tenantId、branchId、userId
-    const safeUserId = user?.id || undefined
-    const safeBranchId = user?.branchId || 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d'
-    const safeTenantId = user?.tenantId || '11111111-1111-1111-1111-111111111111'
+    const isDefaultTenantUser = user?.tenantId === DEFAULT_TENANT_ID
+    const safeUserId = isDefaultTenantUser ? user?.id : undefined
+    const safeBranchId = isDefaultTenantUser && user?.branchId
+      ? user.branchId
+      : 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d'
+    const safeTenantId = DEFAULT_TENANT_ID
     
     const aiResponse = await chat(
       {
@@ -780,7 +800,12 @@ async function handleFollowEvent(event: LineEvent): Promise<void> {
       console.error('[LINE] Failed to get profile in follow:', e.message)
     }
 
-    const userRows = await db.select().from(users).where(eq(users.lineUserId, userId)).limit(1)
+    const userRows = await db.select().from(users).where(
+      and(
+        eq(users.tenantId, DEFAULT_TENANT_ID),
+        eq(users.lineUserId, userId)
+      )
+    ).limit(1)
     const existingUser = userRows.length > 0 ? userRows[0] : null
 
     const msg = existingUser
