@@ -22,11 +22,17 @@ const parseBoundedIntQuery = (
   return Math.max(min, Math.min(max, parsed))
 }
 
+const isValidISODate = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const parsed = new Date(`${value}T00:00:00.000Z`)
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+}
+
 const studentSchema = z.object({
   name: z.string().trim().min(1).max(100),
   classId: z.string().uuid().optional(),
   nfcId: z.string().trim().min(1).max(50).optional(),
-  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional(),
+  birthDate: z.string().trim().refine(isValidISODate, 'Invalid date format (YYYY-MM-DD)').optional(),
   schoolName: z.string().trim().max(100).optional(),
   grade: z.string().trim().max(50).optional(),
   notes: z.string().trim().max(500).optional(),
