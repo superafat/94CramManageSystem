@@ -2,7 +2,10 @@
  * Notification Service - 整合 imStudy 通知系統
  */
 
-const IMSTUDY_API_URL = process.env.IMSTUDY_API_URL || 'https://hivemind-backend-855393865280.asia-east1.run.app'
+const IMSTUDY_API_URL = process.env.IMSTUDY_API_URL
+if (!IMSTUDY_API_URL) {
+  throw new Error('IMSTUDY_API_URL environment variable is required for notifications')
+}
 
 interface NotificationPayload {
   schoolId: string
