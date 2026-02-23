@@ -12,6 +12,17 @@ import type { Variables } from '../middleware/auth.js'
 
 const studentsRouter = new Hono<{ Variables: Variables }>()
 
+const parseBoundedIntQuery = (
+  rawValue: string | undefined,
+  fallback: number,
+  min: number,
+  max: number
+) => {
+  const parsed = Number.parseInt(rawValue ?? '', 10)
+  if (Number.isNaN(parsed)) return fallback
+  return Math.max(min, Math.min(max, parsed))
+}
+
 const studentSchema = z.object({
   name: z.string().min(1).max(100),
   classId: z.string().uuid().optional(),
@@ -26,8 +37,8 @@ const studentSchema = z.object({
 studentsRouter.get('/', async (c) => {
   try {
     const schoolId = c.get('schoolId')
-    const page = Math.max(1, Math.min(1000, parseInt(c.req.query('page') || '1')))
-    const limit = Math.max(1, Math.min(100, parseInt(c.req.query('limit') || '50')))
+    const page = parseBoundedIntQuery(c.req.query('page'), 1, 1, 1000)
+    const limit = parseBoundedIntQuery(c.req.query('limit'), 50, 1, 100)
     const offset = (page - 1) * limit
 
     const [countResult] = await db
