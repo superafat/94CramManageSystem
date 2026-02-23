@@ -48,8 +48,12 @@ const listStudentsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
 })
 
-const requireSchoolId = (schoolId: string | undefined) => {
-  return typeof schoolId === 'string' && schoolId.trim().length > 0 ? schoolId : null
+const schoolIdSchema = z.string().uuid('Invalid school ID format')
+
+const requireSchoolId = (schoolId: string | undefined): string | null => {
+  if (typeof schoolId !== 'string') return null
+  const parsed = schoolIdSchema.safeParse(schoolId.trim())
+  return parsed.success ? parsed.data : null
 }
 
 // 學生列表
