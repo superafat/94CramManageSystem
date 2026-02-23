@@ -32,8 +32,8 @@ export default function RegisterPage() {
 
     try {
       await register(schoolName, email, password, name)
-    } catch (e: any) {
-      setError(e.message || '註冊失敗')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '註冊失敗')
     } finally {
       setLoading(false)
     }
