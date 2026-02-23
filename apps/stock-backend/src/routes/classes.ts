@@ -4,8 +4,20 @@ import { db } from '../db/index';
 import { stockClasses, stockClassMaterials, stockInventory, stockItems, stockMaterialDistributions, stockStudents } from '../db/schema';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { authMiddleware, getAuthUser } from '../middleware/auth';
+import { z } from 'zod';
 
 const app = new Hono();
+const uuidString = z.string().uuid();
+const distributeSchema = z.object({
+  records: z.array(z.object({
+    warehouseId: uuidString,
+    itemId: uuidString,
+    distributedQuantity: z.number().int().positive(),
+    studentId: uuidString.optional(),
+    studentName: z.string().optional(),
+    notes: z.string().optional(),
+  })).default([]),
+});
 app.use('*', authMiddleware, tenantMiddleware);
 
 app.get('/', async (c) => {
@@ -131,17 +143,23 @@ app.post('/:id/distribute', async (c) => {
   const tenantId = getTenantId(c);
   const id = c.req.param('id');
   const authUser = getAuthUser(c);
-  const body = await c.req.json();
+  const parsedBody = distributeSchema.safeParse(await c.req.json());
+  if (!parsedBody.success) {
+    return c.json({ error: 'Invalid input' }, 400);
+  }
 
   const [targetClass] = await db.select().from(stockClasses).where(and(eq(stockClasses.id, id), eq(stockClasses.tenantId, tenantId)));
   if (!targetClass) return c.json({ error: 'Class not found' }, 404);
 
-  const records = Array.isArray(body.records) ? body.records : [];
+  const { records } = parsedBody.data;
   for (const record of records) {
     if (record.studentId || record.studentName) {
+      const studentCondition = record.studentId
+        ? eq(stockStudents.id, record.studentId)
+        : eq(stockStudents.name, record.studentName!);
       const [student] = await db.select().from(stockStudents).where(and(
         eq(stockStudents.tenantId, tenantId),
-        record.studentId ? eq(stockStudents.id, record.studentId) : eq(stockStudents.name, record.studentName),
+        studentCondition,
       ));
       if (student && !student.tuitionPaid) {
         return c.json({ error: `Student tuition not paid: ${student.name}` }, 400);
