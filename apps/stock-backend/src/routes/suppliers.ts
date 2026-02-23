@@ -30,7 +30,13 @@ app.get('/', async (c) => {
 
 app.post('/', async (c) => {
   const tenantId = getTenantId(c);
-  const parsedBody = supplierCreateSchema.safeParse(await c.req.json());
+  let requestBody: unknown;
+  try {
+    requestBody = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+  const parsedBody = supplierCreateSchema.safeParse(requestBody);
   if (!parsedBody.success) {
     return c.json({ error: 'Invalid input' }, 400);
   }
@@ -53,7 +59,13 @@ app.put('/:id', async (c) => {
   if (!parsedParams.success) {
     return c.json({ error: 'Invalid supplier id' }, 400);
   }
-  const parsedBody = supplierUpdateSchema.safeParse(await c.req.json());
+  let requestBody: unknown;
+  try {
+    requestBody = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+  const parsedBody = supplierUpdateSchema.safeParse(requestBody);
   if (!parsedBody.success) {
     return c.json({ error: 'Invalid input' }, 400);
   }
