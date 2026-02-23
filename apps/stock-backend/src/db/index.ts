@@ -213,11 +213,12 @@ export async function checkDatabaseHealth(): Promise<{
         avgQueryTime: Math.round(metrics.avgQueryTime)
       }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     metrics.errors++
+    const errorMessage = error instanceof Error ? error.message : String(error)
     return { 
       healthy: false, 
-      error: error.message,
+      error: errorMessage,
       details: {
         totalQueries: metrics.totalQueries,
         slowQueries: metrics.slowQueries,
@@ -329,7 +330,7 @@ export function createBatchLoader<K, V>(
   let queue: Array<{
     key: K
     resolve: (value: V | null) => void
-    reject: (error: any) => void
+    reject: (error: unknown) => void
   }> = []
   let scheduled = false
   
@@ -418,6 +419,6 @@ export async function closeDatabaseConnection() {
 export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
   get(_target, prop) {
     const instance = initializeDatabase()
-    return (instance as any)[prop]
+    return Reflect.get(instance as object, prop)
   }
 })
