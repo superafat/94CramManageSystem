@@ -22,6 +22,19 @@ interface ClassInfo {
   feeYearly?: number
 }
 
+function isUser(value: unknown): value is User {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Record<string, unknown>
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.email === 'string' &&
+    typeof candidate.name === 'string' &&
+    typeof candidate.role === 'string' &&
+    typeof candidate.status === 'string' &&
+    typeof candidate.createdAt === 'string'
+  )
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://beeclass-backend-855393865280.asia-east1.run.app'
 
 function getAuthHeaders() {
@@ -38,7 +51,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   
   // 班級管理
   const [classes, setClasses] = useState<ClassInfo[]>([])
@@ -55,10 +68,14 @@ export default function AdminPage() {
       return
     }
     
-    let userObj
+    let userObj: unknown
     try {
       userObj = JSON.parse(userData)
     } catch {
+      router.push('/login')
+      return
+    }
+    if (!isUser(userObj)) {
       router.push('/login')
       return
     }
