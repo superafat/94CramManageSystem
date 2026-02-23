@@ -7,7 +7,6 @@ import { zValidator } from '@hono/zod-validator'
 import { db } from '../db/index.js'
 import { exams, examScores, classes, students } from '../db/schema.js'
 import { eq, and } from 'drizzle-orm'
-import { isValidUUID } from '../utils/date.js'
 import type { Variables } from '../middleware/auth.js'
 
 const examsRouter = new Hono<{ Variables: Variables }>()
@@ -25,9 +24,22 @@ const scoreSchema = z.object({
   score: z.number().min(0),
 })
 
+const examIdParamSchema = z.object({
+  examId: z.string().uuid('Invalid exam ID format'),
+})
+
+const studentIdParamSchema = z.object({
+  studentId: z.string().uuid('Invalid student ID format'),
+})
+
+const requireSchoolId = (schoolId: string | undefined) => {
+  return typeof schoolId === 'string' && schoolId.trim().length > 0 ? schoolId : null
+}
+
 examsRouter.get('/', async (c) => {
   try {
-    const schoolId = c.get('schoolId')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
     const schoolExams = await db
       .select({
         id: exams.id, classId: exams.classId, name: exams.name,
@@ -47,7 +59,8 @@ examsRouter.get('/', async (c) => {
 
 examsRouter.post('/', zValidator('json', examSchema), async (c) => {
   try {
-    const schoolId = c.get('schoolId')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
     const body = c.req.valid('json')
 
     const [classData] = await db.select().from(classes).where(eq(classes.id, body.classId))
@@ -67,11 +80,11 @@ examsRouter.post('/', zValidator('json', examSchema), async (c) => {
   }
 })
 
-examsRouter.get('/:examId/scores', async (c) => {
+examsRouter.get('/:examId/scores', zValidator('param', examIdParamSchema), async (c) => {
   try {
-    const examId = c.req.param('examId')
-    const schoolId = c.get('schoolId')
-    if (!isValidUUID(examId)) return c.json({ error: 'Invalid exam ID format' }, 400)
+    const { examId } = c.req.valid('param')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
 
     const [exam] = await db.select().from(exams).where(eq(exams.id, examId))
     if (!exam) return c.json({ error: 'Exam not found' }, 404)
@@ -105,12 +118,16 @@ examsRouter.get('/:examId/scores', async (c) => {
   }
 })
 
-examsRouter.post('/:examId/scores', zValidator('json', scoreSchema), async (c) => {
+examsRouter.post(
+  '/:examId/scores',
+  zValidator('param', examIdParamSchema),
+  zValidator('json', scoreSchema),
+  async (c) => {
   try {
-    const examId = c.req.param('examId')
-    const schoolId = c.get('schoolId')
+    const { examId } = c.req.valid('param')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
     const body = c.req.valid('json')
-    if (!isValidUUID(examId)) return c.json({ error: 'Invalid exam ID format' }, 400)
 
     const [exam] = await db.select().from(exams).where(eq(exams.id, examId))
     if (!exam) return c.json({ error: 'Exam not found' }, 404)
@@ -142,11 +159,11 @@ examsRouter.post('/:examId/scores', zValidator('json', scoreSchema), async (c) =
 })
 
 // 取得學生成績
-examsRouter.get('/scores/:studentId', async (c) => {
+examsRouter.get('/scores/:studentId', zValidator('param', studentIdParamSchema), async (c) => {
   try {
-    const studentId = c.req.param('studentId')
-    const schoolId = c.get('schoolId')
-    if (!isValidUUID(studentId)) return c.json({ error: 'Invalid student ID format' }, 400)
+    const { studentId } = c.req.valid('param')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
 
     const [student] = await db.select().from(students).where(eq(students.id, studentId))
     if (!student || student.schoolId !== schoolId) return c.json({ error: 'Student not found' }, 404)
