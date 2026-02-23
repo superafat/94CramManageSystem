@@ -4,10 +4,13 @@ import { zValidator } from '@hono/zod-validator'
 import { chat } from '../ai/llm'
 import { ragSearch } from '../ai/rag'
 import { logConversation } from '../ai/logger'
+import { authMiddleware } from '../middleware/auth'
 import { getTenantId } from '../middleware/tenant'
 import type { ChatRequest, RAGSearchRequest } from '../ai/types'
 
 export const botRoutes = new Hono()
+
+botRoutes.use('*', authMiddleware)
 
 const aiQuerySchema = z.object({
   query: z.string().min(1, 'Query is required').max(2000, 'Query too long'),
@@ -27,7 +30,10 @@ const ragSearchSchema = z.object({
 
 botRoutes.post('/ai-query', zValidator('json', aiQuerySchema), async (c) => {
   const body = c.req.valid('json')
-  const tenantId = body.tenantId ?? getTenantId(c)
+  const tenantId = getTenantId(c)
+  if (body.tenantId && body.tenantId !== tenantId) {
+    return c.json({ error: 'Tenant mismatch' }, 403)
+  }
   
   try {
     // RAG-augmented: search knowledge base, pass as context to LLM system prompt
@@ -63,7 +69,10 @@ botRoutes.post('/ai-query', zValidator('json', aiQuerySchema), async (c) => {
 
 botRoutes.post('/rag-search', zValidator('json', ragSearchSchema), async (c) => {
   const body = c.req.valid('json')
-  const tenantId = body.tenantId ?? getTenantId(c)
+  const tenantId = getTenantId(c)
+  if (body.tenantId && body.tenantId !== tenantId) {
+    return c.json({ error: 'Tenant mismatch' }, 403)
+  }
   
   try {
     const sources = await ragSearch({ ...body, tenantId })
