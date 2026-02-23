@@ -55,6 +55,32 @@ const app = new Hono<{ Variables: RBACVariables }>()
 // ===== Default tenant for unauthenticated BeeClass routes =====
 const DEFAULT_TENANT_ID = '11111111-1111-1111-1111-111111111111'
 
+type NotificationTriggerResource = 'schedule' | 'invoice' | 'student' | 'grade'
+
+async function getTriggerResourceTenantId(
+  resource: NotificationTriggerResource,
+  id: string
+): Promise<string | null> {
+  let result: unknown
+
+  switch (resource) {
+    case 'schedule':
+      result = await db.execute(sql`SELECT tenant_id FROM schedules WHERE id = ${id} LIMIT 1`)
+      break
+    case 'invoice':
+      result = await db.execute(sql`SELECT tenant_id FROM invoices WHERE id = ${id} LIMIT 1`)
+      break
+    case 'student':
+      result = await db.execute(sql`SELECT tenant_id FROM students WHERE id = ${id} LIMIT 1`)
+      break
+    case 'grade':
+      result = await db.execute(sql`SELECT tenant_id FROM grades WHERE id = ${id} LIMIT 1`)
+      break
+  }
+
+  return (result as Array<{ tenant_id: string | null }>)[0]?.tenant_id ?? null
+}
+
 // ========== Admin Routes (require auth) ==========
 
 /**
@@ -261,7 +287,16 @@ app.post('/admin/notifications/trigger/schedule-change',
   zValidator('json', scheduleChangeSchema),
   async (c) => {
     try {
+      const user = c.get('user')
       const data = c.req.valid('json')
+      const resourceTenantId = await getTriggerResourceTenantId('schedule', data.scheduleId)
+
+      if (!resourceTenantId) {
+        return notFound(c, 'Schedule')
+      }
+      if (resourceTenantId !== user.tenant_id) {
+        return forbidden(c, 'Cross-tenant access denied')
+      }
 
       const result = await sendScheduleChangeNotification(data.scheduleId, {
         originalTime: data.originalTime ? new Date(data.originalTime) : undefined,
@@ -294,7 +329,16 @@ app.post('/admin/notifications/trigger/billing-reminder',
   zValidator('json', billingReminderSchema),
   async (c) => {
     try {
+      const user = c.get('user')
       const data = c.req.valid('json')
+      const resourceTenantId = await getTriggerResourceTenantId('invoice', data.invoiceId)
+
+      if (!resourceTenantId) {
+        return notFound(c, 'Invoice')
+      }
+      if (resourceTenantId !== user.tenant_id) {
+        return forbidden(c, 'Cross-tenant access denied')
+      }
 
       const result = await sendBillingReminder(data.invoiceId)
 
@@ -323,7 +367,16 @@ app.post('/admin/notifications/trigger/attendance-alert',
   zValidator('json', attendanceAlertSchema),
   async (c) => {
     try {
+      const user = c.get('user')
       const data = c.req.valid('json')
+      const resourceTenantId = await getTriggerResourceTenantId('student', data.studentId)
+
+      if (!resourceTenantId) {
+        return notFound(c, 'Student')
+      }
+      if (resourceTenantId !== user.tenant_id) {
+        return forbidden(c, 'Cross-tenant access denied')
+      }
 
       const result = await checkAndSendAttendanceAlert(data.studentId)
 
@@ -353,7 +406,16 @@ app.post('/admin/notifications/trigger/grade',
   zValidator('json', gradeNotificationSchema),
   async (c) => {
     try {
+      const user = c.get('user')
       const data = c.req.valid('json')
+      const resourceTenantId = await getTriggerResourceTenantId('grade', data.gradeId)
+
+      if (!resourceTenantId) {
+        return notFound(c, 'Grade')
+      }
+      if (resourceTenantId !== user.tenant_id) {
+        return forbidden(c, 'Cross-tenant access denied')
+      }
 
       const result = await sendGradeNotification(data.gradeId)
 
