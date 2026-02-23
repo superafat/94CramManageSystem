@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { timingSafeEqual } from 'node:crypto';
 
 const app = new Hono();
 
@@ -9,7 +10,12 @@ app.use('*', async (c, next) => {
     console.error('[Security] INTERNAL_API_KEY is not configured');
     return c.json({ error: 'Service unavailable' }, 503);
   }
-  if (!key || key !== expected) {
+  if (!key) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
+  const keyBuffer = Buffer.from(key);
+  const expectedBuffer = Buffer.from(expected);
+  if (keyBuffer.length !== expectedBuffer.length || !timingSafeEqual(keyBuffer, expectedBuffer)) {
     return c.json({ error: 'Forbidden' }, 403);
   }
   await next();
