@@ -244,8 +244,10 @@ miscRouter.get('/dashboard/stats', async (c) => {
 // ===== Audit Logs =====
 miscRouter.get('/audit-logs', async (c) => {
   const schoolId = c.get('schoolId')
-  const page = parseInt(c.req.query('page') || '1')
-  const limit = parseInt(c.req.query('limit') || '50')
+  const rawPage = parseInt(c.req.query('page') || '1')
+  const rawLimit = parseInt(c.req.query('limit') || '50')
+  const page = Number.isNaN(rawPage) ? 1 : Math.max(1, Math.min(1000, rawPage))
+  const limit = Number.isNaN(rawLimit) ? 50 : Math.max(1, Math.min(100, rawLimit))
   const offset = (page - 1) * limit
   const tableName = c.req.query('tableName')
   const needsAlert = c.req.query('needsAlert') === 'true'
