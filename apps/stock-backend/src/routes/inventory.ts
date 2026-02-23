@@ -152,38 +152,45 @@ app.post('/out', async (c) => {
     return c.json({ error: 'Invalid input' }, 400);
   }
 
-  const [updatedInventory] = await db.update(stockInventory)
-    .set({
-      quantity: sql`${stockInventory.quantity} - ${quantity}`,
-      lastUpdatedAt: new Date()
-    })
-    .where(and(
-      eq(stockInventory.tenantId, tenantId),
-      eq(stockInventory.warehouseId, warehouseId),
-      eq(stockInventory.itemId, itemId),
-      gte(stockInventory.quantity, quantity)
-    ))
-    .returning();
+  const stockOutResult = await db.transaction(async (tx) => {
+    const [updatedInventory] = await tx.update(stockInventory)
+      .set({
+        quantity: sql`${stockInventory.quantity} - ${quantity}`,
+        lastUpdatedAt: new Date()
+      })
+      .where(and(
+        eq(stockInventory.tenantId, tenantId),
+        eq(stockInventory.warehouseId, warehouseId),
+        eq(stockInventory.itemId, itemId),
+        gte(stockInventory.quantity, quantity)
+      ))
+      .returning();
 
-  if (!updatedInventory) {
+    if (!updatedInventory) {
+      return null;
+    }
+
+    await tx.insert(stockTransactions).values({
+      tenantId,
+      warehouseId,
+      itemId,
+      transactionType: transactionType || 'sale_out',
+      quantity: -quantity,
+      referenceId,
+      recipientName,
+      recipientNote,
+      performedBy: SYSTEM_USER_ID,
+      createdAt: new Date()
+    });
+
+    return { remainingQty: updatedInventory.quantity };
+  });
+
+  if (!stockOutResult) {
     return c.json({ error: 'Insufficient stock' }, 400);
   }
 
-  const remainingQty = updatedInventory.quantity;
-
-  // Record transaction
-  await db.insert(stockTransactions).values({
-    tenantId,
-    warehouseId,
-    itemId,
-    transactionType: transactionType || 'sale_out',
-    quantity: -quantity,
-    referenceId,
-    recipientName,
-    recipientNote,
-    performedBy: SYSTEM_USER_ID,
-    createdAt: new Date()
-  });
+  const remainingQty = stockOutResult.remainingQty;
 
   const [item] = await db.select().from(stockItems).where(and(eq(stockItems.id, itemId), eq(stockItems.tenantId, tenantId)));
   const [warehouse] = await db.select().from(stockWarehouses).where(and(eq(stockWarehouses.id, warehouseId), eq(stockWarehouses.tenantId, tenantId)));
