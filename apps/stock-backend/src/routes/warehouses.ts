@@ -7,12 +7,16 @@ import { z } from 'zod';
 
 const app = new Hono();
 const uuidParamSchema = z.object({ id: z.string().uuid() });
-const warehouseInputSchema = z.object({
+const warehouseCreateSchema = z.object({
   name: z.string().trim().min(1),
   code: z.string().trim().min(1),
   address: z.string().optional(),
   isHeadquarters: z.boolean().optional(),
-});
+}).strict();
+const warehouseUpdateSchema = warehouseCreateSchema.partial().refine(
+  (data) => Object.keys(data).length > 0,
+  { message: 'At least one field is required' }
+);
 
 app.use('*', tenantMiddleware);
 
@@ -53,7 +57,7 @@ app.get('/:id', async (c) => {
 // POST create warehouse
 app.post('/', async (c) => {
   const tenantId = getTenantId(c);
-  const parsedBody = warehouseInputSchema.safeParse(await c.req.json());
+  const parsedBody = warehouseCreateSchema.safeParse(await c.req.json());
   if (!parsedBody.success) {
     return c.json({ error: 'Invalid input' }, 400);
   }
@@ -79,7 +83,7 @@ app.put('/:id', async (c) => {
   if (!parsedParams.success) {
     return c.json({ error: 'Invalid warehouse id' }, 400);
   }
-  const parsedBody = warehouseInputSchema.safeParse(await c.req.json());
+  const parsedBody = warehouseUpdateSchema.safeParse(await c.req.json());
   if (!parsedBody.success) {
     return c.json({ error: 'Invalid input' }, 400);
   }
