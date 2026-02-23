@@ -20,6 +20,11 @@ interface Score {
   score: number
 }
 
+interface Student {
+  id: string
+  name: string
+}
+
 interface ExamDetail {
   exam: Exam
   scores: Score[]
@@ -35,7 +40,7 @@ export default function GradesPage() {
   const router = useRouter()
   const { school } = useAuth()
   const [exams, setExams] = useState<Exam[]>([])
-  const [students, setStudents] = useState<any[]>([])
+  const [students, setStudents] = useState<Student[]>([])
   const [selectedExam, setSelectedExam] = useState<ExamDetail | null>(null)
   const [showAddExam, setShowAddExam] = useState(false)
   const [showInputScores, setShowInputScores] = useState(false)
@@ -56,7 +61,7 @@ export default function GradesPage() {
 
   const fetchExams = async () => {
     try {
-      const data = await api.getExams()
+      const data = await api.getExams() as { exams?: Exam[] }
       setExams(data.exams || [])
     } catch (e) {
       console.error(e)
@@ -65,7 +70,7 @@ export default function GradesPage() {
 
   const fetchStudents = async () => {
     try {
-      const data = await api.getStudents()
+      const data = await api.getStudents() as { students?: Student[] }
       setStudents(data.students || [])
     } catch (e) {
       console.error(e)
@@ -83,14 +88,14 @@ export default function GradesPage() {
       setNewExam({ name: '', subject: '', maxScore: 100, examDate: '' })
       setShowAddExam(false)
       fetchExams()
-    } catch (e: any) {
-      showMessage(`❌ ${e.message || '建立失敗'}`)
+    } catch (e: unknown) {
+      showMessage(`❌ ${e instanceof Error ? e.message : '建立失敗'}`)
     }
   }
 
   const loadExamScores = async (examId: string) => {
     try {
-      const data = await api.getExamScores(examId)
+      const data = await api.getExamScores(examId) as ExamDetail
       setSelectedExam(data)
       
       // 初始化分數輸入
@@ -117,8 +122,8 @@ export default function GradesPage() {
       await api.addExamScore(selectedExam.exam.id, { studentId, score })
       showMessage('✅ 儲存成功')
       loadExamScores(selectedExam.exam.id)
-    } catch (e: any) {
-      showMessage(`❌ ${e.message || '儲存失敗'}`)
+    } catch (e: unknown) {
+      showMessage(`❌ ${e instanceof Error ? e.message : '儲存失敗'}`)
     }
   }
 
