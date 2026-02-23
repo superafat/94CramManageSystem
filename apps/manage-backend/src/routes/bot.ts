@@ -31,7 +31,8 @@ const ragSearchSchema = z.object({
 botRoutes.post('/ai-query', zValidator('json', aiQuerySchema), async (c) => {
   const body = c.req.valid('json')
   const tenantId = getTenantId(c)
-  if (body.tenantId && body.tenantId !== tenantId) {
+  const { tenantId: bodyTenantId, ...payload } = body
+  if (bodyTenantId && bodyTenantId !== tenantId) {
     return c.json({ error: 'Tenant mismatch' }, 403)
   }
   
@@ -51,7 +52,7 @@ botRoutes.post('/ai-query', zValidator('json', aiQuerySchema), async (c) => {
       console.warn('[ai-query] RAG search failed:', ragErr instanceof Error ? ragErr.message : String(ragErr))
     }
 
-    const chatReq: ChatRequest = { ...body, tenantId }
+    const chatReq: ChatRequest = { ...payload, tenantId }
     const result = await chat(chatReq, ragContext || undefined)
 
     // Log conversation asynchronously with tenantId
@@ -70,12 +71,14 @@ botRoutes.post('/ai-query', zValidator('json', aiQuerySchema), async (c) => {
 botRoutes.post('/rag-search', zValidator('json', ragSearchSchema), async (c) => {
   const body = c.req.valid('json')
   const tenantId = getTenantId(c)
-  if (body.tenantId && body.tenantId !== tenantId) {
+  const { tenantId: bodyTenantId, ...payload } = body
+  if (bodyTenantId && bodyTenantId !== tenantId) {
     return c.json({ error: 'Tenant mismatch' }, 403)
   }
   
   try {
-    const sources = await ragSearch({ ...body, tenantId })
+    const searchReq: RAGSearchRequest = { ...payload, tenantId }
+    const sources = await ragSearch(searchReq)
     return c.json({ sources, count: sources.length })
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
