@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { isAxiosError } from 'axios';
 import { ArrowRightLeft, Package, ArrowRight } from 'lucide-react';
 import api from '@/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
@@ -34,10 +35,16 @@ interface Item {
   unit: string;
 }
 
+interface RecentTransfer {
+  item: { name: string };
+  warehouse: { name: string };
+  transaction: { transactionType: string; quantity: number; createdAt: string };
+}
+
 export default function TransferPage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [items, setItems] = useState<Item[]>([]);
-  const [recentTransfers, setRecentTransfers] = useState<any[]>([]);
+  const [recentTransfers, setRecentTransfers] = useState<RecentTransfer[]>([]);
 
   const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm<TransferFormData>({
     resolver: zodResolver(transferSchema),
@@ -76,8 +83,8 @@ export default function TransferPage() {
 
   const fetchRecentTransfers = async () => {
     try {
-      const res = await api.get('/inventory/transactions');
-      setRecentTransfers(res.data.filter((t: any) => t.transaction.transactionType === 'transfer_out').slice(0, 5));
+      const res = await api.get<RecentTransfer[]>('/inventory/transactions');
+      setRecentTransfers(res.data.filter((t) => t.transaction.transactionType === 'transfer_out').slice(0, 5));
     } catch (error) {
       console.error('Failed to fetch transfers', error);
     }
@@ -89,9 +96,12 @@ export default function TransferPage() {
       toast.success('調撥成功');
       reset({ quantity: 1 });
       fetchRecentTransfers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(error.response?.data?.error || '調撥失敗');
+      const errorMessage = isAxiosError<{ error?: string }>(error)
+        ? error.response?.data?.error
+        : undefined;
+      toast.error(errorMessage || '調撥失敗');
     }
   };
 
