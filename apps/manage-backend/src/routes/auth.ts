@@ -37,6 +37,35 @@ import {
 
 export const authRoutes = new Hono()
 
+type QueryResultRows<T> = T[] | { rows?: T[] }
+
+type AuthUserRow = {
+  id: string
+  username: string | null
+  full_name: string | null
+  email: string | null
+  role: string
+  tenant_id: string
+  branch_id: string | null
+  is_active: boolean
+  password_hash?: string | null
+}
+
+type TenantLookupRow = { id: string }
+
+function firstRow<T>(result: QueryResultRows<T>): T | null {
+  if (Array.isArray(result)) return result[0] ?? null
+  return result.rows?.[0] ?? null
+}
+
+function isJwtExpiredError(err: unknown): err is { code: string } {
+  return typeof err === 'object' && err !== null && 'code' in err && (err as { code?: unknown }).code === 'ERR_JWT_EXPIRED'
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
 const secret = new TextEncoder().encode(config.JWT_SECRET)
 
 // Firebase public key cache (should be refreshed periodically in production)
@@ -117,9 +146,9 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
         WHERE username = ${body.username}
           AND deleted_at IS NULL
         LIMIT 1
-      `) as any[]
+      `) as QueryResultRows<AuthUserRow>
 
-      const dbUser = Array.isArray(rows) ? rows[0] : (rows as any).rows?.[0] ?? null
+      const dbUser = firstRow(rows)
       
       // 不要洩露帳號是否存在
       if (!dbUser || !dbUser.password_hash) {
@@ -160,8 +189,8 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
           permissions,
         },
       })
-    } catch (err: any) {
-      console.error('Login DB error:', err.message)
+    } catch (err: unknown) {
+      console.error('Login DB error:', errorMessage(err))
       return internalError(c, err)
     }
   }
@@ -202,9 +231,9 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
         WHERE firebase_uid = ${payload.sub}
           AND deleted_at IS NULL
         LIMIT 1
-      `) as any[]
+      `) as QueryResultRows<AuthUserRow>
 
-      const dbUser = Array.isArray(rows) ? rows[0] : (rows as any).rows?.[0] ?? null
+      const dbUser = firstRow(rows)
 
       if (dbUser) {
         if (!dbUser.is_active) {
@@ -253,9 +282,9 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
         },
         isGuest: true,
       })
-    } catch (err: any) {
-      console.error('Firebase login error:', err.message)
-      if (err.code === 'ERR_JWT_EXPIRED') {
+    } catch (err: unknown) {
+      console.error('Firebase login error:', errorMessage(err))
+      if (isJwtExpiredError(err)) {
         return unauthorized(c, 'Firebase token expired')
       }
       return unauthorized(c, 'Invalid Firebase token')
@@ -280,9 +309,9 @@ authRoutes.post('/telegram', zValidator('json', telegramLoginSchema), async (c) 
       WHERE telegram_id = ${String(telegramId)}
         AND deleted_at IS NULL
       LIMIT 1
-    `) as any[]
+    `) as QueryResultRows<AuthUserRow>
 
-    const dbUser = Array.isArray(rows) ? rows[0] : (rows as any).rows?.[0] ?? null
+    const dbUser = firstRow(rows)
 
     if (dbUser) {
       if (!dbUser.is_active) {
@@ -334,8 +363,8 @@ authRoutes.post('/telegram', zValidator('json', telegramLoginSchema), async (c) 
       },
       isGuest: true,
     })
-  } catch (err: any) {
-    console.error('Telegram login error:', err.message)
+  } catch (err: unknown) {
+    console.error('Telegram login error:', errorMessage(err))
     return internalError(c, err)
   }
 })
@@ -348,18 +377,18 @@ authRoutes.post('/trial-signup', rateLimit('trial-signup'), zValidator('json', t
   
   try {
     // Check if slug already exists
-    const [existing] = await db.execute(sql`
+    const existing = firstRow(await db.execute(sql`
       SELECT id FROM tenants WHERE slug = ${body.tenantSlug}
-    `) as any[]
+    `) as QueryResultRows<TenantLookupRow>)
     
     if (existing) {
       return badRequest(c, 'This URL is already taken. Please choose another.')
     }
     
     // Check if email already registered
-    const [existingEmail] = await db.execute(sql`
+    const existingEmail = firstRow(await db.execute(sql`
       SELECT id FROM users WHERE email = ${body.adminEmail}
-    `) as any[]
+    `) as QueryResultRows<TenantLookupRow>)
     
     if (existingEmail) {
       return badRequest(c, 'This email is already registered.')
@@ -399,8 +428,8 @@ authRoutes.post('/trial-signup', rateLimit('trial-signup'), zValidator('json', t
       message: 'Trial application submitted! We will review and get back to you within 24 hours.',
       tenantId,
     })
-  } catch (err: any) {
-    console.error('Trial signup error:', err.message)
+  } catch (err: unknown) {
+    console.error('Trial signup error:', errorMessage(err))
     return internalError(c, err)
   }
 })
@@ -431,8 +460,8 @@ authRoutes.get('/me', async (c) => {
       },
       permissions,
     })
-  } catch (err) {
-    if ((err as any).code === 'ERR_JWT_EXPIRED') {
+  } catch (err: unknown) {
+    if (isJwtExpiredError(err)) {
       return unauthorized(c, 'Token expired')
     }
     return unauthorized(c, 'Invalid token')
