@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { isAxiosError } from 'axios';
 import { Plus, Package, Search, ArrowRight } from 'lucide-react';
 import api from '@/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
@@ -31,11 +32,17 @@ interface Item {
   unit: string;
 }
 
+interface RecentTransaction {
+  item: { name: string };
+  warehouse: { name: string };
+  transaction: { transactionType: string; quantity: number; createdAt: string };
+}
+
 export default function StockInPage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
-  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
   const [scanMode, setScanMode] = useState(false);
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<StockInFormData>({
@@ -85,8 +92,8 @@ export default function StockInPage() {
 
   const fetchRecentTransactions = async () => {
     try {
-      const res = await api.get('/inventory/transactions');
-      setRecentTransactions(res.data.filter((t: any) => t.transaction.transactionType === 'purchase_in').slice(0, 5));
+      const res = await api.get<RecentTransaction[]>('/inventory/transactions');
+      setRecentTransactions(res.data.filter((t) => t.transaction.transactionType === 'purchase_in').slice(0, 5));
     } catch (error) {
       console.error('Failed to fetch transactions', error);
     }
@@ -101,9 +108,12 @@ export default function StockInPage() {
       toast.success('入庫成功');
       reset({ quantity: 1, warehouseId: data.warehouseId });
       fetchRecentTransactions();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(error.response?.data?.error || '入庫失敗');
+      const errorMessage = isAxiosError<{ error?: string }>(error)
+        ? error.response?.data?.error
+        : undefined;
+      toast.error(errorMessage || '入庫失敗');
     }
   };
 
