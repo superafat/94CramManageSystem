@@ -12,7 +12,6 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const publicPaths = ['/login', '/register', '/landing', '/']
     if (!loading && !token && !publicPaths.includes(pathname)) {
-      // 未登入且訪問受保護路徑 → 導向登入
       router.push('/login')
     }
   }, [token, loading, pathname, router])
@@ -41,27 +40,20 @@ export default function RootLayout({
   return (
     <html lang="zh-TW">
       <head>
-        <title>蜂神榜 Ai 點名系統 - AI 驅動的補習班管理系統 | NFC 點名 | 臉部辨識</title>
-        <meta name="description" content="蜂神榜 Ai 點名系統是專為補習班設計的雲端管理系統。支援 NFC 點名、蜂神榜 AI AI 臉部辨識、LINE 家長通知。免硬體費用，月訂閱制，30 天免費試用。" />
-        <meta name="keywords" content="補習班管理系統,點名系統,NFC點名,臉部辨識,學生管理,補習班軟體,安親班管理,教室管理,蜂神榜" />
-        <meta name="author" content="蜂神榜" />
+        <title>94inClass 補習班點名系統 | NFC點名、AI臉辨、LINE通知 | 蜂神榜</title>
+        <meta name="description" content="94inClass 是專為補習班設計的智能點名系統，支援 NFC 刷卡點名（1秒完成）、AI 臉部辨識防代簽、LINE 家長即時通知。免硬體費用，月訂閱制，30 天免費試用，500+ 補習班使用。" />
+        <meta name="keywords" content="補習班點名系統, NFC點名, AI臉部辨識, LINE家長通知, 補習班管理系統, 點名軟體, 學生出勤管理, 安親班點名, 才藝教室點名, 蜂神榜, 94inClass" />
+        <meta name="author" content="蜂神榜 Ai 教育科技" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        
-        {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
-        <meta property="og:title" content="蜂神榜 Ai 點名系統 - AI 驅動的補習班管理系統" />
-        <meta property="og:description" content="NFC 點名 + AI 臉辨 + LINE 通知。免硬體費用，月訂閱制，30 天免費試用。" />
-        <meta property="og:url" content="https://beeclass-dashboard-855393865280.asia-east1.run.app" />
-        <meta property="og:site_name" content="蜂神榜 Ai 點名系統" />
-        
-        {/* Twitter */}
+        <meta property="og:title" content="94inClass 補習班點名系統 | NFC點名 + AI臉辨 + LINE通知" />
+        <meta property="og:description" content="NFC 刷卡 1 秒點名，AI 臉辨防代簽，LINE 家長即時通知。免硬體費用，30 天免費試用。500+ 補習班信賴使用。" />
+        <meta property="og:site_name" content="94inClass 補習班點名系統" />
+        <meta property="og:locale" content="zh_TW" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="蜂神榜 Ai 點名系統" />
-        <meta name="twitter:description" content="AI 驅動的補習班管理系統 - NFC 點名、臉部辨識、LINE 通知" />
-        
-        {/* 其他 */}
+        <meta name="twitter:title" content="94inClass 補習班點名系統" />
+        <meta name="twitter:description" content="NFC點名 + AI臉辨 + LINE通知，補習班最快速的數位點名解決方案" />
         <meta name="theme-color" content="#8FA9B8" />
-        <link rel="canonical" content="https://beeclass-dashboard-855393865280.asia-east1.run.app" />
       </head>
       <body>
         <AuthProvider>
