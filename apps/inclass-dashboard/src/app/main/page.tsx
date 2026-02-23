@@ -44,6 +44,21 @@ interface PaymentRecord {
   status: string
 }
 
+type PaymentType = 'monthly' | 'quarterly' | 'semester' | 'yearly'
+
+interface AlertNotification {
+  id: string
+  action?: string
+  table_name?: string
+  change_summary?: string
+  user_name: string
+  created_at: string
+}
+
+const isPaymentType = (value: string): value is PaymentType => (
+  value === 'monthly' || value === 'quarterly' || value === 'semester' || value === 'yearly'
+)
+
 export default function Home() {
   const { user, school, logout } = useAuth()
   const router = useRouter()
@@ -65,13 +80,13 @@ export default function Home() {
   const [classes, setClasses] = useState<ClassInfo[]>([])
   const [selectedClass, setSelectedClass] = useState<string>('')
   const [paymentAmount, setPaymentAmount] = useState(0)
-  const [paymentType, setPaymentType] = useState<'monthly' | 'quarterly' | 'semester' | 'yearly'>('monthly')
+  const [paymentType, setPaymentType] = useState<PaymentType>('monthly')
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
   const [paymentNotes, setPaymentNotes] = useState('')
   const [submittingPayment, setSubmittingPayment] = useState(false)
   
   // 警示通知
-  const [alerts, setAlerts] = useState<any[]>([])
+  const [alerts, setAlerts] = useState<AlertNotification[]>([])
   const [showAlerts, setShowAlerts] = useState(false)
 
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://beeclass-backend-855393865280.asia-east1.run.app'
@@ -79,7 +94,7 @@ export default function Home() {
   const fetchAlerts = async () => {
     try {
       const token = localStorage.getItem('token')
-      const data = await fetch(`${API_BASE}/api/alerts`, {
+      const data: { alerts?: AlertNotification[] } = await fetch(`${API_BASE}/api/alerts`, {
         headers: { Authorization: `Bearer ${token}` }
       }).then(r => r.json())
       if (data.alerts) {
@@ -158,7 +173,7 @@ export default function Home() {
     setShowPayment(true)
   }
 
-  const handlePaymentTypeChange = (type: 'monthly' | 'quarterly' | 'semester' | 'yearly') => {
+  const handlePaymentTypeChange = (type: PaymentType) => {
     setPaymentType(type)
     const cls = classes.find((c: ClassInfo) => c.id === selectedClass)
     if (cls) {
@@ -472,7 +487,9 @@ export default function Home() {
             <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>費用類型</div>
             <select 
               value={paymentType} 
-              onChange={(e) => handlePaymentTypeChange(e.target.value as any)}
+              onChange={(e) => {
+                if (isPaymentType(e.target.value)) handlePaymentTypeChange(e.target.value)
+              }}
               style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '14px' }}
             >
               <option value="monthly">月費</option>
