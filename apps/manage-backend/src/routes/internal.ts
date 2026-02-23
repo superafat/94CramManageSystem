@@ -7,6 +7,11 @@ import { Hono } from 'hono';
 
 const app = new Hono();
 
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
+if (!INTERNAL_API_KEY) {
+  throw new Error('INTERNAL_API_KEY is required for internal routes');
+}
+
 function safeCompare(a: string, b: string): boolean {
   const bufA = Buffer.from(createHash('sha256').update(a).digest());
   const bufB = Buffer.from(createHash('sha256').update(b).digest());
@@ -16,8 +21,7 @@ function safeCompare(a: string, b: string): boolean {
 // Internal key 驗證
 app.use('*', async (c, next) => {
   const key = c.req.header('X-Internal-Key');
-  const expected = process.env.INTERNAL_API_KEY || 'internal-key-change-in-prod';
-  if (!key || !safeCompare(key, expected)) {
+  if (!key || !safeCompare(key, INTERNAL_API_KEY)) {
     return c.json({ error: 'Forbidden' }, 403);
   }
   await next();
