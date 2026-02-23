@@ -30,7 +30,7 @@ attendanceRouter.post('/checkin', zValidator('json', checkinSchema), async (c) =
     const now = new Date()
     const today = getTodayTW()
 
-    let student
+    let student: typeof students.$inferSelect | undefined
     if (body.studentId) {
       [student] = await db.select().from(students).where(eq(students.id, body.studentId))
     } else if (body.nfcId) {
@@ -88,7 +88,7 @@ attendanceRouter.get('/today', async (c) => {
     const today = getTodayTW()
     const classId = c.req.query('classId')
 
-    let studentList
+    let studentList: Array<typeof students.$inferSelect>
     if (classId) {
       studentList = await db.select().from(students)
         .where(and(eq(students.schoolId, schoolId), eq(students.classId, classId)))
@@ -109,10 +109,11 @@ attendanceRouter.get('/today', async (c) => {
     const records = await db.select().from(attendances)
       .where(and(eq(attendances.date, today), inArray(attendances.studentId, studentIds)))
 
-    const recordsWithNames = records.map(r => {
-      const student = studentList.find(s => s.id === r.studentId)
-      return { ...r, studentName: student?.name || 'Unknown' }
-    })
+    const studentNameMap = new Map(studentList.map(student => [student.id, student.name]))
+    const recordsWithNames = records.map(r => ({
+      ...r,
+      studentName: studentNameMap.get(r.studentId) || 'Unknown'
+    }))
 
     const total = studentList.length
     const arrived = records.filter(r => r.status === 'arrived').length
