@@ -5,10 +5,14 @@ import { chat } from '../ai/llm'
 import { ragSearch } from '../ai/rag'
 import { logConversation } from '../ai/logger'
 import { authMiddleware } from '../middleware/auth'
-import { getTenantId } from '../middleware/tenant'
+import type { RBACVariables } from '../middleware/rbac'
 import type { ChatRequest, RAGSearchRequest } from '../ai/types'
 
-export const botRoutes = new Hono()
+interface BotVariables extends RBACVariables {
+  tenantId: string
+}
+
+export const botRoutes = new Hono<{ Variables: BotVariables }>()
 
 botRoutes.use('*', authMiddleware)
 
@@ -30,7 +34,10 @@ const ragSearchSchema = z.object({
 
 botRoutes.post('/ai-query', zValidator('json', aiQuerySchema), async (c) => {
   const body = c.req.valid('json')
-  const tenantId = getTenantId(c)
+  const tenantId = c.get('tenantId')
+  if (!tenantId) {
+    return c.json({ error: 'Unauthorized: Missing tenant context' }, 401)
+  }
   const { tenantId: bodyTenantId, ...payload } = body
   if (bodyTenantId && bodyTenantId !== tenantId) {
     return c.json({ error: 'Tenant mismatch' }, 403)
@@ -70,7 +77,10 @@ botRoutes.post('/ai-query', zValidator('json', aiQuerySchema), async (c) => {
 
 botRoutes.post('/rag-search', zValidator('json', ragSearchSchema), async (c) => {
   const body = c.req.valid('json')
-  const tenantId = getTenantId(c)
+  const tenantId = c.get('tenantId')
+  if (!tenantId) {
+    return c.json({ error: 'Unauthorized: Missing tenant context' }, 401)
+  }
   const { tenantId: bodyTenantId, ...payload } = body
   if (bodyTenantId && bodyTenantId !== tenantId) {
     return c.json({ error: 'Tenant mismatch' }, 403)
