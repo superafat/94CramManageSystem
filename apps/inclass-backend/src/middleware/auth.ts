@@ -21,7 +21,10 @@ export type AdminVariables = Variables & {
 };
 
 export function getJWTSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET || '94cram-secret-change-in-prod';
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
   return new TextEncoder().encode(secret);
 }
 
