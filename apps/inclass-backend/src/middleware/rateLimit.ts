@@ -1,6 +1,7 @@
 /**
  * Rate Limiting & Security Module
  */
+import type { Context } from 'hono'
 
 // ===== Advanced Rate Limiting & Security =====
 const rateLimitMap = new Map<string, {
@@ -24,7 +25,7 @@ const failedLoginLog: Array<{
   userAgent: string
 }> = []
 
-export function getClientIP(c: any): string {
+export function getClientIP(c: Context): string {
   return c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
     || c.req.header('cf-connecting-ip')
     || 'unknown'
