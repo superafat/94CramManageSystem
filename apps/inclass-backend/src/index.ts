@@ -17,7 +17,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
-import { ZodError } from 'zod'
+import { z, ZodError } from 'zod'
 import { jwtVerify } from 'jose'
 import { db } from './db/index.js'
 import { schools } from './db/schema.js'
@@ -44,6 +44,10 @@ if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required')
 }
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
+const jwtPayloadSchema = z.object({
+  schoolId: z.string().min(1),
+  userId: z.string().min(1),
+})
 // ===== Global Middleware =====
 // CORS - MUST be first (before rate limiter, before auth)
 app.use('/*', cors({
@@ -93,8 +97,9 @@ app.use('/api/*', async (c, next) => {
   const token = authHeader.substring(7)
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
-    c.set('schoolId', payload.schoolId as string)
-    c.set('userId', payload.userId as string)
+    const parsedPayload = jwtPayloadSchema.parse(payload)
+    c.set('schoolId', parsedPayload.schoolId)
+    c.set('userId', parsedPayload.userId)
     await next()
   } catch {
     return c.json({ error: 'Invalid token' }, 401)
