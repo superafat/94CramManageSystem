@@ -5,8 +5,16 @@
 
 import { createHmac } from 'crypto'
 
-const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || 'b456ec1d9cbc50310bd01c6655124fea'
-const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || 'tXVWiHZgwLhb/Z73ScFKT+DmHrdb/9XfRvsmrHSmtq6IOyv4gkHU499Dby7EfxPTxUa+g83V4khBX6OQhDCo4UfbXdEJNL6QM2WWpMmmrh8voAY0u/7glnsX+i7OdgFSO/0xPCdPHrPatRwSwh/ETgdB04t89/1O/w1cDnyilFU='
+const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET
+const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN
+
+function getLineAccessToken(): string | null {
+  if (!LINE_CHANNEL_ACCESS_TOKEN) {
+    console.error('[LINE] Missing LINE_CHANNEL_ACCESS_TOKEN')
+    return null
+  }
+  return LINE_CHANNEL_ACCESS_TOKEN
+}
 
 const LINE_API_BASE = 'https://api.line.me/v2/bot'
 
@@ -71,12 +79,17 @@ export async function sendLineReplyMessage(
     }
   }
   
+  const accessToken = getLineAccessToken()
+  if (!accessToken) {
+    return { success: false, error: 'LINE_CHANNEL_ACCESS_TOKEN is not configured' }
+  }
+  
   try {
     const response = await fetch(`${LINE_API_BASE}/message/reply`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         replyToken,
@@ -124,12 +137,17 @@ export async function sendLinePushMessage(
     }
   }
   
+  const accessToken = getLineAccessToken()
+  if (!accessToken) {
+    return { success: false, error: 'LINE_CHANNEL_ACCESS_TOKEN is not configured' }
+  }
+  
   try {
     const response = await fetch(`${LINE_API_BASE}/message/push`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         to,
@@ -174,10 +192,15 @@ export async function getLineProfile(userId: string): Promise<{
     return { success: false, error: 'Invalid userId format' }
   }
   
+  const accessToken = getLineAccessToken()
+  if (!accessToken) {
+    return { success: false, error: 'LINE_CHANNEL_ACCESS_TOKEN is not configured' }
+  }
+  
   try {
     const response = await fetch(`${LINE_API_BASE}/profile/${userId}`, {
       headers: {
-        'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`
+        'Authorization': `Bearer ${accessToken}`
       }
     })
 
