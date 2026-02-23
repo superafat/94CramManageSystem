@@ -207,11 +207,14 @@ miscRouter.get('/dashboard/stats', async (c) => {
     const totalStudents = allStudents.length
     const newStudentsThisMonth = allStudents.filter(s => s.createdAt && s.createdAt.toISOString().startsWith(thisMonth)).length
 
-    const todayAttendances = await db.select().from(attendances).where(eq(attendances.date, today))
+    const studentIds = allStudents.map(s => s.id)
+    const todayAttendances = studentIds.length > 0
+      ? await db.select().from(attendances)
+        .where(and(eq(attendances.date, today), inArray(attendances.studentId, studentIds)))
+      : []
     const todayArrived = todayAttendances.filter(a => a.status === 'arrived' || a.status === 'late').length
     const attendanceRate = totalStudents > 0 ? Math.round((todayArrived / totalStudents) * 100) : 0
 
-    const studentIds = allStudents.map(s => s.id)
     let totalRevenue = 0
     if (studentIds.length > 0) {
       const schoolPayments = await db.select().from(payments)
