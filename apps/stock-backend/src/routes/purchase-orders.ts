@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from '../db/index';
 import { stockInventory, stockItems, stockPurchaseItems, stockPurchaseOrders, stockSuppliers, stockTransactions, stockWarehouses } from '../db/schema';
@@ -189,7 +189,7 @@ app.delete('/:id/items/:itemId', async (c) => {
   return c.json({ message: 'Purchase item deleted' });
 });
 
-async function updateStatus(c: any, fromStatus: string, toStatus: string) {
+async function updateStatus(c: Context, fromStatus: string, toStatus: string) {
   const tenantId = getTenantId(c);
   const id = c.req.param('id');
   const [existing] = await db.select().from(stockPurchaseOrders).where(and(eq(stockPurchaseOrders.id, id), eq(stockPurchaseOrders.tenantId, tenantId)));
