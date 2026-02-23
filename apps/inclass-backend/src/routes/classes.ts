@@ -12,15 +12,19 @@ import type { Variables } from '../middleware/auth.js'
 const classesRouter = new Hono<{ Variables: Variables }>()
 
 const classSchema = z.object({
-  name: z.string().min(1).max(100),
-  grade: z.string().max(50).optional(),
-  room: z.string().max(50).optional(),
+  name: z.string().trim().min(1).max(100),
+  grade: z.string().trim().min(1).max(50).optional(),
+  room: z.string().trim().min(1).max(50).optional(),
   capacity: z.number().int().min(1).max(1000).optional(),
   feeMonthly: z.number().int().min(0).optional(),
   feeQuarterly: z.number().int().min(0).optional(),
   feeSemester: z.number().int().min(0).optional(),
   feeYearly: z.number().int().min(0).optional(),
-})
+}).strict()
+
+const classUpdateSchema = classSchema
+  .partial()
+  .refine((data) => Object.keys(data).length > 0, { message: 'At least one field is required' })
 
 const classIdParamSchema = z.object({
   id: z.string().uuid('Invalid class ID format'),
@@ -86,7 +90,7 @@ classesRouter.get('/:id', zValidator('param', classIdParamSchema), async (c) => 
 classesRouter.put(
   '/:id',
   zValidator('param', classIdParamSchema),
-  zValidator('json', classSchema.partial()),
+  zValidator('json', classUpdateSchema),
   async (c) => {
   try {
     const { id } = c.req.valid('param')
