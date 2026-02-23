@@ -3,7 +3,7 @@
  * 提供統一的 LINE 訊息發送接口
  */
 
-const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || 'tXVWiHZgwLhb/Z73ScFKT+DmHrdb/9XfRvsmrHSmtq6IOyv4gkHU499Dby7EfxPTxUa+g83V4khBX6OQhDCo4UfbXdEJNL6QM2WWpMmmrh8voAY0u/7glnsX+i7OdgFSO/0xPCdPHrPatRwSwh/ETgdB04t89/1O/w1cDnyilFU='
+const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN
 const LINE_API_BASE = 'https://api.line.me/v2/bot'
 
 /**
@@ -48,6 +48,11 @@ class LineAdapter {
       if (msg.type === 'text' && (!msg.text || msg.text.length > 5000)) {
         return { success: false, error: 'Invalid text message' }
       }
+    }
+
+    if (!LINE_CHANNEL_ACCESS_TOKEN) {
+      console.error('[LINE Adapter] Missing LINE_CHANNEL_ACCESS_TOKEN')
+      return { success: false, error: 'LINE_CHANNEL_ACCESS_TOKEN is not configured' }
     }
 
     try {
