@@ -182,52 +182,38 @@ app.post('/transfer', async (c) => {
     return c.json({ error: 'Invalid input' }, 400);
   }
 
-  // Check source stock
-  const [sourceInventory] = await db.select()
-    .from(stockInventory)
-      .where(and(
-        eq(stockInventory.tenantId, tenantId),
-        eq(stockInventory.warehouseId, fromWarehouseId),
-        eq(stockInventory.itemId, itemId)
-      ));
+  // Deduct from source atomically to prevent concurrent negative stock
+  const [sourceInventory] = await db.update(stockInventory)
+    .set({
+      quantity: sql`${stockInventory.quantity} - ${quantity}`,
+      lastUpdatedAt: new Date()
+    })
+    .where(and(
+      eq(stockInventory.tenantId, tenantId),
+      eq(stockInventory.warehouseId, fromWarehouseId),
+      eq(stockInventory.itemId, itemId),
+      gte(stockInventory.quantity, quantity)
+    ))
+    .returning();
 
-  if (!sourceInventory || sourceInventory.quantity < quantity) {
+  if (!sourceInventory) {
     return c.json({ error: 'Insufficient stock at source warehouse' }, 400);
   }
 
-  // Deduct from source
-  await db.update(stockInventory)
-    .set({ 
-      quantity: sourceInventory.quantity - quantity,
+  // Add to destination with upsert to avoid concurrent duplicate insert/update races
+  await db.insert(stockInventory).values({
+    tenantId,
+    warehouseId: toWarehouseId,
+    itemId,
+    quantity,
+    lastUpdatedAt: new Date()
+  }).onConflictDoUpdate({
+    target: [stockInventory.warehouseId, stockInventory.itemId],
+    set: {
+      quantity: sql`${stockInventory.quantity} + ${quantity}`,
       lastUpdatedAt: new Date()
-    })
-    .where(eq(stockInventory.id, sourceInventory.id));
-
-  // Add to destination
-  const [destInventory] = await db.select()
-    .from(stockInventory)
-      .where(and(
-        eq(stockInventory.tenantId, tenantId),
-        eq(stockInventory.warehouseId, toWarehouseId),
-        eq(stockInventory.itemId, itemId)
-      ));
-
-  if (destInventory) {
-    await db.update(stockInventory)
-      .set({ 
-        quantity: destInventory.quantity + quantity,
-        lastUpdatedAt: new Date()
-      })
-      .where(eq(stockInventory.id, destInventory.id));
-  } else {
-    await db.insert(stockInventory).values({
-      tenantId,
-      warehouseId: toWarehouseId,
-      itemId,
-      quantity,
-      lastUpdatedAt: new Date()
-    });
-  }
+    }
+  });
 
   // Record transactions
   const transferId = crypto.randomUUID();
