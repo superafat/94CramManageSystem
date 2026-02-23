@@ -59,6 +59,18 @@ export async function createAndSendNotification(params: {
   metadata?: Record<string, any>
 }): Promise<{ success: boolean; notificationId?: string; error?: string }> {
   try {
+    // 0. 僅允許同 tenant 的收件人
+    const user = await db.query.users.findFirst({
+      where: and(
+        eq(users.id, params.recipientId),
+        eq(users.tenantId, params.tenantId)
+      )
+    })
+
+    if (!user) {
+      return { success: false, error: 'Recipient not found in tenant' }
+    }
+
     // 1. 檢查用戶通知偏好
     const preference = await db.query.notificationPreferences.findFirst({
       where: and(
@@ -101,12 +113,7 @@ export async function createAndSendNotification(params: {
       metadata: params.metadata || {}
     }).returning()
 
-    // 3. 查詢用戶的 telegram_id 或 line_user_id
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, params.recipientId)
-    })
-
-    // 4. 根據 channel 發送訊息
+    // 3. 根據 channel 發送訊息
     let result: { success: boolean; error?: string }
 
     if (params.channel === 'telegram') {
