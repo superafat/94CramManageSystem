@@ -191,8 +191,17 @@ app.get('/purchases', async (c) => {
       .groupBy(stockPurchaseItems.itemId, stockItems.name),
   ]);
 
-  const totalAmount = orders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
-  return c.json({ totalAmount, bySupplier, byItem });
+  const totalAmount = orders.reduce((sum, order) => sum + Number(order.totalAmount ?? 0), 0);
+  const normalizedBySupplier = bySupplier.map((row) => ({
+    ...row,
+    amount: Number(row.amount ?? 0),
+  }));
+  const normalizedByItem = byItem.map((row) => ({
+    ...row,
+    quantity: Number(row.quantity ?? 0),
+  }));
+
+  return c.json({ totalAmount, bySupplier: normalizedBySupplier, byItem: normalizedByItem });
 });
 
 app.get('/promo-stats', async (c) => {
