@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gte, sql } from 'drizzle-orm';
 import { db } from '../db/index';
 import { stockClasses, stockClassMaterials, stockInventory, stockItems, stockMaterialDistributions, stockStudents } from '../db/schema';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
@@ -148,20 +148,19 @@ app.post('/:id/distribute', async (c) => {
       }
     }
 
-    const [inventory] = await db.select().from(stockInventory).where(and(
+    const [updatedInventory] = await db.update(stockInventory).set({
+      quantity: sql`${stockInventory.quantity} - ${record.distributedQuantity}`,
+      lastUpdatedAt: new Date(),
+    }).where(and(
       eq(stockInventory.tenantId, tenantId),
       eq(stockInventory.warehouseId, record.warehouseId),
       eq(stockInventory.itemId, record.itemId),
-    ));
+      gte(stockInventory.quantity, record.distributedQuantity),
+    )).returning();
 
-    if (!inventory || inventory.quantity < record.distributedQuantity) {
+    if (!updatedInventory) {
       return c.json({ error: `Insufficient stock for item ${record.itemId}` }, 400);
     }
-
-    await db.update(stockInventory).set({
-      quantity: inventory.quantity - record.distributedQuantity,
-      lastUpdatedAt: new Date(),
-    }).where(eq(stockInventory.id, inventory.id));
 
     await db.insert(stockMaterialDistributions).values({
       tenantId,
