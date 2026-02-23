@@ -307,6 +307,12 @@ export default function BillingPage() {
         </div>
       )}
 
+      {!loading && !error && !billingData && (
+        <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-md)', padding: '16px', marginBottom: '16px', border: '1px solid var(--border)', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          目前沒有可顯示的繳費資料，請確認月份或稍後重試。
+        </div>
+      )}
+
       {/* 學費資訊 */}
       {billingData && (
         <div style={{ background: 'var(--primary)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '16px', color: 'white' }}>
