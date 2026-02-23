@@ -44,11 +44,23 @@ export default function DashboardPage() {
     }
   }
 
+  const isEmptyDashboard =
+    !!stats &&
+    stats.totalStudents === 0 &&
+    stats.newStudentsThisMonth === 0 &&
+    stats.totalRevenue === 0 &&
+    stats.stats.totalStudents === 0 &&
+    stats.stats.activeStudents === 0 &&
+    stats.stats.totalClasses === 0 &&
+    stats.stats.totalTeachers === 0
+
   if (loading) {
     return (
-      <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-        載入中...
-      </div>
+      <main style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+        <h1 style={{ fontSize: '22px', color: 'var(--primary)', marginBottom: '8px' }}>📊 教室儀表板</h1>
+        <div style={{ marginBottom: '8px' }}>載入中...</div>
+        <div style={{ fontSize: '13px' }}>正在同步最新教室狀態</div>
+      </main>
     )
   }
 
@@ -66,10 +78,27 @@ export default function DashboardPage() {
     )
   }
 
-  if (!stats) {
+  if (!stats || isEmptyDashboard) {
     return (
-      <main style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-        目前沒有可顯示的儀表板資料
+      <main style={{ padding: '20px', textAlign: 'center', color: 'var(--text-primary)' }}>
+        <h1 style={{ fontSize: '22px', color: 'var(--primary)', marginBottom: '8px' }}>📊 教室儀表板</h1>
+        <div style={{ color: 'var(--text-secondary)', marginBottom: '12px' }}>
+          目前沒有可顯示的儀表板資料，先建立班級或學生後再查看
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => router.push('/main')}
+            style={{ padding: '8px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--primary)', color: 'white', border: 'none', fontSize: '13px', cursor: 'pointer' }}
+          >
+            前往主控台
+          </button>
+          <button
+            onClick={fetchStats}
+            style={{ padding: '8px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)', fontSize: '13px', cursor: 'pointer' }}
+          >
+            重新載入
+          </button>
+        </div>
       </main>
     )
   }
