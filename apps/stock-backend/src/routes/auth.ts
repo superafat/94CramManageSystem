@@ -6,17 +6,34 @@ import { db } from '../db/index';
 import { stockTenants, stockUsers } from '../db/schema';
 import { authMiddleware, getAuthUser } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
+import { z } from 'zod';
 
 const app = new Hono();
 const JWT_SECRET = process.env.JWT_SECRET || '94stock-secret-key-change-in-prod';
+const registerSchema = z.object({
+  tenantName: z.string().trim().min(1),
+  slug: z.string().trim().min(1),
+  email: z.string().trim().email(),
+  password: z.string().min(1),
+  name: z.string().trim().min(1),
+});
+const loginSchema = z.object({
+  email: z.string().trim().email(),
+  password: z.string().min(1),
+});
+const createUserSchema = z.object({
+  email: z.string().trim().email(),
+  password: z.string().min(1),
+  name: z.string().trim().min(1),
+  role: z.string().trim().min(1),
+});
 
 app.post('/register', async (c) => {
-  const body = await c.req.json();
-  const { tenantName, slug, email, password, name } = body;
-
-  if (!tenantName || !slug || !email || !password || !name) {
+  const parsedBody = registerSchema.safeParse(await c.req.json());
+  if (!parsedBody.success) {
     return c.json({ error: 'Missing required fields' }, 400);
   }
+  const { tenantName, slug, email, password, name } = parsedBody.data;
 
   const [existingTenant] = await db.select().from(stockTenants).where(eq(stockTenants.slug, slug));
   if (existingTenant) {
@@ -65,12 +82,11 @@ app.post('/register', async (c) => {
 });
 
 app.post('/login', async (c) => {
-  const body = await c.req.json();
-  const { email, password } = body;
-
-  if (!email || !password) {
+  const parsedBody = loginSchema.safeParse(await c.req.json());
+  if (!parsedBody.success) {
     return c.json({ error: 'Email and password are required' }, 400);
   }
+  const { email, password } = parsedBody.data;
 
   const [user] = await db.select().from(stockUsers).where(eq(stockUsers.email, email));
   if (!user || !user.isActive) {
@@ -141,12 +157,11 @@ app.post('/users', async (c) => {
   }
 
   const tenantId = getTenantId(c);
-  const body = await c.req.json();
-  const { email, password, name, role } = body;
-
-  if (!email || !password || !name || !role) {
+  const parsedBody = createUserSchema.safeParse(await c.req.json());
+  if (!parsedBody.success) {
     return c.json({ error: 'Missing required fields' }, 400);
   }
+  const { email, password, name, role } = parsedBody.data;
 
   const [existingUser] = await db.select().from(stockUsers).where(eq(stockUsers.email, email));
   if (existingUser) {
