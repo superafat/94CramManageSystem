@@ -36,12 +36,23 @@ const studentIdParamSchema = z.object({
   id: z.string().uuid('Invalid student ID format'),
 })
 
+const listStudentsQuerySchema = z.object({
+  page: z.string().regex(/^\d+$/).optional(),
+  limit: z.string().regex(/^\d+$/).optional(),
+})
+
+const requireSchoolId = (schoolId: string | undefined) => {
+  return typeof schoolId === 'string' && schoolId.trim().length > 0 ? schoolId : null
+}
+
 // 學生列表
-studentsRouter.get('/', async (c) => {
+studentsRouter.get('/', zValidator('query', listStudentsQuerySchema), async (c) => {
   try {
-    const schoolId = c.get('schoolId')
-    const page = parseBoundedIntQuery(c.req.query('page'), 1, 1, 1000)
-    const limit = parseBoundedIntQuery(c.req.query('limit'), 50, 1, 100)
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
+    const query = c.req.valid('query')
+    const page = parseBoundedIntQuery(query.page, 1, 1, 1000)
+    const limit = parseBoundedIntQuery(query.limit, 50, 1, 100)
     const offset = (page - 1) * limit
 
     const [countResult] = await db
@@ -70,7 +81,8 @@ studentsRouter.get('/', async (c) => {
 studentsRouter.post('/', zValidator('json', studentSchema), async (c) => {
   try {
     const body = c.req.valid('json')
-    const schoolId = c.get('schoolId')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
 
     if (body.classId) {
       const [classExists] = await db.select().from(classes).where(
@@ -112,7 +124,8 @@ studentsRouter.post('/', zValidator('json', studentSchema), async (c) => {
 studentsRouter.get('/:id', zValidator('param', studentIdParamSchema), async (c) => {
   try {
     const { id } = c.req.valid('param')
-    const schoolId = c.get('schoolId')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
 
     const [student] = await db.select().from(students).where(
       and(eq(students.id, id), eq(students.schoolId, schoolId))
@@ -136,7 +149,8 @@ studentsRouter.put(
   async (c) => {
   try {
     const { id } = c.req.valid('param')
-    const schoolId = c.get('schoolId')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
     const body = c.req.valid('json')
 
     const [existing] = await db.select().from(students).where(
@@ -180,7 +194,8 @@ studentsRouter.put(
 studentsRouter.delete('/:id', zValidator('param', studentIdParamSchema), async (c) => {
   try {
     const { id } = c.req.valid('param')
-    const schoolId = c.get('schoolId')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
 
     const [existing] = await db.select().from(students).where(
       and(eq(students.id, id), eq(students.schoolId, schoolId))
