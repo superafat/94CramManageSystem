@@ -51,6 +51,11 @@ export const adminRoutes = new Hono<{ Variables: RBACVariables }>()
 
 /** Check if string is a valid UUID (guest tokens like tg-xxx are not) */
 const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+const getUserBranchId = (user: unknown): string | null => {
+  if (!user || typeof user !== 'object') return null
+  const branchId = (user as { branch_id?: unknown }).branch_id
+  return typeof branchId === 'string' && isUUID(branchId) ? branchId : null
+}
 
 /** Convert result to array */
 const rows = (result: any): any[] => Array.isArray(result) ? result : (result?.rows ?? [])
@@ -350,8 +355,9 @@ adminRoutes.get('/students', requirePermission(Permission.STUDENTS_READ), zValid
     }
 
     // Role-based filtering
-    if (user.role === Role.TEACHER && (user as any).branch_id) {
-      conditions.push(sql`s.branch_id = ${(user as any).branch_id}`)
+    const teacherBranchId = getUserBranchId(user)
+    if (user.role === Role.TEACHER && teacherBranchId) {
+      conditions.push(sql`s.branch_id = ${teacherBranchId}`)
     } else if (user.role === Role.PARENT && isUUID(user.id)) {
       conditions.push(sql`s.id IN (SELECT student_id FROM parent_students WHERE parent_id = ${user.id})`)
     }
@@ -404,19 +410,55 @@ adminRoutes.get('/students/:id',
       }
 
       // Role check
-      if (user.role === Role.TEACHER && (user as any).branch_id && student.branch_id !== (user as any).branch_id) {
+      const teacherBranchId = getUserBranchId(user)
+      if (user.role === Role.TEACHER && teacherBranchId && student.branch_id !== teacherBranchId) {
         return forbidden(c, 'Access denied')
       }
       if (user.role === Role.PARENT && isUUID(user.id)) {
-        const [link] = await db.execute(sql`SELECT 1 FROM parent_students WHERE student_id = ${studentId} AND parent_id = ${user.id}`) as any[]
+        const [link] = await db.execute(sql`
+          SELECT 1
+          FROM parent_students ps
+          JOIN students s ON s.id = ps.student_id
+          WHERE ps.student_id = ${studentId}
+            AND ps.parent_id = ${user.id}
+            AND s.tenant_id = ${tenantId}
+            AND s.deleted_at IS NULL
+          LIMIT 1
+        `) as any[]
         if (!link) {
           return forbidden(c, 'Access denied')
         }
       }
 
-      const enrollments = await db.execute(sql`SELECT * FROM enrollments WHERE student_id = ${studentId} ORDER BY status, start_date DESC`)
-      const attendance = await db.execute(sql`SELECT * FROM attendance WHERE student_id = ${studentId} ORDER BY date DESC LIMIT 30`)
-      const grades = await db.execute(sql`SELECT * FROM grades WHERE student_id = ${studentId} ORDER BY date DESC LIMIT 20`)
+      const enrollments = await db.execute(sql`
+        SELECT e.*
+        FROM enrollments e
+        JOIN students s ON s.id = e.student_id
+        WHERE e.student_id = ${studentId}
+          AND s.tenant_id = ${tenantId}
+          AND s.deleted_at IS NULL
+        ORDER BY e.status, e.start_date DESC
+      `)
+      const attendance = await db.execute(sql`
+        SELECT a.*
+        FROM attendance a
+        JOIN students s ON s.id = a.student_id
+        WHERE a.student_id = ${studentId}
+          AND s.tenant_id = ${tenantId}
+          AND s.deleted_at IS NULL
+        ORDER BY a.date DESC
+        LIMIT 30
+      `)
+      const grades = await db.execute(sql`
+        SELECT g.*
+        FROM grades g
+        JOIN students s ON s.id = g.student_id
+        WHERE g.student_id = ${studentId}
+          AND s.tenant_id = ${tenantId}
+          AND s.deleted_at IS NULL
+        ORDER BY g.date DESC
+        LIMIT 20
+      `)
 
       return success(c, { student, enrollments: rows(enrollments), attendance: rows(attendance), grades: rows(grades) })
     } catch (err: any) {
