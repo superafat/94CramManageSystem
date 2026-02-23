@@ -3,8 +3,25 @@ import { db } from '../db/index';
 import { stockItems } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
+import { z } from 'zod';
 
 const app = new Hono();
+const nonEmptyString = z.string().trim().min(1);
+const itemCreateSchema = z.object({
+  categoryId: z.string().uuid().optional(),
+  name: nonEmptyString,
+  sku: z.string().optional(),
+  unit: nonEmptyString,
+  safetyStock: z.number().int().min(0).optional(),
+  schoolYear: z.string().optional(),
+  version: z.string().optional(),
+  description: z.string().optional(),
+  isActive: z.boolean().optional(),
+});
+const itemUpdateSchema = itemCreateSchema.partial().refine(
+  (data) => Object.keys(data).length > 0,
+  { message: 'At least one field is required' }
+);
 
 app.use('*', tenantMiddleware);
 
@@ -36,7 +53,11 @@ app.get('/:id', async (c) => {
 // POST create item
 app.post('/', async (c) => {
   const tenantId = getTenantId(c);
-  const body = await c.req.json();
+  const parsedBody = itemCreateSchema.safeParse(await c.req.json());
+  if (!parsedBody.success) {
+    return c.json({ error: 'Invalid input' }, 400);
+  }
+  const body = parsedBody.data;
   
   const [item] = await db.insert(stockItems)
     .values({
@@ -60,7 +81,11 @@ app.post('/', async (c) => {
 app.put('/:id', async (c) => {
   const id = c.req.param('id');
   const tenantId = getTenantId(c);
-  const body = await c.req.json();
+  const parsedBody = itemUpdateSchema.safeParse(await c.req.json());
+  if (!parsedBody.success) {
+    return c.json({ error: 'Invalid input' }, 400);
+  }
+  const body = parsedBody.data;
   
   const [item] = await db.update(stockItems)
     .set({
