@@ -8,14 +8,14 @@ import { z } from 'zod';
 
 const app = new Hono();
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
-const positiveNumber = z.number().positive();
+const positiveInteger = z.number().int().positive();
 const nonEmptyString = z.string().trim().min(1);
 const uuidString = z.string().uuid();
 const optionalUuid = z.string().uuid().optional();
 const stockInSchema = z.object({
   warehouseId: uuidString,
   itemId: uuidString.optional(),
-  quantity: positiveNumber,
+  quantity: positiveInteger,
   referenceId: optionalUuid,
   referenceType: z.string().optional(),
   barcode: z.string().optional()
@@ -23,7 +23,7 @@ const stockInSchema = z.object({
 const stockOutSchema = z.object({
   warehouseId: uuidString,
   itemId: uuidString.optional(),
-  quantity: positiveNumber,
+  quantity: positiveInteger,
   transactionType: z.string().optional(),
   referenceId: optionalUuid,
   recipientName: z.string().optional(),
@@ -34,7 +34,7 @@ const transferSchema = z.object({
   fromWarehouseId: uuidString,
   toWarehouseId: uuidString,
   itemId: uuidString,
-  quantity: positiveNumber,
+  quantity: positiveInteger,
   notes: z.string().optional()
 }).refine(
   (data) => data.fromWarehouseId !== data.toWarehouseId,
