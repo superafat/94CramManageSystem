@@ -23,14 +23,19 @@ const parseBoundedIntQuery = (
 }
 
 const studentSchema = z.object({
-  name: z.string().min(1).max(100),
+  name: z.string().trim().min(1).max(100),
   classId: z.string().uuid().optional(),
-  nfcId: z.string().min(1).max(50).optional(),
+  nfcId: z.string().trim().min(1).max(50).optional(),
   birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional(),
-  schoolName: z.string().max(100).optional(),
-  grade: z.string().max(50).optional(),
-  notes: z.string().max(500).optional(),
-})
+  schoolName: z.string().trim().max(100).optional(),
+  grade: z.string().trim().max(50).optional(),
+  notes: z.string().trim().max(500).optional(),
+}).strict()
+
+const studentUpdateSchema = studentSchema.partial().refine(
+  (data) => Object.keys(data).length > 0,
+  'At least one field is required'
+)
 
 const studentIdParamSchema = z.object({
   id: z.string().uuid('Invalid student ID format'),
@@ -145,7 +150,7 @@ studentsRouter.get('/:id', zValidator('param', studentIdParamSchema), async (c) 
 studentsRouter.put(
   '/:id',
   zValidator('param', studentIdParamSchema),
-  zValidator('json', studentSchema.partial()),
+  zValidator('json', studentUpdateSchema),
   async (c) => {
   try {
     const { id } = c.req.valid('param')
@@ -180,7 +185,11 @@ studentsRouter.put(
 
     const [updated] = await db
       .update(students)
-      .set(body)
+      .set(
+        Object.fromEntries(
+          Object.entries(body).filter(([, value]) => value !== undefined)
+        )
+      )
       .where(and(eq(students.id, id), eq(students.schoolId, schoolId)))
       .returning()
     return c.json({ success: true, student: updated })
