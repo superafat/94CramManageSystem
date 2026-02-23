@@ -7,7 +7,6 @@ import { zValidator } from '@hono/zod-validator'
 import { db } from '../db/index.js'
 import { classes, students } from '../db/schema.js'
 import { eq, sql, and } from 'drizzle-orm'
-import { isValidUUID } from '../utils/date.js'
 import type { Variables } from '../middleware/auth.js'
 
 const classesRouter = new Hono<{ Variables: Variables }>()
@@ -23,9 +22,18 @@ const classSchema = z.object({
   feeYearly: z.number().int().min(0).optional(),
 })
 
+const classIdParamSchema = z.object({
+  id: z.string().uuid('Invalid class ID format'),
+})
+
+const requireSchoolId = (schoolId: string | undefined) => {
+  return typeof schoolId === 'string' && schoolId.trim().length > 0 ? schoolId : null
+}
+
 classesRouter.get('/', async (c) => {
   try {
-    const schoolId = c.get('schoolId')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
     const allClasses = await db.select().from(classes).where(eq(classes.schoolId, schoolId))
     return c.json({ classes: allClasses })
   } catch (e) {
@@ -37,7 +45,8 @@ classesRouter.get('/', async (c) => {
 classesRouter.post('/', zValidator('json', classSchema), async (c) => {
   try {
     const body = c.req.valid('json')
-    const schoolId = c.get('schoolId')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
 
     const [existingClass] = await db.select().from(classes)
       .where(and(eq(classes.schoolId, schoolId), eq(classes.name, body.name)))
@@ -54,15 +63,16 @@ classesRouter.post('/', zValidator('json', classSchema), async (c) => {
   }
 })
 
-classesRouter.get('/:id', async (c) => {
+classesRouter.get('/:id', zValidator('param', classIdParamSchema), async (c) => {
   try {
-    const id = c.req.param('id')
-    const schoolId = c.get('schoolId')
+    const { id } = c.req.valid('param')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
 
-    if (!isValidUUID(id)) return c.json({ error: 'Invalid class ID format' }, 400)
-
-    const [classData] = await db.select().from(classes).where(eq(classes.id, id))
-    if (!classData || classData.schoolId !== schoolId) {
+    const [classData] = await db.select().from(classes).where(
+      and(eq(classes.id, id), eq(classes.schoolId, schoolId))
+    )
+    if (!classData) {
       return c.json({ error: 'Class not found' }, 404)
     }
 
@@ -73,16 +83,21 @@ classesRouter.get('/:id', async (c) => {
   }
 })
 
-classesRouter.put('/:id', zValidator('json', classSchema.partial()), async (c) => {
+classesRouter.put(
+  '/:id',
+  zValidator('param', classIdParamSchema),
+  zValidator('json', classSchema.partial()),
+  async (c) => {
   try {
-    const id = c.req.param('id')
-    const schoolId = c.get('schoolId')
+    const { id } = c.req.valid('param')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
     const body = c.req.valid('json')
 
-    if (!isValidUUID(id)) return c.json({ error: 'Invalid class ID format' }, 400)
-
-    const [existing] = await db.select().from(classes).where(eq(classes.id, id))
-    if (!existing || existing.schoolId !== schoolId) {
+    const [existing] = await db.select().from(classes).where(
+      and(eq(classes.id, id), eq(classes.schoolId, schoolId))
+    )
+    if (!existing) {
       return c.json({ error: 'Class not found' }, 404)
     }
 
@@ -92,7 +107,9 @@ classesRouter.put('/:id', zValidator('json', classSchema.partial()), async (c) =
       if (dup) return c.json({ error: 'Class name already exists' }, 400)
     }
 
-    const [updated] = await db.update(classes).set(body).where(eq(classes.id, id)).returning()
+    const [updated] = await db.update(classes).set(body).where(
+      and(eq(classes.id, id), eq(classes.schoolId, schoolId))
+    ).returning()
     return c.json({ success: true, class: updated })
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error updating class:', e instanceof Error ? e.message : 'Unknown error')
@@ -100,28 +117,29 @@ classesRouter.put('/:id', zValidator('json', classSchema.partial()), async (c) =
   }
 })
 
-classesRouter.delete('/:id', async (c) => {
+classesRouter.delete('/:id', zValidator('param', classIdParamSchema), async (c) => {
   try {
-    const id = c.req.param('id')
-    const schoolId = c.get('schoolId')
+    const { id } = c.req.valid('param')
+    const schoolId = requireSchoolId(c.get('schoolId'))
+    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
 
-    if (!isValidUUID(id)) return c.json({ error: 'Invalid class ID format' }, 400)
-
-    const [existing] = await db.select().from(classes).where(eq(classes.id, id))
-    if (!existing || existing.schoolId !== schoolId) {
+    const [existing] = await db.select().from(classes).where(
+      and(eq(classes.id, id), eq(classes.schoolId, schoolId))
+    )
+    if (!existing) {
       return c.json({ error: 'Class not found' }, 404)
     }
 
     const [studentCount] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(students)
-      .where(eq(students.classId, id))
+      .where(and(eq(students.classId, id), eq(students.schoolId, schoolId)))
 
     if (studentCount && studentCount.count > 0) {
       return c.json({ error: 'Cannot delete class with enrolled students', studentCount: studentCount.count }, 400)
     }
 
-    await db.delete(classes).where(eq(classes.id, id))
+    await db.delete(classes).where(and(eq(classes.id, id), eq(classes.schoolId, schoolId)))
     return c.json({ success: true })
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error deleting class:', e instanceof Error ? e.message : 'Unknown error')
