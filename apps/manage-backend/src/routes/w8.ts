@@ -67,8 +67,8 @@ w8Routes.get('/teachers', requirePermission(Permission.SCHEDULE_READ), zValidato
       return badRequest(c, 'Missing tenant context')
     }
     const conditions = [sql`1=1`]
-    // 優先使用 user 的 tenant_id
-    conditions.push(sql`t.tenant_id = ${query.tenant_id || user.tenant_id}`)
+    // 優先使用 user 的 tenant_id，避免 query 覆寫造成跨租戶讀取
+    conditions.push(sql`t.tenant_id = ${user?.tenant_id ?? query.tenant_id}`)
     if (query.branch_id) conditions.push(sql`t.branch_id = ${query.branch_id}`)
     if (query.status) conditions.push(sql`t.status = ${query.status}`)
     
@@ -118,7 +118,7 @@ w8Routes.post('/teachers', requireRole(Role.ADMIN, Role.MANAGER), zValidator('js
     
     const result = await db.execute(sql`
       INSERT INTO teachers (user_id, tenant_id, branch_id, name, title, phone, rate_per_class)
-      VALUES (${body.userId || null}, ${body.tenantId || user.tenant_id}, ${body.branchId}, 
+      VALUES (${body.userId || null}, ${user?.tenant_id ?? body.tenantId}, ${body.branchId}, 
               ${sanitizeString(body.name)}, ${sanitizeString(body.title)}, ${body.phone || null}, ${body.ratePerClass})
       RETURNING *
     `)
@@ -208,7 +208,7 @@ w8Routes.get('/courses', requirePermission(Permission.SCHEDULE_READ), zValidator
       return badRequest(c, 'Missing tenant context')
     }
     const conditions = [sql`1=1`]
-    conditions.push(sql`c.tenant_id = ${query.tenant_id || user.tenant_id}`)
+    conditions.push(sql`c.tenant_id = ${user?.tenant_id ?? query.tenant_id}`)
     if (query.branch_id) conditions.push(sql`c.branch_id = ${query.branch_id}`)
     if (query.subject) conditions.push(sql`c.subject = ${query.subject}`)
     if (query.status) conditions.push(sql`c.status = ${query.status}`)
@@ -267,7 +267,7 @@ w8Routes.post('/courses', requirePermission(Permission.SCHEDULE_WRITE), zValidat
     
     const result = await db.execute(sql`
       INSERT INTO courses (tenant_id, branch_id, name, subject, duration_minutes, max_students)
-      VALUES (${body.tenantId || user.tenant_id}, ${body.branchId}, ${sanitizeString(body.name)}, 
+      VALUES (${user?.tenant_id ?? body.tenantId}, ${body.branchId}, ${sanitizeString(body.name)}, 
               ${body.subject ? sanitizeString(body.subject) : null}, ${body.durationMinutes}, ${body.maxStudents})
       RETURNING *
     `)
