@@ -31,7 +31,10 @@ jobs:
 
       - name: Build & Push
         run: |
-          docker build -t ${{ env.REGISTRY }}/94portal:${{ github.sha }} apps/portal/
+          docker build \
+            -f apps/portal/Dockerfile \
+            -t ${{ env.REGISTRY }}/94portal:${{ github.sha }} \
+            .
           docker push ${{ env.REGISTRY }}/94portal:${{ github.sha }}
 
       - name: Deploy to Cloud Run
