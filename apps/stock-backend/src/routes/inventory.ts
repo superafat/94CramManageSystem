@@ -40,6 +40,10 @@ const transferSchema = z.object({
   (data) => data.fromWarehouseId !== data.toWarehouseId,
   { message: 'Source and destination warehouse must be different' }
 );
+const transactionQuerySchema = z.object({
+  warehouseId: uuidString.optional(),
+  itemId: uuidString.optional(),
+});
 
 app.use('*', tenantMiddleware);
 
@@ -285,8 +289,16 @@ app.post('/transfer', async (c) => {
 // GET transaction history
 app.get('/transactions', async (c) => {
   const tenantId = getTenantId(c);
-  const warehouseId = c.req.query('warehouseId');
-  const itemId = c.req.query('itemId');
+  const parsedQuery = transactionQuerySchema.safeParse({
+    warehouseId: c.req.query('warehouseId'),
+    itemId: c.req.query('itemId'),
+  });
+
+  if (!parsedQuery.success) {
+    return c.json({ error: 'Invalid query parameters' }, 400);
+  }
+
+  const { warehouseId, itemId } = parsedQuery.data;
 
   const conditions = [eq(stockTransactions.tenantId, tenantId)];
   
