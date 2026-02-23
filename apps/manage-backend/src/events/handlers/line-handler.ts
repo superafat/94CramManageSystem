@@ -74,11 +74,14 @@ class LineEventHandler implements EventHandler {
 
         // 4. 查詢用戶的 line_user_id
         const user = await db.query.users.findFirst({
-          where: eq(users.id, recipientId)
+          where: and(
+            eq(users.id, recipientId),
+            eq(users.tenantId, tenantId)
+          )
         })
 
         if (!user?.lineUserId) {
-          await this.updateNotificationStatus(notification.id, 'failed', 'User has no line_user_id')
+          await this.updateNotificationStatus(notification.id, tenantId, 'failed', 'User has no line_user_id')
           results.failedCount++
           results.errors.push({
             recipientId,
@@ -96,10 +99,10 @@ class LineEventHandler implements EventHandler {
 
         // 6. 更新狀態
         if (sendResult.success) {
-          await this.updateNotificationStatus(notification.id, 'sent')
+          await this.updateNotificationStatus(notification.id, tenantId, 'sent')
           results.sentCount++
         } else {
-          await this.updateNotificationStatus(notification.id, 'failed', sendResult.error)
+          await this.updateNotificationStatus(notification.id, tenantId, 'failed', sendResult.error)
           results.failedCount++
           results.errors.push({
             recipientId,
@@ -129,10 +132,11 @@ class LineEventHandler implements EventHandler {
    */
   private async updateNotificationStatus(
     notificationId: string,
+    tenantId: string,
     status: NotificationStatus,
     errorMessage?: string
   ): Promise<void> {
-    const updateData: any = { status }
+    const updateData: Partial<typeof notifications.$inferInsert> = { status }
 
     if (status === 'sent') {
       updateData.sentAt = new Date()
@@ -144,7 +148,12 @@ class LineEventHandler implements EventHandler {
 
     await db.update(notifications)
       .set(updateData)
-      .where(eq(notifications.id, notificationId))
+      .where(
+        and(
+          eq(notifications.id, notificationId),
+          eq(notifications.tenantId, tenantId)
+        )
+      )
   }
 }
 
