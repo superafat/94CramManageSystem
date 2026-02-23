@@ -7,7 +7,6 @@ import { zValidator } from '@hono/zod-validator'
 import { db } from '../db/index.js'
 import { students, classes } from '../db/schema.js'
 import { eq, sql, and } from 'drizzle-orm'
-import { isValidUUID } from '../utils/date.js'
 import type { Variables } from '../middleware/auth.js'
 
 const studentsRouter = new Hono<{ Variables: Variables }>()
@@ -31,6 +30,10 @@ const studentSchema = z.object({
   schoolName: z.string().max(100).optional(),
   grade: z.string().max(50).optional(),
   notes: z.string().max(500).optional(),
+})
+
+const studentIdParamSchema = z.object({
+  id: z.string().uuid('Invalid student ID format'),
 })
 
 // 學生列表
@@ -70,15 +73,19 @@ studentsRouter.post('/', zValidator('json', studentSchema), async (c) => {
     const schoolId = c.get('schoolId')
 
     if (body.classId) {
-      const [classExists] = await db.select().from(classes).where(eq(classes.id, body.classId))
-      if (!classExists || classExists.schoolId !== schoolId) {
+      const [classExists] = await db.select().from(classes).where(
+        and(eq(classes.id, body.classId), eq(classes.schoolId, schoolId))
+      )
+      if (!classExists) {
         return c.json({ error: 'Invalid class ID' }, 400)
       }
     }
 
     if (body.nfcId) {
-      const [existingNfc] = await db.select().from(students).where(eq(students.nfcId, body.nfcId))
-      if (existingNfc && existingNfc.schoolId === schoolId) {
+      const [existingNfc] = await db.select().from(students).where(
+        and(eq(students.nfcId, body.nfcId), eq(students.schoolId, schoolId))
+      )
+      if (existingNfc) {
         return c.json({ error: 'NFC ID already in use' }, 400)
       }
     }
@@ -102,17 +109,15 @@ studentsRouter.post('/', zValidator('json', studentSchema), async (c) => {
 })
 
 // 學生詳情
-studentsRouter.get('/:id', async (c) => {
+studentsRouter.get('/:id', zValidator('param', studentIdParamSchema), async (c) => {
   try {
-    const id = c.req.param('id')
+    const { id } = c.req.valid('param')
     const schoolId = c.get('schoolId')
 
-    if (!isValidUUID(id)) {
-      return c.json({ error: 'Invalid student ID format' }, 400)
-    }
-
-    const [student] = await db.select().from(students).where(eq(students.id, id))
-    if (!student || student.schoolId !== schoolId) {
+    const [student] = await db.select().from(students).where(
+      and(eq(students.id, id), eq(students.schoolId, schoolId))
+    )
+    if (!student) {
       return c.json({ error: 'Student not found' }, 404)
     }
 
@@ -124,36 +129,46 @@ studentsRouter.get('/:id', async (c) => {
 })
 
 // 更新學生
-studentsRouter.put('/:id', zValidator('json', studentSchema.partial()), async (c) => {
+studentsRouter.put(
+  '/:id',
+  zValidator('param', studentIdParamSchema),
+  zValidator('json', studentSchema.partial()),
+  async (c) => {
   try {
-    const id = c.req.param('id')
+    const { id } = c.req.valid('param')
     const schoolId = c.get('schoolId')
     const body = c.req.valid('json')
 
-    if (!isValidUUID(id)) {
-      return c.json({ error: 'Invalid student ID format' }, 400)
-    }
-
-    const [existing] = await db.select().from(students).where(eq(students.id, id))
-    if (!existing || existing.schoolId !== schoolId) {
+    const [existing] = await db.select().from(students).where(
+      and(eq(students.id, id), eq(students.schoolId, schoolId))
+    )
+    if (!existing) {
       return c.json({ error: 'Student not found' }, 404)
     }
 
     if (body.classId) {
-      const [classExists] = await db.select().from(classes).where(eq(classes.id, body.classId))
-      if (!classExists || classExists.schoolId !== schoolId) {
+      const [classExists] = await db.select().from(classes).where(
+        and(eq(classes.id, body.classId), eq(classes.schoolId, schoolId))
+      )
+      if (!classExists) {
         return c.json({ error: 'Invalid class ID' }, 400)
       }
     }
 
     if (body.nfcId && body.nfcId !== existing.nfcId) {
-      const [existingNfc] = await db.select().from(students).where(eq(students.nfcId, body.nfcId))
-      if (existingNfc && existingNfc.schoolId === schoolId && existingNfc.id !== id) {
+      const [existingNfc] = await db.select().from(students).where(
+        and(eq(students.nfcId, body.nfcId), eq(students.schoolId, schoolId))
+      )
+      if (existingNfc && existingNfc.id !== id) {
         return c.json({ error: 'NFC ID already in use' }, 400)
       }
     }
 
-    const [updated] = await db.update(students).set(body).where(eq(students.id, id)).returning()
+    const [updated] = await db
+      .update(students)
+      .set(body)
+      .where(and(eq(students.id, id), eq(students.schoolId, schoolId)))
+      .returning()
     return c.json({ success: true, student: updated })
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error updating student:', e instanceof Error ? e.message : 'Unknown error')
@@ -162,21 +177,19 @@ studentsRouter.put('/:id', zValidator('json', studentSchema.partial()), async (c
 })
 
 // 刪除學生
-studentsRouter.delete('/:id', async (c) => {
+studentsRouter.delete('/:id', zValidator('param', studentIdParamSchema), async (c) => {
   try {
-    const id = c.req.param('id')
+    const { id } = c.req.valid('param')
     const schoolId = c.get('schoolId')
 
-    if (!isValidUUID(id)) {
-      return c.json({ error: 'Invalid student ID format' }, 400)
-    }
-
-    const [existing] = await db.select().from(students).where(eq(students.id, id))
-    if (!existing || existing.schoolId !== schoolId) {
+    const [existing] = await db.select().from(students).where(
+      and(eq(students.id, id), eq(students.schoolId, schoolId))
+    )
+    if (!existing) {
       return c.json({ error: 'Student not found' }, 404)
     }
 
-    await db.delete(students).where(eq(students.id, id))
+    await db.delete(students).where(and(eq(students.id, id), eq(students.schoolId, schoolId)))
     return c.json({ success: true })
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error deleting student:', e instanceof Error ? e.message : 'Unknown error')
