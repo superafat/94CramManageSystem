@@ -162,8 +162,8 @@ export default function BillingPage() {
       await api.createPaymentRecordsBatch(records)
       showMessage(`✅ 成功為 ${records.length} 位學生繳費！`)
       fetchBilling() // 重新載入
-    } catch (e: any) {
-      showMessage(`❌ ${e.message || '繳費失敗'}`)
+    } catch (e) {
+      showMessage(`❌ ${e instanceof Error ? e.message : '繳費失敗'}`)
     }
     setSubmitting(false)
   }
