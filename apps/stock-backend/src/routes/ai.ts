@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { authMiddleware, getAuthUser } from '../middleware/auth';
 import { getTenantId, tenantMiddleware } from '../middleware/tenant';
 import {
@@ -10,6 +11,13 @@ import {
 } from '../services/ai-predictions';
 
 const app = new Hono();
+const semesterPredictionSchema = z.object({
+  schoolYear: z.string().trim().min(1),
+  semester: z.string().trim().min(1),
+  classCount: z.coerce.number().int().min(0).default(0),
+  studentCount: z.coerce.number().int().min(0).default(0),
+});
+
 app.use('*', authMiddleware, tenantMiddleware);
 
 app.get('/predictions', async (c) => {
@@ -20,14 +28,12 @@ app.get('/predictions', async (c) => {
 
 app.post('/predictions/semester', async (c) => {
   const tenantId = getTenantId(c);
-  const body = await c.req.json();
-  const schoolYear = typeof body.schoolYear === 'string' ? body.schoolYear : '';
-  const semester = typeof body.semester === 'string' ? body.semester : '';
-  const classCount = Number(body.classCount || 0);
-  const studentCount = Number(body.studentCount || 0);
-  if (!schoolYear || !semester) {
-    return c.json({ error: 'schoolYear and semester are required' }, 400);
+  const parsedBody = semesterPredictionSchema.safeParse(await c.req.json());
+  if (!parsedBody.success) {
+    return c.json({ error: 'Invalid input' }, 400);
   }
+
+  const { schoolYear, semester, classCount, studentCount } = parsedBody.data;
   const result = await runSemesterPrediction(tenantId, { schoolYear, semester, classCount, studentCount });
   return c.json(result);
 });
