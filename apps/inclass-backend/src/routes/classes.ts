@@ -33,12 +33,12 @@ const requireSchoolId = (schoolId: string | undefined) => {
 classesRouter.get('/', async (c) => {
   try {
     const schoolId = requireSchoolId(c.get('schoolId'))
-    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
+    if (!schoolId) return c.json({ success: false, data: null, error: 'Unauthorized' }, 401)
     const allClasses = await db.select().from(classes).where(eq(classes.schoolId, schoolId))
-    return c.json({ classes: allClasses })
+    return c.json({ success: true, data: { classes: allClasses }, error: null })
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error fetching classes:', e instanceof Error ? e.message : 'Unknown error')
-    return c.json({ error: 'Failed to fetch classes' }, 500)
+    return c.json({ success: false, data: null, error: 'Failed to fetch classes' }, 500)
   }
 })
 
@@ -46,20 +46,20 @@ classesRouter.post('/', zValidator('json', classSchema), async (c) => {
   try {
     const body = c.req.valid('json')
     const schoolId = requireSchoolId(c.get('schoolId'))
-    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
+    if (!schoolId) return c.json({ success: false, data: null, error: 'Unauthorized' }, 401)
 
     const [existingClass] = await db.select().from(classes)
       .where(and(eq(classes.schoolId, schoolId), eq(classes.name, body.name)))
 
     if (existingClass) {
-      return c.json({ error: 'Class name already exists' }, 400)
+      return c.json({ success: false, data: null, error: 'Class name already exists' }, 400)
     }
 
     const [newClass] = await db.insert(classes).values({ ...body, schoolId }).returning()
-    return c.json({ success: true, class: newClass }, 201)
+    return c.json({ success: true, data: { class: newClass }, error: null }, 201)
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error creating class:', e instanceof Error ? e.message : 'Unknown error')
-    return c.json({ error: 'Failed to create class' }, 500)
+    return c.json({ success: false, data: null, error: 'Failed to create class' }, 500)
   }
 })
 
@@ -67,19 +67,19 @@ classesRouter.get('/:id', zValidator('param', classIdParamSchema), async (c) => 
   try {
     const { id } = c.req.valid('param')
     const schoolId = requireSchoolId(c.get('schoolId'))
-    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
+    if (!schoolId) return c.json({ success: false, data: null, error: 'Unauthorized' }, 401)
 
     const [classData] = await db.select().from(classes).where(
       and(eq(classes.id, id), eq(classes.schoolId, schoolId))
     )
     if (!classData) {
-      return c.json({ error: 'Class not found' }, 404)
+      return c.json({ success: false, data: null, error: 'Class not found' }, 404)
     }
 
-    return c.json({ class: classData })
+    return c.json({ success: true, data: { class: classData }, error: null })
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error fetching class:', e instanceof Error ? e.message : 'Unknown error')
-    return c.json({ error: 'Failed to fetch class' }, 500)
+    return c.json({ success: false, data: null, error: 'Failed to fetch class' }, 500)
   }
 })
 
@@ -91,29 +91,29 @@ classesRouter.put(
   try {
     const { id } = c.req.valid('param')
     const schoolId = requireSchoolId(c.get('schoolId'))
-    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
+    if (!schoolId) return c.json({ success: false, data: null, error: 'Unauthorized' }, 401)
     const body = c.req.valid('json')
 
     const [existing] = await db.select().from(classes).where(
       and(eq(classes.id, id), eq(classes.schoolId, schoolId))
     )
     if (!existing) {
-      return c.json({ error: 'Class not found' }, 404)
+      return c.json({ success: false, data: null, error: 'Class not found' }, 404)
     }
 
     if (body.name && body.name !== existing.name) {
       const [dup] = await db.select().from(classes)
         .where(and(eq(classes.schoolId, schoolId), eq(classes.name, body.name)))
-      if (dup) return c.json({ error: 'Class name already exists' }, 400)
+      if (dup) return c.json({ success: false, data: null, error: 'Class name already exists' }, 400)
     }
 
     const [updated] = await db.update(classes).set(body).where(
       and(eq(classes.id, id), eq(classes.schoolId, schoolId))
     ).returning()
-    return c.json({ success: true, class: updated })
+    return c.json({ success: true, data: { class: updated }, error: null })
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error updating class:', e instanceof Error ? e.message : 'Unknown error')
-    return c.json({ error: 'Failed to update class' }, 500)
+    return c.json({ success: false, data: null, error: 'Failed to update class' }, 500)
   }
 })
 
@@ -121,13 +121,13 @@ classesRouter.delete('/:id', zValidator('param', classIdParamSchema), async (c) 
   try {
     const { id } = c.req.valid('param')
     const schoolId = requireSchoolId(c.get('schoolId'))
-    if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
+    if (!schoolId) return c.json({ success: false, data: null, error: 'Unauthorized' }, 401)
 
     const [existing] = await db.select().from(classes).where(
       and(eq(classes.id, id), eq(classes.schoolId, schoolId))
     )
     if (!existing) {
-      return c.json({ error: 'Class not found' }, 404)
+      return c.json({ success: false, data: null, error: 'Class not found' }, 404)
     }
 
     const [studentCount] = await db
@@ -136,14 +136,18 @@ classesRouter.delete('/:id', zValidator('param', classIdParamSchema), async (c) 
       .where(and(eq(students.classId, id), eq(students.schoolId, schoolId)))
 
     if (studentCount && studentCount.count > 0) {
-      return c.json({ error: 'Cannot delete class with enrolled students', studentCount: studentCount.count }, 400)
+      return c.json({
+        success: false,
+        data: { studentCount: studentCount.count },
+        error: 'Cannot delete class with enrolled students'
+      }, 400)
     }
 
     await db.delete(classes).where(and(eq(classes.id, id), eq(classes.schoolId, schoolId)))
-    return c.json({ success: true })
+    return c.json({ success: true, data: { deleted: true }, error: null })
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error deleting class:', e instanceof Error ? e.message : 'Unknown error')
-    return c.json({ error: 'Failed to delete class' }, 500)
+    return c.json({ success: false, data: null, error: 'Failed to delete class' }, 500)
   }
 })
 
