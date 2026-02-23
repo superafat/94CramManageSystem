@@ -1,11 +1,30 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { BackButton } from '@/components/ui/BackButton'
 
 // TODO: 後端尚未提供 conversation list API，目前使用 demo 數據
 // 等待後端實作：GET /api/admin/conversations?tenantId=xxx&branchId=xxx
 // 預期回傳格式：{ conversations: Array<Conversation> }
-const demoConversations = [
+
+interface Message {
+  role: 'user' | 'ai'
+  text: string
+}
+
+interface Conversation {
+  id: number
+  user: string
+  userId: string
+  time: string
+  messages: Message[]
+  intent: string
+  model: string
+  latency: string
+  ragUsed: boolean
+}
+
+const demoConversations: Conversation[] = [
   {
     id: 1, user: '王媽媽', userId: 'TG_001', time: '08:35',
     messages: [
@@ -41,6 +60,28 @@ const demoConversations = [
 ]
 
 export default function ConversationsPage() {
+  const [conversations, setConversations] = useState<Conversation[] | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Simulate API call
+    const loadConversations = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 800))
+        setConversations(demoConversations)
+      } catch (err) {
+        setError('載入對話紀錄失敗')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadConversations()
+  }, [])
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -67,9 +108,55 @@ export default function ConversationsPage() {
         ))}
       </div>
 
+      {/* Loading State */}
+      {isLoading && (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-surface rounded-2xl border border-border p-5 animate-pulse">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-surface-hover" />
+                <div className="space-y-2">
+                  <div className="h-4 w-20 bg-surface-hover rounded" />
+                  <div className="h-3 w-32 bg-surface-hover rounded" />
+                </div>
+              </div>
+              <div className="space-y-2 ml-13">
+                <div className="h-3 w-3/4 bg-surface-hover rounded" />
+                <div className="h-3 w-full bg-surface-hover rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && !isLoading && (
+        <div className="bg-surface rounded-2xl border border-border p-8 text-center">
+          <div className="text-4xl mb-3">😵</div>
+          <h3 className="text-lg font-medium text-text mb-2">{error}</h3>
+          <p className="text-sm text-text-muted mb-4">請檢查網路連線或稍後再試</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            重新載入
+          </button>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && !error && conversations && conversations.length === 0 && (
+        <div className="bg-surface rounded-2xl border border-border p-8 text-center">
+          <div className="text-5xl mb-3">💬</div>
+          <h3 className="text-lg font-medium text-text mb-2">尚無對話紀錄</h3>
+          <p className="text-sm text-text-muted">等待用戶開始與 AI 客服對話</p>
+        </div>
+      )}
+
       {/* Conversation List */}
-      <div className="space-y-4">
-        {demoConversations.map((conv) => (
+      {!isLoading && !error && conversations && conversations.length > 0 && (
+        <div className="space-y-4">
+        {conversations.map((conv) => (
           <div key={conv.id} className="bg-surface rounded-2xl border border-border p-5">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
@@ -107,7 +194,8 @@ export default function ConversationsPage() {
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
