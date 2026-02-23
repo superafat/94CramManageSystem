@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from '../db/index';
 import { stockBarcodes, stockInventory, stockTransactions, stockItems, stockWarehouses } from '../db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, gte, sql } from 'drizzle-orm';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { sendLowStockAlert } from '../services/notifications';
 
@@ -129,28 +129,24 @@ app.post('/out', async (c) => {
     return c.json({ error: 'Invalid input' }, 400);
   }
 
-  // Check current stock
-  const [inventory] = await db.select()
-    .from(stockInventory)
-      .where(and(
-        eq(stockInventory.tenantId, tenantId),
-        eq(stockInventory.warehouseId, warehouseId),
-        eq(stockInventory.itemId, itemId)
-      ));
+  const [updatedInventory] = await db.update(stockInventory)
+    .set({
+      quantity: sql`${stockInventory.quantity} - ${quantity}`,
+      lastUpdatedAt: new Date()
+    })
+    .where(and(
+      eq(stockInventory.tenantId, tenantId),
+      eq(stockInventory.warehouseId, warehouseId),
+      eq(stockInventory.itemId, itemId),
+      gte(stockInventory.quantity, quantity)
+    ))
+    .returning();
 
-  if (!inventory || inventory.quantity < quantity) {
+  if (!updatedInventory) {
     return c.json({ error: 'Insufficient stock' }, 400);
   }
 
-  // Update inventory
-  await db.update(stockInventory)
-    .set({ 
-      quantity: inventory.quantity - quantity,
-      lastUpdatedAt: new Date()
-    })
-    .where(eq(stockInventory.id, inventory.id));
-
-  const remainingQty = inventory.quantity - quantity;
+  const remainingQty = updatedInventory.quantity;
 
   // Record transaction
   await db.insert(stockTransactions).values({
