@@ -39,6 +39,7 @@ export default function AttendanceReportPage() {
   const { school } = useAuth()
   const [report, setReport] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -50,11 +51,14 @@ export default function AttendanceReportPage() {
 
   const fetchReport = async () => {
     setLoading(true)
+    setError('')
     try {
       const data = await api.getAttendanceReport(selectedMonth)
       setReport(data)
     } catch (e) {
       console.error('Failed to fetch report:', e)
+      setReport(null)
+      setError('讀取報表失敗，請稍後再試')
     } finally {
       setLoading(false)
     }
@@ -96,6 +100,28 @@ export default function AttendanceReportPage() {
 
   if (loading) {
     return <div style={{ padding: '20px', textAlign: 'center' }}>載入中...</div>
+  }
+
+  if (error) {
+    return (
+      <main style={{ padding: '20px', textAlign: 'center', color: 'var(--text-primary)' }}>
+        <div style={{ marginBottom: '12px', color: 'var(--error)' }}>{error}</div>
+        <button
+          onClick={fetchReport}
+          style={{ padding: '8px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--primary)', color: 'white', border: 'none', fontSize: '13px', cursor: 'pointer' }}
+        >
+          重新載入
+        </button>
+      </main>
+    )
+  }
+
+  if (!report) {
+    return (
+      <main style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+        目前沒有可顯示的報表資料
+      </main>
+    )
   }
 
   const dailyList = Object.entries(report?.dailyStats || {}).sort((a, b) => b[0].localeCompare(a[0]))
