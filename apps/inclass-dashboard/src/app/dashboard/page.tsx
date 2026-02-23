@@ -23,17 +23,22 @@ export default function DashboardPage() {
   const router = useRouter()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     fetchStats()
   }, [])
 
   const fetchStats = async () => {
+    setError('')
+    setLoading(true)
     try {
       const data = await api.getDashboardStats()
       setStats(data)
     } catch (e) {
       console.error('Failed to fetch stats:', e)
+      setError('讀取儀表板資料失敗，請稍後再試')
+      setStats(null)
     } finally {
       setLoading(false)
     }
@@ -44,6 +49,28 @@ export default function DashboardPage() {
       <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
         載入中...
       </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <main style={{ padding: '20px', textAlign: 'center', color: 'var(--text-primary)' }}>
+        <div style={{ marginBottom: '12px', color: 'var(--error)' }}>{error}</div>
+        <button
+          onClick={fetchStats}
+          style={{ padding: '8px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--primary)', color: 'white', border: 'none', fontSize: '13px', cursor: 'pointer' }}
+        >
+          重新載入
+        </button>
+      </main>
+    )
+  }
+
+  if (!stats) {
+    return (
+      <main style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+        目前沒有可顯示的儀表板資料
+      </main>
     )
   }
 
@@ -82,25 +109,25 @@ export default function DashboardPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' }}>
         <StatCard 
           title="總學生數" 
-          value={stats?.totalStudents || 0} 
+          value={stats.totalStudents} 
           emoji="👥" 
           color="var(--primary)" 
         />
         <StatCard 
           title="本月新增" 
-          value={stats?.newStudentsThisMonth || 0} 
+          value={stats.newStudentsThisMonth} 
           emoji="🆕" 
           color="var(--success)" 
         />
         <StatCard 
           title="今日出勤率" 
-          value={`${stats?.attendanceRate || 0}%`} 
+          value={`${stats.attendanceRate}%`} 
           emoji="📈" 
           color="var(--accent)" 
         />
         <StatCard 
           title="本月營收" 
-          value={`NT$ ${stats?.totalRevenue?.toLocaleString() || 0}`} 
+          value={`NT$ ${stats.totalRevenue.toLocaleString()}`} 
           emoji="💰" 
           color="var(--warning)" 
         />
@@ -112,10 +139,10 @@ export default function DashboardPage() {
           系統統計
         </h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-          <DetailRow label="總學生數" value={stats?.stats?.totalStudents || 0} />
-          <DetailRow label="活躍學生" value={stats?.stats?.activeStudents || 0} />
-          <DetailRow label="班級數" value={stats?.stats?.totalClasses || 0} />
-          <DetailRow label="教師數" value={stats?.stats?.totalTeachers || 0} />
+          <DetailRow label="總學生數" value={stats.stats.totalStudents} />
+          <DetailRow label="活躍學生" value={stats.stats.activeStudents} />
+          <DetailRow label="班級數" value={stats.stats.totalClasses} />
+          <DetailRow label="教師數" value={stats.stats.totalTeachers} />
         </div>
       </div>
 
