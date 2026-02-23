@@ -155,13 +155,21 @@ app.get('/purchases', async (c) => {
     return c.json({ error: 'Invalid query parameters' }, 400);
   }
   const { from, to } = parsedQuery.data;
+  const fromDate = from ? new Date(from) : undefined;
+  const toDate = to ? new Date(to) : undefined;
+  if (fromDate) {
+    fromDate.setHours(0, 0, 0, 0);
+  }
+  if (toDate) {
+    toDate.setHours(23, 59, 59, 999);
+  }
 
   const conditions: Array<ReturnType<typeof eq> | ReturnType<typeof gte> | ReturnType<typeof lte>> = [
     eq(stockPurchaseOrders.tenantId, tenantId),
     eq(stockPurchaseOrders.status, 'received'),
   ];
-  if (from) conditions.push(gte(stockPurchaseOrders.orderDate, from));
-  if (to) conditions.push(lte(stockPurchaseOrders.orderDate, to));
+  if (fromDate) conditions.push(gte(stockPurchaseOrders.orderDate, fromDate));
+  if (toDate) conditions.push(lte(stockPurchaseOrders.orderDate, toDate));
 
   const orders = await db.select().from(stockPurchaseOrders).where(and(...conditions));
   const orderIds = orders.map((order) => order.id);
