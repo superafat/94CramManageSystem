@@ -304,9 +304,13 @@ miscRouter.post('/alerts/:id/confirm', async (c) => {
     return c.json({ error: 'Invalid alert ID format' }, 400)
   }
   try {
-    await db.update(auditLogs)
+    const [updatedAlert] = await db.update(auditLogs)
       .set({ alertConfirmedAt: new Date() })
       .where(and(eq(auditLogs.id, alertId), eq(auditLogs.schoolId, schoolId)))
+      .returning({ id: auditLogs.id })
+    if (!updatedAlert) {
+      return c.json({ error: 'Alert not found' }, 404)
+    }
     return c.json({ ok: true, message: 'Alert confirmed' })
   } catch (e) {
     console.error('[API Error] Failed to confirm alert:', e)
