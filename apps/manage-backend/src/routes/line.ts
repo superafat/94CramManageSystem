@@ -212,6 +212,15 @@ async function processBinding(lineUserId: string, studentName: string, phoneLast
   if (!lineUserId || typeof lineUserId !== 'string' || lineUserId.length === 0) {
     return { success: false, message: '系統錯誤，請稍後再試' }
   }
+
+  const crossTenantId = await findCrossTenantBinding(lineUserId)
+  if (crossTenantId) {
+    console.warn('[LINE Binding] lineUserId bound to another tenant:', crossTenantId)
+    return {
+      success: false,
+      message: '此 LINE 帳號已綁定其他補習班，請聯繫客服協助'
+    }
+  }
   
   // 驗證輸入格式
   if (!/^\d{4}$/.test(phoneLast4)) {
