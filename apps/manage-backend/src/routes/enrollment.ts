@@ -1,6 +1,10 @@
 // src/routes/enrollment.ts - 招生 API
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { z } from 'zod';
+import { zValidator } from '@hono/zod-validator';
+import { authMiddleware } from '../middleware/auth';
+import type { RBACVariables } from '../middleware/rbac';
 
 // ==================== 類型定義 ====================
 
@@ -47,6 +51,23 @@ interface ConversionStats {
 
 const validPeriods = ['week', 'month', 'quarter'] as const;
 type Period = typeof validPeriods[number];
+const leadStatuses = ['new', 'contacted', 'trial_scheduled', 'trial_completed', 'enrolled', 'lost'] as const;
+const trialRequestSchema = z.object({
+  name: z.string().min(1).max(100),
+  phone: z.string().regex(/^09\d{8}$/, '電話格式錯誤（應為 09 開頭的 10 碼）'),
+  student_name: z.string().min(1).max(100),
+  student_grade: z.string().min(1).max(50),
+  interest_subjects: z.string().max(200).optional(),
+  trial_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '試聽日期格式錯誤（YYYY-MM-DD）'),
+  trial_time: z.string().min(1).max(100),
+});
+const leadStatusUpdateSchema = z.object({
+  status: z.enum(leadStatuses),
+  follow_up_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '跟進日期格式錯誤（YYYY-MM-DD）').optional(),
+});
+const leadIdParamSchema = z.object({
+  id: z.string().regex(/^\d+$/, '無效的 Lead ID').transform((v) => Number(v)).refine((v) => Number.isFinite(v) && v > 0, '無效的 Lead ID'),
+});
 const isValidISODate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime());
 const sanitizeString = (s: unknown) => typeof s === 'string' ? s.replace(/[<>]/g, '').trim() : '';
 const toIntInRange = (input: string | undefined, min: number, max: number, def: number) => {
@@ -57,10 +78,11 @@ const toIntInRange = (input: string | undefined, min: number, max: number, def: 
 
 // ==================== 路由設定 ====================
 
-const enrollment = new Hono();
+const enrollment = new Hono<{ Variables: RBACVariables }>();
 
 // CORS 設定
 enrollment.use('/*', cors());
+enrollment.use('/*', authMiddleware);
 
 // ==================== 資料庫模擬（實際應使用真實 DB） ====================
 
@@ -246,34 +268,14 @@ enrollment.get('/conversion', async (c) => {
  * POST /api/admin/enrollment/trial
  * 預約試聽
  */
-enrollment.post('/trial', async (c) => {
+enrollment.post('/trial', zValidator('json', trialRequestSchema), async (c) => {
   try {
-    const body = await c.req.json();
-    const name = sanitizeString((body as any).name);
-    const studentName = sanitizeString((body as any).student_name);
-    const studentGrade = sanitizeString((body as any).student_grade);
-    const interestSubjects = sanitizeString((body as any).interest_subjects || '');
-    const phone = String((body as any).phone ?? '').trim();
-    
-    // 驗證必填欄位
-    const required = ['name', 'phone', 'student_name', 'student_grade', 'trial_date', 'trial_time'];
-    const missing = required.filter(field => !body[field]);
-    
-    if (missing.length > 0) {
-      return c.json({
-        success: false,
-        error: `缺少必填欄位: ${missing.join(', ')}`
-      }, 400);
-    }
-    
-    // 檢查電話格式
-    const phoneRegex = /^09\d{8}$/;
-    if (!phoneRegex.test(phone)) {
-      return c.json({
-        success: false,
-        error: '電話格式錯誤（應為 09 開頭的 10 碼）'
-      }, 400);
-    }
+    const body = c.req.valid('json');
+    const name = sanitizeString(body.name);
+    const studentName = sanitizeString(body.student_name);
+    const studentGrade = sanitizeString(body.student_grade);
+    const interestSubjects = sanitizeString(body.interest_subjects || '');
+    const phone = body.phone.trim();
     
     // 檢查試聽日期是否為未來
     const trialDate = new Date(body.trial_date);
@@ -419,23 +421,13 @@ enrollment.get('/stats/daily', async (c) => {
  * PATCH /api/admin/enrollment/lead/:id/status
  * 更新 Lead 狀態
  */
-enrollment.patch('/lead/:id/status', async (c) => {
+enrollment.patch('/lead/:id/status',
+  zValidator('param', leadIdParamSchema),
+  zValidator('json', leadStatusUpdateSchema),
+  async (c) => {
   try {
-    const idParam = c.req.param('id');
-    const leadId = parseInt(idParam, 10);
-    if (!Number.isFinite(leadId) || leadId <= 0) {
-      return c.json({ success: false, error: '無效的 Lead ID' }, 400);
-    }
-    const { status, follow_up_date }: { status: Lead['status']; follow_up_date?: string } = await c.req.json();
-    
-    // 驗證狀態值
-    const validStatuses = ['new', 'contacted', 'trial_scheduled', 'trial_completed', 'enrolled', 'lost'];
-    if (!validStatuses.includes(status)) {
-      return c.json({
-        success: false,
-        error: `無效的狀態值。可用值: ${validStatuses.join(', ')}`
-      }, 400);
-    }
+    const { id: leadId } = c.req.valid('param');
+    const { status, follow_up_date } = c.req.valid('json');
     
     // 尋找 lead
     const leadIndex = mockLeads.findIndex(l => l.id === leadId);
