@@ -107,7 +107,7 @@ paymentsRouter.get('/classes/:id/billing', async (c) => {
       .where(and(eq(students.classId, classId), eq(students.active, true)))
 
     const studentIds = classStudents.map(s => s.id)
-    let monthPayments: any[] = []
+    let monthPayments: Array<typeof paymentRecords.$inferSelect> = []
 
     if (studentIds.length > 0) {
       monthPayments = await db.select().from(paymentRecords)
