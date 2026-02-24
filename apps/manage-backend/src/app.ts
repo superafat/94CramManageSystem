@@ -77,7 +77,7 @@ app.use('/api/*', rateLimit())
 app.use('/api/*', tenantMiddleware)
 
 // Health check — no middleware overhead
-app.get('/health', (c) => c.json(createSuccessResponse({ status: 'ok', ts: Date.now(), build: '6c25fbc-demo' })))
+app.get('/health', (c) => c.json(createSuccessResponse({ status: 'ok', ts: Date.now(), build: '54d050e-v2' })))
 
 // Database health check with metrics
 app.get('/health/db', async (c) => {
