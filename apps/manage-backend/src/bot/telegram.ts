@@ -304,14 +304,14 @@ export async function startBot(bot: Bot<BotContext>, mode: 'polling' | 'webhook'
   if (mode === 'polling') {
     // Delete any existing webhook first
     await bot.api.deleteWebhook()
-    console.log('🤖 Telegram Bot starting (long polling)...')
+    console.info('🤖 Telegram Bot starting (long polling)...')
 
     // Retry with backoff if 409 conflict (another instance still polling)
     const maxRetries = 5
     for (let i = 0; i < maxRetries; i++) {
       try {
         await bot.start({
-          onStart: (info) => console.log(`🤖 Telegram Bot @${info.username} is running!`),
+          onStart: (info) => console.info(`🤖 Telegram Bot @${info.username} is running!`),
         })
         return // success
       } catch (err: any) {

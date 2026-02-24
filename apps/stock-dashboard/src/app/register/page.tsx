@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { isAxiosError } from 'axios';
 import api from '@/lib/api';
 
 export default function RegisterPage() {
@@ -9,6 +10,7 @@ export default function RegisterPage() {
   const [form, setForm] = useState({ tenantName: '', slug: '', email: '', password: '', name: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  type ErrorResponse = { error?: string };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,8 +19,8 @@ export default function RegisterPage() {
     try {
       await api.post('/auth/register', form);
       router.push('/login');
-    } catch (err: any) {
-      setError(err?.response?.data?.error || '註冊失敗');
+    } catch (err: unknown) {
+      setError(isAxiosError<ErrorResponse>(err) ? err.response?.data?.error || '註冊失敗' : '註冊失敗');
     } finally {
       setLoading(false);
     }

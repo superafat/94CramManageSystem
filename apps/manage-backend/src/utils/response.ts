@@ -4,10 +4,11 @@
  */
 import type { Context } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
+import type { ZodError } from 'zod'
 
 // ===== Response Types =====
 
-interface SuccessResponse<T = any> {
+interface SuccessResponse<T = unknown> {
   success: true
   data: T
   meta?: {
@@ -17,7 +18,7 @@ interface SuccessResponse<T = any> {
       total: number
       totalPages: number
     }
-    [key: string]: any
+    [key: string]: unknown
   }
 }
 
@@ -26,7 +27,7 @@ interface ErrorResponse {
   error: {
     code: string
     message: string
-    details?: any
+    details?: unknown
   }
 }
 
@@ -174,8 +175,8 @@ export function internalError(c: Context, err?: Error): Response {
 /**
  * 處理 Zod 驗證錯誤
  */
-export function validationError(c: Context, zodError: any): Response {
-  const issues = zodError.issues?.map((issue: any) => ({
+export function validationError(c: Context, zodError: ZodError): Response {
+  const issues = zodError.issues?.map((issue) => ({
     path: issue.path.join('.'),
     message: issue.message,
   })) || []
@@ -192,36 +193,40 @@ export function validationError(c: Context, zodError: any): Response {
 /**
  * 包裝 async handler，統一錯誤處理
  */
-export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
+export function withErrorHandler<T extends (...args: unknown[]) => Promise<unknown>>(
   handler: T
 ): T {
-  return (async (...args: any[]) => {
+  return (async (...args: Parameters<T>) => {
     try {
       return await handler(...args)
-    } catch (err: any) {
+    } catch (err) {
       const c = args[0] as Context
+      const caughtError = err as Error & { name?: string; status?: number; code?: string }
       
-      // Zod validation error
-      if (err.name === 'ZodError') {
-        return validationError(c, err)
+      if (caughtError.name === 'ZodError') {
+        return validationError(c, caughtError as ZodError)
       }
       
-      // HTTP Exception (from middleware)
-      if (err.status) {
-        return error(c, ErrorCode.INTERNAL_ERROR, err.message, err.status)
+      if (caughtError.status) {
+        return error(
+          c,
+          ErrorCode.INTERNAL_ERROR,
+          caughtError.message,
+          caughtError.status as ContentfulStatusCode
+        )
       }
       
-      // Database errors
-      if (err.code?.startsWith('23')) {
-        if (err.code === '23505') {
+      const code = caughtError.code
+      if (code?.startsWith('23')) {
+        if (code === '23505') {
           return conflict(c, 'Duplicate entry')
         }
-        if (err.code === '23503') {
+        if (code === '23503') {
           return badRequest(c, 'Referenced resource not found')
         }
       }
       
-      return internalError(c, err)
+      return internalError(c, caughtError)
     }
   }) as T
 }

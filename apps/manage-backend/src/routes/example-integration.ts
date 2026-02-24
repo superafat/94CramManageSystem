@@ -174,7 +174,7 @@ exampleRoutes.post('/transfer', async (c) => {
 class UserService {
   @cacheable({ ttl: 60000 }) // 快取 1 分鐘
   async getUserById(id: string) {
-    console.log(`Fetching user ${id} from database...`)
+    console.info(`Fetching user ${id} from database...`)
     return await findUserById(id)
   }
 
@@ -183,7 +183,7 @@ class UserService {
     keyGenerator: (email: string) => `user:email:${email}`
   })
   async getUserByEmail(email: string) {
-    console.log(`Fetching user ${email} from database...`)
+    console.info(`Fetching user ${email} from database...`)
     return await findUserByEmail(email)
   }
 }
@@ -217,7 +217,7 @@ exampleRoutes.get('/stats', async (c) => {
   
   if (!stats) {
     // 快取未命中，計算統計數據
-    console.log('Computing stats...')
+    console.info('Computing stats...')
     stats = {
       totalUsers: 1000,
       activeUsers: 750,

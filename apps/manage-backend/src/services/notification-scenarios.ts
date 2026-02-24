@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm'
 import { db } from '../db'
 import { sendBulkNotifications } from './notification'
 import type { NotificationType, NotificationChannel } from '../db/schema'
+import type { RowList } from 'postgres'
 
 const DEFAULT_TENANT_ID = '11111111-1111-1111-1111-111111111111'
 
@@ -31,6 +32,60 @@ function formatDate(date: Date | string): string {
     month: 'long',
     day: 'numeric'
   })
+}
+
+interface ScheduleRow {
+  id: string
+  tenant_id: string
+  course_id: string
+  start_time: string | Date
+  end_time: string | Date
+  course_name: string
+  teacher_name?: string | null
+}
+
+interface RecipientRow {
+  recipient_id: string | null
+  student_id: string
+  student_name: string
+}
+
+interface InvoiceRow {
+  id: string
+  tenant_id: string
+  amount: number
+  due_date: string | Date
+  student_id: string
+  student_name: string
+}
+
+interface ParentRow {
+  parent_id: string | null
+}
+
+interface AttendanceRow {
+  status: string
+  date: string | Date
+}
+
+interface StudentRow {
+  name: string
+  tenant_id: string
+}
+
+interface GradeRow {
+  id: string
+  tenant_id: string
+  score: number
+  exam_type: string
+  student_id: string
+  student_name: string
+  course_name?: string | null
+  course_id?: string | null
+}
+
+function normalizeRows<T>(result: RowList<T> | T[]): T[] {
+  return Array.isArray(result) ? result : Array.from(result)
 }
 
 /**
