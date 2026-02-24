@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { compress } from 'hono/compress'
 import { botRoutes } from './routes/bot'
-import { authRoutes } from './routes/auth'
+import { authRoutes, handleDemoLogin } from './routes/auth'
 import { adminRoutes } from './routes/admin'
 import usersRoutes from './routes/users'
 import { demoRoutes } from './routes/demo'
@@ -107,6 +107,9 @@ app.route('/api/line', lineRoutes)
 // Public routes (no auth)
 app.route('/api/bot', botRoutes)
 app.route('/api/auth', authRoutes)
+
+// Demo login endpoint (registered directly to avoid auth middleware from sub-routers)
+app.post('/api/auth/demo', (c) => handleDemoLogin(c))
 
 // Protected admin routes (JWT + RBAC inside)
 app.route('/api/admin', adminRoutes)

@@ -522,8 +522,9 @@ authRoutes.post('/seed', async (c) => {
 
 // ========================================================================
 // POST /demo - Direct demo login (no DB required, generates JWT directly)
+// Exported for use in app.ts (registered before auth-required routes)
 // ========================================================================
-authRoutes.post('/demo', async (c) => {
+export async function handleDemoLogin(c: import('hono').Context) {
   const DEMO_TENANT_1 = '11111111-1111-1111-1111-111111111111'
   const DEMO_TENANT_2 = '22222222-2222-2222-2222-222222222222'
   const BRANCH_1 = 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d'
@@ -573,4 +574,4 @@ authRoutes.post('/demo', async (c) => {
     console.error('Demo login error:', error)
     return internalError(c, error instanceof Error ? error : undefined)
   }
-})
+}
