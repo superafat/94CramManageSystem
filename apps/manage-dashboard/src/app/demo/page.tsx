@@ -27,7 +27,7 @@ export default function DemoPage() {
     setError('')
 
     try {
-      const res = await fetch(`${API_BASE}/demo/login`, {
+      const res = await fetch(`${API_BASE}/api/auth/demo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: account.username })

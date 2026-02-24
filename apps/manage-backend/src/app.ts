@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { compress } from 'hono/compress'
 import { botRoutes } from './routes/bot'
-import { authRoutes, handleDemoLogin } from './routes/auth'
+import { authRoutes } from './routes/auth'
 import { adminRoutes } from './routes/admin'
 import usersRoutes from './routes/users'
 import { demoRoutes } from './routes/demo'
@@ -71,9 +71,6 @@ app.use('*', cors({
 app.use('/api/*', rateLimit())
 
 app.use('/api/*', tenantMiddleware)
-
-// Demo login endpoint (public, no auth — must be before /api/* middleware)
-app.post('/demo/login', (c) => handleDemoLogin(c))
 
 // Health check — no middleware overhead
 app.get('/health', (c) => c.json(createSuccessResponse({ status: 'ok', ts: Date.now() })))
