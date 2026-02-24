@@ -12,6 +12,7 @@ import lineRoutes from './routes/line'
 import { errorTestRoutes } from './routes/error-test'
 import { healthRoutes } from './routes/health'
 import internalRoutes from './routes/internal'
+import botExtRoutes from './routes/bot-ext'
 import { errorHandler } from './middleware/errorHandler'
 import { tenantMiddleware } from './middleware/tenant'
 import { requestTrackingMiddleware } from './middleware/requestTracking'
@@ -110,6 +111,7 @@ app.route('/api/line', lineRoutes)
 
 // Public routes (no auth)
 app.route('/api/bot', botRoutes)
+app.route('/api/bot-ext', botExtRoutes)
 app.route('/api/auth', authRoutes)
 
 

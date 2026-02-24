@@ -1,0 +1,52 @@
+name: Deploy 94CramBot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/bot-gateway/**'
+      - '.github/workflows/deploy-bot.yml'
+
+env:
+  PROJECT_ID: cram94-manage-system
+  REGION: asia-east1
+  REGISTRY: cram94
+
+jobs:
+  deploy-bot-gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auth to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build & Push
+        run: |
+          docker build -f apps/bot-gateway/Dockerfile \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/bot-gateway:${{ github.sha }} \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/bot-gateway:latest \
+            .
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/bot-gateway --all-tags
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy cram94-bot-gateway \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/bot-gateway:${{ github.sha }} \
+            --region=${{ env.REGION }} \
+            --platform=managed \
+            --allow-unauthenticated \
+            --port=3300 \
+            --memory=512Mi \
+            --min-instances=0 \
+            --max-instances=10 \
+            --set-env-vars="NODE_ENV=production,MANAGE_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,INCLASS_URL=https://cram94-inclass-backend-1015149159553.asia-east1.run.app,STOCK_URL=https://cram94-stock-backend-1015149159553.asia-east1.run.app,GCP_PROJECT_ID=cram94-manage-system" \
+            --set-secrets="TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest"
