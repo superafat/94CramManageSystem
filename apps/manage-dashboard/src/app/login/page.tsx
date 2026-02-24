@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-// 直接呼叫後端 API（production 環境）
-const API_BASE = 'https://cram94-manage-backend-1015149159553.asia-east1.run.app'
+// 使用相對路徑，讓 Next.js proxy (rewrites) 處理跨域
+const API_BASE = ''
 
 export default function LoginPage() {
   const router = useRouter()
