@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from '../../db/index';
 import { stockItems, stockWarehouses, stockInventory, stockTransactions } from '@94cram/shared/db';
-import { eq, and, like } from 'drizzle-orm';
+import { eq, and, like, desc } from 'drizzle-orm';
 
 type Env = { Variables: { tenantId: string } };
 const app = new Hono<Env>();
@@ -206,6 +206,64 @@ app.post('/check', async (c) => {
       data: { item_name: item.name, item_id: item.id, current_stock: totalStock, unit: item.unit },
     });
   } catch (error) {
+    return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
+  }
+});
+
+// POST /stock/history
+app.post('/history', async (c) => {
+  try {
+    const { tenant_id, item_name, limit: queryLimit } = await c.req.json();
+    const tenantId = c.get('tenantId') as string;
+    const maxResults = queryLimit || 10;
+
+    const items = await db.select().from(stockItems)
+      .where(and(eq(stockItems.tenantId, tenantId), like(stockItems.name, `%${item_name}%`)));
+
+    if (items.length === 0) {
+      return c.json({
+        success: false,
+        error: 'item_not_found',
+        message: `找不到品項「${item_name}」`,
+      });
+    }
+
+    const item = items[0];
+
+    const transactions = await db.select({
+      id: stockTransactions.id,
+      transactionType: stockTransactions.transactionType,
+      quantity: stockTransactions.quantity,
+      recipientName: stockTransactions.recipientName,
+      recipientNote: stockTransactions.recipientNote,
+      createdAt: stockTransactions.createdAt,
+      warehouseName: stockWarehouses.name,
+    })
+      .from(stockTransactions)
+      .innerJoin(stockWarehouses, eq(stockTransactions.warehouseId, stockWarehouses.id))
+      .where(and(eq(stockTransactions.tenantId, tenantId), eq(stockTransactions.itemId, item.id)))
+      .orderBy(desc(stockTransactions.createdAt))
+      .limit(maxResults);
+
+    return c.json({
+      success: true,
+      message: `${item.name} 最近 ${transactions.length} 筆交易紀錄`,
+      data: {
+        item_name: item.name,
+        item_id: item.id,
+        transactions: transactions.map(t => ({
+          id: t.id,
+          type: t.transactionType,
+          quantity: t.quantity,
+          warehouse: t.warehouseName,
+          recipient: t.recipientName,
+          note: t.recipientNote,
+          date: t.createdAt,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error('[Bot] history error:', error);
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });

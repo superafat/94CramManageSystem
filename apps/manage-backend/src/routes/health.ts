@@ -78,6 +78,6 @@ healthRoutes.get('/debug/tables', async (c) => {
     `)
     return c.json(createSuccessResponse({ tables }))
   } catch (error) {
-    return c.json(createErrorResponse(String(error)))
+    return c.json(createErrorResponse('DB_ERROR', String(error)))
   }
 })

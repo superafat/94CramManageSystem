@@ -149,6 +149,9 @@ importers:
       '@94cram/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@google-cloud/firestore':
+        specifier: ^7.11.6
+        version: 7.11.6
       '@google/generative-ai':
         specifier: ^0.24.1
         version: 0.24.1

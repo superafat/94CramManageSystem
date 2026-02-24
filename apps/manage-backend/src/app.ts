@@ -45,7 +45,9 @@ if (process.env.NODE_ENV !== 'production') {
 
 app.use('*', cors({
   origin: [
+    'http://localhost:3000',
     'http://localhost:3200',
+    'http://localhost:3201',
     'http://localhost:3300',
     'http://localhost:5173',
     'https://94homework.com',

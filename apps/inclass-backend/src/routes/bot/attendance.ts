@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from '../../db/index.js';
 import { manageStudents, manageCourses, inclassAttendances } from '@94cram/shared/db';
-import { eq, and, like, sql } from 'drizzle-orm';
+import { eq, and, like, sql, gte, lte } from 'drizzle-orm';
 import type { Variables } from '../../middleware/auth.js';
 
 const app = new Hono<{ Variables: Variables }>();
@@ -160,6 +160,71 @@ app.post('/list', async (c) => {
     });
   } catch (error) {
     console.error('[Bot] list error:', error);
+    return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
+  }
+});
+
+// POST /attendance/report
+app.post('/report', async (c) => {
+  try {
+    const { tenant_id, student_name, start_date, end_date } = await c.req.json();
+    const schoolId = c.get('schoolId') as string;
+
+    const students = await db.select().from(manageStudents)
+      .where(and(eq(manageStudents.tenantId, schoolId), eq(manageStudents.name, student_name)));
+
+    if (students.length === 0) {
+      const suggestions = await db.select().from(manageStudents)
+        .where(and(eq(manageStudents.tenantId, schoolId), like(manageStudents.name, `%${student_name}%`)))
+        .limit(5);
+      return c.json({
+        success: false,
+        error: 'student_not_found',
+        message: `找不到學生「${student_name}」`,
+        suggestions: suggestions.map(s => ({ student_id: s.id, name: s.name, class: s.grade })),
+      });
+    }
+
+    const student = students[0];
+    const from = start_date || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const to = end_date || new Date().toISOString().split('T')[0];
+
+    const records = await db.select({
+      status: inclassAttendances.status,
+    })
+      .from(inclassAttendances)
+      .where(
+        and(
+          eq(inclassAttendances.tenantId, schoolId),
+          eq(inclassAttendances.studentId, student.id),
+          gte(inclassAttendances.date, new Date(from)),
+          lte(inclassAttendances.date, new Date(to)),
+        )
+      );
+
+    const present = records.filter(r => r.status === 'present').length;
+    const absent = records.filter(r => r.status === 'absent').length;
+    const late = records.filter(r => r.status === 'late').length;
+    const leave = records.filter(r => r.status === 'leave').length;
+
+    return c.json({
+      success: true,
+      message: `${student.name} ${from} ~ ${to} 出缺勤報告`,
+      data: {
+        student_name: student.name,
+        class_name: student.grade,
+        start_date: from,
+        end_date: to,
+        total: records.length,
+        present,
+        absent,
+        late,
+        leave,
+        attendance_rate: records.length > 0 ? Math.round((present / records.length) * 100) : 0,
+      },
+    });
+  } catch (error) {
+    console.error('[Bot] report error:', error);
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });

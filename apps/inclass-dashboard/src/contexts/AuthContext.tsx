@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://cram94-inclass-backend-1015149159553.asia-east1.run.app'
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3102'
 
 interface User {
   id: string
