@@ -113,7 +113,7 @@ export default function TrialSignupPage() {
               <strong>補習班名稱：</strong>{formData.tenantName}
             </p>
             <p className="text-sm text-blue-900 mb-1">
-              <strong>網址：</strong>https://xxx.com/{formData.tenantSlug}
+              <strong>網址：</strong>https://94cram.com/{formData.tenantSlug}
             </p>
             <p className="text-sm text-blue-900">
               <strong>管理員：</strong>{formData.adminName} ({formData.adminEmail})
@@ -200,7 +200,7 @@ export default function TrialSignupPage() {
                   網址代碼 *
                 </label>
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-500 text-sm">https://app.com/</span>
+                  <span className="text-gray-500 text-sm">https://94cram.com/</span>
                   <input
                     type="text"
                     name="tenantSlug"

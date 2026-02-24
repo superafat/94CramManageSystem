@@ -304,7 +304,7 @@ export default function LandingPage() {
       <footer style={{ padding: '40px 20px', background: '#2A3F4F', color: 'white', textAlign: 'center' }}>
         <p style={{ marginBottom: '10px' }}>© 2026 蜂神榜 Ai 點名系統. All rights reserved.</p>
         <p style={{ fontSize: '14px', opacity: 0.8 }}>
-          <a href="mailto:superafatus@gmail.com" style={{ color: 'white', textDecoration: 'underline' }}>聯絡我們</a>
+          <a href="mailto:superafat0922@gmail.com" style={{ color: 'white', textDecoration: 'underline' }}>聯絡我們</a>
         </p>
       </footer>
     </div>

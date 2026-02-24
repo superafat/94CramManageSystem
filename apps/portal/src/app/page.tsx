@@ -171,7 +171,7 @@ export default function HomePage() {
             <a href={process.env.INCLASS_URL || '#'} className="hover:text-white transition">94inClass 點名系統</a>
             <a href={process.env.STOCK_URL || '#'} className="hover:text-white transition">94Stock 庫存管理</a>
           </div>
-          <p className="text-[#6b7c73] text-xs">© 2026 94cram.app · 蜂神榜 Ai 教育科技 · All rights reserved.</p>
+          <p className="text-[#6b7c73] text-xs">© 2026 94cram.com · 蜂神榜 Ai 教育科技 · All rights reserved.</p>
         </div>
       </footer>
 

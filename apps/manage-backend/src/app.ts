@@ -58,6 +58,11 @@ app.use('*', cors({
     'https://cram94-stock-dashboard-1015149159553.asia-east1.run.app',
     'https://cram94-stock-backend-1015149159553.asia-east1.run.app',
     'https://cram94-portal-1015149159553.asia-east1.run.app',
+    // Custom domain
+    'https://manage.94cram.com',
+    'https://inclass.94cram.com',
+    'https://stock.94cram.com',
+    'https://94cram.com',
   ],
   maxAge: 86400,
 }))
