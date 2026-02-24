@@ -50,6 +50,14 @@ app.use('*', cors({
     'https://94homework.com',
     'https://94manage-miniapp-855393865280.asia-east1.run.app',
     'https://94manage-dashboard-855393865280.asia-east1.run.app',
+    // 新的 Cloud Run URLs (cram94- 前綴)
+    'https://cram94-manage-dashboard-1015149159553.asia-east1.run.app',
+    'https://cram94-manage-backend-1015149159553.asia-east1.run.app',
+    'https://cram94-inclass-dashboard-1015149159553.asia-east1.run.app',
+    'https://cram94-inclass-backend-1015149159553.asia-east1.run.app',
+    'https://cram94-stock-dashboard-1015149159553.asia-east1.run.app',
+    'https://cram94-stock-backend-1015149159553.asia-east1.run.app',
+    'https://cram94-portal-1015149159553.asia-east1.run.app',
   ],
   maxAge: 86400,
 }))
