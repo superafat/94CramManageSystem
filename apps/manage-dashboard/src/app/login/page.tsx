@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-const API_BASE = ''  // Use Next.js proxy (rewrites /api/* → BACKEND_URL)
+const API_BASE = '/api/proxy'  // Next.js API Route proxy → BACKEND_URL at runtime
 
 export default function LoginPage() {
   const router = useRouter()
