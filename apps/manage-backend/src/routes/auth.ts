@@ -166,14 +166,14 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
       const role = dbUser.role as Role
       const permissions = getUserPermissions(role)
 
-      const jwt = await generateToken({
-        sub: dbUser.id,
-        name: dbUser.full_name ?? dbUser.username,
-        email: dbUser.email,
-        role: role,
-        tenant_id: dbUser.tenant_id,
-        branch_id: dbUser.branch_id ?? null,
-      })
+        const jwt = await generateToken({
+          sub: dbUser.id,
+          name: (dbUser.full_name ?? dbUser.username) ?? undefined,
+          email: dbUser.email ?? undefined,
+          role: role,
+          tenant_id: dbUser.tenant_id,
+          branch_id: dbUser.branch_id ?? undefined,
+        })
 
       // Update last_login_at (non-blocking)
       db.execute(sql`UPDATE users SET last_login_at = NOW() WHERE id = ${dbUser.id}`)
@@ -183,15 +183,15 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
         token: jwt,
         user: {
           id: dbUser.id,
-          name: dbUser.full_name ?? dbUser.username,
-          email: dbUser.email,
+          name: (dbUser.full_name ?? dbUser.username) ?? undefined,
+          email: dbUser.email ?? undefined,
           role: role,
           permissions,
         },
       })
     } catch (err: unknown) {
       console.error('Login DB error:', errorMessage(err))
-      return internalError(c, err)
+    return internalError(c, err instanceof Error ? err : undefined)
     }
   }
 
@@ -245,19 +245,19 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
 
         const jwt = await generateToken({
           sub: dbUser.id,
-          name: dbUser.full_name ?? dbUser.username,
-          email: dbUser.email,
+          name: (dbUser.full_name ?? dbUser.username) ?? undefined,
+          email: dbUser.email ?? undefined,
           role: role,
           tenant_id: dbUser.tenant_id,
-          branch_id: dbUser.branch_id ?? null,
+          branch_id: dbUser.branch_id ?? undefined,
         })
 
         return success(c, {
           token: jwt,
           user: {
             id: dbUser.id,
-            name: dbUser.full_name ?? dbUser.username,
-            email: dbUser.email,
+            name: (dbUser.full_name ?? dbUser.username) ?? undefined,
+            email: dbUser.email ?? undefined,
             role: role,
             permissions,
           },
@@ -321,21 +321,21 @@ authRoutes.post('/telegram', zValidator('json', telegramLoginSchema), async (c) 
       const role = dbUser.role as Role
       const permissions = getUserPermissions(role)
 
-      const jwt = await generateToken({
-        sub: dbUser.id,
-        name: dbUser.full_name ?? dbUser.username,
-        email: dbUser.email,
-        role: role,
-        tenant_id: dbUser.tenant_id,
-        branch_id: dbUser.branch_id ?? null,
-      })
+        const jwt = await generateToken({
+          sub: dbUser.id,
+          name: (dbUser.full_name ?? dbUser.username) ?? undefined,
+          email: dbUser.email ?? undefined,
+          role: role,
+          tenant_id: dbUser.tenant_id,
+          branch_id: dbUser.branch_id ?? undefined,
+        })
 
       return success(c, {
         token: jwt,
         user: {
           id: dbUser.id,
-          name: dbUser.full_name ?? dbUser.username,
-          email: dbUser.email,
+          name: (dbUser.full_name ?? dbUser.username) ?? undefined,
+          email: dbUser.email ?? undefined,
           role: role,
           permissions,
         },
@@ -365,7 +365,7 @@ authRoutes.post('/telegram', zValidator('json', telegramLoginSchema), async (c) 
     })
   } catch (err: unknown) {
     console.error('Telegram login error:', errorMessage(err))
-    return internalError(c, err)
+    return internalError(c, err instanceof Error ? err : undefined)
   }
 })
 
@@ -430,7 +430,7 @@ authRoutes.post('/trial-signup', rateLimit('trial-signup'), zValidator('json', t
     })
   } catch (err: unknown) {
     console.error('Trial signup error:', errorMessage(err))
-    return internalError(c, err)
+    return internalError(c, err instanceof Error ? err : undefined)
   }
 })
 
@@ -465,5 +465,46 @@ authRoutes.get('/me', async (c) => {
       return unauthorized(c, 'Token expired')
     }
     return unauthorized(c, 'Invalid token')
+  }
+})
+
+// Seed endpoint - creates initial admin user (for development only)
+authRoutes.post('/seed', async (c) => {
+  if (config.NODE_ENV === 'production') {
+    return forbidden(c, 'Seed endpoint disabled in production')
+  }
+  
+  try {
+    // Check if admin already exists
+    const existing = firstRow(await db.execute(sql`
+      SELECT id FROM users WHERE username = 'admin' LIMIT 1
+    `))
+    
+    if (existing) {
+      return success(c, { message: 'Admin user already exists', userId: existing.id })
+    }
+    
+    // Create default tenant
+    const tenantId = generateId()
+    await db.execute(sql`
+      INSERT INTO tenants (id, name, status, created_at)
+      VALUES (${tenantId}, 'Default Tenant', 'active', NOW())
+    `)
+    
+    // Create admin user with password hash for 'admin123'
+    // Hash: salt:hash where hash = sha256(salt + password)
+    // Using '94cram' as salt
+    const passwordHash = '94cram:' + require('crypto').createHash('sha256').update('94cramadmin123').digest('hex')
+    
+    const userId = generateId()
+    await db.execute(sql`
+      INSERT INTO users (id, tenant_id, username, full_name, email, role, password_hash, is_active, created_at)
+      VALUES (${userId}, ${tenantId}, 'admin', '系統管理員', 'admin@94cram.app', 'superadmin', ${passwordHash}, true, NOW())
+    `)
+    
+    return success(c, { message: 'Admin user created', userId, tenantId })
+  } catch (error) {
+    console.error('Seed error:', error)
+    return internalError(c, 'Failed to seed: ' + errorMessage(error))
   }
 })
