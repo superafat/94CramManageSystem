@@ -45,7 +45,7 @@ async function sendLineNotification(
 }
 
 async function attemptLineFallback(
-  user: { lineUserId?: string } | null,
+  user: { lineUserId?: string | null } | null,
   params: { title: string; body: string }
 ): Promise<{ success: boolean; error?: string }> {
   if (!user?.lineUserId) {

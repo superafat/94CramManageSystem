@@ -1,9 +1,11 @@
 import { firestore } from './client';
+import { getEnabledModules, type BotModule } from './settings';
 
 export interface TenantBinding {
   tenant_id: string;
   tenant_name: string;
   role: string;
+  enabled_modules: BotModule[];
 }
 
 export interface UserBinding {
@@ -29,11 +31,18 @@ export async function addBinding(
   const ref = col.doc(telegramUserId);
   const doc = await ref.get();
 
+  const enabled_modules = await getEnabledModules(tenantId);
+
   if (doc.exists) {
     const data = doc.data() as UserBinding;
     const exists = data.bindings.some((b) => b.tenant_id === tenantId);
     if (!exists) {
-      data.bindings.push({ tenant_id: tenantId, tenant_name: tenantName, role: 'admin' });
+      data.bindings.push({ tenant_id: tenantId, tenant_name: tenantName, role: 'admin', enabled_modules });
+    } else {
+      // Update enabled_modules for existing binding
+      data.bindings = data.bindings.map((b) =>
+        b.tenant_id === tenantId ? { ...b, enabled_modules } : b
+      );
     }
     await ref.update({
       bindings: data.bindings,
@@ -43,7 +52,7 @@ export async function addBinding(
     });
   } else {
     await ref.set({
-      bindings: [{ tenant_id: tenantId, tenant_name: tenantName, role: 'admin' }],
+      bindings: [{ tenant_id: tenantId, tenant_name: tenantName, role: 'admin', enabled_modules }],
       active_tenant_id: tenantId,
       active_tenant_name: tenantName,
       created_at: new Date(),

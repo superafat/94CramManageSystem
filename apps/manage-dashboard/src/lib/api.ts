@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '/api'
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3100'
 
 // ===== API Cache & Performance =====
 

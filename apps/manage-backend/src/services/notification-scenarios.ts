@@ -84,8 +84,8 @@ interface GradeRow {
   course_id?: string | null
 }
 
-function normalizeRows<T>(result: RowList<T> | T[]): T[] {
-  return Array.isArray(result) ? result : Array.from(result)
+function normalizeRows<T extends readonly any[]>(result: RowList<T> | T[]): T[] {
+  return Array.isArray(result) ? result : Array.from(result) as T[]
 }
 
 /**
