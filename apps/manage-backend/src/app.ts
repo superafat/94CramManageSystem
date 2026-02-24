@@ -11,6 +11,7 @@ import notificationRoutes from './routes/notifications'
 import lineRoutes from './routes/line'
 import { errorTestRoutes } from './routes/error-test'
 import { healthRoutes } from './routes/health'
+import internalRoutes from './routes/internal'
 import { errorHandler } from './middleware/errorHandler'
 import { tenantMiddleware } from './middleware/tenant'
 import { requestTrackingMiddleware } from './middleware/requestTracking'
@@ -33,8 +34,7 @@ export const app = new Hono()
 app.use('*', compress())
 
 // Global error handler using onError
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-app.onError(errorHandler as any)
+app.onError((error, context) => errorHandler(error, context))
 
 // Request tracking middleware (adds requestId and logger to context)
 if (process.env.NODE_ENV !== 'production') {
@@ -85,6 +85,7 @@ app.get('/health/db', async (c) => {
 
 // Health check routes (public, no auth)
 app.route('/api/health', healthRoutes)
+app.route('/api/internal', internalRoutes)
 
 // LINE webhook (public, no auth, no tenant middleware)
 app.route('/api/line', lineRoutes)
