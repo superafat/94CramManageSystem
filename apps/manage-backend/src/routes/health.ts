@@ -6,7 +6,7 @@
 import { Hono } from 'hono'
 import { checkDatabaseHealth, db } from '../db'
 import { sql } from 'drizzle-orm'
-import { createSuccessResponse, createErrorResponse, success, internalError } from '../types/api-response'
+import { createSuccessResponse, createErrorResponse } from '../types/api-response'
 
 export const healthRoutes = new Hono()
 
@@ -76,8 +76,8 @@ healthRoutes.get('/debug/tables', async (c) => {
       WHERE table_schema = 'public'
       ORDER BY table_name
     `)
-    return success(c, { tables })
+    return c.json(createSuccessResponse({ tables }))
   } catch (error) {
-    return internalError(c, String(error))
+    return c.json(createErrorResponse(String(error)))
   }
 })
