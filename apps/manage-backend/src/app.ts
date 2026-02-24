@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { compress } from 'hono/compress'
 import { botRoutes } from './routes/bot'
-import { authRoutes } from './routes/auth'
+import { authRoutes, handleDemoLogin } from './routes/auth'
 import { adminRoutes } from './routes/admin'
 import usersRoutes from './routes/users'
 import { demoRoutes } from './routes/demo'
@@ -67,13 +67,17 @@ app.use('*', cors({
   maxAge: 86400,
 }))
 
+// Demo login — registered before /api/* middleware to avoid auth interception
+app.post('/api/auth/demo', (c) => handleDemoLogin(c))
+app.get('/api/auth/demo', (c) => handleDemoLogin(c))
+
 // Global rate limiting (100 requests/min)
 app.use('/api/*', rateLimit())
 
 app.use('/api/*', tenantMiddleware)
 
 // Health check — no middleware overhead
-app.get('/health', (c) => c.json(createSuccessResponse({ status: 'ok', ts: Date.now() })))
+app.get('/health', (c) => c.json(createSuccessResponse({ status: 'ok', ts: Date.now(), build: '6c25fbc-demo' })))
 
 // Database health check with metrics
 app.get('/health/db', async (c) => {
