@@ -63,6 +63,7 @@ export default function ConversationsPage() {
   const [conversations, setConversations] = useState<Conversation[] | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [activeFilter, setActiveFilter] = useState('全部')
 
   useEffect(() => {
     // Simulate API call
@@ -97,8 +98,9 @@ export default function ConversationsPage() {
         {['全部', '📅 排課', '💰 帳務', '❓ FAQ', '📢 客訴', '🎓 招生'].map((filter) => (
           <button
             key={filter}
+            onClick={() => setActiveFilter(filter)}
             className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-              filter === '全部'
+              activeFilter === filter
                 ? 'bg-primary text-white'
                 : 'bg-surface border border-border text-text-muted hover:bg-surface-hover'
             }`}
@@ -106,6 +108,12 @@ export default function ConversationsPage() {
             {filter}
           </button>
         ))}
+      </div>
+
+      {/* Demo Data Notice */}
+      <div className="bg-amber-50 text-amber-700 px-4 py-2 rounded-xl text-sm flex items-center gap-2">
+        <span>⚠️</span>
+        <span>目前顯示為展示資料，待後端 API 完成後將自動切換為即時資料</span>
       </div>
 
       {/* Loading State */}
@@ -156,7 +164,7 @@ export default function ConversationsPage() {
       {/* Conversation List */}
       {!isLoading && !error && conversations && conversations.length > 0 && (
         <div className="space-y-4">
-        {conversations.map((conv) => (
+        {conversations.filter(conv => activeFilter === '全部' || conv.intent === activeFilter).map((conv) => (
           <div key={conv.id} className="bg-surface rounded-2xl border border-border p-5">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">

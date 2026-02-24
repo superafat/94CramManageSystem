@@ -89,14 +89,15 @@ export default function Home() {
   const [alerts, setAlerts] = useState<AlertNotification[]>([])
   const [showAlerts, setShowAlerts] = useState(false)
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://beeclass-backend-855393865280.asia-east1.run.app'
+  const API_BASE = ''
 
   const fetchAlerts = async () => {
     try {
       const token = localStorage.getItem('token')
-      const data: { alerts?: AlertNotification[] } = await fetch(`${API_BASE}/api/alerts`, {
+      const res = await fetch(`${API_BASE}/api/alerts`, {
         headers: { Authorization: `Bearer ${token}` }
-      }).then(r => r.json())
+      })
+      const data: { alerts?: AlertNotification[] } = res.ok ? await res.json() : { alerts: [] }
       if (data.alerts) {
         setAlerts(data.alerts)
       }

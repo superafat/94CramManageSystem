@@ -40,7 +40,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
   const [tgUser, setTgUser] = useState<string | null>(null)
   const [showChat, setShowChat] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('auth_token'))
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('token'))
 
   const user = getUser()
   const userRole = getUserRole()

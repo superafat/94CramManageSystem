@@ -141,6 +141,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user)
     setSchool(data.school)
     localStorage.setItem('token', data.token)
+    if (data.user) localStorage.setItem('user', JSON.stringify(data.user))
+    if (data.school) localStorage.setItem('school', JSON.stringify(data.school))
     router.push('/')
   }
 

@@ -223,7 +223,13 @@ export default function SettingsPage() {
             className="w-full px-4 py-2 rounded-xl border border-border bg-background text-text font-mono text-xs"
           />
         </div>
-        <button className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover transition-colors">
+        <button
+          onClick={() => {
+            // TODO: 後端尚未提供 settings API
+            alert('設定已儲存（注意：後端 API 尚未實作，此為本地預覽）')
+          }}
+          className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover transition-colors"
+        >
           儲存設定
         </button>
       </div>

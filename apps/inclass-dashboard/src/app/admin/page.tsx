@@ -35,7 +35,7 @@ function isUser(value: unknown): value is User {
   )
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://beeclass-backend-855393865280.asia-east1.run.app'
+const API_BASE = ''
 
 function getAuthHeaders() {
   const token = localStorage.getItem('token')
@@ -95,6 +95,10 @@ export default function AdminPage() {
   const fetchClasses = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/classes`, { headers: getAuthHeaders() })
+      if (!res.ok) {
+        console.error('Failed to fetch classes:', res.status)
+        return
+      }
       const data = await res.json()
       setClasses(data.classes || [])
     } catch (e) {

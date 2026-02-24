@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { getCurrentUser } from '@/lib/auth';
+import toast from 'react-hot-toast';
 
 type PurchaseOrderListItem = {
   order: {
@@ -32,14 +33,19 @@ export default function PurchaseOrdersPage() {
   const user = getCurrentUser();
 
   const load = async () => {
-    const [ordersRes, suppliersRes, warehousesRes] = await Promise.all([
-      api.get<PurchaseOrderListItem[]>('/purchase-orders'),
-      api.get<Array<{ id: string; name: string }>>('/suppliers'),
-      api.get<Array<{ id: string; name: string }>>('/warehouses'),
-    ]);
-    setOrders(ordersRes.data);
-    setSuppliers(suppliersRes.data);
-    setWarehouses(warehousesRes.data);
+    try {
+      const [ordersRes, suppliersRes, warehousesRes] = await Promise.all([
+        api.get<PurchaseOrderListItem[]>('/purchase-orders'),
+        api.get<Array<{ id: string; name: string }>>('/suppliers'),
+        api.get<Array<{ id: string; name: string }>>('/warehouses'),
+      ]);
+      setOrders(ordersRes.data);
+      setSuppliers(suppliersRes.data);
+      setWarehouses(warehousesRes.data);
+    } catch (err) {
+      console.error('Failed to load purchase orders:', err);
+      toast.error('載入進貨單資料失敗');
+    }
   };
 
   useEffect(() => {
@@ -48,18 +54,28 @@ export default function PurchaseOrdersPage() {
 
   const createOrder = async () => {
     if (!form.warehouseId) return;
-    await api.post('/purchase-orders', {
-      warehouseId: form.warehouseId,
-      supplierId: form.supplierId || null,
-      notes: form.notes,
-    });
-    setForm({ supplierId: '', warehouseId: '', notes: '' });
-    await load();
+    try {
+      await api.post('/purchase-orders', {
+        warehouseId: form.warehouseId,
+        supplierId: form.supplierId || null,
+        notes: form.notes,
+      });
+      setForm({ supplierId: '', warehouseId: '', notes: '' });
+      await load();
+    } catch (err) {
+      console.error('Failed to create purchase order:', err);
+      toast.error('新增進貨單失敗');
+    }
   };
 
   const updateStatus = async (id: string, action: 'submit' | 'approve' | 'receive') => {
-    await api.post(`/purchase-orders/${id}/${action}`);
-    await load();
+    try {
+      await api.post(`/purchase-orders/${id}/${action}`);
+      await load();
+    } catch (err) {
+      console.error('Failed to update purchase order status:', err);
+      toast.error('更新進貨單狀態失敗');
+    }
   };
 
   return (

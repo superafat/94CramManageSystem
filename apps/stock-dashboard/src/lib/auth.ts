@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-const TOKEN_KEY = 'stock_token';
+const TOKEN_KEY = 'token';
 
 export type CurrentUser = {
   userId?: string;

@@ -50,7 +50,7 @@ export default function BillingPage() {
   const [showFeeEditor, setShowFeeEditor] = useState(false)
   const [feeForm, setFeeForm] = useState({ feeMonthly: 0, feeQuarterly: 0, feeSemester: 0, feeYearly: 0 })
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3100'
+  const API_BASE = ''
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token')

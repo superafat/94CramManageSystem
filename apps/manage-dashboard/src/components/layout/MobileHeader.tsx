@@ -20,6 +20,10 @@ const pageTitles: Record<string, string> = {
   '/my-children/billing': '繳費查詢',
   '/my-schedule': '我的課表',
   '/my-grades': '我的成績',
+  '/teachers': '講師管理',
+  '/salary': '薪資管理',
+  '/dashboard/trials': '試用管理',
+  '/dashboard/audit': '操作紀錄',
 }
 
 // 角色顯示名稱
@@ -67,6 +71,8 @@ export function MobileHeader() {
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    localStorage.removeItem('tenantId')
+    localStorage.removeItem('branchId')
     router.push('/login')
   }
 

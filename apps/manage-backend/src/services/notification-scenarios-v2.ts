@@ -361,8 +361,9 @@ export async function sendScheduleChangeNotifications(
     }
 
     try {
+      const botToken = process.env.TELEGRAM_BOT_TOKEN || ''
       const result = await fetch(
-        `https://api.telegram.org/bot8497754195:AAHkZcV3vXNnAv3UlM9QGe_FsnUioDvBtxg/sendMessage`,
+        `https://api.telegram.org/bot${botToken}/sendMessage`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

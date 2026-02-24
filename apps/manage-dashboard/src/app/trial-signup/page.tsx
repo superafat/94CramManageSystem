@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3100'
+const API_BASE = ''
 
 interface FormData {
   tenantName: string

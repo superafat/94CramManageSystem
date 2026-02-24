@@ -19,7 +19,7 @@ interface SalaryData {
   grand_total_amount: number
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3100'
+const API_BASE = ''
 
 // 取得本月起迄日
 const getMonthRange = (offset: number = 0) => {
@@ -51,8 +51,15 @@ export default function SalaryPage() {
   const fetchSalary = async () => {
     setLoading(true)
     try {
+      const token = localStorage.getItem('token')
       const res = await fetch(
-        `${API_BASE}/api/w8/salary/calculate?start_date=${monthRange.start}&end_date=${monthRange.end}`
+        `${API_BASE}/api/w8/salary/calculate?start_date=${monthRange.start}&end_date=${monthRange.end}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
       )
       const result = await res.json()
       setData(result)
@@ -171,17 +178,23 @@ export default function SalaryPage() {
                         onClick={async () => {
                           setConfirming(teacher.teacher_id)
                           try {
+                            const token = localStorage.getItem('token')
+                            const tenantId = localStorage.getItem('tenantId') || ''
+                            const branchId = localStorage.getItem('branchId') || ''
                             const res = await fetch(`${API_BASE}/api/w8/salary/records`, {
                               method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
+                              headers: {
+                                'Content-Type': 'application/json',
+                                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                              },
                               body: JSON.stringify({
                                 teacher_id: teacher.teacher_id,
                                 period_start: monthRange.start,
                                 period_end: monthRange.end,
                                 total_classes: teacher.total_classes,
                                 total_amount: teacher.total_amount,
-                                tenant_id: '11111111-1111-1111-1111-111111111111',
-                                branch_id: 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d',
+                                tenant_id: tenantId,
+                                branch_id: branchId,
                               }),
                             })
                             if (res.ok) alert(`${teacher.teacher_name} 薪資已確認`)

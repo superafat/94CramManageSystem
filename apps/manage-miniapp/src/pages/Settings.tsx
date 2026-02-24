@@ -25,7 +25,7 @@ export default function Settings({ onLogout, onBack }: SettingsProps) {
       // Clear offline cache on logout
       await storage.clearAll();
       
-      localStorage.removeItem('auth_token');
+      localStorage.removeItem('token');
       localStorage.removeItem('user');
       toast.success('已登出');
       setTimeout(() => onLogout(), 500);

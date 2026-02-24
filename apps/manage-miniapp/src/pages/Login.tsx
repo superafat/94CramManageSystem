@@ -75,11 +75,11 @@ export default function Login({ onLogin }: LoginProps) {
         return;
       }
       
-      localStorage.setItem('auth_token', data.token);
+      localStorage.setItem('token', data.token);
       if (userData) {
         localStorage.setItem('user', JSON.stringify(userData));
       }
-      
+
       setTimeout(() => onLogin(), 800);
     } catch (err) {
       setError(err instanceof Error ? err.message : '登入失敗');
@@ -109,11 +109,11 @@ export default function Login({ onLogin }: LoginProps) {
         return;
       }
       
-      localStorage.setItem('auth_token', data.token);
+      localStorage.setItem('token', data.token);
       if (userData) {
         localStorage.setItem('user', JSON.stringify(userData));
       }
-      
+
       onLogin();
     } catch (err) {
       setError(err instanceof Error ? err.message : '登入失敗');

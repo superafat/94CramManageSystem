@@ -196,18 +196,25 @@ export function requirePermission(
 }> {
   return async (c: Context<{ Variables: RBACVariables }>, next) => {
     const user = c.get('user');
-    const permissions = c.get('permissions');
-    
+
     if (!user) {
       throw new HTTPException(401, { message: 'Unauthorized: No user found' });
     }
-    
-    if (!permissions || !hasPermission(permissions, permission)) {
+
+    // superadmin bypasses all permission checks
+    if (user.role === Role.SUPERADMIN) {
+      await next();
+      return;
+    }
+
+    const permissions = c.get('permissions') || getUserPermissions(user.role);
+
+    if (!hasPermission(permissions, permission)) {
       throw new HTTPException(403, {
         message: `Forbidden: Requires permission '${permission}'`,
       });
     }
-    
+
     await next();
   };
 }
@@ -223,22 +230,29 @@ export function requireAnyPermission(
 }> {
   return async (c: Context<{ Variables: RBACVariables }>, next) => {
     const user = c.get('user');
-    const userPermissions = c.get('permissions');
-    
+
     if (!user) {
       throw new HTTPException(401, { message: 'Unauthorized: No user found' });
     }
-    
+
+    // superadmin bypasses all permission checks
+    if (user.role === Role.SUPERADMIN) {
+      await next();
+      return;
+    }
+
+    const userPermissions = c.get('permissions') || getUserPermissions(user.role);
+
     const hasAny = permissions.some((permission) =>
       hasPermission(userPermissions, permission)
     );
-    
+
     if (!hasAny) {
       throw new HTTPException(403, {
         message: `Forbidden: Requires one of permissions: ${permissions.join(', ')}`,
       });
     }
-    
+
     await next();
   };
 }

@@ -50,7 +50,19 @@ const jwtPayloadSchema = z.object({
 // ===== Global Middleware =====
 // CORS - MUST be first (before rate limiter, before auth)
 app.use('/*', cors({
-  origin: '*',
+  origin: [
+    'https://inclass.94cram.app',
+    'https://cram94-inclass-dashboard-1015149159553.asia-east1.run.app',
+    'https://manage.94cram.app',
+    'https://cram94-manage-dashboard-1015149159553.asia-east1.run.app',
+    'https://stock.94cram.app',
+    'https://cram94-stock-dashboard-1015149159553.asia-east1.run.app',
+    'https://cram94-portal-1015149159553.asia-east1.run.app',
+    'http://localhost:3201',
+    'http://localhost:3200',
+    'http://localhost:3000',
+    'http://localhost:3300',
+  ],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id'],
 }))

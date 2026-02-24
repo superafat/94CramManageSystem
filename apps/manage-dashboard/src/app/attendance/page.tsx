@@ -30,7 +30,7 @@ export default function AttendancePage() {
   const [editMode, setEditMode] = useState(false)
   const [changes, setChanges] = useState<Record<string, 'present' | 'late' | 'absent'>>({})
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3100'
+  const API_BASE = ''
 
   const loadData = async () => {
     try {

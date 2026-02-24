@@ -70,6 +70,10 @@ export const manageCourses = pgTable('manage_courses', {
   subject: varchar('subject', { length: 100 }),
   grade: varchar('grade', { length: 20 }),
   price: decimal('price', { precision: 10, scale: 2 }),
+  feeMonthly: decimal('fee_monthly', { precision: 10, scale: 2 }),
+  feeQuarterly: decimal('fee_quarterly', { precision: 10, scale: 2 }),
+  feeSemester: decimal('fee_semester', { precision: 10, scale: 2 }),
+  feeYearly: decimal('fee_yearly', { precision: 10, scale: 2 }),
   hours: integer('hours'),
   createdAt: timestamp('created_at').defaultNow(),
 });
@@ -155,6 +159,45 @@ export const inclassExamScores = pgTable('inclass_exam_scores', {
   studentId: uuid('student_id').notNull(),
   score: integer('score').notNull(),
   note: text('note'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const inclassParents = pgTable('inclass_parents', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  studentId: uuid('student_id').references(() => manageStudents.id).notNull(),
+  name: varchar('name', { length: 100 }).notNull(),
+  phone: varchar('phone', { length: 20 }),
+  lineUserId: varchar('line_user_id', { length: 255 }),
+  relation: varchar('relation', { length: 50 }),
+  notifyEnabled: boolean('notify_enabled').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const inclassPaymentRecords = pgTable('inclass_payment_records', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  studentId: uuid('student_id').references(() => manageStudents.id).notNull(),
+  courseId: uuid('course_id').references(() => manageCourses.id).notNull(),
+  paymentType: varchar('payment_type', { length: 20 }).notNull(),
+  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+  periodMonth: varchar('period_month', { length: 7 }),
+  paymentDate: timestamp('payment_date'),
+  status: varchar('status', { length: 20 }).default('pending'),
+  notes: text('notes'),
+  createdBy: uuid('created_by'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const inclassSchedules = pgTable('inclass_schedules', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  courseId: uuid('course_id').references(() => manageCourses.id).notNull(),
+  teacherId: uuid('teacher_id').references(() => manageTeachers.id),
+  dayOfWeek: integer('day_of_week').notNull(),
+  startTime: varchar('start_time', { length: 5 }).notNull(),
+  endTime: varchar('end_time', { length: 5 }).notNull(),
+  room: varchar('room', { length: 50 }),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

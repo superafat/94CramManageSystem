@@ -12,6 +12,10 @@ const classSchema = z.object({
   name: z.string().trim().min(1).max(100),
   grade: z.string().trim().min(1).max(50).optional(),
   subject: z.string().trim().min(1).max(100).optional(),
+  feeMonthly: z.number().nonnegative().optional(),
+  feeQuarterly: z.number().nonnegative().optional(),
+  feeSemester: z.number().nonnegative().optional(),
+  feeYearly: z.number().nonnegative().optional(),
 }).strict()
 
 const classUpdateSchema = classSchema.partial().refine((data) => Object.keys(data).length > 0, { message: 'At least one field is required' })
@@ -43,6 +47,10 @@ classesRouter.post('/', zValidator('json', classSchema), async (c) => {
       name: body.name,
       grade: body.grade,
       subject: body.subject,
+      feeMonthly: body.feeMonthly != null ? String(body.feeMonthly) : undefined,
+      feeQuarterly: body.feeQuarterly != null ? String(body.feeQuarterly) : undefined,
+      feeSemester: body.feeSemester != null ? String(body.feeSemester) : undefined,
+      feeYearly: body.feeYearly != null ? String(body.feeYearly) : undefined,
     }).returning()
     return c.json({ success: true, data: { class: newClass }, error: null }, 201)
   } catch (e) {
@@ -79,7 +87,12 @@ classesRouter.put('/:id', zValidator('param', classIdParamSchema), zValidator('j
       if (dup) return c.json({ success: false, data: null, error: 'Class name already exists' }, 400)
     }
 
-    const [updated] = await db.update(manageCourses).set(body).where(and(eq(manageCourses.id, id), eq(manageCourses.tenantId, schoolId))).returning()
+    const updateData: Record<string, unknown> = { ...body }
+    if (body.feeMonthly != null) updateData.feeMonthly = String(body.feeMonthly)
+    if (body.feeQuarterly != null) updateData.feeQuarterly = String(body.feeQuarterly)
+    if (body.feeSemester != null) updateData.feeSemester = String(body.feeSemester)
+    if (body.feeYearly != null) updateData.feeYearly = String(body.feeYearly)
+    const [updated] = await db.update(manageCourses).set(updateData).where(and(eq(manageCourses.id, id), eq(manageCourses.tenantId, schoolId))).returning()
     return c.json({ success: true, data: { class: updated }, error: null })
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error updating class:', e instanceof Error ? e.message : 'Unknown error')

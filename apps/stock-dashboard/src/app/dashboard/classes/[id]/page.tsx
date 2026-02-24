@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import toast from 'react-hot-toast';
 
 type ClassInfo = {
   id: string;
@@ -72,33 +73,53 @@ export default function ClassDetailPage() {
   }, [id]);
 
   const calculateRequired = async () => {
-    const res = await api.get<RequiredRow[]>(`/classes/${id}/required-stock`);
-    setRequiredRows(res.data);
+    try {
+      const res = await api.get<RequiredRow[]>(`/classes/${id}/required-stock`);
+      setRequiredRows(res.data);
+    } catch (err) {
+      console.error('Failed to calculate required stock:', err);
+      toast.error('計算所需數量失敗');
+    }
   };
 
   const addMaterial = async () => {
     if (!newMaterial.itemId) return;
-    await api.post(`/classes/${id}/materials`, newMaterial);
-    setNewMaterial({ itemId: '', quantityPerStudent: 1 });
-    await load();
+    try {
+      await api.post(`/classes/${id}/materials`, newMaterial);
+      setNewMaterial({ itemId: '', quantityPerStudent: 1 });
+      await load();
+    } catch (err) {
+      console.error('Failed to add material:', err);
+      toast.error('新增教材失敗');
+    }
   };
 
   const removeMaterial = async (materialId: string) => {
-    await api.delete(`/classes/${id}/materials/${materialId}`);
-    await load();
+    try {
+      await api.delete(`/classes/${id}/materials/${materialId}`);
+      await load();
+    } catch (err) {
+      console.error('Failed to remove material:', err);
+      toast.error('移除教材失敗');
+    }
   };
 
   const distribute = async () => {
     if (!warehouseId || requiredRows.length === 0) return;
-    const records = requiredRows
-      .filter((row) => row.requiredQty > 0)
-      .map((row) => ({
-        warehouseId,
-        itemId: row.itemId,
-        distributedQuantity: row.requiredQty,
-      }));
-    await api.post(`/classes/${id}/distribute`, { records });
-    await calculateRequired();
+    try {
+      const records = requiredRows
+        .filter((row) => row.requiredQty > 0)
+        .map((row) => ({
+          warehouseId,
+          itemId: row.itemId,
+          distributedQuantity: row.requiredQty,
+        }));
+      await api.post(`/classes/${id}/distribute`, { records });
+      await calculateRequired();
+    } catch (err) {
+      console.error('Failed to distribute materials:', err);
+      toast.error('批次配發失敗');
+    }
   };
 
   // Loading State
