@@ -91,4 +91,5 @@ jobs:
             --memory=256Mi \
             --min-instances=0 \
             --max-instances=2 \
-            --set-env-vars="NODE_ENV=production,DEPLOY_SHA=${{ github.sha }},BACKEND_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_BASE=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app"
+            --set-env-vars="NODE_ENV=production,DEPLOY_SHA=${{ github.sha }},BACKEND_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_BASE=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app" \
+            --set-secrets="JWT_SECRET=JWT_SECRET:latest"
