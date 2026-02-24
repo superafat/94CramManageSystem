@@ -72,6 +72,9 @@ app.use('/api/*', rateLimit())
 
 app.use('/api/*', tenantMiddleware)
 
+// Demo login endpoint (public, no auth — must be before /api/* middleware)
+app.post('/demo/login', (c) => handleDemoLogin(c))
+
 // Health check — no middleware overhead
 app.get('/health', (c) => c.json(createSuccessResponse({ status: 'ok', ts: Date.now() })))
 
@@ -108,8 +111,6 @@ app.route('/api/line', lineRoutes)
 app.route('/api/bot', botRoutes)
 app.route('/api/auth', authRoutes)
 
-// Demo login endpoint (registered directly to avoid auth middleware from sub-routers)
-app.post('/api/auth/demo', (c) => handleDemoLogin(c))
 
 // Protected admin routes (JWT + RBAC inside)
 app.route('/api/admin', adminRoutes)
