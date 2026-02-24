@@ -153,7 +153,7 @@ export function validateAll(schemas: {
   params?: ZodSchema
 }) {
   return async (c: Context, next: Next) => {
-    const validated: any = {}
+    const validated: Partial<{ params: unknown; query: unknown; body: unknown }> = {}
     
     try {
       if (schemas.params) {

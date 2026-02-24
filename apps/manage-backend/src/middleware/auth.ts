@@ -11,6 +11,15 @@ interface AuthVariables extends RBACVariables {
   tenantId: string
 }
 
+interface AuthenticatedUser {
+  id: string
+  tenant_id: string
+  branch_id: string | null
+  email: string
+  name: string
+  role: Role
+}
+
 /**
  * Middleware: require valid JWT, populate user + permissions
  */
@@ -24,17 +33,17 @@ export async function authMiddleware(c: Context<{ Variables: AuthVariables }>, n
   try {
     const payload = await verify(token)
 
-    const user = {
+    const user: AuthenticatedUser = {
       id: payload.userId || payload.sub || '',
       tenant_id: payload.tenantId || '38068f5a-6bad-4edc-b26b-66bc6ac90fb3',
-      branch_id: null as string | null,
+      branch_id: null,
       email: payload.email || '',
       name: payload.name || '',
-      role: (payload.role as Role) || Role.PARENT,
+      role: (payload.role as Role) || Role.PARENT
     }
 
     const permissions = getUserPermissions(user.role)
-    c.set('user', user as any)
+    c.set('user', user)
     c.set('permissions', permissions)
     c.set('tenantId', user.tenant_id)
 
@@ -53,15 +62,15 @@ export async function optionalAuth(c: Context<{ Variables: AuthVariables }>, nex
     const token = authHeader.slice(7)
     try {
       const payload = await verify(token)
-      const user = {
-        id: payload.userId || payload.sub || '',
-        tenant_id: payload.tenantId || '38068f5a-6bad-4edc-b26b-66bc6ac90fb3',
-        branch_id: null as string | null,
-        email: payload.email || '',
-        name: payload.name || '',
-        role: (payload.role as Role) || Role.PARENT,
-      }
-      c.set('user', user as any)
+        const user: AuthenticatedUser = {
+          id: payload.userId || payload.sub || '',
+          tenant_id: payload.tenantId || '38068f5a-6bad-4edc-b26b-66bc6ac90fb3',
+          branch_id: null,
+          email: payload.email || '',
+          name: payload.name || '',
+          role: (payload.role as Role) || Role.PARENT
+        }
+        c.set('user', user)
       c.set('permissions', getUserPermissions(user.role))
       c.set('tenantId', user.tenant_id)
     } catch {

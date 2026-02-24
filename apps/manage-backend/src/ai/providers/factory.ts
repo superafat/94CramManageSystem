@@ -130,7 +130,7 @@ export class ProviderFactory {
           continue
         }
 
-        console.log(`[Factory] Using provider: ${providerName}`)
+        console.info(`[Factory] Using provider: ${providerName}`)
         const result = await provider.chat(params)
         
         return {

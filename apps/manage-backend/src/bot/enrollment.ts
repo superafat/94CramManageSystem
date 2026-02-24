@@ -238,8 +238,7 @@ function formatCourseRecommendation(courses: Course[]): string {
 async function createLead(data: ConversationContext['data']): Promise<boolean> {
   try {
     // 這裡應該呼叫你的資料庫 API
-    // 暫時使用 console.log 模擬
-    console.log('Creating lead:', data);
+    console.info('Creating lead:', data);
     
     // 實際應該是：
     // await fetch('http://localhost:3100/api/admin/leads', {
@@ -516,7 +515,7 @@ export function checkTimeouts() {
     
     if (timeSinceLastActivity > TIMEOUT_MS && conv.state !== EnrollmentState.COMPLETED) {
       // 這裡可以發送提醒訊息（需要 bot 實例）
-      console.log(`對話超時: ${chatId}, 狀態: ${conv.state}`);
+      console.info(`對話超時: ${chatId}, 狀態: ${conv.state}`);
     }
   }
 }

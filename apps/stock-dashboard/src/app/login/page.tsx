@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { isAxiosError } from 'axios';
 import api from '@/lib/api';
 import { setToken } from '@/lib/auth';
 
@@ -11,6 +12,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  type ErrorResponse = { error?: string };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,8 +22,8 @@ export default function LoginPage() {
       const res = await api.post('/auth/login', { email, password });
       setToken(res.data.token);
       router.push('/dashboard');
-    } catch (err: any) {
-      setError(err?.response?.data?.error || '登入失敗');
+    } catch (err: unknown) {
+      setError(isAxiosError<ErrorResponse>(err) ? err.response?.data?.error || '登入失敗' : '登入失敗');
     } finally {
       setLoading(false);
     }

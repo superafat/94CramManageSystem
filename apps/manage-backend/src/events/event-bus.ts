@@ -48,7 +48,7 @@ class EventBus {
     }
     
     this.handlers.set(key, handler)
-    console.log(`[EventBus] Registered handler: ${handler.name} for channel: ${key}`)
+    console.info(`[EventBus] Registered handler: ${handler.name} for channel: ${key}`)
   }
 
   /**
@@ -56,7 +56,7 @@ class EventBus {
    */
   unregisterHandler(channel: string): void {
     this.handlers.delete(channel)
-    console.log(`[EventBus] Unregistered handler for channel: ${channel}`)
+    console.info(`[EventBus] Unregistered handler for channel: ${channel}`)
   }
 
   /**
@@ -90,7 +90,7 @@ class EventBus {
    * 發布事件（同步）
    */
   async emit(event: NotificationEvent): Promise<EventHandlerResult[]> {
-    console.log(`[EventBus] Emitting event: ${event.type}`)
+    console.info(`[EventBus] Emitting event: ${event.type}`)
     
     // 記錄事件
     this.logEvent(event)
@@ -163,7 +163,7 @@ class EventBus {
         // 記錄結果
         this.logEventResult(event, result)
         
-        console.log(
+        console.info(
           `[EventBus] Handler ${handler.name} completed:`,
           `sent=${result.sentCount}, failed=${result.failedCount}, skipped=${result.skippedCount}`
         )

@@ -61,7 +61,7 @@ ${lead.trial_date ? `📅 **試聽預約：** ${lead.trial_date} ${lead.trial_ti
       parse_mode: 'Markdown' 
     });
     
-    console.log(`新 lead 通知已發送: ${lead.name}`);
+    console.info(`新 lead 通知已發送: ${lead.name}`);
   } catch (error) {
     console.error('發送新 lead 通知失敗:', error);
   }
@@ -113,7 +113,7 @@ export async function sendTrialReminder(
     }
     
     await bot.telegram.sendMessage(chatId, message);
-    console.log(`試聽提醒已發送: ${lead.name} (${daysBefore} 天前)`);
+    console.info(`試聽提醒已發送: ${lead.name} (${daysBefore} 天前)`);
   } catch (error) {
     console.error('發送試聽提醒失敗:', error);
   }
@@ -142,7 +142,7 @@ export async function sendFollowUpReminder(bot: Telegraf, leads: Lead[]) {
       parse_mode: 'Markdown'
     });
     
-    console.log(`跟進提醒已發送: ${leads.length} 筆`);
+    console.info(`跟進提醒已發送: ${leads.length} 筆`);
   } catch (error) {
     console.error('發送跟進提醒失敗:', error);
   }
@@ -175,7 +175,7 @@ ${stats.conversionRate > 0.3 ? '🎉 表現優異！' : stats.conversionRate > 0
       parse_mode: 'Markdown'
     });
     
-    console.log('週報已發送');
+    console.info('週報已發送');
   } catch (error) {
     console.error('發送週報失敗:', error);
   }
@@ -244,7 +244,7 @@ async function getWeeklyStats(): Promise<ConversionStats> {
 export function setupNotificationSchedules(bot: Telegraf) {
   // 每天 9:00 - 發送當天試聽提醒
   schedule.scheduleJob('0 9 * * *', async () => {
-    console.log('執行當天試聽提醒...');
+    console.info('執行當天試聽提醒...');
     const todayTrials = await getUpcomingTrials(0);
     
     for (const lead of todayTrials) {
@@ -255,7 +255,7 @@ export function setupNotificationSchedules(bot: Telegraf) {
   
   // 每天 18:00 - 發送明天試聽提醒
   schedule.scheduleJob('0 18 * * *', async () => {
-    console.log('執行明日試聽提醒...');
+    console.info('執行明日試聽提醒...');
     const tomorrowTrials = await getUpcomingTrials(1);
     
     for (const lead of tomorrowTrials) {
@@ -265,7 +265,7 @@ export function setupNotificationSchedules(bot: Telegraf) {
   
   // 每天 8:30 - 發送跟進提醒給教室長
   schedule.scheduleJob('30 8 * * *', async () => {
-    console.log('執行跟進提醒...');
+    console.info('執行跟進提醒...');
     const overdueLeads = await getOverdueFollowUps();
     
     if (overdueLeads.length > 0) {
@@ -275,12 +275,12 @@ export function setupNotificationSchedules(bot: Telegraf) {
   
   // 每週一 9:00 - 發送週報
   schedule.scheduleJob('0 9 * * 1', async () => {
-    console.log('執行週報發送...');
+    console.info('執行週報發送...');
     const stats = await getWeeklyStats();
     await sendWeeklyReport(bot, stats);
   });
   
-  console.log('✅ 通知排程已設定');
+  console.info('✅ 通知排程已設定');
 }
 
 // ==================== 輔助函式 ====================
@@ -340,7 +340,7 @@ export async function sendTestNotification(bot: Telegraf, type: string) {
       await sendWeeklyReport(bot, testStats);
       break;
     default:
-      console.log('未知的通知類型');
+      console.info('未知的通知類型');
   }
 }
 

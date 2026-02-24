@@ -79,11 +79,11 @@ function createPostgresClient() {
       fetch_types: false,
       // 监控钩子
       onnotice: (notice) => {
-        console.log('[DB Notice]', notice)
+        console.info('[DB Notice]', notice)
       },
       onparameter: (key, value) => {
         if (config.NODE_ENV === 'development') {
-          console.log('[DB Parameter]', key, value)
+          console.info('[DB Parameter]', key, value)
         }
       },
       connection: {
@@ -103,11 +103,11 @@ function createPostgresClient() {
       fetch_types: false,
       // 监控钩子
       onnotice: (notice) => {
-        console.log('[DB Notice]', notice)
+        console.info('[DB Notice]', notice)
       },
       onparameter: (key, value) => {
         if (config.NODE_ENV === 'development') {
-          console.log('[DB Parameter]', key, value)
+          console.info('[DB Parameter]', key, value)
         }
       },
       connection: {
@@ -152,17 +152,17 @@ function setupConnectionMonitoring(client: ReturnType<typeof postgres>) {
       const recentQueries = metrics.queryTimes.slice(-10).length
       metrics.activeConnections = Math.min(recentQueries, config.DB_POOL_MAX)
       
-      if (config.NODE_ENV === 'development') {
-        console.log('[DB Metrics]', {
-          totalQueries: metrics.totalQueries,
-          slowQueries: metrics.slowQueries,
-          timeouts: metrics.timeouts,
-          errors: metrics.errors,
-          avgQueryTime: Math.round(metrics.avgQueryTime),
-          reconnections: metrics.reconnections,
-          activeConnections: metrics.activeConnections
-        })
-      }
+        if (config.NODE_ENV === 'development') {
+          console.info('[DB Metrics]', {
+            totalQueries: metrics.totalQueries,
+            slowQueries: metrics.slowQueries,
+            timeouts: metrics.timeouts,
+            errors: metrics.errors,
+            avgQueryTime: Math.round(metrics.avgQueryTime),
+            reconnections: metrics.reconnections,
+            activeConnections: metrics.activeConnections
+          })
+        }
     } catch (error) {
       console.error('[DB Monitoring Error]', error)
     }
@@ -378,7 +378,7 @@ function initializeDatabase() {
     _client = createPostgresClient()
     _db = drizzle(_client, { schema })
     
-    console.log('[DB] Database connection initialized', {
+    console.info('[DB] Database connection initialized', {
       poolMax: config.DB_POOL_MAX,
       queryTimeout: config.DB_QUERY_TIMEOUT,
       nodeEnv: config.NODE_ENV
@@ -387,7 +387,7 @@ function initializeDatabase() {
     // 预热连接池
     checkDatabaseHealth().then(health => {
       if (health.healthy) {
-        console.log(`[DB] Health check passed, latency: ${health.latency}ms`)
+        console.info(`[DB] Health check passed, latency: ${health.latency}ms`)
       } else {
         console.error('[DB] Health check failed:', health.error)
       }
@@ -406,11 +406,11 @@ function initializeDatabase() {
  */
 export async function closeDatabaseConnection() {
   if (_client) {
-    console.log('[DB] Closing database connection...')
+    console.info('[DB] Closing database connection...')
     await _client.end()
     _client = null
     _db = null
-    console.log('[DB] Database connection closed')
+    console.info('[DB] Database connection closed')
   }
 }
 

@@ -94,6 +94,32 @@ interface LineMessageObject {
 const app = new Hono()
 const DEFAULT_TENANT_ID = '11111111-1111-1111-1111-111111111111'
 
+interface RateLimitRow {
+  count: number
+}
+
+interface ConversationRecord {
+  user_message?: unknown
+  bot_reply?: unknown
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  if (error && typeof error === 'object' && 'message' in error) {
+    return String((error as { message?: unknown }).message ?? 'Unknown error')
+  }
+  return 'Unknown error'
+}
+
+function logLineError(label: string, error: unknown) {
+  if (error instanceof Error) {
+    console.error(label, error.message, error.stack)
+  } else {
+    console.error(label, error)
+  }
+}
+
 // ===== Rate Limiting Config =====
 // 
 // 建議配置：
@@ -247,15 +273,18 @@ async function processBinding(lineUserId: string, studentName: string, phoneLast
         AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
     `)
     
-    const attemptCount = (recentAttempts as any[])[0]?.count || 0
-    if (attemptCount > 5) {
+    const attemptRows = Array.isArray(recentAttempts)
+      ? (recentAttempts as unknown as RateLimitRow[])
+      : []
+    const attemptCount = attemptRows[0]?.count ?? 0
+  if (attemptCount > 5) {
       return { 
         success: false, 
         message: '綁定嘗試次數過多，請稍後再試（5分鐘後可重試）' 
       }
     }
-  } catch (e: any) {
-    console.error('[LINE Binding] Rate limit check error:', e.message)
+  } catch (error) {
+    logLineError('[LINE Binding] Rate limit check error:', error)
   }
   
   try {
@@ -323,8 +352,8 @@ async function processBinding(lineUserId: string, studentName: string, phoneLast
       message: `✅ 綁定成功！${matched.name}，歡迎使用補習班 LINE 服務～`,
       userId: matched.id,
     }
-  } catch (error: any) {
-    console.error('[LINE Binding] Error:', error.message, error.stack)
+  } catch (error) {
+    logLineError('[LINE Binding] Error:', error)
     return { success: false, message: '系統忙碌中，請稍後再試' }
   }
 }
@@ -370,7 +399,7 @@ async function getConversationHistory(lineUserId: string, limit = 6): Promise<Co
     `)
 
     const messages: ConversationMessage[] = []
-    const records = rows as any[]
+    const records = Array.isArray(rows) ? (rows as ConversationRecord[]) : []
     
     // 反轉成正序，並驗證數據完整性
     for (let i = records.length - 1; i >= 0; i--) {
@@ -383,8 +412,8 @@ async function getConversationHistory(lineUserId: string, limit = 6): Promise<Co
       }
     }
     return messages
-  } catch (e: any) {
-    console.error('[LINE] Get history error:', e.message, e.stack)
+  } catch (error) {
+    logLineError('[LINE] Get history error:', error)
     return []
   }
 }
@@ -433,8 +462,8 @@ async function saveConversation(params: {
         (${params.lineUserId}, ${sanitizedUserName}, ${sanitizedRole}, ${sanitizedMessage}, 
          ${sanitizedReply}, ${sanitizedIntent}, ${sanitizedModel}, ${safeLatency}, NOW())
     `)
-  } catch (e: any) {
-    console.error('[LINE] Save conversation error:', e.message, e.stack)
+  } catch (error) {
+    logLineError('[LINE] Save conversation error:', error)
     // 不拋出錯誤，避免影響主流程
   }
 }
@@ -484,12 +513,12 @@ app.post('/webhook', async (c) => {
 
     // 安全解析 JSON
     let body: LineWebhookBody
-    try {
-      body = JSON.parse(rawBody)
-    } catch (e) {
-      console.error('[LINE] Invalid JSON body:', e)
-      return c.text('Bad Request', 400)
-    }
+      try {
+        body = JSON.parse(rawBody)
+      } catch (error) {
+        logLineError('[LINE] Invalid JSON body:', error)
+        return c.text('Bad Request', 400)
+      }
     
     // 驗證 events 陣列
     if (!body.events || !Array.isArray(body.events)) {
@@ -504,16 +533,16 @@ app.post('/webhook', async (c) => {
     for (const event of events) {
       if (event && typeof event === 'object' && event.type) {
         setTimeout(() => {
-          processEvent(event).catch(e => 
-            console.error('[LINE] Event error:', e.message, e.stack)
+          processEvent(event).catch((error) =>
+            logLineError('[LINE] Event error:', error)
           )
         }, 0)
       }
     }
     
     return c.json({ success: true })
-  } catch (error: any) {
-    console.error('[LINE] Webhook error:', error.message, error.stack)
+  } catch (error) {
+    logLineError('[LINE] Webhook error:', error)
     // 回傳 200 避免 LINE 重試
     return c.json({ success: false, error: 'Internal server error' }, 200)
   }
@@ -552,14 +581,14 @@ async function processEvent(event: LineEvent): Promise<void> {
       case 'unfollow':
         // 記錄取消追蹤
         if (event.source.userId) {
-          console.log('[LINE] User unfollowed:', event.source.userId)
+          console.info('[LINE] User unfollowed:', event.source.userId)
         }
         break
       default:
-        console.log('[LINE] Unhandled event type:', event.type)
+        console.info('[LINE] Unhandled event type:', event.type)
     }
-  } catch (error: any) {
-    console.error(`[LINE] Error processing ${event.type} event:`, error.message, error.stack)
+  } catch (error) {
+    logLineError(`[LINE] Error processing ${event.type} event:`, error)
   }
 }
 
@@ -605,8 +634,8 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
       await sendLineReplyMessage(replyToken, [
         { type: 'text', text: '此 LINE 帳號已綁定其他補習班，請聯繫客服協助' }
       ])
-    } catch (e: any) {
-      console.error('[LINE] Failed to send cross-tenant message:', e.message)
+    } catch (error: unknown) {
+      logLineError('[LINE] Failed to send cross-tenant message', error)
     }
     return
   }
@@ -618,13 +647,13 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
   
   // 限制訊息長度（防止濫用）
   if (messageText.length > 2000) {
-    try {
-      await sendLineReplyMessage(replyToken, [
-        { type: 'text', text: '訊息太長了，請簡短一點～' }
-      ])
-    } catch (e: any) {
-      console.error('[LINE] Failed to send length error message:', e.message)
-    }
+      try {
+        await sendLineReplyMessage(replyToken, [
+          { type: 'text', text: '訊息太長了，請簡短一點～' }
+        ])
+      } catch (error: unknown) {
+        logLineError('[LINE] Failed to send length error message', error)
+      }
     return
   }
 
@@ -643,8 +672,8 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
           await sendLineReplyMessage(replyToken, [
             { type: 'text', text: '學生姓名太長，請重新輸入' }
           ])
-        } catch (e: any) {
-          console.error('[LINE] Failed to send name length error:', e.message)
+        } catch (error: unknown) {
+          logLineError('[LINE] Failed to send name length error', error)
         }
         return
       }
@@ -655,8 +684,8 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
         await sendLineReplyMessage(replyToken, [
           { type: 'text', text: result.message }
         ])
-      } catch (e: any) {
-        console.error('[LINE] Failed to send binding result:', e.message)
+      } catch (error: unknown) {
+        logLineError('[LINE] Failed to send binding result', error)
       }
       
       // 記錄綁定嘗試
@@ -696,8 +725,8 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
         name = profileResult.success && profileResult.profile ? profileResult.profile.displayName : ''
         // 清理並限制 displayName 長度
         name = sanitizeString(name).slice(0, 50)
-      } catch (e: any) {
-        console.error('[LINE] Failed to get profile:', e.message)
+      } catch (error: unknown) {
+        logLineError('[LINE] Failed to get profile', error)
       }
       
       // 如果是簡單問候，引導綁定
@@ -708,8 +737,8 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
           await sendLineReplyMessage(replyToken, [
             { type: 'text', text: greetingMsg }
           ])
-        } catch (e: any) {
-          console.error('[LINE] Failed to send greeting:', e.message)
+        } catch (error: unknown) {
+          logLineError('[LINE] Failed to send greeting', error)
         }
         return
       }
@@ -779,9 +808,9 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
     // 4. Reply API 回覆（免費）
     try {
       await sendLineReplyMessage(replyToken, [{ type: 'text', text: reply }])
-    } catch (e: any) {
-      console.error('[LINE] Failed to send AI reply:', e.message)
-      throw e // 重新拋出以觸發外層錯誤處理
+    } catch (error: unknown) {
+      logLineError('[LINE] Failed to send AI reply', error)
+      throw error // 重新拋出以觸發外層錯誤處理
     }
 
     // 5. 存對話紀錄
@@ -795,14 +824,14 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
       model: aiResponse.model || 'unknown',
       latencyMs: aiResponse.latencyMs,
     })
-  } catch (error: any) {
-    console.error('[LINE] Message handler error:', error.message, error.stack)
+  } catch (error: unknown) {
+    logLineError('[LINE] Message handler error', error)
     try {
       await sendLineReplyMessage(replyToken, [
         { type: 'text', text: '不好意思，系統有點忙，稍等一下再試試～' }
       ])
-    } catch (e: any) {
-      console.error('[LINE] Failed to send error message:', e.message)
+    } catch (sendError: unknown) {
+      logLineError('[LINE] Failed to send error message', sendError)
     }
   }
 }
@@ -835,8 +864,8 @@ async function handleFollowEvent(event: LineEvent): Promise<void> {
         await sendLineReplyMessage(replyToken, [
           { type: 'text', text: '此 LINE 帳號已綁定其他補習班，請聯繫客服協助' }
         ])
-      } catch (e: any) {
-        console.error('[LINE] Failed to send cross-tenant follow message:', e.message)
+      } catch (error: unknown) {
+        logLineError('[LINE] Failed to send cross-tenant follow message', error)
       }
       return
     }
@@ -847,8 +876,8 @@ async function handleFollowEvent(event: LineEvent): Promise<void> {
       name = profileResult.success && profileResult.profile 
         ? profileResult.profile.displayName 
         : ''
-    } catch (e: any) {
-      console.error('[LINE] Failed to get profile in follow:', e.message)
+    } catch (error: unknown) {
+      logLineError('[LINE] Failed to get profile in follow', error)
     }
 
     const userRows = await db.select().from(users).where(
@@ -865,15 +894,15 @@ async function handleFollowEvent(event: LineEvent): Promise<void> {
 
     try {
       await sendLineReplyMessage(replyToken, [{ type: 'text', text: msg }])
-    } catch (e: any) {
-      console.error('[LINE] Failed to send follow message:', e.message)
+    } catch (error: unknown) {
+      logLineError('[LINE] Failed to send follow message', error)
     }
-  } catch (e: any) {
-    console.error('[LINE] Follow event error:', e.message, e.stack)
+  } catch (error: unknown) {
+    logLineError('[LINE] Follow event error', error)
     try {
       await sendLineReplyMessage(replyToken, [{ type: 'text', text: '歡迎！有問題隨時問我～' }])
-    } catch (err: any) {
-      console.error('[LINE] Failed to send fallback follow message:', err.message)
+    } catch (fallbackError: unknown) {
+      logLineError('[LINE] Failed to send fallback follow message', fallbackError)
     }
   }
 }

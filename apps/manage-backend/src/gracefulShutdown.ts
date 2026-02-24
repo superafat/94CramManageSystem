@@ -1,5 +1,6 @@
 import { closeDatabaseConnection } from './db'
 import { logger } from './utils/logger'
+import type { Server } from 'http'
 
 interface ShutdownOptions {
   timeout?: number
@@ -12,7 +13,7 @@ interface ShutdownOptions {
  */
 export class GracefulShutdown {
   private isShuttingDown = false
-  private server: any = null
+  private server: Server | null = null
   private options: ShutdownOptions
 
   constructor(options: ShutdownOptions = {}) {
@@ -25,7 +26,7 @@ export class GracefulShutdown {
   /**
    * Register the server instance for shutdown
    */
-  registerServer(server: any) {
+  registerServer(server: Server) {
     this.server = server
     return this
   }
@@ -69,9 +70,10 @@ export class GracefulShutdown {
 
       // Close HTTP server
       if (this.server && typeof this.server.close === 'function') {
+        const server = this.server
         logger.info('Closing HTTP server...')
         await new Promise<void>((resolve, reject) => {
-          this.server.close((err?: Error) => {
+          server.close((err?: Error) => {
             if (err) reject(err)
             else resolve()
           })
@@ -92,7 +94,7 @@ export class GracefulShutdown {
 /**
  * Initialize graceful shutdown with default configuration
  */
-export function initGracefulShutdown(server: any, options?: ShutdownOptions) {
+export function initGracefulShutdown(server: Server, options?: ShutdownOptions) {
   const shutdown = new GracefulShutdown(options)
   shutdown.registerServer(server).setupHandlers()
   return shutdown

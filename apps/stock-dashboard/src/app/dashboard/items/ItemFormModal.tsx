@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { X } from 'lucide-react';
+import axios from 'axios';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
@@ -21,15 +22,37 @@ const itemSchema = z.object({
 
 type ItemFormData = z.infer<typeof itemSchema>;
 
+interface ItemCategory {
+  id: string;
+  name: string;
+}
+
+interface EditableItem {
+  id: string;
+  name: string;
+  sku?: string | null;
+  categoryId?: string | null;
+  unit: string;
+  safetyStock?: number | null;
+  schoolYear?: string | null;
+  version?: string | null;
+  description?: string | null;
+  isActive: boolean;
+}
+
+interface ApiErrorResponse {
+  error?: string;
+}
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  editItem?: any;
+  editItem?: EditableItem;
 }
 
 export default function ItemFormModal({ isOpen, onClose, onSuccess, editItem }: Props) {
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<ItemCategory[]>([]);
   const isEdit = !!editItem;
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ItemFormData>({
@@ -91,9 +114,12 @@ export default function ItemFormModal({ isOpen, onClose, onSuccess, editItem }: 
       }
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(error.response?.data?.error || '操作失敗');
+      const message = axios.isAxiosError<ApiErrorResponse>(error)
+        ? (error.response?.data?.error || '操作失敗')
+        : '操作失敗';
+      toast.error(message);
     }
   };
 
