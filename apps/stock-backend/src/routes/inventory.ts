@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { db } from '../db/index';
-import { stockBarcodes, stockInventory, stockTransactions, stockItems, stockWarehouses } from '../db/schema';
+import { stockBarcodes, stockInventory, stockTransactions, stockItems, stockWarehouses } from '@94cram/shared/db';
 import { eq, and, desc, gte, sql } from 'drizzle-orm';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { sendLowStockAlert } from '../services/notifications';

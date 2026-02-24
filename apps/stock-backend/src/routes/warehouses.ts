@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { db } from '../db/index';
-import { stockWarehouses } from '../db/schema';
+import { stockWarehouses } from '@94cram/shared/db';
 import { and, eq } from 'drizzle-orm';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { z } from 'zod';

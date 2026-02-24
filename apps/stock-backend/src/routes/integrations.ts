@@ -4,7 +4,7 @@ import { authMiddleware, getAuthUser } from '../middleware/auth';
 import { getTenantId, tenantMiddleware } from '../middleware/tenant';
 import { getIntegrationSettings, getStudents, syncAll, upsertIntegrationSettings } from '../services/integration-94manage';
 import { db } from '../db/index';
-import { stockIntegrationSettings } from '../db/schema';
+import { stockIntegrationSettings } from '@94cram/shared/db';
 
 const app = new Hono();
 app.use('*', authMiddleware, tenantMiddleware);

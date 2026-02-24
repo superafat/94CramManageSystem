@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { and, desc, eq, gte, inArray, lte, lt, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db/index';
-import { stockInventory, stockItems, stockPurchaseItems, stockPurchaseOrders, stockSuppliers, stockTransactions, stockWarehouses } from '../db/schema';
+import { stockInventory, stockItems, stockPurchaseItems, stockPurchaseOrders, stockSuppliers, stockTransactions, stockWarehouses } from '@94cram/shared/db';
 import { authMiddleware } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { z } from 'zod';

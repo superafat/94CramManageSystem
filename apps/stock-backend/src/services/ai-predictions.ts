@@ -8,7 +8,7 @@ import {
   stockPurchaseItems,
   stockPurchaseOrders,
   stockTransactions,
-} from '../db/schema';
+} from '@94cram/shared/db';
 
 export async function getPredictions(tenantId: string) {
   return db.select().from(stockAiPredictions)

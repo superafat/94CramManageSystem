@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/index';
-import { stockClasses, stockIntegrationSettings, stockStudents } from '../db/schema';
+import { stockClasses, stockIntegrationSettings, stockStudents } from '@94cram/shared/db';
 
 type IntegrationSettingsInput = {
   apiEndpoint?: string;

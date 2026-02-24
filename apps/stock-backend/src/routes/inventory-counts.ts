@@ -8,7 +8,7 @@ import {
   stockInventoryCounts,
   stockItems,
   stockTransactions,
-} from '../db/schema';
+} from '@94cram/shared/db';
 import { authMiddleware, getAuthUser } from '../middleware/auth';
 import { getTenantId, tenantMiddleware } from '../middleware/tenant';
 
