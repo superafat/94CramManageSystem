@@ -89,4 +89,4 @@ jobs:
             --memory=256Mi \
             --min-instances=0 \
             --max-instances=2 \
-            --set-env-vars="NODE_ENV=production"
+            --set-env-vars="NODE_ENV=production,BACKEND_URL=https://cram94-inclass-backend-1015149159553.asia-east1.run.app"
