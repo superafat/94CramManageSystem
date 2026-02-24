@@ -1,6 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from '../db/index';
-import { stockNotificationSettings, stockNotifications } from '../db/schema';
+import { stockNotificationSettings, stockNotifications } from '@94cram/shared/db';
 import { sendNotification as sendTelegramNotification } from './telegram';
 
 export const NOTIFICATION_TYPES = ['low_stock', 'purchase_approval', 'system'] as const;

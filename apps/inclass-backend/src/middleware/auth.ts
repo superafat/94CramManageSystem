@@ -7,7 +7,7 @@
 import type { Context, Next } from 'hono';
 import { verify, type JWTPayload } from '@94cram/shared/auth';
 import { db } from '../db/index.js';
-import { users } from '../db/schema.js';
+import { users } from '@94cram/shared/db';
 import { eq } from 'drizzle-orm';
 
 export type Variables = {
@@ -65,7 +65,7 @@ export function adminOnly() {
   return async (c: Context<{ Variables: AdminVariables }>, next: Next) => {
     const userId = c.get('userId');
     const [adminUser] = await db.select().from(users).where(eq(users.id, userId));
-    if (!adminUser || adminUser.role !== 'admin') {
+    if (!adminUser || adminUser.role !== 'admin' || !adminUser.isActive) {
       return c.json({ error: 'Admin access required' }, 403);
     }
     c.set('adminUser', adminUser);

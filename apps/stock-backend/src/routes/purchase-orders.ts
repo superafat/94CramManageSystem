@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from '../db/index';
-import { stockInventory, stockItems, stockPurchaseItems, stockPurchaseOrders, stockSuppliers, stockTransactions, stockWarehouses } from '../db/schema';
+import { stockInventory, stockItems, stockPurchaseItems, stockPurchaseOrders, stockSuppliers, stockTransactions, stockWarehouses } from '@94cram/shared/db';
 import { authMiddleware, getAuthUser } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { sendPurchaseApprovalAlert } from '../services/notifications';

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/index';
-import { stockBarcodes, stockItems } from '../db/schema';
+import { stockBarcodes, stockItems } from '@94cram/shared/db';
 import { authMiddleware } from '../middleware/auth';
 import { getTenantId, tenantMiddleware } from '../middleware/tenant';
 

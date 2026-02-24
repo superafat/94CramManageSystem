@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import { config } from '../config'
-import * as schema from './schema'
+import * as schema from '@94cram/shared/db'
 
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null
 let _client: ReturnType<typeof postgres> | null = null
@@ -79,11 +79,11 @@ function createPostgresClient() {
       fetch_types: false,
       // 监控钩子
       onnotice: (notice) => {
-        console.log('[DB Notice]', notice)
+        console.info('[DB Notice]', notice)
       },
       onparameter: (key, value) => {
         if (config.NODE_ENV === 'development') {
-          console.log('[DB Parameter]', key, value)
+        console.info('[DB Parameter]', key, value)
         }
       },
       connection: {
@@ -103,11 +103,11 @@ function createPostgresClient() {
       fetch_types: false,
       // 监控钩子
       onnotice: (notice) => {
-        console.log('[DB Notice]', notice)
+        console.info('[DB Notice]', notice)
       },
       onparameter: (key, value) => {
         if (config.NODE_ENV === 'development') {
-          console.log('[DB Parameter]', key, value)
+          console.info('[DB Parameter]', key, value)
         }
       },
       connection: {
@@ -153,7 +153,7 @@ function setupConnectionMonitoring(client: ReturnType<typeof postgres>) {
       metrics.activeConnections = Math.min(recentQueries, config.DB_POOL_MAX)
       
       if (config.NODE_ENV === 'development') {
-        console.log('[DB Metrics]', {
+        console.info('[DB Metrics]', {
           totalQueries: metrics.totalQueries,
           slowQueries: metrics.slowQueries,
           timeouts: metrics.timeouts,
@@ -379,7 +379,7 @@ function initializeDatabase() {
     _client = createPostgresClient()
     _db = drizzle(_client, { schema })
     
-    console.log('[DB] Database connection initialized', {
+    console.info('[DB] Database connection initialized', {
       poolMax: config.DB_POOL_MAX,
       queryTimeout: config.DB_QUERY_TIMEOUT,
       nodeEnv: config.NODE_ENV
@@ -388,7 +388,7 @@ function initializeDatabase() {
     // 预热连接池
     checkDatabaseHealth().then(health => {
       if (health.healthy) {
-        console.log(`[DB] Health check passed, latency: ${health.latency}ms`)
+        console.info(`[DB] Health check passed, latency: ${health.latency}ms`)
       } else {
         console.error('[DB] Health check failed:', health.error)
       }
@@ -407,11 +407,11 @@ function initializeDatabase() {
  */
 export async function closeDatabaseConnection() {
   if (_client) {
-    console.log('[DB] Closing database connection...')
+    console.info('[DB] Closing database connection...')
     await _client.end()
     _client = null
     _db = null
-    console.log('[DB] Database connection closed')
+    console.info('[DB] Database connection closed')
   }
 }
 

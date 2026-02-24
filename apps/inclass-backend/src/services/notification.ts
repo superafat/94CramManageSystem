@@ -59,7 +59,7 @@ export async function sendToParent(
     }
 
     const result = await response.json()
-    console.log('✅ 通知已發送:', result)
+    console.info('✅ 通知已發送:', result)
     return true
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error'

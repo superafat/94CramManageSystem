@@ -3,7 +3,11 @@
  * 統一使用 @94cram/shared/auth
  */
 import type { Context, Next } from 'hono';
-import { verify, type JWTPayload } from '@94cram/shared/auth';
+import { eq } from 'drizzle-orm';
+import { verify } from '@94cram/shared/auth';
+import { users } from '@94cram/shared/db';
+import { config } from '../config';
+import { db } from '../db';
 
 export interface AuthUser {
   id: string;
@@ -22,13 +26,19 @@ export async function authMiddleware(c: Context, next: Next) {
   }
 
   try {
-    const payload = await verify(token);
+    const payload = await verify(token, config.JWT_SECRET);
+    const userId = payload.userId || payload.sub || '';
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user || user.isActive === false) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
     const authUser: AuthUser = {
-      id: payload.userId || payload.sub || '',
-      tenantId: payload.tenantId || '',
-      role: payload.role || 'viewer',
-      email: payload.email || '',
-      name: payload.name || '',
+      id: user.id,
+      tenantId: payload.tenantId || user.tenantId || '',
+      role: payload.role || user.role || 'viewer',
+      email: payload.email || user.email || '',
+      name: payload.name || user.name || '',
     };
 
     if (!authUser.id || !authUser.tenantId) {

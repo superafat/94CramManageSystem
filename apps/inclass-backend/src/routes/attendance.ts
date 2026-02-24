@@ -1,23 +1,19 @@
-/**
- * Attendance Routes - 點名系統
- */
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
 import { db } from '../db/index.js'
-import { students, attendances, parents } from '../db/schema.js'
-import { eq, and, inArray } from 'drizzle-orm'
-import { getTodayTW } from '../utils/date.js'
-import { notifyAttendance, notifyLate } from '../services/notification.js'
+import { inclassAttendances, inclassNfcCards, manageStudents } from '@94cram/shared/db'
+import { and, eq, gte, lt } from 'drizzle-orm'
 import type { Variables } from '../middleware/auth.js'
 
 const attendanceRouter = new Hono<{ Variables: Variables }>()
 
 const checkinSchema = z.object({
   studentId: z.string().uuid().optional(),
-  nfcId: z.string().min(1).max(50).optional(),
+  nfcId: z.string().min(1).max(100).optional(),
   method: z.enum(['nfc', 'face', 'manual']),
   status: z.enum(['arrived', 'late', 'absent']),
+  classId: z.string().uuid().optional(),
 }).refine(
   (data) => data.studentId || data.nfcId,
   { message: 'Either studentId or nfcId must be provided' }
@@ -27,53 +23,54 @@ attendanceRouter.post('/checkin', zValidator('json', checkinSchema), async (c) =
   try {
     const body = c.req.valid('json')
     const schoolId = c.get('schoolId')
-    const now = new Date()
-    const today = getTodayTW()
 
-    let student: typeof students.$inferSelect | undefined
-    if (body.studentId) {
-      [student] = await db.select().from(students)
-        .where(and(eq(students.id, body.studentId), eq(students.schoolId, schoolId)))
-    } else if (body.nfcId) {
-      [student] = await db.select().from(students)
-        .where(and(eq(students.nfcId, body.nfcId), eq(students.schoolId, schoolId)))
+    if (!body.classId) {
+      // FIXME: shared manageStudents 沒有 classId，checkin 需明確 courseId
+      return c.json({ error: 'Not implemented: classId is required for shared schema migration' }, 501)
     }
 
+    let studentId = body.studentId
+    if (!studentId && body.nfcId) {
+      const [card] = await db.select().from(inclassNfcCards).where(
+        and(eq(inclassNfcCards.tenantId, schoolId), eq(inclassNfcCards.cardUid, body.nfcId), eq(inclassNfcCards.isActive, true))
+      )
+      studentId = card?.studentId ?? undefined
+    }
+
+    if (!studentId) return c.json({ error: 'Student not found' }, 404)
+
+    const [student] = await db.select().from(manageStudents).where(
+      and(eq(manageStudents.id, studentId), eq(manageStudents.tenantId, schoolId))
+    )
     if (!student) return c.json({ error: 'Student not found' }, 404)
 
-    const [existingRecord] = await db.select().from(attendances)
-      .where(and(eq(attendances.studentId, student.id), eq(attendances.date, today)))
+    const now = new Date()
+    const start = new Date(now)
+    start.setHours(0, 0, 0, 0)
+    const end = new Date(start)
+    end.setDate(end.getDate() + 1)
 
+    const [existingRecord] = await db.select().from(inclassAttendances).where(
+      and(
+        eq(inclassAttendances.tenantId, schoolId),
+        eq(inclassAttendances.studentId, student.id),
+        gte(inclassAttendances.date, start),
+        lt(inclassAttendances.date, end)
+      )
+    )
     if (existingRecord) {
       return c.json({ error: 'Student already checked in today', existingRecord }, 400)
     }
 
-    const [record] = await db.insert(attendances).values({
+    const [record] = await db.insert(inclassAttendances).values({
+      tenantId: schoolId,
       studentId: student.id,
-      classId: student.classId,
+      courseId: body.classId,
+      date: now,
+      status: body.status === 'arrived' ? 'present' : body.status,
       checkInTime: now,
-      status: body.status,
-      date: today,
+      checkInMethod: body.method,
     }).returning()
-
-    // Send parent notification asynchronously (non-blocking)
-    const studentCopy = { ...student }
-    setImmediate(async () => {
-      try {
-        const [parent] = await db.select().from(parents)
-          .where(eq(parents.studentId, studentCopy.id))
-
-        if (parent?.lineUserId && parent.notifyEnabled) {
-          if (body.status === 'arrived') {
-            await notifyAttendance(schoolId, studentCopy.name, parent.lineUserId, now)
-          } else if (body.status === 'late') {
-            await notifyLate(schoolId, studentCopy.name, parent.lineUserId, now)
-          }
-        }
-      } catch (err) {
-        console.error('[Notification] Failed to send notification (non-critical):', err instanceof Error ? err.message : 'Unknown error')
-      }
-    })
 
     return c.json({ success: true, record })
   } catch (e) {
@@ -82,50 +79,31 @@ attendanceRouter.post('/checkin', zValidator('json', checkinSchema), async (c) =
   }
 })
 
-// 今日出缺勤
 attendanceRouter.get('/today', async (c) => {
   try {
     const schoolId = c.get('schoolId')
-    const today = getTodayTW()
     const classId = c.req.query('classId')
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    const end = new Date(start)
+    end.setDate(end.getDate() + 1)
 
-    let studentList: Array<typeof students.$inferSelect>
-    if (classId) {
-      studentList = await db.select().from(students)
-        .where(and(eq(students.schoolId, schoolId), eq(students.classId, classId)))
-    } else {
-      studentList = await db.select().from(students)
-        .where(eq(students.schoolId, schoolId))
-    }
+    const records = await db.select().from(inclassAttendances).where(
+      and(
+        eq(inclassAttendances.tenantId, schoolId),
+        classId ? eq(inclassAttendances.courseId, classId) : undefined,
+        gte(inclassAttendances.date, start),
+        lt(inclassAttendances.date, end)
+      )
+    )
 
-    const studentIds = studentList.map(s => s.id)
-
-    if (studentIds.length === 0) {
-      return c.json({
-        stats: { total: 0, arrived: 0, late: 0, absent: 0, checkedIn: 0, notCheckedIn: 0 },
-        attendances: []
-      })
-    }
-
-    const records = await db.select().from(attendances)
-      .where(and(eq(attendances.date, today), inArray(attendances.studentId, studentIds)))
-
-    const studentNameMap = new Map(studentList.map(student => [student.id, student.name]))
-    const recordsWithNames = records.map(r => ({
-      ...r,
-      studentName: studentNameMap.get(r.studentId) || 'Unknown'
-    }))
-
-    const total = studentList.length
-    const arrived = records.filter(r => r.status === 'arrived').length
+    const present = records.filter(r => r.status === 'present').length
     const late = records.filter(r => r.status === 'late').length
-    const explicitAbsent = records.filter(r => r.status === 'absent').length
-    const notCheckedIn = total - records.length
-    const absent = explicitAbsent + notCheckedIn
+    const absent = records.filter(r => r.status === 'absent').length
 
     return c.json({
-      stats: { total, arrived, late, absent, checkedIn: records.length, notCheckedIn },
-      attendances: recordsWithNames
+      stats: { total: records.length, arrived: present, late, absent, checkedIn: records.length, notCheckedIn: 0 },
+      attendances: records
     })
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error fetching today attendance:', e instanceof Error ? e.message : 'Unknown error')

@@ -1,27 +1,13 @@
 import { Hono } from 'hono';
-import { sign } from 'hono/jwt';
 import bcrypt from 'bcryptjs';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/index';
-import { stockTenants, stockUsers } from '../db/schema';
+import { tenants, users } from '@94cram/shared/db';
 import { authMiddleware, getAuthUser } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
-import { config } from '../config';
 import { z } from 'zod';
 
 const app = new Hono();
-const JWT_SECRET = config.JWT_SECRET;
-const registerSchema = z.object({
-  tenantName: z.string().trim().min(1),
-  slug: z.string().trim().min(1),
-  email: z.string().trim().email(),
-  password: z.string().min(1),
-  name: z.string().trim().min(1),
-});
-const loginSchema = z.object({
-  email: z.string().trim().email(),
-  password: z.string().min(1),
-});
 const createUserSchema = z.object({
   email: z.string().trim().email(),
   password: z.string().min(1),
@@ -29,109 +15,12 @@ const createUserSchema = z.object({
   role: z.string().trim().min(1),
 });
 
-app.post('/register', async (c) => {
-  const parsedBody = registerSchema.safeParse(await c.req.json());
-  if (!parsedBody.success) {
-    return c.json({ error: 'Missing required fields' }, 400);
-  }
-  const { tenantName, slug, email, password, name } = parsedBody.data;
-
-  const [existingTenant] = await db.select().from(stockTenants).where(eq(stockTenants.slug, slug));
-  if (existingTenant) {
-    return c.json({ error: 'Slug already exists' }, 400);
-  }
-
-  const [existingUser] = await db.select().from(stockUsers).where(eq(stockUsers.email, email));
-  if (existingUser) {
-    return c.json({ error: 'Email already exists' }, 400);
-  }
-
-  const [tenant] = await db.insert(stockTenants).values({ name: tenantName, slug }).returning();
-  const passwordHash = await bcrypt.hash(password, 10);
-  const [user] = await db.insert(stockUsers).values({
-    tenantId: tenant.id,
-    email,
-    passwordHash,
-    name,
-    role: 'admin',
-    isActive: true,
-  }).returning();
-
-  const token = await sign(
-    {
-      userId: user.id,
-      tenantId: user.tenantId,
-      role: user.role,
-      email: user.email,
-      name: user.name,
-      exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
-    },
-    JWT_SECRET,
-  );
-
-  return c.json({
-    token,
-    user: {
-      id: user.id,
-      tenantId: user.tenantId,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      isActive: user.isActive,
-    },
-  }, 201);
-});
-
-app.post('/login', async (c) => {
-  const parsedBody = loginSchema.safeParse(await c.req.json());
-  if (!parsedBody.success) {
-    return c.json({ error: 'Email and password are required' }, 400);
-  }
-  const { email, password } = parsedBody.data;
-
-  const [user] = await db.select().from(stockUsers).where(eq(stockUsers.email, email));
-  if (!user || !user.isActive) {
-    return c.json({ error: 'Invalid credentials' }, 401);
-  }
-
-  const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) {
-    return c.json({ error: 'Invalid credentials' }, 401);
-  }
-
-  await db.update(stockUsers).set({ lastLoginAt: new Date() }).where(eq(stockUsers.id, user.id));
-
-  const token = await sign(
-    {
-      userId: user.id,
-      tenantId: user.tenantId,
-      role: user.role,
-      email: user.email,
-      name: user.name,
-      exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
-    },
-    JWT_SECRET,
-  );
-
-  return c.json({
-    token,
-    user: {
-      id: user.id,
-      tenantId: user.tenantId,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      isActive: user.isActive,
-    },
-  });
-});
-
 app.use('/me', authMiddleware, tenantMiddleware);
 app.get('/me', async (c) => {
   const authUser = getAuthUser(c);
-  const [user] = await db.select().from(stockUsers).where(and(
-    eq(stockUsers.id, authUser.id),
-    eq(stockUsers.tenantId, getTenantId(c)),
+  const [user] = await db.select().from(users).where(and(
+    eq(users.id, authUser.id),
+    eq(users.tenantId, getTenantId(c)),
   ));
 
   if (!user) {
@@ -149,6 +38,25 @@ app.get('/me', async (c) => {
   });
 });
 
+app.use('/setup-tenant', authMiddleware);
+app.post('/setup-tenant', async (c) => {
+  const authUser = getAuthUser(c);
+  const body = await c.req.json().catch(() => ({}));
+  const [existing] = await db.select().from(tenants).where(eq(tenants.id, authUser.tenantId));
+  if (existing) {
+    return c.json(existing);
+  }
+
+  // FIXME: tenant bootstrap should be owned by manage system orchestration.
+  const [created] = await db.insert(tenants).values({
+    id: authUser.tenantId,
+    name: typeof body.name === 'string' && body.name.trim() ? body.name.trim() : `Tenant-${authUser.tenantId.slice(0, 8)}`,
+    slug: typeof body.slug === 'string' && body.slug.trim() ? body.slug.trim() : authUser.tenantId.slice(0, 8),
+  }).returning();
+
+  return c.json(created, 201);
+});
+
 app.use('/users', authMiddleware, tenantMiddleware);
 
 app.post('/users', async (c) => {
@@ -164,13 +72,13 @@ app.post('/users', async (c) => {
   }
   const { email, password, name, role } = parsedBody.data;
 
-  const [existingUser] = await db.select().from(stockUsers).where(eq(stockUsers.email, email));
+  const [existingUser] = await db.select().from(users).where(eq(users.email, email));
   if (existingUser) {
     return c.json({ error: 'Email already exists' }, 400);
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const [user] = await db.insert(stockUsers).values({
+  const [user] = await db.insert(users).values({
     tenantId,
     email,
     passwordHash,
@@ -189,18 +97,18 @@ app.get('/users', async (c) => {
   }
 
   const tenantId = getTenantId(c);
-  const users = await db.select({
-    id: stockUsers.id,
-    tenantId: stockUsers.tenantId,
-    email: stockUsers.email,
-    name: stockUsers.name,
-    role: stockUsers.role,
-    isActive: stockUsers.isActive,
-    lastLoginAt: stockUsers.lastLoginAt,
-    createdAt: stockUsers.createdAt,
-  }).from(stockUsers).where(eq(stockUsers.tenantId, tenantId));
+  const tenantUsers = await db.select({
+    id: users.id,
+    tenantId: users.tenantId,
+    email: users.email,
+    name: users.name,
+    role: users.role,
+    isActive: users.isActive,
+    lastLoginAt: users.lastLoginAt,
+    createdAt: users.createdAt,
+  }).from(users).where(eq(users.tenantId, tenantId));
 
-  return c.json(users);
+  return c.json(tenantUsers);
 });
 
 export default app;

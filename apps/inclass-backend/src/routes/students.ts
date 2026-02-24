@@ -1,127 +1,74 @@
-/**
- * Students Routes - 學生管理
- */
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
 import { db } from '../db/index.js'
-import { students, classes } from '../db/schema.js'
-import { eq, sql, and } from 'drizzle-orm'
+import { manageStudents, manageCourses, manageEnrollments } from '@94cram/shared/db'
+import { and, eq, sql } from 'drizzle-orm'
 import type { Variables } from '../middleware/auth.js'
 
 const studentsRouter = new Hono<{ Variables: Variables }>()
 
-const isValidISODate = (value: string) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
-  const parsed = new Date(`${value}T00:00:00.000Z`)
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
-}
-
 const studentSchema = z.object({
   name: z.string().trim().min(1).max(100),
   classId: z.string().uuid().optional(),
-  nfcId: z.string().trim().min(1).max(50).optional(),
-  birthDate: z.string().trim().refine(isValidISODate, 'Invalid date format (YYYY-MM-DD)').optional(),
-  schoolName: z.string().trim().max(100).optional(),
-  grade: z.string().trim().max(50).optional(),
-  notes: z.string().trim().max(500).optional(),
+  schoolName: z.string().trim().max(255).optional(),
+  grade: z.string().trim().max(20).optional(),
+  phone: z.string().trim().max(20).optional(),
+  email: z.string().trim().email().optional(),
+  guardianName: z.string().trim().max(100).optional(),
+  guardianPhone: z.string().trim().max(20).optional(),
 }).strict()
 
-const studentUpdateSchema = studentSchema.partial().refine(
-  (data) => Object.keys(data).length > 0,
-  'At least one field is required'
-)
-
-const studentIdParamSchema = z.object({
-  id: z.string().uuid('Invalid student ID format'),
-})
-
-type StudentUpdatePayload = Partial<
-  Pick<
-    typeof students.$inferInsert,
-    'name' | 'classId' | 'nfcId' | 'birthDate' | 'schoolName' | 'grade' | 'notes'
-  >
->
-
-const listStudentsQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).max(1000).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
-})
-
+const studentUpdateSchema = studentSchema.partial().refine((data) => Object.keys(data).length > 0, 'At least one field is required')
+const studentIdParamSchema = z.object({ id: z.string().uuid('Invalid student ID format') })
+const listStudentsQuerySchema = z.object({ page: z.coerce.number().int().min(1).max(1000).default(1), limit: z.coerce.number().int().min(1).max(100).default(50) })
 const schoolIdSchema = z.string().uuid('Invalid school ID format')
-
 const requireSchoolId = (schoolId: string | undefined): string | null => {
   if (typeof schoolId !== 'string') return null
   const parsed = schoolIdSchema.safeParse(schoolId.trim())
   return parsed.success ? parsed.data : null
 }
 
-// 學生列表
 studentsRouter.get('/', zValidator('query', listStudentsQuerySchema), async (c) => {
   try {
     const schoolId = requireSchoolId(c.get('schoolId'))
     if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
     const { page, limit } = c.req.valid('query')
     const offset = (page - 1) * limit
-
-    const [countResult] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(students)
-      .where(eq(students.schoolId, schoolId))
-
+    const [countResult] = await db.select({ count: sql<number>`count(*)::int` }).from(manageStudents).where(eq(manageStudents.tenantId, schoolId))
     const total = countResult?.count || 0
-
-    const allStudents = await db.select().from(students)
-      .where(eq(students.schoolId, schoolId))
-      .limit(limit)
-      .offset(offset)
-
-    return c.json({
-      students: allStudents,
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
-    })
+    const allStudents = await db.select().from(manageStudents).where(eq(manageStudents.tenantId, schoolId)).limit(limit).offset(offset)
+    return c.json({ students: allStudents, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } })
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error fetching students:', e instanceof Error ? e.message : 'Unknown error')
     return c.json({ error: 'Failed to fetch students' }, 500)
   }
 })
 
-// 新增學生
 studentsRouter.post('/', zValidator('json', studentSchema), async (c) => {
   try {
     const body = c.req.valid('json')
     const schoolId = requireSchoolId(c.get('schoolId'))
     if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
-
     if (body.classId) {
-      const [classExists] = await db.select().from(classes).where(
-        and(eq(classes.id, body.classId), eq(classes.schoolId, schoolId))
-      )
-      if (!classExists) {
-        return c.json({ error: 'Invalid class ID' }, 400)
-      }
+      const [course] = await db.select().from(manageCourses).where(and(eq(manageCourses.id, body.classId), eq(manageCourses.tenantId, schoolId)))
+      if (!course) return c.json({ error: 'Invalid class ID' }, 400)
     }
 
-    if (body.nfcId) {
-      const [existingNfc] = await db.select().from(students).where(
-        and(eq(students.nfcId, body.nfcId), eq(students.schoolId, schoolId))
-      )
-      if (existingNfc) {
-        return c.json({ error: 'NFC ID already in use' }, 400)
-      }
-    }
-
-    const [newStudent] = await db.insert(students).values({
+    const [newStudent] = await db.insert(manageStudents).values({
+      tenantId: schoolId,
       name: body.name,
-      schoolId,
-      classId: body.classId,
-      nfcId: body.nfcId,
-      birthDate: body.birthDate,
-      schoolName: body.schoolName,
+      school: body.schoolName,
       grade: body.grade,
-      notes: body.notes,
+      phone: body.phone,
+      email: body.email,
+      guardianName: body.guardianName,
+      guardianPhone: body.guardianPhone,
     }).returning()
 
+    if (body.classId) {
+      await db.insert(manageEnrollments).values({ tenantId: schoolId, studentId: newStudent.id, courseId: body.classId })
+    }
     return c.json({ success: true, student: newStudent }, 201)
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error creating student:', e instanceof Error ? e.message : 'Unknown error')
@@ -129,20 +76,13 @@ studentsRouter.post('/', zValidator('json', studentSchema), async (c) => {
   }
 })
 
-// 學生詳情
 studentsRouter.get('/:id', zValidator('param', studentIdParamSchema), async (c) => {
   try {
     const { id } = c.req.valid('param')
     const schoolId = requireSchoolId(c.get('schoolId'))
     if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
-
-    const [student] = await db.select().from(students).where(
-      and(eq(students.id, id), eq(students.schoolId, schoolId))
-    )
-    if (!student) {
-      return c.json({ error: 'Student not found' }, 404)
-    }
-
+    const [student] = await db.select().from(manageStudents).where(and(eq(manageStudents.id, id), eq(manageStudents.tenantId, schoolId)))
+    if (!student) return c.json({ error: 'Student not found' }, 404)
     return c.json({ student })
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error fetching student:', e instanceof Error ? e.message : 'Unknown error')
@@ -150,57 +90,30 @@ studentsRouter.get('/:id', zValidator('param', studentIdParamSchema), async (c) 
   }
 })
 
-// 更新學生
-studentsRouter.put(
-  '/:id',
-  zValidator('param', studentIdParamSchema),
-  zValidator('json', studentUpdateSchema),
-  async (c) => {
+studentsRouter.put('/:id', zValidator('param', studentIdParamSchema), zValidator('json', studentUpdateSchema), async (c) => {
   try {
     const { id } = c.req.valid('param')
     const schoolId = requireSchoolId(c.get('schoolId'))
     if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
     const body = c.req.valid('json')
 
-    const [existing] = await db.select().from(students).where(
-      and(eq(students.id, id), eq(students.schoolId, schoolId))
-    )
-    if (!existing) {
-      return c.json({ error: 'Student not found' }, 404)
-    }
-
+    const [existing] = await db.select().from(manageStudents).where(and(eq(manageStudents.id, id), eq(manageStudents.tenantId, schoolId)))
+    if (!existing) return c.json({ error: 'Student not found' }, 404)
     if (body.classId) {
-      const [classExists] = await db.select().from(classes).where(
-        and(eq(classes.id, body.classId), eq(classes.schoolId, schoolId))
-      )
-      if (!classExists) {
-        return c.json({ error: 'Invalid class ID' }, 400)
-      }
+      const [course] = await db.select().from(manageCourses).where(and(eq(manageCourses.id, body.classId), eq(manageCourses.tenantId, schoolId)))
+      if (!course) return c.json({ error: 'Invalid class ID' }, 400)
     }
 
-    if (body.nfcId && body.nfcId !== existing.nfcId) {
-      const [existingNfc] = await db.select().from(students).where(
-        and(eq(students.nfcId, body.nfcId), eq(students.schoolId, schoolId))
-      )
-      if (existingNfc && existingNfc.id !== id) {
-        return c.json({ error: 'NFC ID already in use' }, 400)
-      }
-    }
+    const [updated] = await db.update(manageStudents).set({
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.schoolName !== undefined ? { school: body.schoolName } : {}),
+      ...(body.grade !== undefined ? { grade: body.grade } : {}),
+      ...(body.phone !== undefined ? { phone: body.phone } : {}),
+      ...(body.email !== undefined ? { email: body.email } : {}),
+      ...(body.guardianName !== undefined ? { guardianName: body.guardianName } : {}),
+      ...(body.guardianPhone !== undefined ? { guardianPhone: body.guardianPhone } : {}),
+    }).where(and(eq(manageStudents.id, id), eq(manageStudents.tenantId, schoolId))).returning()
 
-    const updateData: StudentUpdatePayload = {}
-    if (body.name !== undefined) updateData.name = body.name
-    if (body.classId !== undefined) updateData.classId = body.classId
-    if (body.nfcId !== undefined) updateData.nfcId = body.nfcId
-    if (body.birthDate !== undefined) updateData.birthDate = body.birthDate
-    if (body.schoolName !== undefined) updateData.schoolName = body.schoolName
-    if (body.grade !== undefined) updateData.grade = body.grade
-    if (body.notes !== undefined) updateData.notes = body.notes
-
-    const [updated] = await db
-      .update(students)
-      .set(updateData)
-      .where(and(eq(students.id, id), eq(students.schoolId, schoolId)))
-      .returning()
     return c.json({ success: true, student: updated })
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error updating student:', e instanceof Error ? e.message : 'Unknown error')
@@ -208,21 +121,14 @@ studentsRouter.put(
   }
 })
 
-// 刪除學生
 studentsRouter.delete('/:id', zValidator('param', studentIdParamSchema), async (c) => {
   try {
     const { id } = c.req.valid('param')
     const schoolId = requireSchoolId(c.get('schoolId'))
     if (!schoolId) return c.json({ error: 'Unauthorized' }, 401)
-
-    const [existing] = await db.select().from(students).where(
-      and(eq(students.id, id), eq(students.schoolId, schoolId))
-    )
-    if (!existing) {
-      return c.json({ error: 'Student not found' }, 404)
-    }
-
-    await db.delete(students).where(and(eq(students.id, id), eq(students.schoolId, schoolId)))
+    const [existing] = await db.select().from(manageStudents).where(and(eq(manageStudents.id, id), eq(manageStudents.tenantId, schoolId)))
+    if (!existing) return c.json({ error: 'Student not found' }, 404)
+    await db.delete(manageStudents).where(and(eq(manageStudents.id, id), eq(manageStudents.tenantId, schoolId)))
     return c.json({ success: true })
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Error deleting student:', e instanceof Error ? e.message : 'Unknown error')

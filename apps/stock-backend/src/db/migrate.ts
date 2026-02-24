@@ -9,7 +9,7 @@ const runMigrate = async () => {
     throw new Error('DATABASE_URL is not set in .env');
   }
 
-  console.log('Connecting to database...');
+  console.info('Connecting to database...');
   const connection = postgres(url, { max: 1 });
   const db = drizzle(connection);
 
@@ -198,7 +198,7 @@ CREATE TABLE IF NOT EXISTS stock_barcodes (
 `);
 
     await migrate(db, { migrationsFolder: './drizzle' });
-    console.log('Migrations complete!');
+    console.info('Migrations complete!');
   } catch (error) {
     console.error('Migration failed:', error);
     process.exit(1);

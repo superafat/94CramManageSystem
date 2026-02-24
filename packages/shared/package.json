@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "drizzle-orm": "^0.29.0",
+    "drizzle-orm": "^0.45.1",
     "hono": "^4.0.0",
     "jose": "^6.0.0",
     "postgres": "^3.4.0",

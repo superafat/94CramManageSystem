@@ -9,7 +9,7 @@ app.get('/', (c) => {
 });
 app.route('/api', routes);
 const port = parseInt(process.env.PORT || '3001');
-console.log(`Server is running on port ${port}`);
+console.info(`Server is running on port ${port}`);
 try {
   serve({
     fetch: app.fetch,

@@ -18,9 +18,9 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { z, ZodError } from 'zod'
-import { jwtVerify } from 'jose'
+import { verify } from '@94cram/shared/auth'
 import { db } from './db/index.js'
-import { schools } from './db/schema.js'
+import { tenants } from '@94cram/shared/db'
 import { rateLimit, getClientIP } from './middleware/rateLimit.js'
 // Route modules
 import authRoutes from './routes/auth.js'
@@ -43,9 +43,8 @@ const app = new Hono<{ Variables: Variables }>()
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required')
 }
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 const jwtPayloadSchema = z.object({
-  schoolId: z.string().min(1),
+  tenantId: z.string().min(1),
   userId: z.string().min(1),
 })
 // ===== Global Middleware =====
@@ -60,7 +59,6 @@ app.use('*', logger())
 // Rate limiter for auth routes (skip OPTIONS & demo)
 app.use('/api/auth/*', async (c, next) => {
   if (c.req.method === 'OPTIONS') return next()
-  if (c.req.path === '/api/auth/demo') return next()
   const ip = getClientIP(c)
   const result = rateLimit(`auth:${ip}`)
   if (!result.allowed) {
@@ -96,9 +94,9 @@ app.use('/api/*', async (c, next) => {
   }
   const token = authHeader.substring(7)
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET)
+    const payload = await verify(token)
     const parsedPayload = jwtPayloadSchema.parse(payload)
-    c.set('schoolId', parsedPayload.schoolId)
+    c.set('schoolId', parsedPayload.tenantId)
     c.set('userId', parsedPayload.userId)
     await next()
   } catch {
@@ -113,7 +111,7 @@ app.get('/', (c) => c.json({
 }))
 app.get('/health', async (c) => {
   try {
-    const dbCheckPromise = db.select().from(schools).limit(1)
+    const dbCheckPromise = db.select().from(tenants).limit(1)
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('Database timeout')), 5000)
     )
@@ -176,11 +174,11 @@ app.onError((err, c) => {
 export default app
 // ===== Start Server =====
 const port = parseInt(process.env.PORT || '3100')
-console.log(`🐝 BeeClass Backend starting on port ${port}...`)
+console.info(`🐝 BeeClass Backend starting on port ${port}...`)
 const serve = async () => {
   const { serve } = await import('@hono/node-server')
   serve({ port, fetch: app.fetch })
-  console.log(`✅ BeeClass Backend running at http://localhost:${port}`)
+  console.info(`✅ BeeClass Backend running at http://localhost:${port}`)
 }
 
 serve().catch((error) => {
