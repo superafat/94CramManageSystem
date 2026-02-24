@@ -45,7 +45,7 @@ export default function LoginPage() {
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-xl)' }}>
           <div style={{ fontSize: '56px', marginBottom: 'var(--space-sm)' }} className="animate-float">🐝</div>
           <h1 style={{ fontSize: '28px', color: 'var(--primary)', fontWeight: 'bold', margin: 0 }}>蜂神榜 Ai 點名系統</h1>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: 'var(--space-xs)' }}>Ai點名系統管理系統</p>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: 'var(--space-xs)' }}>AI 驅動的補習班點名系統</p>
         </div>
 
         {/* Form */}
