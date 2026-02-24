@@ -521,73 +521,56 @@ authRoutes.post('/seed', async (c) => {
 })
 
 // ========================================================================
-// POST /demo-seed - Create demo users for the Demo login page (idempotent)
+// POST /demo - Direct demo login (no DB required, generates JWT directly)
 // ========================================================================
-authRoutes.post('/demo-seed', async (c) => {
+authRoutes.post('/demo', async (c) => {
   const DEMO_TENANT_1 = '11111111-1111-1111-1111-111111111111'
   const DEMO_TENANT_2 = '22222222-2222-2222-2222-222222222222'
+  const BRANCH_1 = 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d'
+  const BRANCH_2 = 'b2c3d4e5-f6a7-2b3c-9d4e-5f6a7b8c9d0e'
+
+  const DEMO_ACCOUNTS: Record<string, { id: string; name: string; role: Role; tenantId: string; branchId: string }> = {
+    boss:     { id: 'demo-boss',     name: 'Demo 館長',  role: Role.ADMIN,   tenantId: DEMO_TENANT_1, branchId: BRANCH_1 },
+    staff:    { id: 'demo-staff',    name: 'Demo 行政',  role: Role.STAFF,   tenantId: DEMO_TENANT_1, branchId: BRANCH_1 },
+    teacher2: { id: 'demo-teacher',  name: 'Demo 教師',  role: Role.TEACHER, tenantId: DEMO_TENANT_1, branchId: BRANCH_1 },
+    parent2:  { id: 'demo-parent',   name: 'Demo 家長',  role: Role.PARENT,  tenantId: DEMO_TENANT_1, branchId: BRANCH_1 },
+    student:  { id: 'demo-student',  name: 'Demo 學生',  role: Role.STUDENT, tenantId: DEMO_TENANT_1, branchId: BRANCH_1 },
+    boss2:    { id: 'demo-boss2',    name: 'Demo 館長2', role: Role.ADMIN,   tenantId: DEMO_TENANT_2, branchId: BRANCH_2 },
+  }
 
   try {
-    // Check if demo users already exist
-    const existing = firstRow(await db.execute(sql`
-      SELECT id FROM users WHERE username = 'boss' AND tenant_id = ${DEMO_TENANT_1} LIMIT 1
-    `))
+    const body = await c.req.json<{ username?: string }>().catch(() => ({ username: undefined }))
+    const username = body.username || 'boss'
+    const account = DEMO_ACCOUNTS[username]
 
-    if (existing) {
-      return success(c, { message: 'Demo users already exist', seeded: false })
+    if (!account) {
+      return badRequest(c, `Unknown demo account: ${username}`)
     }
 
-    const bcrypt = await import('bcryptjs')
-    const passwordHash = await bcrypt.default.hash('demo', 10)
-    const now = new Date().toISOString()
-    const branchId1 = 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d'
-    const branchId2 = generateId()
+    const permissions = getUserPermissions(account.role)
+    const jwt = await generateToken({
+      sub: account.id,
+      name: account.name,
+      email: `${username}@demo.94cram.com`,
+      role: account.role,
+      tenant_id: account.tenantId,
+      branch_id: account.branchId,
+    })
 
-    // Create demo tenants
-    await db.execute(sql`
-      INSERT INTO tenants (id, name, slug, plan, active, created_at, updated_at)
-      VALUES (${DEMO_TENANT_1}, 'Demo Cram School', 'demo', 'free', true, ${now}, ${now})
-      ON CONFLICT (id) DO NOTHING
-    `)
-    await db.execute(sql`
-      INSERT INTO tenants (id, name, slug, plan, active, created_at, updated_at)
-      VALUES (${DEMO_TENANT_2}, 'Demo Cram School 2', 'demo2', 'free', true, ${now}, ${now})
-      ON CONFLICT (id) DO NOTHING
-    `)
-
-    // Create demo branches
-    await db.execute(sql`
-      INSERT INTO branches (id, tenant_id, name, code, created_at)
-      VALUES (${branchId1}, ${DEMO_TENANT_1}, 'Main Branch', 'main', ${now})
-      ON CONFLICT (id) DO NOTHING
-    `)
-    await db.execute(sql`
-      INSERT INTO branches (id, tenant_id, name, code, created_at)
-      VALUES (${branchId2}, ${DEMO_TENANT_2}, 'Main Branch', 'main', ${now})
-      ON CONFLICT (id) DO NOTHING
-    `)
-
-    // Create demo users
-    const demoUsers = [
-      { username: 'boss', fullName: 'Demo Boss', role: 'admin', tenantId: DEMO_TENANT_1, branchId: branchId1 },
-      { username: 'staff', fullName: 'Demo Staff', role: 'staff', tenantId: DEMO_TENANT_1, branchId: branchId1 },
-      { username: 'teacher2', fullName: 'Demo Teacher', role: 'teacher', tenantId: DEMO_TENANT_1, branchId: branchId1 },
-      { username: 'parent2', fullName: 'Demo Parent', role: 'parent', tenantId: DEMO_TENANT_1, branchId: branchId1 },
-      { username: 'student', fullName: 'Demo Student', role: 'student', tenantId: DEMO_TENANT_1, branchId: branchId1 },
-      { username: 'boss2', fullName: 'Demo Boss 2', role: 'admin', tenantId: DEMO_TENANT_2, branchId: branchId2 },
-    ]
-
-    for (const u of demoUsers) {
-      const userId = generateId()
-      await db.execute(sql`
-        INSERT INTO users (id, tenant_id, branch_id, username, full_name, email, password_hash, role, is_active, created_at, updated_at)
-        VALUES (${userId}, ${u.tenantId}, ${u.branchId}, ${u.username}, ${u.fullName}, ${u.username + '@demo.94cram.com'}, ${passwordHash}, ${u.role}, true, ${now}, ${now})
-      `)
-    }
-
-    return success(c, { message: 'Demo users created', seeded: true })
+    return success(c, {
+      token: jwt,
+      user: {
+        id: account.id,
+        name: account.name,
+        email: `${username}@demo.94cram.com`,
+        role: account.role,
+        tenant_id: account.tenantId,
+        branch_id: account.branchId,
+        permissions,
+      },
+    })
   } catch (error) {
-    console.error('Demo seed error:', error)
+    console.error('Demo login error:', error)
     return internalError(c, error instanceof Error ? error : undefined)
   }
 })
