@@ -12,6 +12,56 @@ import { sendLinePushMessage } from './line'
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  if (typeof error === 'string') {
+    return error
+  }
+
+  return String(error)
+}
+
+async function sendLineNotification(
+  lineUserId: string,
+  title: string,
+  body: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    return await sendLinePushMessage(lineUserId, [
+      {
+        type: 'text',
+        text: `${title}\n\n${body}`
+      }
+    ])
+  } catch (error) {
+    return {
+      success: false,
+      error: getErrorMessage(error) || 'LINE push message failed'
+    }
+  }
+}
+
+async function attemptLineFallback(
+  user: { lineUserId?: string } | null,
+  params: { title: string; body: string }
+): Promise<{ success: boolean; error?: string }> {
+  if (!user?.lineUserId) {
+    return { success: false, error: 'User has no line_user_id for fallback' }
+  }
+
+  if (!LINE_CHANNEL_ACCESS_TOKEN) {
+    return {
+      success: false,
+      error: 'LINE_CHANNEL_ACCESS_TOKEN is not configured for fallback'
+    }
+  }
+
+  return sendLineNotification(user.lineUserId, params.title, params.body)
+}
+
 /**
  * 發送 Telegram 訊息
  */
@@ -45,8 +95,8 @@ export async function sendTelegramMessage(
     }
 
     return { success: true }
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch (error) {
+    return { success: false, error: getErrorMessage(error) }
   }
 }
 
@@ -87,7 +137,7 @@ export async function createAndSendNotification(params: {
 
     // 如果用戶明確關閉此類通知，則跳過
     if (preference && !preference.enabled) {
-      console.log(`User ${params.recipientId} has disabled ${params.type} notifications`)
+    console.info(`User ${params.recipientId} has disabled ${params.type} notifications`)
       
       // 建立 skipped 記錄
       const [notification] = await db.insert(notifications).values({
@@ -138,6 +188,32 @@ export async function createAndSendNotification(params: {
         `*${params.title}*\n\n${params.body}`,
         params.metadata
       )
+
+      if (!result.success) {
+        console.error('Telegram notification failed, attempting LINE fallback', {
+          notificationId: notification.id,
+          errorMessage: result.error
+        })
+
+        const fallbackResult = await attemptLineFallback(user, params)
+
+        if (fallbackResult.success) {
+          console.info('LINE fallback succeeded for Telegram notification', {
+            notificationId: notification.id
+          })
+          result = fallbackResult
+        } else {
+          console.error('LINE fallback also failed', {
+            notificationId: notification.id,
+            errorMessage: fallbackResult.error
+          })
+          const combinedError = [result.error, fallbackResult.error].filter(Boolean).join(' | ')
+          result = {
+            success: false,
+            error: combinedError || 'Notification delivery failed'
+          }
+        }
+      }
     } else if (params.channel === 'line') {
       if (!user?.lineUserId) {
         await db.update(notifications)
@@ -165,22 +241,7 @@ export async function createAndSendNotification(params: {
         }
       }
 
-      try {
-        result = await sendLinePushMessage(
-          user.lineUserId,
-          [
-            {
-              type: 'text',
-              text: `${params.title}\n\n${params.body}`
-            }
-          ]
-        )
-      } catch (error: any) {
-        result = {
-          success: false,
-          error: error?.message || 'LINE push message failed'
-        }
-      }
+      result = await sendLineNotification(user.lineUserId, params.title, params.body)
     } else {
       // email or other channels not implemented yet
       await db.update(notifications)
@@ -213,9 +274,9 @@ export async function createAndSendNotification(params: {
 
       return { success: false, notificationId: notification.id, error: result.error }
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('createAndSendNotification error:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: getErrorMessage(error) }
   }
 }
 

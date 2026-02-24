@@ -1,5 +1,5 @@
 // 共用 Schema - tenants, users, branches, permissions
-import { pgTable, serial, varchar, uuid, timestamp, boolean, text } from './connection';
+import { pgTable, serial, varchar, uuid, timestamp, boolean, text } from '../connection';
 
 export const tenants = pgTable('tenants', {
   id: uuid('id').defaultRandom().primaryKey(),
