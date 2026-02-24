@@ -1,0 +1,24 @@
+{
+  "name": "@94cram/bot-gateway",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.0.0",
+    "@google/generative-ai": "^0.24.1",
+    "@hono/node-server": "^1.19.9",
+    "google-auth-library": "^9.0.0",
+    "hono": "^4.11.9",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

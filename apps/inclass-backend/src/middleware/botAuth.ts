@@ -1,0 +1,38 @@
+import { createMiddleware } from 'hono/factory';
+import { OAuth2Client } from 'google-auth-library';
+
+const client = new OAuth2Client();
+const BOT_SERVICE_ACCOUNT = 'cram94-bot-gateway@cram94-manage-system.iam.gserviceaccount.com';
+
+export const botAuth = createMiddleware(async (c, next) => {
+  try {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ success: false, error: '未授權：缺少 token' }, 401);
+    }
+
+    const token = authHeader.split(' ')[1];
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.SERVICE_URL,
+    });
+
+    const payload = ticket.getPayload();
+    if (payload?.email !== BOT_SERVICE_ACCOUNT) {
+      return c.json({ success: false, error: '非授權服務' }, 403);
+    }
+
+    const body = await c.req.json();
+    const tenantId = body.tenant_id;
+    if (!tenantId) {
+      return c.json({ success: false, error: '缺少 tenant_id' }, 400);
+    }
+
+    c.set('schoolId', tenantId);
+    c.set('userId', 'bot-gateway');
+    await next();
+  } catch (error) {
+    console.error('[botAuth] Error:', error instanceof Error ? error.message : error);
+    return c.json({ success: false, error: '認證失敗' }, 401);
+  }
+});

@@ -25,6 +25,7 @@
     "chartjs-node-canvas": "^5.0.0",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.45.1",
+    "google-auth-library": "^9.15.1",
     "grammy": "^1.40.0",
     "hono": "^4.11.9",
     "jose": "^6.1.3",

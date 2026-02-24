@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import routes from './routes/index';
+import botRoutes from './routes/bot/index';
 
 const app = new Hono();
 
@@ -74,6 +75,7 @@ app.get('/', (c) => {
 });
 
 app.route('/api', routes);
+app.route('/api/bot', botRoutes);
 
 const port = parseInt(process.env.PORT || '3001');
 console.info(`Server is running on port ${port}`);
