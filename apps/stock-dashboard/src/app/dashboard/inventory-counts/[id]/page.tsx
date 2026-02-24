@@ -50,9 +50,14 @@ export default function InventoryCountDetailPage() {
 
   const submitCount = async () => {
     if (!currentItemId) return;
-    await api.post(`/inventory-counts/${id}/items/${currentItemId}/count`, { countedQuantity, barcode });
-    setCountedQuantity(0);
-    await load();
+    try {
+      await api.post(`/inventory-counts/${id}/items/${currentItemId}/count`, { countedQuantity, barcode });
+      setCountedQuantity(0);
+      await load();
+    } catch (err) {
+      console.error('Failed to submit count:', err);
+      toast.error('送出盤點數量失敗');
+    }
   };
 
   return (

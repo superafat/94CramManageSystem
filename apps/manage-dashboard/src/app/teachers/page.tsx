@@ -14,9 +14,14 @@ interface Teacher {
   email?: string
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3100'
-const TENANT_ID = '11111111-1111-1111-1111-111111111111'
-const BRANCH_ID = 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d'
+const API_BASE = ''
+
+function getTenantId() {
+  return typeof window !== 'undefined' ? localStorage.getItem('tenantId') || '' : ''
+}
+function getBranchId() {
+  return typeof window !== 'undefined' ? localStorage.getItem('branchId') || '' : ''
+}
 
 export default function TeachersPage() {
   const router = useRouter()
@@ -30,7 +35,7 @@ export default function TeachersPage() {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
     return {
       'Content-Type': 'application/json',
-      'X-Tenant-Id': TENANT_ID,
+      'X-Tenant-Id': getTenantId(),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     }
   }
@@ -63,8 +68,8 @@ export default function TeachersPage() {
         headers: getHeaders(),
         body: JSON.stringify({
           ...form,
-          tenant_id: TENANT_ID,
-          branch_id: BRANCH_ID,
+          tenant_id: getTenantId(),
+          branch_id: getBranchId(),
         })
       })
       

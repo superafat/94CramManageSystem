@@ -9,6 +9,10 @@ export const manageCourses = pgTable('manage_courses', {
   subject: varchar('subject', { length: 100 }),
   grade: varchar('grade', { length: 20 }), // 國一, 高一...
   price: decimal('price', { precision: 10, scale: 2 }),
+  feeMonthly: decimal('fee_monthly', { precision: 10, scale: 2 }),
+  feeQuarterly: decimal('fee_quarterly', { precision: 10, scale: 2 }),
+  feeSemester: decimal('fee_semester', { precision: 10, scale: 2 }),
+  feeYearly: decimal('fee_yearly', { precision: 10, scale: 2 }),
   hours: integer('hours'), // 總時數
   createdAt: timestamp('created_at').defaultNow(),
 });

@@ -3,7 +3,10 @@
  * 提供統一的 Telegram 訊息發送接口
  */
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8497754195:AAHkZcV3vXNnAv3UlM9QGe_FsnUioDvBtxg'
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
+if (!TELEGRAM_BOT_TOKEN) {
+  console.warn('WARNING: TELEGRAM_BOT_TOKEN not set. Telegram notifications will fail.')
+}
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`
 
 /**

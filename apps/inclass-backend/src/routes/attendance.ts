@@ -25,8 +25,7 @@ attendanceRouter.post('/checkin', zValidator('json', checkinSchema), async (c) =
     const schoolId = c.get('schoolId')
 
     if (!body.classId) {
-      // FIXME: shared manageStudents 沒有 classId，checkin 需明確 courseId
-      return c.json({ error: 'Not implemented: classId is required for shared schema migration' }, 501)
+      return c.json({ error: 'classId is required' }, 400)
     }
 
     let studentId = body.studentId

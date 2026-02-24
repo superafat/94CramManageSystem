@@ -4,9 +4,14 @@ import { BackButton } from '@/components/ui/BackButton'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3100'
-const TENANT_ID = '11111111-1111-1111-1111-111111111111'
-const BRANCH_ID = 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d'
+const API_BASE = ''
+
+function getTenantId() {
+  return typeof window !== 'undefined' ? localStorage.getItem('tenantId') || '' : ''
+}
+function getBranchId() {
+  return typeof window !== 'undefined' ? localStorage.getItem('branchId') || '' : ''
+}
 
 interface Student {
   id: string
@@ -48,7 +53,7 @@ export default function StudentsPage() {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
     return {
       'Content-Type': 'application/json',
-      'X-Tenant-Id': TENANT_ID,
+      'X-Tenant-Id': getTenantId(),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     }
   }
@@ -121,7 +126,7 @@ export default function StudentsPage() {
           email: form.email || null,
           schoolName: form.schoolName || null,
           notes: form.notes || null,
-          branchId: BRANCH_ID,
+          branchId: getBranchId(),
         }),
       })
 

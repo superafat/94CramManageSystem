@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
+import toast from 'react-hot-toast';
 
 type Supplier = {
   id: string;
@@ -21,8 +22,13 @@ export default function SuppliersPage() {
   const [form, setForm] = useState(defaultForm);
 
   const load = async () => {
-    const res = await api.get<Supplier[]>('/suppliers');
-    setSuppliers(res.data);
+    try {
+      const res = await api.get<Supplier[]>('/suppliers');
+      setSuppliers(res.data);
+    } catch (err) {
+      console.error('Failed to load suppliers:', err);
+      toast.error('載入供應商資料失敗');
+    }
   };
 
   useEffect(() => {
@@ -31,14 +37,19 @@ export default function SuppliersPage() {
 
   const submit = async () => {
     if (!form.name.trim()) return;
-    if (editingId) {
-      await api.put(`/suppliers/${editingId}`, form);
-    } else {
-      await api.post('/suppliers', form);
+    try {
+      if (editingId) {
+        await api.put(`/suppliers/${editingId}`, form);
+      } else {
+        await api.post('/suppliers', form);
+      }
+      setEditingId(null);
+      setForm(defaultForm);
+      await load();
+    } catch (err) {
+      console.error('Failed to save supplier:', err);
+      toast.error(editingId ? '更新供應商失敗' : '新增供應商失敗');
     }
-    setEditingId(null);
-    setForm(defaultForm);
-    await load();
   };
 
   const edit = (supplier: Supplier) => {
@@ -54,8 +65,13 @@ export default function SuppliersPage() {
   };
 
   const remove = async (id: string) => {
-    await api.delete(`/suppliers/${id}`);
-    await load();
+    try {
+      await api.delete(`/suppliers/${id}`);
+      await load();
+    } catch (err) {
+      console.error('Failed to delete supplier:', err);
+      toast.error('刪除供應商失敗');
+    }
   };
 
   return (

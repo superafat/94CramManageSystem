@@ -29,6 +29,10 @@ interface StatsResponse {
   churn?: {
     highRisk: number
   }
+  // Student list format (teacher/parent endpoints)
+  students?: { id: string; name: string }[]
+  student?: { id: string; name: string }
+  pagination?: { total: number }
 }
 
 interface DashboardProps {
@@ -66,9 +70,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
   // Transform API data to Stats format, fallback to demo data
   // Handle different response shapes: tenant stats (admin) vs students list (parent/teacher)
-  const hasData = data && (data.totalStudents != null || data.summary != null || (data as any).students != null || (data as any).student != null)
-  
-  const studentCount = (data as any)?.students?.length ?? (data as any)?.pagination?.total ?? data?.totalStudents ?? data?.summary?.totalStudents ?? 0
+  const hasData = data && (data.totalStudents != null || data.summary != null || data.students != null || data.student != null)
+
+  const studentCount = data?.students?.length ?? data?.pagination?.total ?? data?.totalStudents ?? data?.summary?.totalStudents ?? 0
   
   const stats: DashboardStats = hasData ? {
     totalStudents: studentCount || 8,

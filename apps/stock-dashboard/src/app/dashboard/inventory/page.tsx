@@ -28,42 +28,10 @@ export default function InventoryPage() {
   const fetchInventory = async () => {
     try {
       setLoading(true);
-      // 這裡先模擬資料，後續會串接真實 API
-      const mockData: InventoryItem[] = [
-        {
-          id: '1',
-          itemId: 'item-1',
-          itemName: '國一英文講義上冊',
-          sku: 'EN-J1-01',
-          unit: '本',
-          warehouseName: '總部倉庫',
-          quantity: 150,
-          safetyStock: 50,
-        },
-        {
-          id: '2',
-          itemId: 'item-2',
-          itemName: '白板筆 (黑)',
-          sku: 'STA-001',
-          unit: '盒',
-          warehouseName: '總部倉庫',
-          quantity: 3,
-          safetyStock: 5,
-        },
-        {
-          id: '3',
-          itemId: 'item-3',
-          itemName: '數學練習簿',
-          sku: 'MATH-001',
-          unit: '本',
-          warehouseName: '分校A',
-          quantity: 80,
-          safetyStock: 30,
-        },
-      ];
-      setInventory(mockData);
+      const res = await api.get<InventoryItem[]>('/inventory');
+      setInventory(res.data);
     } catch (error) {
-      console.error('Failed to fetch inventory', error);
+      console.error('Failed to fetch inventory:', error);
       toast.error('無法載入庫存資料');
     } finally {
       setLoading(false);
@@ -128,7 +96,7 @@ export default function InventoryPage() {
             </div>
             <div>
               <p className="text-sm text-gray-500">倉庫數量</p>
-              <p className="text-2xl font-bold text-gray-900">2</p>
+              <p className="text-2xl font-bold text-gray-900">{new Set(inventory.map(i => i.warehouseName)).size}</p>
             </div>
           </div>
         </div>

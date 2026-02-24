@@ -16,7 +16,10 @@ export interface JWTPayload {
 }
 
 function getSecret(secret?: string): Uint8Array {
-  const s = secret || process.env.JWT_SECRET || '94cram-secret-change-in-prod';
+  const s = secret || process.env.JWT_SECRET;
+  if (!s) {
+    throw new Error('JWT_SECRET is required. Set JWT_SECRET environment variable or pass secret explicitly.');
+  }
   return new TextEncoder().encode(s);
 }
 

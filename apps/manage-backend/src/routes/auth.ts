@@ -95,14 +95,20 @@ async function getFirebasePublicKeys(): Promise<Record<string, string>> {
   return firebasePublicKeys
 }
 
-/** Verify password against sha256+salt hash stored as "salt:hash" */
-function verifyPassword(password: string, stored: string): boolean {
-  if (!stored || !stored.includes(':')) return false
+/** Verify password - supports bcrypt and legacy sha256+salt hash stored as "salt:hash" */
+async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  if (!stored) return false
+  // bcrypt hashes start with $2a$ or $2b$
+  if (stored.startsWith('$2a$') || stored.startsWith('$2b$')) {
+    const bcrypt = await import('bcryptjs')
+    return bcrypt.default.compare(password, stored)
+  }
+  // Legacy: sha256 with salt stored as "salt:hash"
+  if (!stored.includes(':')) return false
   const [salt, hash] = stored.split(':')
   if (!salt || !hash) return false
   const check = createHash('sha256').update(password + salt).digest('hex')
-  // 使用 constant-time comparison 防止 timing attack
-  return crypto.subtle ? timingSafeEqual(check, hash) : check === hash
+  return timingSafeEqual(check, hash)
 }
 
 /** Timing-safe string comparison */
@@ -124,7 +130,15 @@ async function generateToken(payload: {
   tenant_id: string
   branch_id?: string | null
 }): Promise<string> {
-  return new jose.SignJWT(payload)
+  return new jose.SignJWT({
+    sub: payload.sub,
+    userId: payload.sub,
+    name: payload.name,
+    email: payload.email,
+    role: payload.role,
+    tenantId: payload.tenant_id,
+    branchId: payload.branch_id ?? undefined,
+  })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('7d')
@@ -159,7 +173,7 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
         return forbidden(c, '帳號已停用')
       }
 
-      if (!verifyPassword(body.password, dbUser.password_hash)) {
+      if (!(await verifyPassword(body.password, dbUser.password_hash))) {
         return unauthorized(c, '帳號或密碼錯誤')
       }
 
@@ -399,11 +413,9 @@ authRoutes.post('/trial-signup', rateLimit('trial-signup'), zValidator('json', t
     const userId = generateId()
     const now = new Date().toISOString()
     
-    // Hash password - use simple random hex
-    const salt = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-      .map(b => b.toString(16).padStart(2, '0')).join('')
-    const hash = createHash('sha256').update(body.password + salt).digest('hex')
-    const passwordHash = `${salt}:${hash}`
+    // Hash password with bcrypt
+    const bcrypt = await import('bcryptjs')
+    const passwordHash = await bcrypt.default.hash(body.password, 10)
     
     // Create tenant
     await db.execute(sql`
@@ -420,8 +432,8 @@ authRoutes.post('/trial-signup', rateLimit('trial-signup'), zValidator('json', t
     
     // Create admin user
     await db.execute(sql`
-      INSERT INTO users (id, tenant_id, branch_id, name, email, phone, password, role, created_at, updated_at)
-      VALUES (${userId}, ${tenantId}, ${branchId}, ${body.adminName}, ${body.adminEmail}, ${body.adminPhone || null}, ${passwordHash}, 'admin', ${now}, ${now})
+      INSERT INTO users (id, tenant_id, branch_id, full_name, email, phone, password_hash, role, is_active, created_at, updated_at)
+      VALUES (${userId}, ${tenantId}, ${branchId}, ${body.adminName}, ${body.adminEmail}, ${body.adminPhone || null}, ${passwordHash}, 'admin', true, ${now}, ${now})
     `)
     
     return success(c, {
@@ -455,8 +467,8 @@ authRoutes.get('/me', async (c) => {
         name: payload.name,
         email: payload.email,
         role: role,
-        tenant_id: payload.tenant_id,
-        branch_id: payload.branch_id,
+        tenant_id: (payload.tenantId as string) || (payload.tenant_id as string),
+        branch_id: (payload.branchId as string) || (payload.branch_id as string),
       },
       permissions,
     })
@@ -470,42 +482,40 @@ authRoutes.get('/me', async (c) => {
 
 // Seed endpoint - creates initial admin user
 authRoutes.post('/seed', async (c) => {
-  // Skip production check for now - can be enabled later with proper protection
-  // if (config.NODE_ENV === 'production') {
-  //   return forbidden(c, 'Seed endpoint disabled in production')
-  // }
-  
+  if (config.NODE_ENV === 'production') {
+    return forbidden(c, 'Seed endpoint disabled in production')
+  }
+
   try {
     // Check if admin already exists
     const existing = firstRow(await db.execute(sql`
       SELECT id FROM users WHERE username = 'admin' LIMIT 1
     `))
-    
+
     if (existing) {
       return success(c, { message: 'Admin user already exists', userId: existing.id })
     }
-    
+
     // Create default tenant
     const tenantId = generateId()
     await db.execute(sql`
       INSERT INTO tenants (id, name, status, created_at)
       VALUES (${tenantId}, 'Default Tenant', 'active', NOW())
     `)
-    
-    // Create admin user with password hash for 'admin123'
-    // Hash: salt:hash where hash = sha256(salt + password)
-    // Using '94cram' as salt
-    const passwordHash = '94cram:' + require('crypto').createHash('sha256').update('94cramadmin123').digest('hex')
-    
+
+    // Create admin user with bcrypt password hash
+    const bcrypt = await import('bcryptjs')
+    const passwordHash = await bcrypt.default.hash('admin123', 10)
+
     const userId = generateId()
     await db.execute(sql`
       INSERT INTO users (id, tenant_id, username, full_name, email, role, password_hash, is_active, created_at)
       VALUES (${userId}, ${tenantId}, 'admin', '系統管理員', 'admin@94cram.app', 'superadmin', ${passwordHash}, true, NOW())
     `)
-    
+
     return success(c, { message: 'Admin user created', userId, tenantId })
   } catch (error) {
     console.error('Seed error:', error)
-    return internalError(c, 'Failed to seed: ' + errorMessage(error))
+    return internalError(c, error instanceof Error ? error : undefined)
   }
 })

@@ -1,6 +1,6 @@
 // API Client Helper with Authentication and Retry
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://beeclass-backend-855393865280.asia-east1.run.app'
+const API_BASE = ''
 const MAX_RETRIES = 3
 const RETRY_DELAY = 1000 // 1 second
 

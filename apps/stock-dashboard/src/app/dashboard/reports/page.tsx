@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import * as XLSX from 'xlsx';
 import api from '@/lib/api';
+import toast from 'react-hot-toast';
 
 type SummaryData = {
   totalItems: number;
@@ -46,23 +47,43 @@ export default function ReportsPage() {
   const [to, setTo] = useState('');
 
   const loadSummary = async () => {
-    const res = await api.get<SummaryData>('/reports/summary');
-    setSummary(res.data);
+    try {
+      const res = await api.get<SummaryData>('/reports/summary');
+      setSummary(res.data);
+    } catch (err) {
+      console.error('Failed to load summary:', err);
+      toast.error('載入庫存總覽失敗');
+    }
   };
   const loadTurnover = async () => {
-    const res = await api.get<TurnoverRow[]>('/reports/turnover');
-    setTurnover(res.data);
+    try {
+      const res = await api.get<TurnoverRow[]>('/reports/turnover');
+      setTurnover(res.data);
+    } catch (err) {
+      console.error('Failed to load turnover:', err);
+      toast.error('載入周轉分析失敗');
+    }
   };
   const loadPurchases = async () => {
-    const query = new URLSearchParams();
-    if (from) query.set('from', from);
-    if (to) query.set('to', to);
-    const res = await api.get<PurchasesData>(`/reports/purchases?${query.toString()}`);
-    setPurchases(res.data);
+    try {
+      const query = new URLSearchParams();
+      if (from) query.set('from', from);
+      if (to) query.set('to', to);
+      const res = await api.get<PurchasesData>(`/reports/purchases?${query.toString()}`);
+      setPurchases(res.data);
+    } catch (err) {
+      console.error('Failed to load purchases:', err);
+      toast.error('載入進貨統計失敗');
+    }
   };
   const loadPromo = async () => {
-    const res = await api.get<PromoData>('/reports/promo-stats');
-    setPromo(res.data);
+    try {
+      const res = await api.get<PromoData>('/reports/promo-stats');
+      setPromo(res.data);
+    } catch (err) {
+      console.error('Failed to load promo stats:', err);
+      toast.error('載入公關品統計失敗');
+    }
   };
 
   useEffect(() => {

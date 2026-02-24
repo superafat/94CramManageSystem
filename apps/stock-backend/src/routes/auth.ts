@@ -41,6 +41,9 @@ app.get('/me', async (c) => {
 app.use('/setup-tenant', authMiddleware);
 app.post('/setup-tenant', async (c) => {
   const authUser = getAuthUser(c);
+  if (authUser.role !== 'admin' && authUser.role !== 'superadmin') {
+    return c.json({ error: 'Forbidden: admin role required' }, 403);
+  }
   const body = await c.req.json().catch(() => ({}));
   const [existing] = await db.select().from(tenants).where(eq(tenants.id, authUser.tenantId));
   if (existing) {
@@ -72,7 +75,7 @@ app.post('/users', async (c) => {
   }
   const { email, password, name, role } = parsedBody.data;
 
-  const [existingUser] = await db.select().from(users).where(eq(users.email, email));
+  const [existingUser] = await db.select().from(users).where(and(eq(users.email, email), eq(users.tenantId, tenantId)));
   if (existingUser) {
     return c.json({ error: 'Email already exists' }, 400);
   }

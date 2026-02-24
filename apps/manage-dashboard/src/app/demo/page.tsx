@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3100'
+const API_BASE = ''
 
 // Demo 帳號列表（展示不同角色）
 const DEMO_ACCOUNTS = [

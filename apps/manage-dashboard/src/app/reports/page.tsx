@@ -31,8 +31,8 @@ export default function ReportsPage() {
   const [error, setError] = useState<string | null>(null)
   const [period, setPeriod] = useState('2026-02')
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3100'
-  const BRANCH_ID = 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d'
+  const API_BASE = ''
+  const branchId = typeof window !== 'undefined' ? localStorage.getItem('branchId') || '' : ''
 
   const loadReport = async () => {
     try {
@@ -59,7 +59,7 @@ export default function ReportsPage() {
       const gradesData = gradesRes.ok ? await gradesRes.json() : { grades: [] }
       
       // 取得流失風險學生
-      const churnRes = await fetch(`${API_BASE}/api/admin/churn/${BRANCH_ID}?days=30`, {
+      const churnRes = await fetch(`${API_BASE}/api/admin/churn/${branchId}?days=30`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       const churnData = churnRes.ok ? await churnRes.json() : { students: [] }

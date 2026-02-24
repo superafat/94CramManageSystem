@@ -8,6 +8,13 @@
       "when": 1771776181265,
       "tag": "0000_jazzy_black_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1771912040260,
+      "tag": "0001_brave_magus",
+      "breakpoints": true
     }
   ]
 }

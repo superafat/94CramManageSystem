@@ -8,6 +8,13 @@ import { z } from 'zod';
 
 const app = new Hono();
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
+
+/** Return authenticated user ID if available, otherwise fall back to SYSTEM_USER_ID */
+function getPerformer(c: { var: Record<string, unknown> }): string {
+  const authUser = c.var['authUser'] as { id?: string } | undefined;
+  return authUser?.id || SYSTEM_USER_ID;
+}
+
 const positiveInteger = z.number().int().positive();
 const nonEmptyString = z.string().trim().min(1);
 const uuidString = z.string().uuid();
@@ -131,7 +138,7 @@ app.post('/in', async (c) => {
     quantity,
     referenceId,
     referenceType,
-    performedBy: SYSTEM_USER_ID, // TODO: get from auth
+    performedBy: getPerformer(c),
     createdAt: new Date()
   });
 
@@ -188,7 +195,7 @@ app.post('/out', async (c) => {
       referenceId,
       recipientName,
       recipientNote,
-      performedBy: SYSTEM_USER_ID,
+      performedBy: getPerformer(c),
       createdAt: new Date()
     });
 
@@ -260,7 +267,7 @@ app.post('/transfer', async (c) => {
       quantity: -quantity,
       referenceId: transferId,
       referenceType: 'transfer',
-      performedBy: SYSTEM_USER_ID,
+      performedBy: getPerformer(c),
       createdAt: new Date()
     });
 
@@ -272,7 +279,7 @@ app.post('/transfer', async (c) => {
       quantity,
       referenceId: transferId,
       referenceType: 'transfer',
-      performedBy: SYSTEM_USER_ID,
+      performedBy: getPerformer(c),
       createdAt: new Date()
     });
 

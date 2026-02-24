@@ -41,7 +41,7 @@ export default function GradesPage() {
   })
   const [addSaving, setAddSaving] = useState(false)
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3100'
+  const API_BASE = ''
 
   const loadGrades = async () => {
     try {
@@ -69,7 +69,7 @@ export default function GradesPage() {
     try {
       const token = localStorage.getItem('token')
       const res = await fetch(`${API_BASE}/api/admin/students?limit=100`, {
-        headers: { 'Authorization': `Bearer ${token}`, 'X-Tenant-Id': '11111111-1111-1111-1111-111111111111' }
+        headers: { 'Authorization': `Bearer ${token}`, 'X-Tenant-Id': localStorage.getItem('tenantId') || '' }
       })
       if (res.ok) {
         const data = await res.json()
@@ -91,7 +91,7 @@ export default function GradesPage() {
       const token = localStorage.getItem('token')
       const res = await fetch(`${API_BASE}/api/admin/grades`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Tenant-Id': '11111111-1111-1111-1111-111111111111' },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Tenant-Id': localStorage.getItem('tenantId') || '' },
         body: JSON.stringify({
           studentId: addForm.studentId,
           subject: addForm.subject,

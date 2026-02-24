@@ -51,11 +51,14 @@ export function createAuthMiddleware(options?: { skipPaths?: string[] }) {
  * 驗證 X-Internal-Key header
  */
 export function createInternalKeyMiddleware() {
-  const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'internal-key-change-in-prod';
+  const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
+  if (!INTERNAL_API_KEY) {
+    console.warn('WARNING: INTERNAL_API_KEY not set. Internal API access is disabled.');
+  }
 
   return async (c: Context, next: Next) => {
     const key = c.req.header('X-Internal-Key');
-    if (!key || key !== INTERNAL_API_KEY) {
+    if (!INTERNAL_API_KEY || !key || key !== INTERNAL_API_KEY) {
       return c.json({ error: 'Forbidden' }, 403);
     }
     await next();
@@ -71,6 +74,7 @@ export function getAuthUser(c: Context): JWTPayload {
 
 // 舊版相容
 export function verifyInternalKey(key: string): boolean {
-  const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'internal-key-change-in-prod';
+  const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
+  if (!INTERNAL_API_KEY) return false;
   return key === INTERNAL_API_KEY;
 }

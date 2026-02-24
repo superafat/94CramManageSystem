@@ -1,6 +1,4 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '/api'
-const TENANT_ID = '11111111-1111-1111-1111-111111111111'
-const BRANCH_ID = 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d'
 
 // ===== API Cache & Performance =====
 
@@ -87,8 +85,8 @@ export interface RAGSource {
 
 // Tenant context stored in localStorage
 export function getCurrentTenantId(): string {
-  if (typeof window === 'undefined') return '11111111-1111-1111-1111-111111111111'
-  return localStorage.getItem('tenantId') ?? '11111111-1111-1111-1111-111111111111'
+  if (typeof window === 'undefined') return ''
+  return localStorage.getItem('tenantId') ?? ''
 }
 
 export function setCurrentTenantId(id: string) {
@@ -96,8 +94,8 @@ export function setCurrentTenantId(id: string) {
 }
 
 export function getCurrentBranchId(): string {
-  if (typeof window === 'undefined') return 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d'
-  return localStorage.getItem('branchId') ?? 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d'
+  if (typeof window === 'undefined') return ''
+  return localStorage.getItem('branchId') ?? ''
 }
 
 export function setCurrentBranchId(id: string) {
@@ -283,7 +281,7 @@ export async function fetchStudents(): Promise<Student[]> {
 
 // Generic API fetch utility
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {

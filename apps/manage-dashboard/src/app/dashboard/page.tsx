@@ -29,7 +29,7 @@ export default function DashboardPage() {
   const [authorized, setAuthorized] = useState(false)
   const [alerts, setAlerts] = useState<Alert[]>([])
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3100'
+  const API_BASE = ''
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token')
@@ -177,7 +177,7 @@ export default function DashboardPage() {
           </div>
           {alerts.length > 5 && (
             <div className="mt-3 text-center">
-              <a href="/dashboard/alerts" className="text-sm text-red-600 hover:underline">查看全部 {alerts.length} 筆警示 →</a>
+              <a href="/dashboard/audit" className="text-sm text-red-600 hover:underline">查看全部 {alerts.length} 筆警示 →</a>
             </div>
           )}
         </div>

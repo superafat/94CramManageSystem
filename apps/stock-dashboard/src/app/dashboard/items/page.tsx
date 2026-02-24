@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
 import ItemFormModal from './ItemFormModal';
@@ -24,6 +24,7 @@ export default function ItemsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<StockItem | undefined>();
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
 
   useEffect(() => {
     fetchItems();
@@ -66,10 +67,14 @@ export default function ItemsPage() {
     }
   };
 
-  const filteredItems = items.filter(item => 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredItems = items.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesFilter = filterStatus === 'all' ||
+      (filterStatus === 'active' && item.isActive) ||
+      (filterStatus === 'inactive' && !item.isActive);
+    return matchesSearch && matchesFilter;
+  });
 
   return (
     <div className="space-y-6 relative h-full flex flex-col">
@@ -105,10 +110,15 @@ export default function ItemsPage() {
           />
         </div>
         <div className="flex gap-2">
-          <button className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8FA895]">
-            <Filter className="mr-2 h-4 w-4 text-gray-500" />
-            篩選
-          </button>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'inactive')}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8FA895]"
+          >
+            <option value="all">全部狀態</option>
+            <option value="active">啟用中</option>
+            <option value="inactive">已停用</option>
+          </select>
         </div>
       </div>
 
