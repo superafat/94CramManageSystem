@@ -113,3 +113,15 @@ app.route('/api', notificationRoutes)
 if (process.env.NODE_ENV !== 'production') {
   app.route('/api/test/errors', errorTestRoutes)
 }
+
+// Public debug endpoint (no auth)
+app.get('/debug/tables', async (c) => {
+  try {
+    const { db } = await import('./db')
+    const { sql } = await import('drizzle-orm')
+    const result = await db.execute(sql`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name`)
+    return c.json({ success: true, tables: result })
+  } catch (error) {
+    return c.json({ success: false, error: String(error) }, 500)
+  }
+})
