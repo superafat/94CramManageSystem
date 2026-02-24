@@ -89,6 +89,36 @@
   },
   "hotPaths": [
     {
+      "path": "apps/bot-gateway/src/webhooks/telegram.ts",
+      "accessCount": 7,
+      "lastAccessed": 1771954611363,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/modules/ai-engine.ts",
+      "accessCount": 5,
+      "lastAccessed": 1771954549581,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/handlers/intent-router.ts",
+      "accessCount": 5,
+      "lastAccessed": 1771954611856,
+      "type": "file"
+    },
+    {
+      "path": "apps/manage-backend/src/app.ts",
+      "accessCount": 4,
+      "lastAccessed": 1771954358928,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/handlers/callback.ts",
+      "accessCount": 4,
+      "lastAccessed": 1771954601888,
+      "type": "file"
+    },
+    {
       "path": "apps/inclass-dashboard/src/contexts/AuthContext.tsx",
       "accessCount": 3,
       "lastAccessed": 1771949728696,
@@ -104,12 +134,6 @@
       "path": "apps/stock-dashboard/src/lib/api.ts",
       "accessCount": 3,
       "lastAccessed": 1771949746957,
-      "type": "file"
-    },
-    {
-      "path": "apps/manage-backend/src/app.ts",
-      "accessCount": 3,
-      "lastAccessed": 1771949756436,
       "type": "file"
     },
     {
@@ -134,6 +158,30 @@
       "path": "apps/manage-dashboard/src/lib/api.ts",
       "accessCount": 2,
       "lastAccessed": 1771949714181,
+      "type": "file"
+    },
+    {
+      "path": "apps/stock-backend/src/index.ts",
+      "accessCount": 2,
+      "lastAccessed": 1771954359708,
+      "type": "file"
+    },
+    {
+      "path": "apps/inclass-backend/src/index.ts",
+      "accessCount": 2,
+      "lastAccessed": 1771954360271,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/modules/api-client.ts",
+      "accessCount": 2,
+      "lastAccessed": 1771954497114,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/modules/auth-manager.ts",
+      "accessCount": 2,
+      "lastAccessed": 1771954501528,
       "type": "file"
     },
     {
@@ -185,22 +233,10 @@
       "type": "directory"
     },
     {
-      "path": "apps/inclass-backend/src/index.ts",
-      "accessCount": 1,
-      "lastAccessed": 1771949597197,
-      "type": "file"
-    },
-    {
       "path": "apps/stock-backend/src",
       "accessCount": 1,
       "lastAccessed": 1771949602323,
       "type": "directory"
-    },
-    {
-      "path": "apps/stock-backend/src/index.ts",
-      "accessCount": 1,
-      "lastAccessed": 1771949605445,
-      "type": "file"
     },
     {
       "path": "apps/stock-dashboard/src",
@@ -254,6 +290,102 @@
       "path": "apps/stock-dashboard/.env.production",
       "accessCount": 1,
       "lastAccessed": 1771949708472,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/package.json",
+      "accessCount": 1,
+      "lastAccessed": 1771954325512,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/app.ts",
+      "accessCount": 1,
+      "lastAccessed": 1771954325725,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/Dockerfile",
+      "accessCount": 1,
+      "lastAccessed": 1771954326200,
+      "type": "file"
+    },
+    {
+      "path": ".claude/todo.md",
+      "accessCount": 1,
+      "lastAccessed": 1771954327777,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/index.ts",
+      "accessCount": 1,
+      "lastAccessed": 1771954330487,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/config.ts",
+      "accessCount": 1,
+      "lastAccessed": 1771954330946,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/modules/confirm-manager.ts",
+      "accessCount": 1,
+      "lastAccessed": 1771954334483,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/modules/platform-adapter.ts",
+      "accessCount": 1,
+      "lastAccessed": 1771954334925,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/commands/bind.ts",
+      "accessCount": 1,
+      "lastAccessed": 1771954337849,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/commands/switch.ts",
+      "accessCount": 1,
+      "lastAccessed": 1771954338302,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/commands/sync.ts",
+      "accessCount": 1,
+      "lastAccessed": 1771954338721,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/commands/help.ts",
+      "accessCount": 1,
+      "lastAccessed": 1771954339127,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/firestore/bindings.ts",
+      "accessCount": 1,
+      "lastAccessed": 1771954339688,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/firestore/cache.ts",
+      "accessCount": 1,
+      "lastAccessed": 1771954340102,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/firestore/client.ts",
+      "accessCount": 1,
+      "lastAccessed": 1771954340532,
+      "type": "file"
+    },
+    {
+      "path": "apps/bot-gateway/src/firestore/logs.ts",
+      "accessCount": 1,
+      "lastAccessed": 1771954340942,
       "type": "file"
     }
   ],

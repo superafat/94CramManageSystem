@@ -19,13 +19,16 @@ function buildSystemPrompt(cache: TenantCache | null): string {
 - inclass.leave: 登記學生請假（需要：student_name, date, reason?）
 - inclass.late: 登記學生遲到（需要：student_name, date）
 - inclass.query: 查詢出缺勤（需要：class_name? 或 student_name?, date?）
+- inclass.report: 出缺勤報表/統計（需要：class_name?, start_date?, end_date?）
 - manage.payment: 登記繳費（需要：student_name, amount, payment_type?, date?）
 - manage.add_student: 新增學生（需要：name, class_name?, parent_phone?, parent_name?）
 - manage.query_student: 查學生資料（需要：student_name 或 keyword）
 - manage.query_finance: 查財務報表（需要：start_date?, end_date?, payment_type?）
+- manage.query_payment_history: 查繳費紀錄/歷史（需要：student_name?, start_date?, end_date?）
 - stock.ship: 出貨（需要：item_name, quantity, destination）
 - stock.restock: 進貨（需要：item_name, quantity）
 - stock.query: 查庫存（需要：item_name?）
+- stock.history: 庫存異動紀錄/歷史（需要：item_name?, start_date?, end_date?）
 - system.switch: 切換補習班
 - system.help: 查看使用說明
 - unknown: 無法辨識

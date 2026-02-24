@@ -2,6 +2,7 @@ import { getPendingAction, confirmAction, cancelAction } from '../modules/confir
 import { executeIntent, formatResponse } from './intent-router';
 import { authenticate } from '../modules/auth-manager';
 import { logOperation } from '../firestore/logs';
+import { incrementUsage } from '../firestore/usage';
 import { answerCallbackQuery, editMessageText } from '../utils/telegram';
 import type { UnifiedMessage } from '../modules/platform-adapter';
 
@@ -59,6 +60,7 @@ export async function handleCallback(msg: UnifiedMessage): Promise<void> {
     };
 
     const apiResponse = await executeIntent(intentResult, auth);
+    incrementUsage(auth.tenantId, 'api_calls').catch(() => {});
     const responseText = formatResponse(apiResponse);
 
     await logOperation({
