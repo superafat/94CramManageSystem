@@ -71,8 +71,12 @@ const passwordSchema = z.string()
 
 const app = new Hono<{ Variables: RBACVariables }>()
 
-// ===== Apply auth middleware to all routes =====
-app.use('*', authMiddleware)
+// ===== Apply auth middleware to routes in this sub-router =====
+// Use specific paths instead of '*' to avoid intercepting routes
+// handled by other sub-routers (e.g. authRoutes at /api/auth)
+app.use('/admin/*', authMiddleware)
+app.use('/auth/me', authMiddleware)
+app.use('/auth/password', authMiddleware)
 
 // ==================== Admin API ====================
 
