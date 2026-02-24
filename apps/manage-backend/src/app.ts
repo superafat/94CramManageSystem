@@ -17,7 +17,8 @@ import { tenantMiddleware } from './middleware/tenant'
 import { requestTrackingMiddleware } from './middleware/requestTracking'
 import { rateLimit } from './middleware/rateLimit'
 import { runMigrations } from './db/startup-migrations'
-import { checkDatabaseHealth, getDatabaseMetrics } from './db'
+import { checkDatabaseHealth, getDatabaseMetrics, db } from './db'
+import { sql } from 'drizzle-orm'
 import { initializeEventSystem } from './events'
 import { createSuccessResponse } from './types/api-response'
 import { logger } from './utils/logger'
@@ -115,10 +116,12 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Public debug endpoint (no auth)
+app.get('/debug/test', (c) => {
+  return c.json({ success: true, message: 'Debug endpoint works' })
+})
+
 app.get('/debug/tables', async (c) => {
   try {
-    const { db } = await import('./db')
-    const { sql } = await import('drizzle-orm')
     const result = await db.execute(sql`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name`)
     return c.json({ success: true, tables: result })
   } catch (error) {
