@@ -2,7 +2,11 @@ import { callBotApi, type BotApiResponse } from '../modules/api-client';
 import type { IntentResult } from '../modules/ai-engine';
 import type { AuthContext } from '../modules/auth-manager';
 
-const QUERY_INTENTS = ['inclass.query', 'manage.query_student', 'manage.query_finance', 'stock.query'];
+const QUERY_INTENTS = [
+  'inclass.query', 'inclass.report',
+  'manage.query_student', 'manage.query_finance', 'manage.query_payment_history',
+  'stock.query', 'stock.history',
+];
 const WRITE_INTENTS = [
   'inclass.leave', 'inclass.late',
   'manage.payment', 'manage.add_student',
@@ -28,6 +32,9 @@ const INTENT_API_MAP: Record<string, { service: 'manage' | 'inclass' | 'stock'; 
   'stock.ship': { service: 'stock', path: '/stock/ship' },
   'stock.restock': { service: 'stock', path: '/stock/restock' },
   'stock.query': { service: 'stock', path: '/stock/check' },
+  'inclass.report': { service: 'inclass', path: '/attendance/report' },
+  'manage.query_payment_history': { service: 'manage', path: '/finance/history' },
+  'stock.history': { service: 'stock', path: '/stock/history' },
 };
 
 export async function executeIntent(

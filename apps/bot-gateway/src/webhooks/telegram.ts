@@ -12,6 +12,7 @@ import { handleSync } from '../commands/sync';
 import { handleHelp } from '../commands/help';
 import { sendMessage } from '../utils/telegram';
 import { checkRateLimit } from '../utils/rate-limit';
+import { incrementUsage } from '../firestore/usage';
 import type { TelegramUpdate } from '../utils/telegram';
 
 export const telegramWebhook = new Hono();
@@ -67,6 +68,9 @@ telegramWebhook.post('/', async (c) => {
     const cache = await getCache(auth.tenantId);
     const intent = await parseIntent(text, cache);
 
+    // Track AI usage (fire-and-forget)
+    incrementUsage(auth.tenantId, 'ai_calls').catch(() => {});
+
     if (intent.need_clarification) {
       await sendMessage(msg.chatId, `🤔 ${intent.clarification_question}`);
       return c.json({ ok: true });
@@ -86,9 +90,17 @@ telegramWebhook.post('/', async (c) => {
       return c.json({ ok: true });
     }
 
+    // Module permission check
+    const intentModule = intent.intent.split('.')[0];
+    if (!auth.enabledModules.includes(intentModule)) {
+      await sendMessage(msg.chatId, `⚠️ 此補習班尚未啟用「${intentModule}」模組，請聯繫管理員`);
+      return c.json({ ok: true });
+    }
+
     // Query intents: execute directly
     if (isQueryIntent(intent.intent)) {
       const result = await executeIntent(intent, auth);
+      incrementUsage(auth.tenantId, 'api_calls').catch(() => {});
       await sendMessage(msg.chatId, formatResponse(result));
       return c.json({ ok: true });
     }
