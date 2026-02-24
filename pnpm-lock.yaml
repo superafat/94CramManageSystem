@@ -532,6 +532,9 @@ importers:
         specifier: ^3.22.0
         version: 3.25.76
     devDependencies:
+      '@types/node':
+        specifier: ^25.2.3
+        version: 25.3.0
       typescript:
         specifier: ^5.3.0
         version: 5.9.3
@@ -7263,7 +7266,7 @@ snapshots:
 
   '@types/pg@8.11.6':
     dependencies:
-      '@types/node': 20.19.33
+      '@types/node': 25.3.0
       pg-protocol: 1.11.0
       pg-types: 4.1.0
 

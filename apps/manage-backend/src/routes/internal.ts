@@ -2,7 +2,7 @@
  * Internal API Routes — 跨系統內部呼叫
  * 認證：X-Internal-Key header
  */
-import { timingSafeEqual, createHash } from 'crypto';
+import { timingSafeEqual } from 'crypto';
 import { Hono } from 'hono';
 
 const app = new Hono();
@@ -12,16 +12,22 @@ if (!INTERNAL_API_KEY) {
   throw new Error('INTERNAL_API_KEY is required for internal routes');
 }
 
-function safeCompare(a: string, b: string): boolean {
-  const bufA = Buffer.from(createHash('sha256').update(a).digest());
-  const bufB = Buffer.from(createHash('sha256').update(b).digest());
-  return timingSafeEqual(bufA, bufB);
+const INTERNAL_API_KEY_BUFFER = Buffer.from(INTERNAL_API_KEY);
+
+function safeCompare(key: string): boolean {
+  const keyBuffer = Buffer.from(key);
+
+  if (keyBuffer.length !== INTERNAL_API_KEY_BUFFER.length) {
+    return false;
+  }
+
+  return timingSafeEqual(keyBuffer, INTERNAL_API_KEY_BUFFER);
 }
 
 // Internal key 驗證
 app.use('*', async (c, next) => {
   const key = c.req.header('X-Internal-Key');
-  if (!key || !safeCompare(key, INTERNAL_API_KEY)) {
+  if (!key || !safeCompare(key)) {
     return c.json({ error: 'Forbidden' }, 403);
   }
   await next();
