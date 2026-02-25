@@ -14,8 +14,7 @@
     "@hono/node-server": "^1.19.9",
     "google-auth-library": "^9.0.0",
     "hono": "^4.11.9",
-    "zod": "^4.3.6",
-    "_comment_zod": "Intentionally uses zod v4 (vs @94cram/shared zod v3). bot-gateway is fully independent (Firestore, not PostgreSQL) and shares no zod schemas with other packages."
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
