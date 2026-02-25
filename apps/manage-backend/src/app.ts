@@ -12,6 +12,7 @@ import lineRoutes from './routes/line'
 import { errorTestRoutes } from './routes/error-test'
 import { healthRoutes } from './routes/health'
 import internalRoutes from './routes/internal'
+import parentExtRoutes from './routes/parent-ext'
 import botExtRoutes from './routes/bot-ext'
 import { errorHandler } from './middleware/errorHandler'
 import { tenantMiddleware } from './middleware/tenant'
@@ -108,6 +109,7 @@ app.get('/health/db', async (c) => {
 // Health check routes (public, no auth)
 app.route('/api/health', healthRoutes)
 app.route('/api/internal', internalRoutes)
+app.route('/api/parent-ext', parentExtRoutes)
 
 // LINE webhook (public, no auth, no tenant middleware)
 app.route('/api/line', lineRoutes)

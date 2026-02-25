@@ -5,6 +5,8 @@ export interface TenantCache {
   classes: string[];
   items: Array<{ id: string; name: string; stock: number }>;
   warehouses: Array<{ id: string; name: string }>;
+  tenantName?: string;
+  tenantAddress?: string;
   last_synced_at: Date;
 }
 

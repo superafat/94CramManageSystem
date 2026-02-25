@@ -39,7 +39,7 @@ const systems = [
     name: '94CramBot AI 助手',
     tagline: 'Telegram 對話即操作，管理不開電腦',
     description: '透過 Telegram 聊天機器人，用自然語言完成點名、繳費、出貨等操作。Gemini AI 理解你的指令，寫入前二次確認，安全又方便。',
-    url: 'https://t.me/cram94bot',
+    url: process.env.BOT_DASHBOARD_URL || 'https://t.me/cram94bot',
     color: '#A89BB5',
     highlights: ['自然語言 AI 操作', 'Telegram 即時回應', '寫入操作二次確認', '跨系統統一入口'],
   },
@@ -145,7 +145,7 @@ export default function HomePage() {
               <p className="text-[#6b7c73] text-xs mb-3">多校區統一管理，AI 預測備貨</p>
               <span className="text-[#9CADB7] font-semibold text-xs">→ 前往 94Stock</span>
             </a>
-            <a href="https://t.me/cram94bot" className="bg-white rounded-xl p-5 border border-[#d8d1c6] hover:shadow-md transition text-left">
+            <a href={process.env.BOT_DASHBOARD_URL || 'https://t.me/cram94bot'} className="bg-white rounded-xl p-5 border border-[#d8d1c6] hover:shadow-md transition text-left">
               <p className="font-bold text-[#4b5c53] mb-2">🤖 想用手機對話操作系統</p>
               <p className="text-[#6b7c73] text-xs mb-3">Telegram AI 助手，說話就能辦事</p>
               <span className="text-[#A89BB5] font-semibold text-xs">→ 前往 94CramBot</span>
@@ -179,7 +179,7 @@ export default function HomePage() {
             <a href={process.env.MANAGE_URL || '#'} className="hover:text-white transition">94Manage 學員管理</a>
             <a href={process.env.INCLASS_URL || '#'} className="hover:text-white transition">94inClass 點名系統</a>
             <a href={process.env.STOCK_URL || '#'} className="hover:text-white transition">94Stock 庫存管理</a>
-            <a href="https://t.me/cram94bot" className="hover:text-white transition">94CramBot AI 助手</a>
+            <a href={process.env.BOT_DASHBOARD_URL || 'https://t.me/cram94bot'} className="hover:text-white transition">94CramBot AI 助手</a>
           </div>
           <p className="text-[#6b7c73] text-xs">© 2026 94cram.com · 蜂神榜 Ai 教育科技 · All rights reserved.</p>
         </div>
