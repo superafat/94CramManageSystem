@@ -1,7 +1,0 @@
-{
-  "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"/Users/dali/Github/94CramManageSystem/docs/plans/2026-02-24-94crambot-implementation.md\"}",
-  "error": "File content (28860 tokens) exceeds maximum allowed tokens (25000). Please use offset and limit parameters to read specific portions of the file, or use the GrepTool to search for specific content.",
-  "timestamp": "2026-02-24T17:32:45.092Z",
-  "retry_count": 2
-}
