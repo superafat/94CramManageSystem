@@ -49,4 +49,4 @@ jobs:
             --cpu 1 \
             --min-instances 0 \
             --max-instances 2 \
-            --set-env-vars "NODE_ENV=production,MANAGE_URL=https://cram94-manage-dashboard-1015149159553.asia-east1.run.app,INCLASS_URL=https://cram94-inclass-dashboard-1015149159553.asia-east1.run.app,STOCK_URL=https://cram94-stock-dashboard-1015149159553.asia-east1.run.app"
+            --set-env-vars "NODE_ENV=production,MANAGE_URL=https://cram94-manage-dashboard-1015149159553.asia-east1.run.app,INCLASS_URL=https://cram94-inclass-dashboard-1015149159553.asia-east1.run.app,STOCK_URL=https://cram94-stock-dashboard-1015149159553.asia-east1.run.app,BOT_DASHBOARD_URL=https://cram94-bot-dashboard-1015149159553.asia-east1.run.app"

@@ -35,6 +35,7 @@ import miscRoutes from './routes/misc.js'
 import internalRoutes from './routes/internal.js'
 import webhookRoutes from './routes/webhooks.js'
 import botRoutes from './routes/bot/index.js'
+import parentExtRoutes from './routes/parent-ext.js'
 type Variables = {
   schoolId: string
   userId: string
@@ -107,6 +108,8 @@ app.use('/api/*', async (c, next) => {
   if (c.req.path.startsWith('/api/webhooks/')) return next()
   // Bot routes use GCP IAM auth via botAuth middleware
   if (c.req.path.startsWith('/api/bot/')) return next()
+  // Parent-ext routes use X-Internal-Key auth
+  if (c.req.path.startsWith('/api/parent-ext/')) return next()
   const token = extractToken(c)
   if (!token) {
     return c.json({ error: 'Unauthorized' }, 401)
@@ -164,6 +167,8 @@ app.route('/api/payments', paymentsRoutes)
 app.route('/api', miscRoutes)
 // Bot Gateway API routes (GCP IAM auth via botAuth middleware)
 app.route('/api/bot', botRoutes)
+// Parent-ext routes (X-Internal-Key auth, for bot-gateway parent queries)
+app.route('/api/parent-ext', parentExtRoutes)
 // Webhook routes (own auth via X-Webhook-Secret header)
 app.route('/api/webhooks', webhookRoutes)
 // Internal API (own auth via INTERNAL_API_TOKEN, NOT JWT)

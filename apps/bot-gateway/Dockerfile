@@ -15,5 +15,5 @@ COPY --from=builder --chown=appuser:nodejs /app /app
 WORKDIR /app/apps/bot-gateway
 ENV NODE_ENV=production
 USER appuser
-EXPOSE 8080
+EXPOSE 3300
 CMD ["node", "dist/index.js"]
