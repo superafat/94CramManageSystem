@@ -110,30 +110,16 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {systems.map((sys) => (
-              <a
+              <SystemCard
                 key={sys.key}
-                href={sys.url}
-                className="group block rounded-2xl bg-white border-2 p-8 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
-                style={{ borderColor: sys.color + '88' }}
-              >
-                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">{sys.emoji}</div>
-                <h3 className="text-xl font-bold text-[#4b5c53] mb-1">{sys.name}</h3>
-                <p className="text-sm font-medium mb-3" style={{ color: sys.color }}>{sys.tagline}</p>
-                <p className="text-sm text-[#6b746e] mb-5 leading-relaxed">{sys.description}</p>
-                <ul className="space-y-1.5 mb-6">
-                  {sys.highlights.map((h) => (
-                    <li key={h} className="text-xs text-[#5d6c64] flex items-center gap-2">
-                      <span className="text-[#8fa895]">✓</span> {h}
-                    </li>
-                  ))}
-                </ul>
-                <div
-                  className="inline-block w-full text-center px-5 py-2.5 rounded-lg text-white text-sm font-semibold transition-opacity group-hover:opacity-90"
-                  style={{ backgroundColor: sys.color }}
-                >
-                  了解更多 →
-                </div>
-              </a>
+                emoji={sys.emoji}
+                name={sys.name}
+                tagline={sys.tagline}
+                description={sys.description}
+                url={sys.url}
+                color={sys.color}
+                highlights={sys.highlights}
+              />
             ))}
           </div>
         </div>

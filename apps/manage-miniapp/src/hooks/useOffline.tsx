@@ -65,12 +65,12 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
       const result = await storage.processPendingSyncs(async (syncItem) => {
         try {
           const response = await fetch(syncItem.endpoint, {
-            method: syncItem.action === 'create' ? 'POST' : 
+            method: syncItem.action === 'create' ? 'POST' :
                     syncItem.action === 'update' ? 'PUT' : 'DELETE',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
             },
+            credentials: 'include',
             body: syncItem.action !== 'delete' ? JSON.stringify(syncItem.data) : undefined
           });
 

@@ -127,6 +127,7 @@ export function useOfflineApi<T = any>(
           ...headers,
           ...fetchOptionsRef.current.headers,
         },
+        credentials: 'include',
         signal: controller.signal,
       });
 
@@ -155,8 +156,8 @@ export function useOfflineApi<T = any>(
       setIsFromCache(false);
       setError(null);
       setLoading(false);
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
         setLoading(false);
         return;
       }

@@ -4,7 +4,7 @@
  * 保留 RBAC（getUserPermissions）
  */
 import type { Context, Next } from 'hono'
-import { verify } from '@94cram/shared/auth'
+import { verify, extractToken } from '@94cram/shared/auth'
 import { getUserPermissions, Role, type RBACVariables } from './rbac'
 
 interface AuthVariables extends RBACVariables {
@@ -24,18 +24,21 @@ interface AuthenticatedUser {
  * Middleware: require valid JWT, populate user + permissions
  */
 export async function authMiddleware(c: Context<{ Variables: AuthVariables }>, next: Next) {
-  const authHeader = c.req.header('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return c.json({ error: 'Unauthorized: Missing Bearer token' }, 401)
+  const token = extractToken(c)
+  if (!token) {
+    return c.json({ error: 'Unauthorized: Missing token' }, 401)
   }
 
-  const token = authHeader.slice(7)
   try {
     const payload = await verify(token)
 
+    if (!payload.tenantId) {
+      return c.json({ error: 'Unauthorized: Missing tenant context' }, 401)
+    }
+
     const user: AuthenticatedUser = {
       id: payload.userId || payload.sub || '',
-      tenant_id: payload.tenantId || '38068f5a-6bad-4edc-b26b-66bc6ac90fb3',
+      tenant_id: payload.tenantId,
       branch_id: null,
       email: payload.email || '',
       name: payload.name || '',
@@ -57,22 +60,23 @@ export async function authMiddleware(c: Context<{ Variables: AuthVariables }>, n
  * Optional auth — sets user if token present, continues anyway
  */
 export async function optionalAuth(c: Context<{ Variables: AuthVariables }>, next: Next) {
-  const authHeader = c.req.header('Authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.slice(7)
+  const token = extractToken(c)
+  if (token) {
     try {
       const payload = await verify(token)
+      if (payload.tenantId) {
         const user: AuthenticatedUser = {
           id: payload.userId || payload.sub || '',
-          tenant_id: payload.tenantId || '38068f5a-6bad-4edc-b26b-66bc6ac90fb3',
+          tenant_id: payload.tenantId,
           branch_id: null,
           email: payload.email || '',
           name: payload.name || '',
           role: (payload.role as Role) || Role.PARENT
         }
         c.set('user', user)
-      c.set('permissions', getUserPermissions(user.role))
-      c.set('tenantId', user.tenant_id)
+        c.set('permissions', getUserPermissions(user.role))
+        c.set('tenantId', user.tenant_id)
+      }
     } catch {
       // Token 無效 — 繼續但不設 user
     }

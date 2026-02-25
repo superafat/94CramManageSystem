@@ -82,7 +82,7 @@ export function useAPIWithRetry<T>(
     {
       onError: (error) => {
         if (retryCount < maxRetries) {
-          console.log(`Retrying... (${retryCount + 1}/${maxRetries})`)
+          console.warn(`Retrying... (${retryCount + 1}/${maxRetries})`)
           setTimeout(() => {
             setRetryCount(c => c + 1)
             result.refetch()

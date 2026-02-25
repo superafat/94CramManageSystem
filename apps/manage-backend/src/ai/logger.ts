@@ -15,7 +15,7 @@ export async function logConversation(
       INSERT INTO conversations (branch_id, tenant_id, channel, query, answer, model, intent, latency_ms, tokens_used)
       VALUES (${branchId}, ${tenantId ?? null}, ${channel}, ${query}, ${response.answer}, ${response.model}, ${response.intent}, ${response.latencyMs}, ${response.tokensUsed ?? null})
     `)
-  } catch (err: any) {
-    console.error('[logger] failed to log conversation:', err.message)
+  } catch (err) {
+    console.error('[logger] failed to log conversation:', err instanceof Error ? err.message : String(err))
   }
 }

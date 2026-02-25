@@ -79,6 +79,7 @@ export function useApi<T = any>(
             ...headers,
             ...fetchOptionsRef.current.headers,
           },
+          credentials: 'include',
           signal: controller.signal,
         });
 
@@ -97,9 +98,9 @@ export function useApi<T = any>(
         setData(result);
         setError(null);
         setLoading(false);
-      } catch (err: any) {
+      } catch (err) {
         // Ignore abort errors
-        if (err.name === 'AbortError') {
+        if (err instanceof Error && err.name === 'AbortError') {
           setLoading(false);
           return;
         }

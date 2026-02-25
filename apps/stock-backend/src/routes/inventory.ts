@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { db } from '../db/index';
 import { stockBarcodes, stockInventory, stockTransactions, stockItems, stockWarehouses } from '@94cram/shared/db';
 import { eq, and, desc, gte, sql } from 'drizzle-orm';
+import { authMiddleware } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { sendLowStockAlert } from '../services/notifications';
 import { z } from 'zod';
@@ -52,7 +53,7 @@ const transactionQuerySchema = z.object({
   itemId: uuidString.optional(),
 });
 
-app.use('*', tenantMiddleware);
+app.use('*', authMiddleware, tenantMiddleware);
 
 // GET inventory for a warehouse
 app.get('/warehouse/:warehouseId', async (c) => {

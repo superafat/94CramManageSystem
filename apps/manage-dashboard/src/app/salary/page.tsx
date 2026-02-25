@@ -51,18 +51,19 @@ export default function SalaryPage() {
   const fetchSalary = async () => {
     setLoading(true)
     try {
-      const token = localStorage.getItem('token')
       const res = await fetch(
-        `${API_BASE}/api/w8/salary/calculate?start_date=${monthRange.start}&end_date=${monthRange.end}`,
+        `${API_BASE}/api/w8/salary/calculate?startDate=${monthRange.start}&endDate=${monthRange.end}`,
         {
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
         }
       )
+      if (!res.ok) {
+        console.error('Salary API error:', res.status)
+        return
+      }
       const result = await res.json()
-      setData(result)
+      setData(result.data ?? result)
     } catch (err) {
       console.error('Failed to fetch salary:', err)
     } finally {
@@ -161,12 +162,12 @@ export default function SalaryPage() {
                       <div
                         className="h-full bg-primary rounded-full transition-all"
                         style={{
-                          width: `${Math.min(100, (Number(teacher.total_amount) / data.grand_total_amount) * 100)}%`
+                          width: `${data.grand_total_amount > 0 ? Math.min(100, (Number(teacher.total_amount) / data.grand_total_amount) * 100) : 0}%`
                         }}
                       />
                     </div>
                     <p className="text-xs text-text-muted mt-1 text-right">
-                      佔比 {((Number(teacher.total_amount) / data.grand_total_amount) * 100).toFixed(1)}%
+                      佔比 {data.grand_total_amount > 0 ? ((Number(teacher.total_amount) / data.grand_total_amount) * 100).toFixed(1) : '0.0'}%
                     </p>
                   </div>
 
@@ -178,15 +179,12 @@ export default function SalaryPage() {
                         onClick={async () => {
                           setConfirming(teacher.teacher_id)
                           try {
-                            const token = localStorage.getItem('token')
                             const tenantId = localStorage.getItem('tenantId') || ''
                             const branchId = localStorage.getItem('branchId') || ''
                             const res = await fetch(`${API_BASE}/api/w8/salary/records`, {
                               method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json',
-                                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                              },
+                              headers: { 'Content-Type': 'application/json' },
+                              credentials: 'include',
                               body: JSON.stringify({
                                 teacher_id: teacher.teacher_id,
                                 period_start: monthRange.start,
@@ -199,7 +197,10 @@ export default function SalaryPage() {
                             })
                             if (res.ok) alert(`${teacher.teacher_name} 薪資已確認`)
                             else alert('確認失敗')
-                          } catch { alert('確認失敗') }
+                          } catch (err) {
+                          console.error('[Salary] Confirm failed:', err)
+                          alert('確認失敗')
+                        }
                           finally { setConfirming(null) }
                         }}
                         className="flex-1 py-1.5 text-sm border border-primary text-primary rounded-lg disabled:opacity-50"

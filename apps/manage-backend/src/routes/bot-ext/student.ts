@@ -3,14 +3,14 @@ import { db } from '../../db'
 import { manageStudents } from '@94cram/shared/db'
 import { eq, and, like } from 'drizzle-orm'
 
-type BotExtVariables = { tenantId: string; botRequest: boolean }
+type BotExtVariables = { tenantId: string; botRequest: boolean; botBody: Record<string, unknown> }
 
 const app = new Hono<{ Variables: BotExtVariables }>()
 
 // POST /student/create
 app.post('/create', async (c) => {
   try {
-    const { tenant_id, name, class_name, parent_phone, parent_name } = await c.req.json()
+    const { tenant_id, name, class_name, parent_phone, parent_name } = c.get('botBody') as any
     const tenantId = c.get('tenantId') as string
 
     const existing = await db.select().from(manageStudents)
@@ -45,11 +45,12 @@ app.post('/create', async (c) => {
 // POST /student/search
 app.post('/search', async (c) => {
   try {
-    const { tenant_id, keyword } = await c.req.json()
+    const { tenant_id, keyword } = c.get('botBody') as any
     const tenantId = c.get('tenantId') as string
 
+    const safeKeyword = (keyword || '').replace(/[%_\\]/g, '');
     const students = await db.select().from(manageStudents)
-      .where(and(eq(manageStudents.tenantId, tenantId), like(manageStudents.name, `%${keyword}%`)))
+      .where(and(eq(manageStudents.tenantId, tenantId), like(manageStudents.name, `%${safeKeyword}%`)))
       .limit(10)
 
     return c.json({

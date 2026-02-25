@@ -20,9 +20,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
     const user = typeof window !== 'undefined' ? localStorage.getItem('user') : null
-    if (!token || !user) {
+    if (!user) {
       router.push('/login')
       return
     }

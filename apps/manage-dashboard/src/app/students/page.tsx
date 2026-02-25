@@ -50,11 +50,9 @@ export default function StudentsPage() {
   const [saving, setSaving] = useState(false)
 
   const getHeaders = () => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
     return {
       'Content-Type': 'application/json',
       'X-Tenant-Id': getTenantId(),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     }
   }
 
@@ -64,11 +62,12 @@ export default function StudentsPage() {
       setError(null)
       const res = await fetch(
         `${API_BASE}/api/admin/students?limit=100&status=${statusFilter}`,
-        { headers: getHeaders() }
+        { headers: getHeaders(), credentials: 'include' }
       )
       if (!res.ok) throw new Error('載入失敗')
-      const data = await res.json()
-      setStudents(data.students || [])
+      const json = await res.json()
+      const payload = json.data ?? json
+      setStudents(payload.students || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : '載入學生資料失敗')
     } finally {
@@ -119,6 +118,7 @@ export default function StudentsPage() {
       const res = await fetch(url, {
         method: editingStudent ? 'PUT' : 'POST',
         headers: getHeaders(),
+        credentials: 'include',
         body: JSON.stringify({
           fullName: form.fullName,
           gradeLevel: form.gradeLevel || null,

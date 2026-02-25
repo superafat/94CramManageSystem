@@ -22,6 +22,7 @@ export default function LoginPage() {
       const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username, password })
       })
 
@@ -36,19 +37,17 @@ export default function LoginPage() {
         return
       }
 
-      // API 回應格式: { success, data: { token, user } }
+      // API 回應格式: { success, data: { user } }（token 由後端設為 HttpOnly cookie）
       const responseData = data.data || data
-      const token = responseData.token
       const userData = responseData.user
 
-      if (!token || !userData) {
+      if (!userData) {
         setError('登入回應格式錯誤')
         setLoading(false)
         return
       }
 
-      // 儲存 token 和用戶資訊
-      localStorage.setItem('token', token)
+      // 儲存用戶資訊（token 由 HttpOnly cookie 管理）
       localStorage.setItem('user', JSON.stringify(userData))
       localStorage.setItem('tenantId', userData.tenant_id)
       localStorage.setItem('branchId', userData.branch_id || '')
@@ -64,9 +63,9 @@ export default function LoginPage() {
         student: '/my-schedule',
       }
       router.push(homePages[role] || '/dashboard')
-    } catch (err: any) {
+    } catch (err) {
       console.error('Login error:', err)
-      setError(err?.message || err?.toString() || '無法連接伺服器')
+      setError(err instanceof Error ? err.message : '無法連接伺服器')
       setLoading(false)
     }
   }

@@ -24,8 +24,12 @@ export default function Settings({ onLogout, onBack }: SettingsProps) {
     if (confirm('確定要登出嗎？')) {
       // Clear offline cache on logout
       await storage.clearAll();
-      
-      localStorage.removeItem('token');
+
+      try {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      } catch {
+        // Ignore logout API errors
+      }
       localStorage.removeItem('user');
       toast.success('已登出');
       setTimeout(() => onLogout(), 500);

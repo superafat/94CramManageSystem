@@ -4,6 +4,14 @@ import { db } from '../db/index';
 import { stockBarcodes, stockItems } from '@94cram/shared/db';
 import { authMiddleware } from '../middleware/auth';
 import { getTenantId, tenantMiddleware } from '../middleware/tenant';
+import { z } from 'zod';
+
+const barcodeCreateSchema = z.object({
+  itemId: z.string().uuid(),
+  barcode: z.string().min(1),
+  barcodeType: z.string().optional(),
+  isPrimary: z.boolean().optional(),
+});
 
 const app = new Hono();
 app.use('*', authMiddleware, tenantMiddleware);
@@ -21,14 +29,23 @@ app.get('/', async (c) => {
 
 app.post('/', async (c) => {
   const tenantId = getTenantId(c);
-  const body = await c.req.json();
-  if (!body.itemId || !body.barcode) return c.json({ error: 'itemId and barcode are required' }, 400);
+  let requestBody: unknown;
+  try {
+    requestBody = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+  const parsed = barcodeCreateSchema.safeParse(requestBody);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid input' }, 400);
+  }
+  const body = parsed.data;
 
   const [created] = await db.insert(stockBarcodes).values({
     tenantId,
     itemId: body.itemId,
     barcode: body.barcode,
-    barcodeType: body.barcodeType || 'code128',
+    barcodeType: body.barcodeType ?? 'code128',
     isPrimary: body.isPrimary ?? false,
   }).returning();
   return c.json(created, 201);

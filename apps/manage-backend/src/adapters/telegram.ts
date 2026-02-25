@@ -65,10 +65,10 @@ class TelegramAdapter {
         success: true,
         messageId: result.result?.message_id
       }
-    } catch (error: any) {
+    } catch (error) {
       return {
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       }
     }
   }

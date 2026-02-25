@@ -32,11 +32,9 @@ export default function TeachersPage() {
   const [form, setForm] = useState({ name: '', title: '教師', phone: '', rate_per_class: '' })
 
   const getHeaders = () => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
     return {
       'Content-Type': 'application/json',
       'X-Tenant-Id': getTenantId(),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     }
   }
 
@@ -46,9 +44,10 @@ export default function TeachersPage() {
 
   const fetchTeachers = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/w8/teachers`, { headers: getHeaders() })
-      const data = await res.json()
-      setTeachers(data.teachers || data || [])
+      const res = await fetch(`${API_BASE}/api/w8/teachers`, { headers: getHeaders(), credentials: 'include' })
+      const json = await res.json()
+      const payload = json.data ?? json
+      setTeachers(payload.teachers || [])
     } catch (err) {
       console.error('Failed to fetch teachers:', err)
     } finally {
@@ -66,6 +65,7 @@ export default function TeachersPage() {
       const res = await fetch(url, {
         method: editingTeacher ? 'PUT' : 'POST',
         headers: getHeaders(),
+        credentials: 'include',
         body: JSON.stringify({
           ...form,
           tenant_id: getTenantId(),

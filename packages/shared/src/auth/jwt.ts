@@ -43,15 +43,26 @@ export async function sign(payload: Omit<JWTPayload, 'sub'>, secret?: string): P
 
 export async function verify(token: string, secret?: string): Promise<JWTPayload> {
   const { payload } = await jwtVerify(token, getSecret(secret));
+
+  const userId = (typeof payload.userId === 'string' ? payload.userId : null) ?? payload.sub ?? null;
+  const tenantId = typeof payload.tenantId === 'string' ? payload.tenantId : null;
+  const email = typeof payload.email === 'string' ? payload.email : null;
+  const name = typeof payload.name === 'string' ? payload.name : null;
+  const role = typeof payload.role === 'string' ? payload.role : null;
+
+  if (!userId || !tenantId || !email || !name || !role) {
+    throw new Error('JWT payload is missing required fields: userId, tenantId, email, name, role');
+  }
+
   return {
     sub: payload.sub,
-    userId: (payload.userId as string) || payload.sub || '',
-    tenantId: (payload.tenantId as string) || '',
-    email: (payload.email as string) || '',
-    name: (payload.name as string) || '',
-    role: (payload.role as string) || '',
-    permissions: (payload.permissions as string[]) || [],
-    systems: (payload.systems as string[]) || [],
+    userId,
+    tenantId,
+    email,
+    name,
+    role,
+    permissions: Array.isArray(payload.permissions) ? (payload.permissions as string[]) : [],
+    systems: Array.isArray(payload.systems) ? (payload.systems as string[]) : [],
   };
 }
 

@@ -3,31 +3,36 @@
 interface SystemCardProps {
   emoji: string;
   name: string;
+  tagline: string;
   description: string;
   url: string;
   color: string;
+  highlights: string[];
 }
 
-export function SystemCard({ emoji, name, description, url, color }: SystemCardProps) {
+export function SystemCard({ emoji, name, tagline, description, url, color, highlights }: SystemCardProps) {
   return (
     <a
       href={url}
-      className="group block rounded-2xl p-8 text-center transition-all duration-300
-        hover:scale-105 hover:shadow-xl bg-white/80 backdrop-blur-sm border-2"
-      style={{ borderColor: color + '66' }}
+      className="group block rounded-2xl bg-white border-2 p-8 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
+      style={{ borderColor: color + '88' }}
     >
+      <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">{emoji}</div>
+      <h3 className="text-xl font-bold text-[#4b5c53] mb-1">{name}</h3>
+      <p className="text-sm font-medium mb-3" style={{ color }}>{tagline}</p>
+      <p className="text-sm text-[#6b746e] mb-5 leading-relaxed">{description}</p>
+      <ul className="space-y-1.5 mb-6">
+        {highlights.map((h) => (
+          <li key={h} className="text-xs text-[#5d6c64] flex items-center gap-2">
+            <span className="text-[#8fa895]">✓</span> {h}
+          </li>
+        ))}
+      </ul>
       <div
-        className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300"
-      >
-        {emoji}
-      </div>
-      <h2 className="text-xl font-bold text-gray-700 mb-2">{name}</h2>
-      <p className="text-sm text-gray-500">{description}</p>
-      <div
-        className="mt-4 inline-block px-4 py-1.5 rounded-full text-sm font-medium text-white transition-opacity group-hover:opacity-90"
+        className="inline-block w-full text-center px-5 py-2.5 rounded-lg text-white text-sm font-semibold transition-opacity group-hover:opacity-90"
         style={{ backgroundColor: color }}
       >
-        進入系統 →
+        了解更多 →
       </div>
     </a>
   );

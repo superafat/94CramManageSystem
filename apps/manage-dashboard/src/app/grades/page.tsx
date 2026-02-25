@@ -47,13 +47,13 @@ export default function GradesPage() {
     try {
       setLoading(true)
       setError(null)
-      const token = localStorage.getItem('token')
       const res = await fetch(`${API_BASE}/api/admin/grades?limit=100`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include',
       })
       if (!res.ok) throw new Error('API 錯誤')
-      const data = await res.json()
-      setRecords(data.grades || [])
+      const json = await res.json()
+      const payload = json.data ?? json
+      setRecords(payload.grades || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : '載入失敗')
       setRecords([])
@@ -67,15 +67,18 @@ export default function GradesPage() {
   // 載入學生列表（給新增用）
   const loadStudents = async () => {
     try {
-      const token = localStorage.getItem('token')
       const res = await fetch(`${API_BASE}/api/admin/students?limit=100`, {
-        headers: { 'Authorization': `Bearer ${token}`, 'X-Tenant-Id': localStorage.getItem('tenantId') || '' }
+        credentials: 'include',
+        headers: { 'X-Tenant-Id': localStorage.getItem('tenantId') || '' },
       })
       if (res.ok) {
-        const data = await res.json()
-        setStudentOptions((data.students || []).map((s: any) => ({ id: s.id, full_name: s.full_name })))
+        const json2 = await res.json()
+        const stuPayload = json2.data ?? json2
+        setStudentOptions((stuPayload.students || []).map((s: { id: string; full_name: string }) => ({ id: s.id, full_name: s.full_name })))
       }
-    } catch {}
+    } catch (err) {
+      console.error('Failed to load students:', err)
+    }
   }
 
   const openAddGrade = () => {
@@ -88,10 +91,10 @@ export default function GradesPage() {
     e.preventDefault()
     setAddSaving(true)
     try {
-      const token = localStorage.getItem('token')
       const res = await fetch(`${API_BASE}/api/admin/grades`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Tenant-Id': localStorage.getItem('tenantId') || '' },
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-Id': localStorage.getItem('tenantId') || '' },
+        credentials: 'include',
         body: JSON.stringify({
           studentId: addForm.studentId,
           subject: addForm.subject,

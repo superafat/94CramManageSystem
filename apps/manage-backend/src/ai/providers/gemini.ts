@@ -67,9 +67,9 @@ export class GeminiProvider implements LLMProvider {
         modelName: 'gemini-2.0-flash-lite',
         finishReason: 'stop',
       }
-    } catch (error: any) {
+    } catch (error) {
       this.healthScore = Math.max(0, this.healthScore - 10)
-      throw this.wrapError(error)
+      throw this.wrapError(error instanceof Error ? error : new Error(String(error)))
     } finally {
       clearTimeout(timer)
     }

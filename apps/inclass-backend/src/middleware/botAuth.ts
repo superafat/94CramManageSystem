@@ -11,10 +11,16 @@ export const botAuth = createMiddleware(async (c, next) => {
       return c.json({ success: false, error: '未授權：缺少 token' }, 401);
     }
 
+    const serviceUrl = process.env.SERVICE_URL;
+    if (!serviceUrl) {
+      console.error('[botAuth] SERVICE_URL is not configured');
+      return c.json({ success: false, error: '服務未設定' }, 503);
+    }
+
     const token = authHeader.split(' ')[1];
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience: process.env.SERVICE_URL,
+      audience: serviceUrl,
     });
 
     const payload = ticket.getPayload();
@@ -22,6 +28,7 @@ export const botAuth = createMiddleware(async (c, next) => {
       return c.json({ success: false, error: '非授權服務' }, 403);
     }
 
+    // Parse body once and stash in context — route handlers read from c.get('botBody')
     const body = await c.req.json();
     const tenantId = body.tenant_id;
     if (!tenantId) {
@@ -30,6 +37,7 @@ export const botAuth = createMiddleware(async (c, next) => {
 
     c.set('schoolId', tenantId);
     c.set('userId', 'bot-gateway');
+    c.set('botBody', body);
     await next();
   } catch (error) {
     console.error('[botAuth] Error:', error instanceof Error ? error.message : error);

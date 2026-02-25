@@ -3,13 +3,14 @@ import { db } from '../../db/index';
 import { stockItems, stockWarehouses, stockInventory, stockTransactions } from '@94cram/shared/db';
 import { eq, and, like, desc } from 'drizzle-orm';
 
-type Env = { Variables: { tenantId: string } };
+type Env = { Variables: { tenantId: string; botBody: Record<string, unknown> } };
 const app = new Hono<Env>();
 
 // POST /stock/ship
 app.post('/ship', async (c) => {
   try {
-    const { item_name, item_id, quantity, destination, destination_id } = await c.req.json();
+    const body = c.get('botBody') as Record<string, unknown>;
+    const { item_name, item_id, quantity, destination, destination_id } = body as { item_name?: string; item_id?: string; quantity: number; destination?: string; destination_id?: string };
     const tenantId = c.get('tenantId') as string;
 
     let items;
@@ -18,12 +19,13 @@ app.post('/ship', async (c) => {
         .where(and(eq(stockItems.tenantId, tenantId), eq(stockItems.id, item_id)));
     } else {
       items = await db.select().from(stockItems)
-        .where(and(eq(stockItems.tenantId, tenantId), eq(stockItems.name, item_name)));
+        .where(and(eq(stockItems.tenantId, tenantId), eq(stockItems.name, item_name!)));
     }
 
     if (items.length === 0) {
+      const safeItemName = (item_name || '').replace(/[%_\\]/g, '');
       const suggestions = await db.select().from(stockItems)
-        .where(and(eq(stockItems.tenantId, tenantId), like(stockItems.name, `%${item_name}%`)))
+        .where(and(eq(stockItems.tenantId, tenantId), like(stockItems.name, `%${safeItemName}%`)))
         .limit(5);
       return c.json({
         success: false, error: 'item_not_found',
@@ -39,8 +41,9 @@ app.post('/ship', async (c) => {
       warehouses = await db.select().from(stockWarehouses)
         .where(and(eq(stockWarehouses.tenantId, tenantId), eq(stockWarehouses.id, destination_id)));
     } else {
+      const safeDestination = (destination || '').replace(/[%_\\]/g, '');
       warehouses = await db.select().from(stockWarehouses)
-        .where(and(eq(stockWarehouses.tenantId, tenantId), like(stockWarehouses.name, `%${destination}%`)));
+        .where(and(eq(stockWarehouses.tenantId, tenantId), like(stockWarehouses.name, `%${safeDestination}%`)));
     }
 
     if (warehouses.length === 0) {
@@ -105,7 +108,8 @@ app.post('/ship', async (c) => {
 // POST /stock/restock
 app.post('/restock', async (c) => {
   try {
-    const { item_name, item_id, quantity } = await c.req.json();
+    const body = c.get('botBody') as Record<string, unknown>;
+    const { item_name, item_id, quantity } = body as { item_name?: string; item_id?: string; quantity: number };
     const tenantId = c.get('tenantId') as string;
 
     let items;
@@ -114,12 +118,13 @@ app.post('/restock', async (c) => {
         .where(and(eq(stockItems.tenantId, tenantId), eq(stockItems.id, item_id)));
     } else {
       items = await db.select().from(stockItems)
-        .where(and(eq(stockItems.tenantId, tenantId), eq(stockItems.name, item_name)));
+        .where(and(eq(stockItems.tenantId, tenantId), eq(stockItems.name, item_name!)));
     }
 
     if (items.length === 0) {
+      const safeItemName = (item_name || '').replace(/[%_\\]/g, '');
       const suggestions = await db.select().from(stockItems)
-        .where(and(eq(stockItems.tenantId, tenantId), like(stockItems.name, `%${item_name}%`)))
+        .where(and(eq(stockItems.tenantId, tenantId), like(stockItems.name, `%${safeItemName}%`)))
         .limit(5);
       return c.json({
         success: false, error: 'item_not_found',
@@ -179,7 +184,8 @@ app.post('/restock', async (c) => {
 // POST /stock/check
 app.post('/check', async (c) => {
   try {
-    const { item_name, item_id } = await c.req.json();
+    const body = c.get('botBody') as Record<string, unknown>;
+    const { item_name, item_id } = body as { item_name?: string; item_id?: string };
     const tenantId = c.get('tenantId') as string;
 
     let items;
@@ -187,8 +193,9 @@ app.post('/check', async (c) => {
       items = await db.select().from(stockItems)
         .where(and(eq(stockItems.tenantId, tenantId), eq(stockItems.id, item_id)));
     } else {
+      const safeItemName = (item_name || '').replace(/[%_\\]/g, '');
       items = await db.select().from(stockItems)
-        .where(and(eq(stockItems.tenantId, tenantId), like(stockItems.name, `%${item_name}%`)));
+        .where(and(eq(stockItems.tenantId, tenantId), like(stockItems.name, `%${safeItemName}%`)));
     }
 
     if (items.length === 0) {
@@ -213,12 +220,14 @@ app.post('/check', async (c) => {
 // POST /stock/history
 app.post('/history', async (c) => {
   try {
-    const { tenant_id, item_name, limit: queryLimit } = await c.req.json();
+    const body = c.get('botBody') as Record<string, unknown>;
+    const { tenant_id, item_name, limit: queryLimit } = body as { tenant_id?: string; item_name?: string; limit?: number };
     const tenantId = c.get('tenantId') as string;
     const maxResults = queryLimit || 10;
 
+    const safeItemName = (item_name || '').replace(/[%_\\]/g, '');
     const items = await db.select().from(stockItems)
-      .where(and(eq(stockItems.tenantId, tenantId), like(stockItems.name, `%${item_name}%`)));
+      .where(and(eq(stockItems.tenantId, tenantId), like(stockItems.name, `%${safeItemName}%`)));
 
     if (items.length === 0) {
       return c.json({

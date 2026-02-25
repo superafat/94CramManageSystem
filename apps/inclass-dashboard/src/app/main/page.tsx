@@ -93,9 +93,8 @@ export default function Home() {
 
   const fetchAlerts = async () => {
     try {
-      const token = localStorage.getItem('token')
       const res = await fetch(`${API_BASE}/api/alerts`, {
-        headers: { Authorization: `Bearer ${token}` }
+        credentials: 'include'
       })
       const data: { alerts?: AlertNotification[] } = res.ok ? await res.json() : { alerts: [] }
       if (data.alerts) {

@@ -75,9 +75,10 @@ class LineAdapter {
       }
 
       return { success: true }
-    } catch (error: any) {
-      console.error('[LINE] Push error:', error.message)
-      return { success: false, error: error.message }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('[LINE] Push error:', message)
+      return { success: false, error: message }
     }
   }
 

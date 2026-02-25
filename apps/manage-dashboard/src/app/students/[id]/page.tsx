@@ -42,13 +42,13 @@ export default function StudentDetailPage() {
         setError(null)
 
         // Fetch student details
-        const studentData = await apiFetch<{ student: Student }>(`/admin/students/${studentId}`)
+        const studentData = await apiFetch<{ student: Student }>(`/api/admin/students/${studentId}`)
         setStudent(studentData.student)
 
         // Try to fetch attendance (optional)
         try {
           const attendanceData = await apiFetch<{ records: AttendanceRecord[] }>(
-            `/admin/attendance?studentId=${studentId}`
+            `/api/admin/attendance?studentId=${studentId}`
           )
           setAttendance(attendanceData.records ?? [])
         } catch {
@@ -59,7 +59,7 @@ export default function StudentDetailPage() {
         // Try to fetch grades (optional)
         try {
           const gradesData = await apiFetch<{ grades: GradeRecord[] }>(
-            `/admin/grades?studentId=${studentId}`
+            `/api/admin/grades?studentId=${studentId}`
           )
           setGrades(gradesData.grades ?? [])
         } catch {

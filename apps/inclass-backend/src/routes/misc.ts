@@ -11,8 +11,10 @@ import {
   inclassSchedules,
   inclassPaymentRecords,
   inclassParents,
+  auditLogs,
+  users,
 } from '@94cram/shared/db'
-import { and, eq, gte, lt, sql } from 'drizzle-orm'
+import { and, eq, gte, lt, sql, desc } from 'drizzle-orm'
 import type { Variables } from '../middleware/auth.js'
 
 const miscRouter = new Hono<{ Variables: Variables }>()
@@ -316,6 +318,42 @@ miscRouter.get('/scores/:studentId', async (c) => {
   // Forward to exams router - this endpoint is at /api/exams/scores/:studentId
   const studentId = c.req.param('studentId')
   return c.redirect(`/api/exams/scores/${studentId}`)
+})
+
+// ===== Alerts: Recent audit log entries for the tenant =====
+miscRouter.get('/alerts', async (c) => {
+  try {
+    const schoolId = c.get('schoolId')
+
+    const rows = await db
+      .select({
+        id: auditLogs.id,
+        action: auditLogs.action,
+        table_name: auditLogs.resource,
+        change_summary: auditLogs.details,
+        user_name: users.name,
+        created_at: auditLogs.createdAt,
+      })
+      .from(auditLogs)
+      .leftJoin(users, eq(auditLogs.userId, users.id))
+      .where(eq(auditLogs.tenantId, schoolId))
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(50)
+
+    const alerts = rows.map((row) => ({
+      id: row.id,
+      action: row.action ?? undefined,
+      table_name: row.table_name ?? undefined,
+      change_summary: row.change_summary ?? undefined,
+      user_name: row.user_name ?? '系統',
+      created_at: row.created_at?.toISOString() ?? new Date().toISOString(),
+    }))
+
+    return c.json({ alerts })
+  } catch (e) {
+    console.error('[API Error]', c.req.path, 'Error fetching alerts:', e instanceof Error ? e.message : 'Unknown error')
+    return c.json({ error: 'Failed to fetch alerts' }, 500)
+  }
 })
 
 export default miscRouter

@@ -17,7 +17,9 @@ if (!WEBHOOK_SECRET) console.warn('[Warning] WEBHOOK_SECRET not set, webhook end
 
 webhookRouter.post('/sync', async (c) => {
   if (!WEBHOOK_SECRET) return c.json({ error: 'Webhook not configured' }, 503)
-  if (c.req.header('X-Webhook-Secret') !== WEBHOOK_SECRET) return c.json({ error: 'Unauthorized' }, 401)
+  const incoming = c.req.header('X-Webhook-Secret') ?? ''
+  const { timingSafeEqual } = await import('crypto')
+  if (incoming.length !== WEBHOOK_SECRET.length || !timingSafeEqual(Buffer.from(incoming), Buffer.from(WEBHOOK_SECRET))) return c.json({ error: 'Unauthorized' }, 401)
   try {
     const payload = webhookSyncSchema.safeParse(await c.req.json())
     if (!payload.success) return c.json({ error: 'Invalid webhook payload', details: payload.error.flatten() }, 400)

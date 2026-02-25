@@ -1,88 +1,136 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { BackButton } from '@/components/ui/BackButton'
 
-// TODO: 後端尚未提供 conversation list API，目前使用 demo 數據
-// 等待後端實作：GET /api/admin/conversations?tenantId=xxx&branchId=xxx
-// 預期回傳格式：{ conversations: Array<Conversation> }
-
-interface Message {
-  role: 'user' | 'ai'
-  text: string
-}
-
 interface Conversation {
-  id: number
-  user: string
-  userId: string
-  time: string
-  messages: Message[]
-  intent: string
-  model: string
-  latency: string
-  ragUsed: boolean
+  id: string
+  channel: string
+  intent: string | null
+  query: string
+  answer: string
+  model: string | null
+  latency_ms: number | null
+  tokens_used: number | null
+  created_at: string
+  branch_id: string
+  branch_name: string | null
 }
 
-const demoConversations: Conversation[] = [
-  {
-    id: 1, user: '王媽媽', userId: 'TG_001', time: '08:35',
-    messages: [
-      { role: 'user', text: '國中數學課什麼時候上？學費多少？' },
-      { role: 'ai', text: '根據知識庫資料：國中部數學課在每週二四晚上 18:30-20:30。國中部的學費為每月4500元，報名時需繳交註冊費1000元。' },
-    ],
-    intent: '💰 帳務', model: '蜂神榜 AI', latency: '2.5s', ragUsed: true,
-  },
-  {
-    id: 2, user: '李爸爸', userId: 'TG_002', time: '08:30',
-    messages: [
-      { role: 'user', text: '學費可以分期嗎？' },
-      { role: 'ai', text: '目前我們接受現金、轉帳或信用卡付款。關於分期付款的安排，建議您直接聯繫櫃台，我們可以根據您的需求提供彈性方案。' },
-    ],
-    intent: '💰 帳務', model: '蜂神榜 AI', latency: '1.8s', ragUsed: true,
-  },
-  {
-    id: 3, user: '張家長', userId: 'TG_003', time: '08:22',
-    messages: [
-      { role: 'user', text: '我對老師的態度很不滿，想投訴' },
-      { role: 'ai', text: '非常抱歉讓您有不愉快的經驗。我們非常重視每位家長的意見。請告訴我更多細節，包括是哪位老師、發生了什麼事，我會立即轉交主管處理。' },
-    ],
-    intent: '📢 客訴', model: '蜂神榜 AI', latency: '8.0s', ragUsed: false,
-  },
-  {
-    id: 4, user: '陳同學', userId: 'TG_004', time: '08:15',
-    messages: [
-      { role: 'user', text: '王老師教什麼科目？' },
-      { role: 'ai', text: '根據知識庫資料，王老師教的科目是數學。王老師是台大數學系畢業，有10年教學經驗，專攻國中數學。' },
-    ],
-    intent: '❓ FAQ', model: '蜂神榜 AI', latency: '1.4s', ragUsed: true,
-  },
-]
+interface Pagination {
+  total: number
+  limit: number
+  offset: number
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  telegram: 'Telegram',
+  line: 'LINE',
+  web: 'Web',
+}
+
+const PLATFORM_COLORS: Record<string, string> = {
+  telegram: 'bg-blue-100 text-blue-700',
+  line: 'bg-green-100 text-green-700',
+  web: 'bg-morandi-blue/10 text-morandi-blue',
+}
+
+const INTENT_COLORS: Record<string, string> = {
+  FAQ: 'bg-morandi-green/10 text-morandi-green',
+  enrollment: 'bg-morandi-peach/10 text-morandi-peach',
+  schedule: 'bg-morandi-purple/10 text-morandi-purple',
+  billing: 'bg-morandi-yellow/10 text-morandi-yellow',
+  greeting: 'bg-surface text-text-muted',
+}
+
+function PlatformBadge({ channel }: { channel: string }) {
+  const label = PLATFORM_LABELS[channel] ?? channel
+  const color = PLATFORM_COLORS[channel] ?? 'bg-surface text-text-muted'
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>
+      {label}
+    </span>
+  )
+}
+
+function IntentBadge({ intent }: { intent: string | null }) {
+  if (!intent) return null
+  const color = INTENT_COLORS[intent] ?? 'bg-surface text-text-muted'
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>
+      {intent}
+    </span>
+  )
+}
+
+function formatDate(iso: string) {
+  const d = new Date(iso)
+  return d.toLocaleString('zh-TW', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
+function SkeletonRow() {
+  return (
+    <div className="px-5 py-4 border-b border-border animate-pulse">
+      <div className="flex items-start gap-3">
+        <div className="h-4 w-16 bg-border rounded-full" />
+        <div className="flex-1 space-y-2">
+          <div className="h-4 w-3/4 bg-border rounded" />
+          <div className="h-3 w-1/2 bg-border rounded" />
+        </div>
+        <div className="h-4 w-12 bg-border rounded-full" />
+      </div>
+    </div>
+  )
+}
 
 export default function ConversationsPage() {
-  const [conversations, setConversations] = useState<Conversation[] | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [pagination, setPagination] = useState<Pagination>({ total: 0, limit: 20, offset: 0 })
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeFilter, setActiveFilter] = useState('全部')
+
+  // Filters
+  const [platform, setPlatform] = useState('all')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+
+  const fetchConversations = useCallback(async (offset = 0) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const params = new URLSearchParams({ limit: '20', offset: String(offset) })
+      if (platform !== 'all') params.set('platform', platform)
+      if (from) params.set('from', from)
+      if (to) params.set('to', to)
+
+      const res = await fetch(`/api/admin/conversations?${params}`, {
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error?.message ?? 'Unknown error')
+      setConversations(json.data.conversations)
+      setPagination(json.data.pagination)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '載入失敗')
+    } finally {
+      setLoading(false)
+    }
+  }, [platform, from, to])
 
   useEffect(() => {
-    // Simulate API call
-    const loadConversations = async () => {
-      try {
-        setIsLoading(true)
-        setError(null)
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 800))
-        setConversations(demoConversations)
-      } catch (err) {
-        setError('載入對話紀錄失敗')
-      } finally {
-        setIsLoading(false)
-      }
-    }
+    fetchConversations(0)
+  }, [fetchConversations])
 
-    loadConversations()
-  }, [])
+  const totalPages = Math.ceil(pagination.total / pagination.limit)
+  const currentPage = Math.floor(pagination.offset / pagination.limit) + 1
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -94,114 +142,137 @@ export default function ConversationsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        {['全部', '📅 排課', '💰 帳務', '❓ FAQ', '📢 客訴', '🎓 招生'].map((filter) => (
-          <button
-            key={filter}
-            onClick={() => setActiveFilter(filter)}
-            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-              activeFilter === filter
-                ? 'bg-primary text-white'
-                : 'bg-surface border border-border text-text-muted hover:bg-surface-hover'
-            }`}
+      <div className="bg-surface rounded-2xl border border-border px-5 py-4 flex flex-wrap gap-4 items-end">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-text-muted font-medium">平台</label>
+          <select
+            value={platform}
+            onChange={(e) => setPlatform(e.target.value)}
+            className="h-9 px-3 rounded-lg border border-border bg-background text-sm text-text focus:outline-none focus:ring-2 focus:ring-morandi-blue/40"
           >
-            {filter}
+            <option value="all">全部</option>
+            <option value="telegram">Telegram</option>
+            <option value="line">LINE</option>
+            <option value="web">Web</option>
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-text-muted font-medium">開始日期</label>
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="h-9 px-3 rounded-lg border border-border bg-background text-sm text-text focus:outline-none focus:ring-2 focus:ring-morandi-blue/40"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-text-muted font-medium">結束日期</label>
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="h-9 px-3 rounded-lg border border-border bg-background text-sm text-text focus:outline-none focus:ring-2 focus:ring-morandi-blue/40"
+          />
+        </div>
+        {(platform !== 'all' || from || to) && (
+          <button
+            onClick={() => { setPlatform('all'); setFrom(''); setTo('') }}
+            className="h-9 px-3 rounded-lg text-sm text-text-muted hover:text-text border border-border hover:bg-border/40 transition-colors"
+          >
+            清除篩選
           </button>
-        ))}
+        )}
+        <span className="ml-auto text-sm text-text-muted">
+          共 {pagination.total} 筆
+        </span>
       </div>
 
-      {/* Demo Data Notice */}
-      <div className="bg-amber-50 text-amber-700 px-4 py-2 rounded-xl text-sm flex items-center gap-2">
-        <span>⚠️</span>
-        <span>目前顯示為展示資料，待後端 API 完成後將自動切換為即時資料</span>
-      </div>
+      {/* List */}
+      <div className="bg-surface rounded-2xl border border-border overflow-hidden">
+        {/* Header */}
+        <div className="px-5 py-3 border-b border-border bg-background/50 grid grid-cols-[1fr_auto_auto_auto] gap-3 text-xs font-medium text-text-muted uppercase tracking-wide">
+          <span>訊息</span>
+          <span className="w-16 text-center">平台</span>
+          <span className="w-16 text-center">意圖</span>
+          <span className="w-24 text-right">時間 / 延遲</span>
+        </div>
 
-      {/* Loading State */}
-      {isLoading && (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-surface rounded-2xl border border-border p-5 animate-pulse">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-surface-hover" />
-                <div className="space-y-2">
-                  <div className="h-4 w-20 bg-surface-hover rounded" />
-                  <div className="h-3 w-32 bg-surface-hover rounded" />
-                </div>
-              </div>
-              <div className="space-y-2 ml-13">
-                <div className="h-3 w-3/4 bg-surface-hover rounded" />
-                <div className="h-3 w-full bg-surface-hover rounded" />
-              </div>
+        {error && (
+          <div className="px-5 py-8 text-center text-sm text-red-500">
+            載入失敗：{error}
+          </div>
+        )}
+
+        {loading && !error && (
+          <>
+            {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)}
+          </>
+        )}
+
+        {!loading && !error && conversations.length === 0 && (
+          <div className="px-5 py-16 flex flex-col items-center justify-center text-center">
+            <div className="w-14 h-14 rounded-full bg-morandi-blue/10 flex items-center justify-center mb-3">
+              <span className="text-2xl">💬</span>
             </div>
-          ))}
-        </div>
-      )}
+            <p className="text-sm font-medium text-text mb-1">暫無對話紀錄</p>
+            <p className="text-xs text-text-muted">AI 客服尚未收到任何訊息，或篩選條件無符合結果。</p>
+          </div>
+        )}
 
-      {/* Error State */}
-      {error && !isLoading && (
-        <div className="bg-surface rounded-2xl border border-border p-8 text-center">
-          <div className="text-4xl mb-3">😵</div>
-          <h3 className="text-lg font-medium text-text mb-2">{error}</h3>
-          <p className="text-sm text-text-muted mb-4">請檢查網路連線或稍後再試</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-          >
-            重新載入
-          </button>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!isLoading && !error && conversations && conversations.length === 0 && (
-        <div className="bg-surface rounded-2xl border border-border p-8 text-center">
-          <div className="text-5xl mb-3">💬</div>
-          <h3 className="text-lg font-medium text-text mb-2">尚無對話紀錄</h3>
-          <p className="text-sm text-text-muted">等待用戶開始與 AI 客服對話</p>
-        </div>
-      )}
-
-      {/* Conversation List */}
-      {!isLoading && !error && conversations && conversations.length > 0 && (
-        <div className="space-y-4">
-        {conversations.filter(conv => activeFilter === '全部' || conv.intent === activeFilter).map((conv) => (
-          <div key={conv.id} className="bg-surface rounded-2xl border border-border p-5">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-medium text-primary">
-                  {conv.user[0]}
-                </div>
-                <div>
-                  <p className="font-medium text-text">{conv.user}</p>
-                  <p className="text-xs text-text-muted">{conv.userId} · {conv.time}</p>
-                </div>
+        {!loading && !error && conversations.map((conv) => (
+          <div key={conv.id} className="px-5 py-4 border-b border-border last:border-0 hover:bg-background/40 transition-colors">
+            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-start">
+              {/* Message preview */}
+              <div className="min-w-0">
+                <p className="text-sm text-text font-medium truncate">{conv.query}</p>
+                <p className="text-xs text-text-muted truncate mt-0.5 leading-relaxed">{conv.answer}</p>
+                {conv.branch_name && (
+                  <p className="text-xs text-text-muted/60 mt-0.5">{conv.branch_name}</p>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary">{conv.intent}</span>
-                <span className="text-xs text-text-muted">{conv.model}</span>
-                <span className="text-xs text-text-muted">⏱ {conv.latency}</span>
-                {conv.ragUsed && (
-                  <span className="text-xs px-2 py-1 rounded-lg bg-morandi-sage/20 text-morandi-sage">📚 RAG</span>
+
+              {/* Platform */}
+              <div className="w-16 flex justify-center pt-0.5">
+                <PlatformBadge channel={conv.channel} />
+              </div>
+
+              {/* Intent */}
+              <div className="w-16 flex justify-center pt-0.5">
+                <IntentBadge intent={conv.intent} />
+              </div>
+
+              {/* Time & latency */}
+              <div className="w-24 text-right">
+                <p className="text-xs text-text-muted">{formatDate(conv.created_at)}</p>
+                {conv.latency_ms != null && (
+                  <p className="text-xs text-text-muted/60 mt-0.5">{conv.latency_ms}ms</p>
                 )}
               </div>
             </div>
-
-            {/* Messages */}
-            <div className="space-y-3 ml-13">
-              {conv.messages.map((msg, i) => (
-                <div key={i} className={`flex gap-2 ${msg.role === 'ai' ? '' : ''}`}>
-                  <span className="text-sm mt-0.5">{msg.role === 'user' ? '👤' : '🤖'}</span>
-                  <p className={`text-sm leading-relaxed ${
-                    msg.role === 'ai' ? 'text-text bg-background rounded-xl px-3 py-2' : 'text-text-muted'
-                  }`}>
-                    {msg.text}
-                  </p>
-                </div>
-              ))}
-            </div>
           </div>
         ))}
+      </div>
+
+      {/* Pagination */}
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <button
+            disabled={currentPage <= 1}
+            onClick={() => fetchConversations((currentPage - 2) * pagination.limit)}
+            className="h-8 px-3 rounded-lg text-sm border border-border text-text-muted hover:bg-border/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            上一頁
+          </button>
+          <span className="text-sm text-text-muted">
+            第 {currentPage} / {totalPages} 頁
+          </span>
+          <button
+            disabled={currentPage >= totalPages}
+            onClick={() => fetchConversations(currentPage * pagination.limit)}
+            className="h-8 px-3 rounded-lg text-sm border border-border text-text-muted hover:bg-border/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            下一頁
+          </button>
         </div>
       )}
     </div>

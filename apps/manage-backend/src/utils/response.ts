@@ -160,13 +160,14 @@ export function conflict(c: Context, message: string): Response {
 /**
  * 500 Internal Server Error
  */
-export function internalError(c: Context, err?: Error): Response {
-  const message = process.env.NODE_ENV === 'production' 
-    ? 'Internal server error' 
-    : err?.message || 'Internal server error'
-  
+export function internalError(c: Context, err?: unknown): Response {
+  const errorObj = err instanceof Error ? err : new Error(String(err))
+  const message = process.env.NODE_ENV === 'production'
+    ? 'Internal server error'
+    : errorObj.message || 'Internal server error'
+
   if (err) {
-    console.error('[API Error]', err)
+    console.error('[API Error]', errorObj)
   }
   
   return error(c, ErrorCode.INTERNAL_ERROR, message, 500)

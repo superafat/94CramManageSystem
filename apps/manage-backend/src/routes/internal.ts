@@ -64,8 +64,8 @@ app.post('/seed', async (c) => {
     
     if (users.length === 0) {
       const userId = crypto.randomUUID()
-      const salt = '94cram'
-      const passwordHash = salt + ':' + createHash('sha256').update(salt + 'admin123').digest('hex')
+      const bcrypt = await import('bcryptjs')
+      const passwordHash = await bcrypt.default.hash('admin123', 10)
       
       await db.execute(sql`
         INSERT INTO users (id, tenant_id, username, full_name, email, role, password_hash, is_active, created_at)

@@ -46,8 +46,8 @@ export function verifyLineSignature(body: string, signature: string): boolean {
     
     // 使用常數時間比較防止 timing attack
     return hash.length === signature.length && hash === signature
-  } catch (error: any) {
-    console.error('[LINE] Signature verification error:', error.message)
+  } catch (error) {
+    console.error('[LINE] Signature verification error:', error instanceof Error ? error.message : String(error))
     return false
   }
 }
@@ -104,9 +104,10 @@ export async function sendLineReplyMessage(
     }
 
     return { success: true }
-  } catch (error: any) {
-    console.error('[LINE] Reply error:', error.message, error.stack)
-    return { success: false, error: error.message }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[LINE] Reply error:', message, error instanceof Error ? error.stack : undefined)
+    return { success: false, error: message }
   }
 }
 
@@ -162,9 +163,10 @@ export async function sendLinePushMessage(
     }
 
     return { success: true }
-  } catch (error: any) {
-    console.error('[LINE] Push error:', error.message, error.stack)
-    return { success: false, error: error.message }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[LINE] Push error:', message, error instanceof Error ? error.stack : undefined)
+    return { success: false, error: message }
   }
 }
 
@@ -218,8 +220,9 @@ export async function getLineProfile(userId: string): Promise<{
     }
     
     return { success: true, profile }
-  } catch (error: any) {
-    console.error('[LINE] Profile fetch error:', error.message, error.stack)
-    return { success: false, error: error.message }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[LINE] Profile fetch error:', message, error instanceof Error ? error.stack : undefined)
+    return { success: false, error: message }
   }
 }

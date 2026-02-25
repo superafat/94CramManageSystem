@@ -67,8 +67,8 @@ export async function chat(
       latencyMs: Date.now() - start,
       tokensUsed: result.tokensUsed,
     }
-  } catch (err: any) {
-    console.error('[LLM] All providers failed:', err.message)
+  } catch (err) {
+    console.error('[LLM] All providers failed:', err instanceof Error ? err.message : String(err))
     throw err
   }
 }

@@ -120,7 +120,7 @@ adminRoutes.post('/knowledge/ingest', requireRole(Role.ADMIN), zValidator('json'
       return success(c, { stored: 1 })
     }
     return badRequest(c, 'Provide "content" or "chunks" array')
-  } catch (err: any) {
+  } catch (err) {
     console.error('Ingest error:', err)
     return internalError(c, err)
   }
@@ -138,7 +138,7 @@ adminRoutes.get('/tenants', requireRole(Role.ADMIN), async (c) => {
       ORDER BY created_at
     `)
     return success(c, { tenants: rows(result) })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
@@ -157,7 +157,7 @@ adminRoutes.get('/tenants/:tenantId/stats',
         knowledgeChunks: chunk?.count ?? 0,
         branches: branch?.count ?? 0,
       })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -191,7 +191,7 @@ adminRoutes.get('/trials', requireRole(Role.ADMIN), async (c) => {
         t.created_at DESC
     `)
     return success(c, { trials: rows(result) })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
@@ -218,7 +218,7 @@ adminRoutes.get('/trials/:tenantId',
         return notFound(c, 'Tenant not found')
       }
       return success(c, { tenant })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   })
@@ -253,7 +253,7 @@ adminRoutes.post('/trials/:tenantId/approve',
       `)
       
       return success(c, { message: 'Trial approved for 30 days' })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   })
@@ -282,7 +282,7 @@ adminRoutes.post('/trials/:tenantId/reject',
       `)
       
       return success(c, { message: 'Trial request rejected' })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   })
@@ -309,7 +309,7 @@ adminRoutes.post('/trials/:tenantId/revoke',
       `)
       
       return success(c, { message: 'Trial revoked' })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   })
@@ -386,7 +386,7 @@ adminRoutes.get('/students', requirePermission(Permission.STUDENTS_READ), zValid
       limit: query.limit,
       total,
     })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
@@ -461,7 +461,7 @@ adminRoutes.get('/students/:id',
       `)
 
       return success(c, { student, enrollments: rows(enrollments), attendance: rows(attendance), grades: rows(grades) })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -493,7 +493,7 @@ adminRoutes.post('/students',
       `) as any[]
       
       return success(c, { id: result?.id }, 201)
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -535,7 +535,7 @@ adminRoutes.put('/students/:id',
       }
       
       return success(c, { updated: true })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -563,7 +563,7 @@ adminRoutes.delete('/students/:id',
       }
       
       return success(c, { deleted: true })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -593,7 +593,7 @@ adminRoutes.get('/scheduling/week',
       const schedule = await getWeeklySchedule(user.tenant_id, branchId)
       if (wantsMd(c)) return mdResponse(c, scheduleToMd(schedule as any[]))
       return success(c, { schedule })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -610,7 +610,7 @@ adminRoutes.get('/schedule/:branchId',
       const schedule = await getWeeklySchedule(user.tenant_id, branchId)
       if (wantsMd(c)) return mdResponse(c, scheduleToMd(schedule as any[]))
       return success(c, { schedule })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -649,7 +649,7 @@ adminRoutes.post('/schedule/check',
         effectiveFrom: body.effectiveFrom,
       })
       return success(c, { conflicts, hasConflicts: conflicts.length > 0 })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -688,7 +688,7 @@ adminRoutes.post('/schedule/create',
         effectiveFrom: body.effectiveFrom,
       })
       return success(c, result, 201)
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -750,7 +750,7 @@ adminRoutes.get('/attendance',
         limit: query.limit,
         total: cnt?.total ?? 0,
       })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -777,7 +777,7 @@ adminRoutes.post('/attendance',
       }
       
       return success(c, { inserted }, 201)
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -853,7 +853,7 @@ adminRoutes.get('/grades',
         limit: query.limit,
         total: cnt?.total ?? 0,
       })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -884,7 +884,121 @@ adminRoutes.post('/grades',
       }
       
       return success(c, { inserted }, 201)
-    } catch (err: any) {
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
+
+// ========================================================================
+// REPORTS TREND
+// ========================================================================
+
+const trendQuerySchema = z.object({
+  months: z.coerce.number().int().min(1).max(24).default(6),
+})
+
+adminRoutes.get('/reports/trend',
+  requirePermission(Permission.STUDENTS_READ),
+  zValidator('query', trendQuerySchema),
+  async (c) => {
+    const user = c.get('user')
+    const tenantId = user.tenant_id
+    const { months } = c.req.valid('query')
+
+    try {
+      // Generate the last N month buckets
+      const monthRows = await db.execute(sql`
+        SELECT TO_CHAR(m, 'YYYY-MM') as month
+        FROM generate_series(
+          date_trunc('month', NOW()) - (${months - 1} || ' months')::interval,
+          date_trunc('month', NOW()),
+          '1 month'::interval
+        ) AS m
+        ORDER BY m
+      `)
+
+      // Active students per month: count students created on or before end of that month
+      // with status = 'active' (approximation — uses created_at as proxy for enrollment start)
+      const studentRows = await db.execute(sql`
+        SELECT
+          TO_CHAR(date_trunc('month', generate_series), 'YYYY-MM') as month,
+          COUNT(s.id)::int as active_students
+        FROM generate_series(
+          date_trunc('month', NOW()) - (${months - 1} || ' months')::interval,
+          date_trunc('month', NOW()),
+          '1 month'::interval
+        ) AS generate_series
+        LEFT JOIN students s
+          ON s.tenant_id = ${tenantId}
+          AND s.status = 'active'
+          AND s.created_at <= (generate_series + interval '1 month' - interval '1 second')
+          AND (s.deleted_at IS NULL OR s.deleted_at > generate_series)
+        GROUP BY 1
+        ORDER BY 1
+      `)
+
+      // Attendance rate per month
+      const attRows = await db.execute(sql`
+        SELECT
+          TO_CHAR(date_trunc('month', a.date), 'YYYY-MM') as month,
+          COUNT(*)::int as total,
+          SUM(CASE WHEN a.present THEN 1 ELSE 0 END)::int as present_count
+        FROM attendance a
+        JOIN students s ON a.student_id = s.id
+        WHERE s.tenant_id = ${tenantId}
+          AND a.date >= date_trunc('month', NOW()) - (${months - 1} || ' months')::interval
+          AND a.date < date_trunc('month', NOW()) + interval '1 month'
+        GROUP BY 1
+        ORDER BY 1
+      `)
+
+      // Average grade score per month
+      const gradeRows = await db.execute(sql`
+        SELECT
+          TO_CHAR(date_trunc('month', COALESCE(g.date, g.exam_date)), 'YYYY-MM') as month,
+          ROUND(AVG(g.score)::numeric, 1)::float as avg_score
+        FROM grades g
+        JOIN students s ON g.student_id = s.id
+        WHERE g.tenant_id = ${tenantId}
+          AND COALESCE(g.date, g.exam_date) >= date_trunc('month', NOW()) - (${months - 1} || ' months')::interval
+          AND COALESCE(g.date, g.exam_date) < date_trunc('month', NOW()) + interval '1 month'
+        GROUP BY 1
+        ORDER BY 1
+      `)
+
+      // Build lookup maps
+      const studentMap = new Map<string, number>()
+      for (const r of rows(studentRows)) {
+        studentMap.set(r.month as string, r.active_students as number)
+      }
+
+      const attMap = new Map<string, { total: number; present: number }>()
+      for (const r of rows(attRows)) {
+        attMap.set(r.month as string, { total: r.total as number, present: r.present_count as number })
+      }
+
+      const gradeMap = new Map<string, number>()
+      for (const r of rows(gradeRows)) {
+        gradeMap.set(r.month as string, r.avg_score as number)
+      }
+
+      const result = rows(monthRows).map((r) => {
+        const month = r.month as string
+        const att = attMap.get(month)
+        const attendanceRate = att && att.total > 0
+          ? Math.round((att.present / att.total) * 100)
+          : 0
+        return {
+          month,
+          activeStudents: studentMap.get(month) ?? 0,
+          attendanceRate,
+          avgScore: gradeMap.get(month) ?? 0,
+        }
+      })
+
+      return success(c, { months: result })
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -952,7 +1066,7 @@ adminRoutes.get('/billing',
       }
 
       return badRequest(c, 'Provide parentId or branchId')
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -973,7 +1087,7 @@ adminRoutes.post('/billing/generate',
     try {
       const result = await generateInvoices(user.tenant_id, body.branchId, body.period)
       return success(c, result, 201)
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -992,7 +1106,7 @@ adminRoutes.get('/billing/:branchId',
       const invoices = await getInvoices(user.tenant_id, branchId, period)
       if (wantsMd(c)) return mdResponse(c, invoicesToMd(invoices as any[], period))
       return success(c, { invoices, period })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -1014,7 +1128,7 @@ adminRoutes.post('/billing/:invoiceId/pay',
     try {
       await markPaid(invoiceId, body.method ?? 'cash', body.ref)
       return success(c, { paid: true })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -1037,7 +1151,7 @@ adminRoutes.get('/reports/branch/:branchId',
       const report = await generateBranchReport(user.tenant_id, branchId, period)
       if (wantsMd(c)) return mdResponse(c, branchReportToMd(report))
       return success(c, report)
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -1056,7 +1170,7 @@ adminRoutes.get('/reports/student/:studentId',
         return notFound(c, 'Student')
       }
       return success(c, report)
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -1089,7 +1203,7 @@ adminRoutes.get('/churn/:branchId',
         lowRisk: risks.length - high.length - medium.length,
         students: risks,
       })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -1114,7 +1228,7 @@ adminRoutes.post('/payroll/calculate',
     try {
       const result = await calculatePayroll(user.tenant_id, body.branchId, body.period)
       return success(c, result)
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -1130,7 +1244,7 @@ adminRoutes.get('/payroll',
     try {
       const records = await getPayroll(user.tenant_id, period)
       return success(c, { records, period })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -1152,7 +1266,7 @@ adminRoutes.get('/teachers', requirePermission(Permission.SCHEDULE_READ), async 
       ORDER BY name
     `)
     return success(c, { teachers: rows(teacherRows) })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
@@ -1189,7 +1303,7 @@ adminRoutes.post('/teachers',
         RETURNING id
       `)
       return success(c, { id: first(result)?.id }, 201)
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -1219,7 +1333,7 @@ adminRoutes.get('/leads',
         SELECT * FROM leads WHERE ${where} ORDER BY created_at DESC
       `)
       return success(c, { leads: rows(leadRows) })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -1238,7 +1352,7 @@ adminRoutes.get('/leads/overdue', requireRole(Role.ADMIN, Role.MANAGER), async (
       ORDER BY created_at ASC
     `)
     return success(c, { overdue: rows(leadRows), count: rows(leadRows).length })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
@@ -1259,16 +1373,25 @@ adminRoutes.get('/courses/:id/fees', requirePermission(Permission.SCHEDULE_READ)
     
     if (!result) return notFound(c, 'Course not found')
     return success(c, { course: result })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
 
 // Update course fee settings
-adminRoutes.put('/courses/:id/fees', requirePermission(Permission.SCHEDULE_WRITE), async (c) => {
+adminRoutes.put('/courses/:id/fees',
+  requirePermission(Permission.SCHEDULE_WRITE),
+  zValidator('param', z.object({ id: uuidSchema })),
+  zValidator('json', z.object({
+    feeMonthly: z.number().nonnegative().optional(),
+    feeQuarterly: z.number().nonnegative().optional(),
+    feeSemester: z.number().nonnegative().optional(),
+    feeYearly: z.number().nonnegative().optional(),
+  })),
+  async (c) => {
   const user = c.get('user')
-  const courseId = c.req.param('id')
-  const body = await c.req.json()
+  const { id: courseId } = c.req.valid('param')
+  const body = c.req.valid('json')
   
   try {
     await db.execute(sql`
@@ -1281,16 +1404,22 @@ adminRoutes.put('/courses/:id/fees', requirePermission(Permission.SCHEDULE_WRITE
       WHERE id = ${courseId} AND tenant_id = ${user.tenant_id}
     `)
     return success(c, { message: 'Fees updated' })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
 
 // Get billing data for a course (students + payment status)
-adminRoutes.get('/billing/course/:courseId', requirePermission(Permission.BILLING_READ), async (c) => {
+adminRoutes.get('/billing/course/:courseId',
+  requirePermission(Permission.BILLING_READ),
+  zValidator('param', z.object({ courseId: uuidSchema })),
+  zValidator('query', z.object({
+    periodMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+  })),
+  async (c) => {
   const user = c.get('user')
-  const courseId = c.req.param('courseId')
-  const periodMonth = c.req.query('periodMonth') || new Date().toISOString().substring(0, 7)
+  const { courseId } = c.req.valid('param')
+  const periodMonth = c.req.valid('query').periodMonth || new Date().toISOString().substring(0, 7)
   
   try {
     // Get course info with fees
@@ -1331,21 +1460,29 @@ adminRoutes.get('/billing/course/:courseId', requirePermission(Permission.BILLIN
         unpaid: total - paid
       }
     })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
 
 // Batch create payment records
-adminRoutes.post('/billing/payment-records/batch', requirePermission(Permission.BILLING_WRITE), async (c) => {
+adminRoutes.post('/billing/payment-records/batch',
+  requirePermission(Permission.BILLING_WRITE),
+  zValidator('json', z.object({
+    records: z.array(z.object({
+      studentId: uuidSchema,
+      courseId: uuidSchema,
+      paymentType: z.string().min(1),
+      amount: z.number().positive(),
+      periodMonth: z.string().regex(/^\d{4}-\d{2}$/),
+      paymentDate: z.string().optional(),
+      notes: z.string().optional(),
+    })).min(1),
+  })),
+  async (c) => {
   const user = c.get('user')
-  const body = await c.req.json()
-  const { records } = body
-  
-  if (!records || !Array.isArray(records) || records.length === 0) {
-    return badRequest(c, 'No records provided')
-  }
-  
+  const { records } = c.req.valid('json')
+
   try {
     for (const rec of records) {
       await db.execute(sql`
@@ -1361,7 +1498,7 @@ adminRoutes.post('/billing/payment-records/batch', requirePermission(Permission.
     }
     
     return success(c, { created: records.length })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
@@ -1392,7 +1529,7 @@ adminRoutes.get('/billing/payment-records', requirePermission(Permission.BILLING
     `)
     
     return success(c, { records: rows(rowsData) })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
@@ -1461,11 +1598,21 @@ async function createAuditLog(
 }
 
 // Get audit logs with filters
-adminRoutes.get('/audit-logs', requirePermission(Permission.REPORTS_READ), async (c) => {
+adminRoutes.get('/audit-logs',
+  requirePermission(Permission.REPORTS_READ),
+  zValidator('query', z.object({
+    page: z.coerce.number().int().positive().default(1),
+    limit: z.coerce.number().int().positive().max(200).default(50),
+    tableName: z.string().optional(),
+    action: z.string().optional(),
+    recordId: z.string().optional(),
+    needsAlert: z.enum(['true', 'false']).optional(),
+  })),
+  async (c) => {
   const user = c.get('user')
-  const query = c.req.query()
-  const page = parseInt(query.page || '1')
-  const limit = parseInt(query.limit || '50')
+  const query = c.req.valid('query')
+  const page = Math.max(1, query.page)
+  const limit = Math.min(200, Math.max(1, query.limit))
   const offset = (page - 1) * limit
 
   const tableName = query.tableName
@@ -1500,7 +1647,7 @@ adminRoutes.get('/audit-logs', requirePermission(Permission.REPORTS_READ), async
       limit,
       total: countResult?.total ?? 0,
     })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
@@ -1522,7 +1669,7 @@ adminRoutes.get('/alerts', requirePermission(Permission.REPORTS_READ), async (c)
     `)
 
     return success(c, { alerts: rows(rowsData) })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
@@ -1540,7 +1687,7 @@ adminRoutes.post('/alerts/:id/confirm', requirePermission(Permission.STUDENTS_WR
     `)
 
     return success(c, { message: 'Alert confirmed' })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
@@ -1584,7 +1731,7 @@ adminRoutes.post('/alerts/:id/revert', requirePermission(Permission.STUDENTS_WRI
     `)
 
     return success(c, { message: 'Change reverted' })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
@@ -1601,7 +1748,7 @@ adminRoutes.get('/ai/providers', requirePermission(Permission.REPORTS_READ), asy
       providers: status,
       available: availableProviders,
     })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
@@ -1620,7 +1767,7 @@ adminRoutes.get('/ai/quota', requirePermission(Permission.REPORTS_READ), async (
         last7Days: totalCost7d,
       },
     })
-  } catch (err: any) {
+  } catch (err) {
     return internalError(c, err)
   }
 })
@@ -1652,7 +1799,7 @@ adminRoutes.get('/ai/quota/:provider/history',
           cost: history.reduce((sum: number, h: any) => sum + h.estimatedCost, 0),
         },
       })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -1680,7 +1827,7 @@ adminRoutes.post('/ai/quota/limits',
         provider,
         limits: quotaManager.getStats(provider).limits,
       })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -1700,7 +1847,7 @@ adminRoutes.post('/ai/quota/:provider/reset',
         message: 'Quota reset successfully',
         provider,
       })
-    } catch (err: any) {
+    } catch (err) {
       return internalError(c, err)
     }
   }
@@ -1716,17 +1863,144 @@ adminRoutes.post('/ai/strategy',
   zValidator('json', strategySchema),
   async (c) => {
     const { strategy } = c.req.valid('json')
-    
+
     try {
       providerFactory.setStrategy(strategy)
       const chain = providerFactory.getFallbackChain()
-      
+
       return success(c, {
         message: 'Strategy updated',
         strategy,
         fallbackChain: chain,
       })
-    } catch (err: any) {
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
+
+// ========================================================================
+// CONVERSATIONS (AI 對話紀錄)
+// ========================================================================
+
+const conversationsQuerySchema = z.object({
+  platform: z.enum(['telegram', 'line', 'web', 'all']).default('all'),
+  intent: z.string().max(50).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+})
+
+adminRoutes.get('/conversations',
+  requirePermission(Permission.REPORTS_READ),
+  zValidator('query', conversationsQuerySchema),
+  async (c) => {
+    const user = c.get('user')
+    const tenantId = user.tenant_id
+    const query = c.req.valid('query')
+
+    try {
+      const conditions = [sql`c.tenant_id = ${tenantId}`]
+
+      if (query.platform !== 'all') {
+        conditions.push(sql`c.channel = ${query.platform}`)
+      }
+      if (query.intent) {
+        conditions.push(sql`c.intent = ${query.intent}`)
+      }
+      if (query.from) {
+        conditions.push(sql`c.created_at >= ${query.from}::timestamptz`)
+      }
+      if (query.to) {
+        conditions.push(sql`c.created_at <= ${query.to}::timestamptz`)
+      }
+
+      const where = sql.join(conditions, sql` AND `)
+
+      const [countResult] = await db.execute(sql`
+        SELECT COUNT(*)::int as total FROM conversations c WHERE ${where}
+      `) as any[]
+
+      const convRows = await db.execute(sql`
+        SELECT
+          c.id, c.channel, c.intent, c.query, c.answer,
+          c.model, c.latency_ms, c.tokens_used, c.created_at,
+          c.branch_id,
+          b.name as branch_name
+        FROM conversations c
+        LEFT JOIN branches b ON c.branch_id = b.id
+        WHERE ${where}
+        ORDER BY c.created_at DESC
+        LIMIT ${query.limit} OFFSET ${query.offset}
+      `)
+
+      return success(c, {
+        conversations: rows(convRows),
+        pagination: {
+          total: countResult?.total ?? 0,
+          limit: query.limit,
+          offset: query.offset,
+        },
+      })
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
+
+// ========================================================================
+// SETTINGS (系統設定)
+// ========================================================================
+
+const settingsSchema = z.object({
+  aiMode: z.string().max(100),
+  aiEngine: z.string().max(100),
+  searchThreshold: z.number().min(0).max(1),
+  maxResults: z.number().int().min(1).max(10),
+  telegramToken: z.string().max(500),
+  defaultBranchId: z.string().max(36),
+})
+
+adminRoutes.get('/settings',
+  requirePermission(Permission.SETTINGS_READ),
+  async (c) => {
+    const user = c.get('user')
+    const tenantId = user.tenant_id
+
+    try {
+      const [row] = await db.execute(sql`
+        SELECT settings FROM manage_settings WHERE tenant_id = ${tenantId}
+      `) as any[]
+
+      return success(c, { settings: row?.settings ?? {} })
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
+
+adminRoutes.post('/settings',
+  requirePermission(Permission.SETTINGS_WRITE),
+  zValidator('json', settingsSchema),
+  async (c) => {
+    const user = c.get('user')
+    const tenantId = user.tenant_id
+    const body = c.req.valid('json')
+
+    try {
+      await db.execute(sql`
+        INSERT INTO manage_settings (tenant_id, settings, updated_at, updated_by)
+        VALUES (${tenantId}, ${JSON.stringify(body)}::jsonb, NOW(), ${user.id})
+        ON CONFLICT (tenant_id)
+        DO UPDATE SET
+          settings = ${JSON.stringify(body)}::jsonb,
+          updated_at = NOW(),
+          updated_by = ${user.id}
+      `)
+
+      return success(c, { settings: body })
+    } catch (err) {
       return internalError(c, err)
     }
   }

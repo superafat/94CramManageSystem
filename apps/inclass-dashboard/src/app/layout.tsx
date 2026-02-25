@@ -5,16 +5,16 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useEffect } from 'react'
 
 function RouteGuard({ children }: { children: React.ReactNode }) {
-  const { token, loading } = useAuth()
+  const { user, loading } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
   useEffect(() => {
     const publicPaths = ['/login', '/register', '/landing', '/']
-    if (!loading && !token && !publicPaths.includes(pathname)) {
+    if (!loading && !user && !publicPaths.includes(pathname)) {
       router.push('/login')
     }
-  }, [token, loading, pathname, router])
+  }, [user, loading, pathname, router])
 
   if (loading) {
     return (

@@ -79,9 +79,9 @@ export class MiniMaxProvider implements LLMProvider {
         tokensUsed: data.usage?.total_tokens,
         finishReason: data.choices?.[0]?.finish_reason || 'stop',
       }
-    } catch (error: any) {
+    } catch (error) {
       this.healthScore = Math.max(0, this.healthScore - 10)
-      throw this.wrapError(error)
+      throw this.wrapError(error instanceof Error ? error : new Error(String(error)))
     }
   }
 

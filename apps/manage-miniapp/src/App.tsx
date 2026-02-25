@@ -40,7 +40,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
   const [tgUser, setTgUser] = useState<string | null>(null)
   const [showChat, setShowChat] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('token'))
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('user'))
 
   const user = getUser()
   const userRole = getUserRole()
@@ -84,8 +84,13 @@ export default function App() {
             {'\n'}家長與學生請使用 LINE 官方帳號查詢資料。
           </p>
           <button
-            onClick={() => {
-              localStorage.clear()
+            onClick={async () => {
+              try {
+                await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+              } catch {
+                // Ignore logout API errors
+              }
+              localStorage.removeItem('user');
               setIsLoggedIn(false)
             }}
             className="px-6 py-3 rounded-xl font-medium text-white"

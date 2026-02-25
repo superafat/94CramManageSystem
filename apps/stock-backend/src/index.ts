@@ -77,7 +77,7 @@ app.get('/', (c) => {
 app.route('/api', routes);
 app.route('/api/bot', botRoutes);
 
-const port = parseInt(process.env.PORT || '3001');
+const port = parseInt(process.env.PORT || '3101');
 console.info(`Server is running on port ${port}`);
 
 try {

@@ -4,7 +4,7 @@ import { manageStudents, manageCourses } from '@94cram/shared/db'
 import { eq } from 'drizzle-orm'
 import { Firestore } from '@google-cloud/firestore'
 
-type BotExtVariables = { tenantId: string; botRequest: boolean }
+type BotExtVariables = { tenantId: string; botRequest: boolean; botBody: Record<string, unknown> }
 
 const app = new Hono<{ Variables: BotExtVariables }>()
 
@@ -40,7 +40,7 @@ app.post('/classes', async (c) => {
 // POST /data/bindcode
 app.post('/bindcode', async (c) => {
   try {
-    const { tenant_id, tenant_name } = await c.req.json()
+    const { tenant_id, tenant_name } = c.get('botBody') as any
     const tenantId = c.get('tenantId') as string
 
     const code = String(Math.floor(100000 + Math.random() * 900000))

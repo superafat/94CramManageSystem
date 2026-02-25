@@ -51,7 +51,7 @@ export function MobileHeader() {
   useEffect(() => {
     const userStr = localStorage.getItem('user')
     if (userStr) {
-      try { setUser(JSON.parse(userStr)) } catch {}
+      try { setUser(JSON.parse(userStr)) } catch { localStorage.removeItem('user') }
     }
   }, [])
 
@@ -68,8 +68,10 @@ export function MobileHeader() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showMenu])
 
-  const handleLogout = () => {
-    localStorage.removeItem('token')
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    } catch { /* ignore */ }
     localStorage.removeItem('user')
     localStorage.removeItem('tenantId')
     localStorage.removeItem('branchId')

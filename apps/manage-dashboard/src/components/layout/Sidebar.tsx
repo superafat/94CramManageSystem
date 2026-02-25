@@ -81,7 +81,9 @@ export function Sidebar() {
     if (userStr) {
       try {
         setUser(JSON.parse(userStr))
-      } catch {}
+      } catch {
+        localStorage.removeItem('user')
+      }
     }
   }, [])
 
@@ -90,8 +92,10 @@ export function Sidebar() {
   // 過濾出當前角色可見的選單項目
   const visibleItems = navItems.filter(item => item.roles.includes(userRole))
 
-  const handleLogout = () => {
-    localStorage.removeItem('token')
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    } catch { /* ignore */ }
     localStorage.removeItem('user')
     localStorage.removeItem('tenantId')
     localStorage.removeItem('branchId')

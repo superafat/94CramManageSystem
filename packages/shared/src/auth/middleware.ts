@@ -4,6 +4,7 @@
  */
 import type { Context, Next } from 'hono';
 import { verify, type JWTPayload } from './jwt';
+import { extractToken } from './cookie';
 
 /**
  * JWT Auth Middleware Factory
@@ -22,12 +23,10 @@ export function createAuthMiddleware(options?: { skipPaths?: string[] }) {
     const path = c.req.path;
     if (skipPaths.some(p => path.startsWith(p))) return next();
 
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = extractToken(c);
+    if (!token) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
-
-    const token = authHeader.substring(7);
     try {
       const payload = await verify(token);
 

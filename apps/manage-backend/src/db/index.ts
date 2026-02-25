@@ -213,11 +213,11 @@ export async function checkDatabaseHealth(): Promise<{
         avgQueryTime: Math.round(metrics.avgQueryTime)
       }
     }
-  } catch (error: any) {
+  } catch (error) {
     metrics.errors++
-    return { 
-      healthy: false, 
-      error: error.message,
+    return {
+      healthy: false,
+      error: error instanceof Error ? error.message : String(error),
       details: {
         totalQueries: metrics.totalQueries,
         slowQueries: metrics.slowQueries,

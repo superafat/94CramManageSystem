@@ -78,10 +78,8 @@ interface NotificationInput {
 }
 
 function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem('token')
   return {
     'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
   }
 }
 
@@ -102,7 +100,7 @@ async function fetchWithRetry<T>(
       (error instanceof Error && /^HTTP 5\d{2}$/.test(error.message)) // 5xx server error
     
     if (retries > 0 && isRetryable) {
-      console.log(`[API] Retrying... ${retries} attempts left`)
+      console.warn(`[API] Retrying... ${retries} attempts left`)
       await sleep(RETRY_DELAY * (MAX_RETRIES - retries + 1)) // Exponential-ish backoff
       return fetchWithRetry(fetchFn, retries - 1)
     }
@@ -116,15 +114,15 @@ export const api = {
     return fetchWithRetry(async () => {
       const response = await fetch(`${API_BASE}${endpoint}`, {
         ...options,
+        credentials: 'include',
         headers: {
           ...getAuthHeaders(),
           ...options.headers,
         },
       })
 
-      // Handle 401 - token expired
+      // Handle 401 - cookie expired or missing
       if (response.status === 401) {
-        localStorage.removeItem('token')
         window.location.href = '/login'
         throw new Error('Session expired')
       }

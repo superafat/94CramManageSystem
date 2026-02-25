@@ -56,6 +56,7 @@ export default function Login({ onLogin }: LoginProps) {
       const response = await fetch(`${API_BASE}/auth/telegram`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           telegram_id: user.id,
           first_name: user.first_name,
@@ -66,7 +67,7 @@ export default function Login({ onLogin }: LoginProps) {
       if (!response.ok) throw new Error('Telegram 登入失敗');
       const data = await response.json();
       const userData = data.user || parseJwt(data.token);
-      
+
       // 檢查角色：只有管理角色可進入
       const adminRoles = ['superadmin', 'admin', 'staff', 'teacher'];
       if (userData && !adminRoles.includes(userData.role)) {
@@ -74,8 +75,7 @@ export default function Login({ onLogin }: LoginProps) {
         setLoading(false);
         return;
       }
-      
-      localStorage.setItem('token', data.token);
+
       if (userData) {
         localStorage.setItem('user', JSON.stringify(userData));
       }
@@ -95,12 +95,13 @@ export default function Login({ onLogin }: LoginProps) {
       const response = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username, password }),
       });
       if (!response.ok) throw new Error('帳號或密碼錯誤');
       const data = await response.json();
       const userData = data.user || parseJwt(data.token);
-      
+
       // 檢查角色：只有管理角色可進入
       const adminRoles = ['superadmin', 'admin', 'staff', 'teacher'];
       if (userData && !adminRoles.includes(userData.role)) {
@@ -108,8 +109,7 @@ export default function Login({ onLogin }: LoginProps) {
         setSubmitting(false);
         return;
       }
-      
-      localStorage.setItem('token', data.token);
+
       if (userData) {
         localStorage.setItem('user', JSON.stringify(userData));
       }

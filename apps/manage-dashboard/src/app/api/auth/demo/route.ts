@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       .setExpirationTime('7d')
       .sign(secret)
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       data: {
         token: jwt,
@@ -79,6 +79,14 @@ export async function POST(request: NextRequest) {
       },
       timestamp: Date.now(),
     })
+    response.cookies.set('token', jwt, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60,
+    })
+    return response
   } catch (error) {
     console.error('Demo login error:', error)
     return NextResponse.json(

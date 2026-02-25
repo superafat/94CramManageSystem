@@ -14,8 +14,6 @@
     "@tanstack/react-table": "^8.21.3",
     "@zxing/browser": "^0.1.5",
     "axios": "^1.13.5",
-    "js-cookie": "^3.0.5",
-    "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.575.0",
     "next": "^16.0.3",
     "react": "^19.0.0",
@@ -27,8 +25,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/js-cookie": "^3.0.6",
-    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.2.3",
     "@types/react": "^19.0.6",
     "@types/react-dom": "^19.0.2",
