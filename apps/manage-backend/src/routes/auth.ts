@@ -11,6 +11,7 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import * as jose from 'jose'
+import { setAuthCookie, clearAuthCookie, extractToken } from '@94cram/shared/auth'
 import { config } from '../config'
 import { db } from '../db'
 import { sql } from 'drizzle-orm'
@@ -193,6 +194,7 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
       db.execute(sql`UPDATE users SET last_login_at = NOW() WHERE id = ${dbUser.id}`)
         .catch(() => { /* non-critical */ })
 
+      setAuthCookie(c, jwt)
       return success(c, {
         token: jwt,
         user: {
@@ -266,6 +268,7 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
           branch_id: dbUser.branch_id ?? undefined,
         })
 
+        setAuthCookie(c, jwt)
         return success(c, {
           token: jwt,
           user: {
@@ -286,6 +289,7 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
         tenant_id: '38068f5a-6bad-4edc-b26b-66bc6ac90fb3', // 預設 tenant
       })
 
+      setAuthCookie(c, jwt)
       return success(c, {
         token: jwt,
         user: {
@@ -316,6 +320,31 @@ authRoutes.post('/telegram', zValidator('json', telegramLoginSchema), async (c) 
   const telegramId = body.telegram_id
 
   try {
+    // Verify Telegram HMAC if hash is provided (production requirement)
+    const botToken = process.env.TELEGRAM_BOT_TOKEN
+    if (body.hash && botToken) {
+      const { createHash: ch, createHmac } = await import('crypto')
+      const secretKey = ch('sha256').update(botToken).digest()
+      const dataCheckString = Object.keys(body)
+        .filter(k => k !== 'hash')
+        .sort()
+        .map(k => `${k}=${(body as Record<string, unknown>)[k]}`)
+        .join('\n')
+      const expectedHash = createHmac('sha256', secretKey).update(dataCheckString).digest('hex')
+      if (expectedHash !== body.hash) {
+        return c.json({ error: 'Telegram authentication failed' }, 401)
+      }
+      // Check auth_date freshness (5 minutes)
+      if (body.auth_date) {
+        const age = Math.floor(Date.now() / 1000) - body.auth_date
+        if (age > 300) {
+          return c.json({ error: 'Telegram auth expired' }, 401)
+        }
+      }
+    } else if (process.env.NODE_ENV === 'production') {
+      return c.json({ error: 'Telegram hash verification required' }, 401)
+    }
+
     // 1. 嘗試用 telegram_id 找已綁定的 user
     const rows = await db.execute(sql`
       SELECT id, username, full_name, email, role, tenant_id, branch_id, is_active
@@ -344,6 +373,7 @@ authRoutes.post('/telegram', zValidator('json', telegramLoginSchema), async (c) 
           branch_id: dbUser.branch_id ?? undefined,
         })
 
+      setAuthCookie(c, jwt)
       return success(c, {
         token: jwt,
         user: {
@@ -367,6 +397,7 @@ authRoutes.post('/telegram', zValidator('json', telegramLoginSchema), async (c) 
       branch_id: 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d',
     })
 
+    setAuthCookie(c, jwt)
     return success(c, {
       token: jwt,
       user: {
@@ -450,12 +481,11 @@ authRoutes.post('/trial-signup', rateLimit('trial-signup'), zValidator('json', t
 // GET /me - Get Current User Info
 // ========================================================================
 authRoutes.get('/me', async (c) => {
-  const authHeader = c.req.header('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return unauthorized(c, 'Missing Bearer token')
+  const token = extractToken(c)
+  if (!token) {
+    return unauthorized(c, 'Missing token')
   }
 
-  const token = authHeader.slice(7)
   try {
     const { payload } = await jose.jwtVerify(token, secret)
     const role = payload.role as Role
@@ -527,6 +557,14 @@ authRoutes.post('/demo', async (c) => {
   return handleDemoLogin(c)
 })
 
+// ========================================================================
+// POST /logout - Clear auth cookie
+// ========================================================================
+authRoutes.post('/logout', async (c) => {
+  clearAuthCookie(c)
+  return c.json({ success: true })
+})
+
 export async function handleDemoLogin(c: import('hono').Context) {
   const DEMO_TENANT_1 = '11111111-1111-1111-1111-111111111111'
   const DEMO_TENANT_2 = '22222222-2222-2222-2222-222222222222'
@@ -561,6 +599,7 @@ export async function handleDemoLogin(c: import('hono').Context) {
       branch_id: account.branchId,
     })
 
+    setAuthCookie(c, jwt)
     return success(c, {
       token: jwt,
       user: {

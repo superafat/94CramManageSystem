@@ -60,7 +60,9 @@ export async function handleCallback(msg: UnifiedMessage): Promise<void> {
     };
 
     const apiResponse = await executeIntent(intentResult, auth);
-    incrementUsage(auth.tenantId, 'api_calls').catch(() => {});
+    incrementUsage(auth.tenantId, 'api_calls').catch((err: unknown) => {
+      console.error('[Callback] Failed to increment usage:', err);
+    });
     const responseText = formatResponse(apiResponse);
 
     await logOperation({

@@ -107,9 +107,10 @@ export async function handleCommand(
       case 'open_app': return '📱 請使用 /app 指令開啟控制台，或直接點選下方按鈕！'
       default: return '❌ 不支援的指令'
     }
-  } catch (err: any) {
-    console.error(`[cmd/${action}]`, err.message)
-    return `❌ 執行失敗：${err.message}`
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[cmd/${action}]`, msg)
+    return `❌ 執行失敗：${msg}`
   }
 }
 

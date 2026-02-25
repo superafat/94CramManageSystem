@@ -12,7 +12,10 @@ RUN pnpm build
 FROM node:20-slim
 WORKDIR /app
 COPY --from=builder /app /app
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 --ingroup nodejs appuser
 WORKDIR /app/apps/inclass-backend
 ENV NODE_ENV=production
+USER appuser
 EXPOSE 8080
 CMD ["node", "dist/index.js"]

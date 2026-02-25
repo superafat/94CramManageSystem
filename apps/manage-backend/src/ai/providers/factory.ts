@@ -137,11 +137,12 @@ export class ProviderFactory {
           ...result,
           provider: providerName,
         }
-      } catch (error: any) {
-        console.warn(`[Factory] ${providerName} failed: ${error.message}`)
-        attempts.push({ provider: providerName, error })
-        
-        if (!error.retryable) {
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error))
+        console.warn(`[Factory] ${providerName} failed: ${err.message}`)
+        attempts.push({ provider: providerName, error: err })
+
+        if (!(error instanceof Error) || !(error as NodeJS.ErrnoException & { retryable?: boolean }).retryable) {
           console.warn(`[Factory] ${providerName} error is not retryable, trying next provider...`)
         }
       }

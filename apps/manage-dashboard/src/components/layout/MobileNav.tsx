@@ -85,7 +85,7 @@ export function MobileNav() {
   useEffect(() => {
     const userStr = localStorage.getItem('user')
     if (userStr) {
-      try { setUser(JSON.parse(userStr)) } catch {}
+      try { setUser(JSON.parse(userStr)) } catch { localStorage.removeItem('user') }
     }
   }, [])
 
@@ -130,17 +130,22 @@ export function MobileNav() {
                 <span className="text-xs text-text-muted">{item.label}</span>
               </Link>
             ))}
-            <Link
-              href="/login"
-              onClick={() => {
-                localStorage.clear()
+            <button
+              onClick={async () => {
+                try {
+                  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+                } catch { /* ignore */ }
+                localStorage.removeItem('user')
+                localStorage.removeItem('tenantId')
+                localStorage.removeItem('branchId')
                 setShowMore(false)
+                window.location.href = '/login'
               }}
               className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-surface-hover"
             >
               <span className="text-2xl">🚪</span>
               <span className="text-xs text-text-muted">登出</span>
-            </Link>
+            </button>
           </div>
         </div>
       )}

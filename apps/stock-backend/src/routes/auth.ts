@@ -3,16 +3,121 @@ import bcrypt from 'bcryptjs';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/index';
 import { tenants, users } from '@94cram/shared/db';
+import { sign, setAuthCookie, clearAuthCookie } from '@94cram/shared/auth';
 import { authMiddleware, getAuthUser } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { z } from 'zod';
 
 const app = new Hono();
+
+const loginSchema = z.object({
+  email: z.string().trim().email(),
+  password: z.string().min(1),
+});
+
+const registerSchema = z.object({
+  tenantName: z.string().trim().min(1),
+  slug: z.string().trim().min(1),
+  email: z.string().trim().email(),
+  password: z.string().min(6),
+  name: z.string().trim().min(1),
+});
+
 const createUserSchema = z.object({
   email: z.string().trim().email(),
   password: z.string().min(1),
   name: z.string().trim().min(1),
   role: z.string().trim().min(1),
+});
+
+app.post('/login', async (c) => {
+  const parsed = loginSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request body', details: parsed.error.flatten().fieldErrors }, 400);
+  }
+  const { email, password } = parsed.data;
+
+  const [user] = await db.select().from(users).where(eq(users.email, email));
+  if (!user || user.isActive === false) {
+    return c.json({ error: 'Invalid email or password' }, 401);
+  }
+
+  const passwordValid = await bcrypt.compare(password, user.passwordHash);
+  if (!passwordValid) {
+    return c.json({ error: 'Invalid email or password' }, 401);
+  }
+
+  // Update last login timestamp
+  await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
+
+  const token = await sign({
+    userId: user.id,
+    tenantId: user.tenantId ?? '',
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    systems: ['stock'],
+  });
+
+  setAuthCookie(c, token);
+  return c.json({
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      tenantId: user.tenantId,
+    },
+  });
+});
+
+app.post('/register', async (c) => {
+  const parsed = registerSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request body', details: parsed.error.flatten().fieldErrors }, 400);
+  }
+  const { tenantName, slug, email, password, name } = parsed.data;
+
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  try {
+    await db.transaction(async (tx) => {
+      // Check slug uniqueness
+      const [existingTenant] = await tx.select().from(tenants).where(eq(tenants.slug, slug));
+      if (existingTenant) {
+        throw Object.assign(new Error('Slug already taken'), { statusCode: 400 });
+      }
+
+      // Check email uniqueness
+      const [existingUser] = await tx.select().from(users).where(eq(users.email, email));
+      if (existingUser) {
+        throw Object.assign(new Error('Email already registered'), { statusCode: 400 });
+      }
+
+      const [tenant] = await tx.insert(tenants).values({
+        name: tenantName,
+        slug,
+      }).returning();
+
+      await tx.insert(users).values({
+        tenantId: tenant.id,
+        email,
+        passwordHash,
+        name,
+        role: 'admin',
+        isActive: true,
+      });
+    });
+  } catch (err) {
+    const e = err as Error & { statusCode?: number };
+    if (e.statusCode === 400) {
+      return c.json({ error: e.message }, 400);
+    }
+    throw err;
+  }
+
+  return c.json({ message: 'Registration successful' }, 201);
 });
 
 app.use('/me', authMiddleware, tenantMiddleware);
@@ -112,6 +217,11 @@ app.get('/users', async (c) => {
   }).from(users).where(eq(users.tenantId, tenantId));
 
   return c.json(tenantUsers);
+});
+
+app.post('/logout', async (c) => {
+  clearAuthCookie(c);
+  return c.json({ success: true });
 });
 
 export default app;

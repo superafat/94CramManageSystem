@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BackButton } from '@/components/ui/BackButton'
 
@@ -76,36 +76,12 @@ export default function SchedulesPage() {
   const startDate = formatDate(weekDates[0])
   const endDate = formatDate(weekDates[6])
 
-  useEffect(() => {
-    // 檢查登入狀態
-    const userStr = localStorage.getItem('user')
-    if (!userStr) {
-      router.push('/login')
-      return
-    }
-    
-    fetchSchedules()
-    fetchTeachers()
-    fetchCourses()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weekOffset])
-
-  const fetchSchedules = async () => {
+  const fetchSchedules = useCallback(async () => {
     setLoading(true)
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
-    if (!token) {
-      console.error('No token found')
-      router.push('/login')
-      return
-    }
     try {
       const res = await fetch(
         `${API_BASE}/api/w8/schedules?start_date=${startDate}&end_date=${endDate}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { credentials: 'include' }
       )
       if (!res.ok) {
         console.error('Fetch schedules failed:', res.status, res.statusText)
@@ -121,17 +97,26 @@ export default function SchedulesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [startDate, endDate, router])
+
+  useEffect(() => {
+    // 檢查登入狀態；teachers/courses 只需載入一次
+    const userStr = localStorage.getItem('user')
+    if (!userStr) {
+      router.push('/login')
+      return
+    }
+    fetchTeachers()
+    fetchCourses()
+  }, [router])
+
+  useEffect(() => {
+    fetchSchedules()
+  }, [fetchSchedules])
 
   const fetchTeachers = async () => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
-    if (!token) return
     try {
-      const res = await fetch(`${API_BASE}/api/w8/teachers`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const res = await fetch(`${API_BASE}/api/w8/teachers`, { credentials: 'include' })
       if (!res.ok) {
         console.error('Fetch teachers failed:', res.status)
         return
@@ -144,14 +129,8 @@ export default function SchedulesPage() {
   }
 
   const fetchCourses = async () => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
-    if (!token) return
     try {
-      const res = await fetch(`${API_BASE}/api/w8/courses`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const res = await fetch(`${API_BASE}/api/w8/courses`, { credentials: 'include' })
       if (!res.ok) {
         console.error('Fetch courses failed:', res.status)
         return
@@ -165,14 +144,11 @@ export default function SchedulesPage() {
 
   const handleAddSchedule = async (e: React.FormEvent) => {
     e.preventDefault()
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
     try {
       const res = await fetch(`${API_BASE}/api/w8/schedules`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(addForm),
       })
       if (res.ok) {
@@ -448,14 +424,11 @@ export default function SchedulesPage() {
                 <button
                   onClick={async () => {
                     if (!confirm('確定取消此堂課？')) return
-                    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
                     try {
                       await fetch(`${API_BASE}/api/w8/schedules/${selectedSchedule.id}/change`, {
                         method: 'POST',
-                        headers: { 
-                          'Content-Type': 'application/json',
-                          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                        },
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
                         body: JSON.stringify({ change_type: 'cancelled', reason: '手動取消' }),
                       })
                       setSelectedSchedule(null)

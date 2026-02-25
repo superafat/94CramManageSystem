@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3102'
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || ''
 
 interface User {
   id: string
@@ -20,7 +20,6 @@ interface School {
 }
 
 interface AuthContextType {
-  token: string | null
   user: User | null
   school: School | null
   login: (email: string, password: string) => Promise<void>
@@ -41,30 +40,25 @@ export const useAuth = () => {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [school, setSchool] = useState<School | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    // Load token from localStorage
-    const savedToken = localStorage.getItem('token')
-    if (savedToken) {
-      setToken(savedToken)
-      // Verify token and load user
-      fetchMe(savedToken)
+    // Check if user was previously logged in, then verify with server via cookie
+    const savedUser = localStorage.getItem('user')
+    if (savedUser) {
+      fetchMe()
     } else {
       setLoading(false)
     }
   }, [])
 
-  const fetchMe = async (authToken: string) => {
+  const fetchMe = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
+        credentials: 'include'
       })
       if (res.ok) {
         const text = await res.text()
@@ -77,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return
         }
       } else {
-        // Invalid token
+        // Invalid/expired cookie
         logout()
       }
     } catch (e) {
@@ -92,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await fetch(`${API_BASE}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ email, password })
     })
 
@@ -111,10 +106,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data.error || '登入失敗')
     }
 
-    setToken(data.token)
     setUser(data.user)
     setSchool(data.school)
-    localStorage.setItem('token', data.token)
     localStorage.setItem('user', JSON.stringify(data.user))
     router.push('/')
   }
@@ -123,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await fetch(`${API_BASE}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ schoolName, email, password, name })
     })
 
@@ -137,10 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) {
       throw new Error(data.error || 'Registration failed')
     }
-    setToken(data.token)
     setUser(data.user)
     setSchool(data.school)
-    localStorage.setItem('token', data.token)
     if (data.user) localStorage.setItem('user', JSON.stringify(data.user))
     if (data.school) localStorage.setItem('school', JSON.stringify(data.school))
     router.push('/')
@@ -149,7 +141,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const demoLogin = async () => {
     const res = await fetch(`${API_BASE}/api/auth/demo`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
     })
 
     const text = await res.text()
@@ -164,27 +157,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data.error || 'Demo 登入失敗')
     }
 
-    setToken(data.token)
     setUser(data.user)
     setSchool(data.school)
-    localStorage.setItem('token', data.token)
     localStorage.setItem('user', JSON.stringify(data.user))
     localStorage.setItem('school', JSON.stringify(data.school))
     router.push('/main')
   }
 
   const logout = () => {
-    setToken(null)
     setUser(null)
     setSchool(null)
-    localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('school')
+    fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {})
     router.push('/login')
   }
 
   return (
-    <AuthContext.Provider value={{ token, user, school, login, register, demoLogin, logout, loading }}>
+    <AuthContext.Provider value={{ user, school, login, register, demoLogin, logout, loading }}>
       {children}
     </AuthContext.Provider>
   )

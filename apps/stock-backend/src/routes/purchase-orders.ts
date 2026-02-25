@@ -5,6 +5,24 @@ import { stockInventory, stockItems, stockPurchaseItems, stockPurchaseOrders, st
 import { authMiddleware, getAuthUser } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { sendPurchaseApprovalAlert } from '../services/notifications';
+import { z } from 'zod';
+
+const uuidParamSchema = z.object({ id: z.string().uuid() });
+
+const purchaseOrderCreateSchema = z.object({
+  warehouseId: z.string().uuid(),
+  supplierId: z.string().uuid().optional(),
+  orderDate: z.string().optional(),
+  notes: z.string().optional(),
+  totalAmount: z.number().optional(),
+});
+
+const purchaseItemCreateSchema = z.object({
+  itemId: z.string().uuid(),
+  quantity: z.number().int().positive(),
+  unitPrice: z.number().optional(),
+  totalPrice: z.number().optional(),
+});
 
 const app = new Hono();
 app.use('*', authMiddleware, tenantMiddleware);
@@ -26,7 +44,17 @@ app.get('/', async (c) => {
 app.post('/', async (c) => {
   const tenantId = getTenantId(c);
   const authUser = getAuthUser(c);
-  const body = await c.req.json();
+  let requestBody: unknown;
+  try {
+    requestBody = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+  const parsed = purchaseOrderCreateSchema.safeParse(requestBody);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid input' }, 400);
+  }
+  const body = parsed.data;
   const [created] = await db.insert(stockPurchaseOrders).values({
     tenantId,
     warehouseId: body.warehouseId,
@@ -34,7 +62,7 @@ app.post('/', async (c) => {
     status: 'draft',
     orderDate: body.orderDate ? new Date(body.orderDate) : new Date(),
     notes: body.notes,
-    totalAmount: body.totalAmount,
+    totalAmount: body.totalAmount?.toString(),
     createdBy: authUser.id,
   }).returning();
   return c.json(created, 201);
@@ -160,8 +188,22 @@ app.post('/:id/cancel', async (c) => {
 
 app.post('/:id/items', async (c) => {
   const tenantId = getTenantId(c);
-  const id = c.req.param('id');
-  const body = await c.req.json();
+  const parsedParams = uuidParamSchema.safeParse({ id: c.req.param('id') });
+  if (!parsedParams.success) {
+    return c.json({ error: 'Invalid purchase order id' }, 400);
+  }
+  const { id } = parsedParams.data;
+  let requestBody: unknown;
+  try {
+    requestBody = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+  const parsed = purchaseItemCreateSchema.safeParse(requestBody);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid input' }, 400);
+  }
+  const body = parsed.data;
   const [order] = await db.select().from(stockPurchaseOrders).where(and(eq(stockPurchaseOrders.id, id), eq(stockPurchaseOrders.tenantId, tenantId)));
   if (!order) return c.json({ error: 'Purchase order not found' }, 404);
   if (order.status !== 'draft') return c.json({ error: 'Only draft order can be edited' }, 400);
@@ -170,8 +212,8 @@ app.post('/:id/items', async (c) => {
     purchaseOrderId: id,
     itemId: body.itemId,
     quantity: body.quantity,
-    unitPrice: body.unitPrice,
-    totalPrice: body.totalPrice,
+    unitPrice: body.unitPrice?.toString(),
+    totalPrice: body.totalPrice?.toString(),
   }).returning();
   return c.json(created, 201);
 });

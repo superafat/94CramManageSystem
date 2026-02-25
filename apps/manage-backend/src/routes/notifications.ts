@@ -127,7 +127,7 @@ app.post('/admin/notifications/send',
         notificationIds: result.notificationIds,
         errors: result.errors,
       })
-    } catch (error: any) {
+    } catch (error) {
       console.error('Send notification error:', error)
       return internalError(c, error)
     }
@@ -195,7 +195,7 @@ app.get('/admin/notifications',
       const total = Number(countResult[0]?.count || 0)
 
       return successWithPagination(c, { notifications: notifs }, { page, limit, total })
-    } catch (error: any) {
+    } catch (error) {
       console.error('List notifications error:', error)
       return internalError(c, error)
     }
@@ -218,7 +218,7 @@ app.get('/notifications/preferences', authMiddleware, async (c) => {
     const preferences = await getUserNotificationPreferences(user.id)
 
     return success(c, { preferences })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Get preferences error:', error)
     return internalError(c, error)
   }
@@ -261,7 +261,7 @@ app.post('/notifications/preferences',
         updatedCount: updated.length,
         preferences: updated,
       })
-    } catch (error: any) {
+    } catch (error) {
       console.error('Update preferences error:', error)
       return internalError(c, error)
     }
@@ -308,7 +308,7 @@ app.post('/admin/notifications/trigger/schedule-change',
         sentCount: result.sentCount,
         error: result.error,
       })
-    } catch (error: any) {
+    } catch (error) {
       console.error('Schedule change notification error:', error)
       return internalError(c, error)
     }
@@ -346,7 +346,7 @@ app.post('/admin/notifications/trigger/billing-reminder',
         sentCount: result.sentCount,
         error: result.error,
       })
-    } catch (error: any) {
+    } catch (error) {
       console.error('Billing reminder error:', error)
       return internalError(c, error)
     }
@@ -385,7 +385,7 @@ app.post('/admin/notifications/trigger/attendance-alert',
         alertSent: result.alertSent,
         error: result.error,
       })
-    } catch (error: any) {
+    } catch (error) {
       console.error('Attendance alert error:', error)
       return internalError(c, error)
     }
@@ -423,7 +423,7 @@ app.post('/admin/notifications/trigger/grade',
         sentCount: result.sentCount,
         error: result.error,
       })
-    } catch (error: any) {
+    } catch (error) {
       console.error('Grade notification error:', error)
       return internalError(c, error)
     }
@@ -533,7 +533,7 @@ app.post('/notifications/beeclass', zValidator('json', beeClassSchema), async (c
       channel: data.channel,
     })
     
-  } catch (error: any) {
+  } catch (error) {
     console.error('[BeeClass Notify] Unexpected error:', error)
     return internalError(c, error)
   }

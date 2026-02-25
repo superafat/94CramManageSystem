@@ -12,9 +12,14 @@ export const botAuth = createMiddleware(async (c, next) => {
     }
 
     const token = authHeader.split(' ')[1];
+    const serviceUrl = process.env.SERVICE_URL;
+    if (!serviceUrl) {
+      console.error('[botAuth] SERVICE_URL is not configured');
+      return c.json({ success: false, error: '服務未設定' }, 503);
+    }
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience: process.env.SERVICE_URL,
+      audience: serviceUrl,
     });
 
     const payload = ticket.getPayload();
@@ -29,6 +34,7 @@ export const botAuth = createMiddleware(async (c, next) => {
     }
 
     c.set('tenantId', tenantId);
+    c.set('botBody', body);
     await next();
   } catch (error) {
     console.error('[botAuth] Error:', error instanceof Error ? error.message : error);

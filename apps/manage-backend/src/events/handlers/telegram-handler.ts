@@ -108,12 +108,12 @@ class TelegramEventHandler implements EventHandler {
             error: sendResult.error || 'Unknown error'
           })
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error(`[TelegramHandler] Error processing recipient ${recipientId}:`, error)
         results.failedCount++
         results.errors.push({
           recipientId,
-          error: error.message
+          error: error instanceof Error ? error.message : String(error)
         })
       }
 

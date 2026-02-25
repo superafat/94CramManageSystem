@@ -246,6 +246,8 @@ export const telegramLoginSchema = z.object({
   telegram_id: z.union([z.string(), z.number()]).transform(String),
   first_name: z.string().optional(),
   last_name: z.string().optional(),
+  auth_date: z.number().int().optional(),
+  hash: z.string().optional(),
 })
 
 // Trial signup schema - for new users applying for 30-day trial

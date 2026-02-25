@@ -32,18 +32,15 @@ export default function DashboardPage() {
   const API_BASE = ''
 
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('token')
-    return {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    }
+    return { 'Content-Type': 'application/json' }
   }
 
   // Fetch alerts
   const fetchAlerts = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/admin/alerts`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'include',
       })
       const data = await res.json()
       if (data.success) {
@@ -93,7 +90,9 @@ export default function DashboardPage() {
     fetchTenants().then(ts => {
       setTenants(ts)
       setCurrentTenant(ts.find(t => t.id === tenantId) ?? null)
-    }).catch(() => {})
+    }).catch((err: unknown) => {
+      console.error('Failed to fetch tenants:', err)
+    })
   }, [])
 
   const handleTest = async () => {
@@ -108,14 +107,18 @@ export default function DashboardPage() {
     setTesting(false)
   }
 
-  const intentDistribution = [
-    { intent: '📅 排課查詢', count: stats?.conversations ? Math.round(stats.conversations * 0.28) : 0, pct: 28 },
-    { intent: '💰 費用帳務', count: stats?.conversations ? Math.round(stats.conversations * 0.23) : 0, pct: 23 },
-    { intent: '❓ 一般問答', count: stats?.conversations ? Math.round(stats.conversations * 0.19) : 0, pct: 19 },
-    { intent: '🎓 招生諮詢', count: stats?.conversations ? Math.round(stats.conversations * 0.13) : 0, pct: 13 },
-    { intent: '📝 作業成績', count: stats?.conversations ? Math.round(stats.conversations * 0.10) : 0, pct: 10 },
-    { intent: '📢 客訴建議', count: stats?.conversations ? Math.round(stats.conversations * 0.07) : 0, pct: 7 },
-  ]
+  // 意圖分佈：目前無真實統計數據，顯示為待統計狀態
+  const totalConversations = stats?.conversations ?? 0
+  const intentDistribution = totalConversations > 0
+    ? [
+        { intent: '📅 排課查詢', count: null as number | null, pct: null as number | null },
+        { intent: '💰 費用帳務', count: null, pct: null },
+        { intent: '❓ 一般問答', count: null, pct: null },
+        { intent: '🎓 招生諮詢', count: null, pct: null },
+        { intent: '📝 作業成績', count: null, pct: null },
+        { intent: '📢 客訴建議', count: null, pct: null },
+      ]
+    : []
 
   // 未授權時不顯示內容
   if (!authorized) {
@@ -221,17 +224,21 @@ export default function DashboardPage() {
         <div className="lg:col-span-2 bg-surface rounded-2xl border border-border p-6">
           <h2 className="text-lg font-semibold text-text mb-4">意圖分佈</h2>
           <div className="space-y-4">
-            {intentDistribution.map((item) => (
-              <div key={item.intent}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-text">{item.intent}</span>
-                  <span className="text-text-muted">{item.count} ({item.pct}%)</span>
+            {intentDistribution.length === 0 ? (
+              <p className="text-sm text-text-muted text-center py-4">尚無對話數據，待系統累積統計資料</p>
+            ) : (
+              intentDistribution.map((item) => (
+                <div key={item.intent}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-text">{item.intent}</span>
+                    <span className="text-text-muted">{item.count != null ? `${item.count} (${item.pct}%)` : '待統計'}</span>
+                  </div>
+                  <div className="h-2 bg-border rounded-full overflow-hidden">
+                    <div className="h-full bg-primary/30 rounded-full" style={{ width: item.pct != null ? `${item.pct}%` : '0%' }} />
+                  </div>
                 </div>
-                <div className="h-2 bg-border rounded-full overflow-hidden">
-                  <div className="h-full bg-primary rounded-full" style={{ width: `${item.pct}%` }} />
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 

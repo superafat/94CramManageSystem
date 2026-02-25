@@ -29,6 +29,40 @@ import { requireRole, requirePermission, Role, Permission, type RBACVariables } 
 import { uuidSchema } from '../utils/validation'
 import { success, notFound, internalError, badRequest } from '../utils/response'
 
+// ===== Row Interfaces =====
+interface BranchRow {
+  id: string
+  name: string
+}
+
+interface ChurnScanRow {
+  id: string
+  branch_id: string
+  scan_type: string
+  total_students: number
+  at_risk_count: number
+  avg_risk_score: number | null
+  created_at: string
+}
+
+interface StudentRow {
+  id: string
+  full_name: string
+  student_code: string
+  branch_name: string | null
+}
+
+interface ChurnRiskHistoryRow {
+  risk_level: string
+  risk_score: number
+  factors: unknown
+  created_at: string
+}
+
+function normalizeRows<T>(result: unknown): T[] {
+  return Array.isArray(result) ? result : Array.from(result as Iterable<T>)
+}
+
 export const churnV2Routes = new Hono<{ Variables: RBACVariables }>()
 
 // Apply auth middleware
@@ -70,10 +104,10 @@ churnV2Routes.get('/admin/churn/:branchId',
       const { minRisk } = c.req.valid('query')
 
       // 驗證分校存在
-      const branchResult = await db.execute(sql`
+      const branchResult = normalizeRows<BranchRow>(await db.execute(sql`
         SELECT id, name FROM branches WHERE id = ${branchId} LIMIT 1
-      `) as any[]
-      
+      `))
+
       const branch = branchResult[0]
       if (!branch) {
         return notFound(c, 'Branch')
@@ -97,12 +131,12 @@ churnV2Routes.get('/admin/churn/:branchId',
           total: risks.length,
           critical: risks.filter((r: ChurnRiskScore) => r.riskLevel === 'critical').length,
           high: risks.filter((r: ChurnRiskScore) => r.riskLevel === 'high').length,
-          medium: risks.filter((r: ChRiskScore) => r.riskLevel === 'medium').length,
+          medium: risks.filter((r: ChurnRiskScore) => r.riskLevel === 'medium').length,
           low: risks.filter((r: ChurnRiskScore) => r.riskLevel === 'low').length,
         },
         generatedAt: new Date().toISOString(),
       })
-    } catch (err: any) {
+    } catch (err) {
       console.error('Churn risk error:', err)
       return internalError(c, err)
     }
@@ -123,18 +157,18 @@ churnV2Routes.get('/admin/churn/:branchId/history',
       const { days } = c.req.valid('query')
 
       // 驗證分校存在
-      const branchResult = await db.execute(sql`
+      const branchResult = normalizeRows<BranchRow>(await db.execute(sql`
         SELECT id, name FROM branches WHERE id = ${branchId} LIMIT 1
-      `) as any[]
-      
+      `))
+
       const branch = branchResult[0]
       if (!branch) {
         return notFound(c, 'Branch')
       }
 
       // 取得歷史掃描記錄
-      const historyResult = await db.execute(sql`
-        SELECT 
+      const historyResult = normalizeRows<ChurnScanRow>(await db.execute(sql`
+        SELECT
           id,
           branch_id,
           scan_type,
@@ -146,7 +180,7 @@ churnV2Routes.get('/admin/churn/:branchId/history',
         WHERE branch_id = ${branchId}
           AND created_at >= NOW() - INTERVAL '${days} days'
         ORDER BY created_at DESC
-      `) as any[]
+      `))
 
       // 計算趨勢統計
       const stats = {
@@ -172,7 +206,7 @@ churnV2Routes.get('/admin/churn/:branchId/history',
         stats,
         period: { days },
       })
-    } catch (err: any) {
+    } catch (err) {
       console.error('Churn history error:', err)
       return internalError(c, err)
     }
@@ -193,10 +227,10 @@ churnV2Routes.post('/admin/churn/:branchId/scan',
       const { type } = c.req.valid('json')
 
       // 驗證分校存在
-      const branchResult = await db.execute(sql`
+      const branchResult = normalizeRows<BranchRow>(await db.execute(sql`
         SELECT id, name FROM branches WHERE id = ${branchId} LIMIT 1
-      `) as any[]
-      
+      `))
+
       const branch = branchResult[0]
       if (!branch) {
         return notFound(c, 'Branch')
@@ -216,7 +250,7 @@ churnV2Routes.post('/admin/churn/:branchId/scan',
         result,
         scannedAt: new Date().toISOString(),
       })
-    } catch (err: any) {
+    } catch (err) {
       console.error('Churn scan error:', err)
       return internalError(c, err)
     }
@@ -237,15 +271,15 @@ churnV2Routes.get('/admin/churn/student/:studentId',
       const { days } = c.req.valid('query')
 
       // 驗證學生存在
-      const studentResult = await db.execute(sql`
+      const studentResult = normalizeRows<StudentRow>(await db.execute(sql`
         SELECT s.id, s.full_name, s.student_code, b.name as branch_name
         FROM students s
         LEFT JOIN branches b ON s.branch_id = b.id
         WHERE s.id = ${studentId}
           AND s.deleted_at IS NULL
         LIMIT 1
-      `) as any[]
-      
+      `))
+
       const student = studentResult[0]
       if (!student) {
         return notFound(c, 'Student')
@@ -255,8 +289,8 @@ churnV2Routes.get('/admin/churn/student/:studentId',
       const currentRisk = await calculateChurnRisk(studentId)
 
       // 取得歷史風險記錄
-      const historyResult = await db.execute(sql`
-        SELECT 
+      const historyResult = normalizeRows<ChurnRiskHistoryRow>(await db.execute(sql`
+        SELECT
           risk_level,
           risk_score,
           factors,
@@ -265,7 +299,7 @@ churnV2Routes.get('/admin/churn/student/:studentId',
         WHERE student_id = ${studentId}
           AND created_at >= NOW() - INTERVAL '${days} days'
         ORDER BY created_at DESC
-      `) as any[]
+      `))
 
       return success(c, {
         student: {
@@ -278,7 +312,7 @@ churnV2Routes.get('/admin/churn/student/:studentId',
         history: historyResult,
         period: { days },
       })
-    } catch (err: any) {
+    } catch (err) {
       console.error('Student churn detail error:', err)
       return internalError(c, err)
     }
@@ -315,7 +349,7 @@ churnV2Routes.get('/admin/churn/:branchId/export',
 
       // JSON 格式（預設）
       return success(c, { risks, exportedAt: new Date().toISOString() })
-    } catch (err: any) {
+    } catch (err) {
       console.error('Churn export error:', err)
       return internalError(c, err)
     }

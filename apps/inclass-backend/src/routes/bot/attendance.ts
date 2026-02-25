@@ -9,8 +9,15 @@ const app = new Hono<{ Variables: Variables }>();
 // POST /attendance/leave
 app.post('/leave', async (c) => {
   try {
-    const { tenant_id, student_name, student_id, date, reason } = await c.req.json();
-    const schoolId = c.get('schoolId') as string;
+    const body = c.get('botBody');
+    const { student_name, student_id, date, reason } = body as {
+      student_name?: string; student_id?: string; date?: string; reason?: string;
+    };
+    const schoolId = c.get('schoolId');
+
+    if (!student_id && !student_name) {
+      return c.json({ success: false, error: 'missing_param', message: '缺少 student_id 或 student_name' }, 400);
+    }
 
     let students;
     if (student_id) {
@@ -18,12 +25,13 @@ app.post('/leave', async (c) => {
         .where(and(eq(manageStudents.tenantId, schoolId), eq(manageStudents.id, student_id)));
     } else {
       students = await db.select().from(manageStudents)
-        .where(and(eq(manageStudents.tenantId, schoolId), eq(manageStudents.name, student_name)));
+        .where(and(eq(manageStudents.tenantId, schoolId), eq(manageStudents.name, student_name!)));
     }
 
     if (students.length === 0) {
+      const safeName = (student_name || '').replace(/[%_\\]/g, '');
       const suggestions = await db.select().from(manageStudents)
-        .where(and(eq(manageStudents.tenantId, schoolId), like(manageStudents.name, `%${student_name}%`)))
+        .where(and(eq(manageStudents.tenantId, schoolId), like(manageStudents.name, `%${safeName}%`)))
         .limit(5);
       return c.json({
         success: false,
@@ -66,8 +74,15 @@ app.post('/leave', async (c) => {
 // POST /attendance/late
 app.post('/late', async (c) => {
   try {
-    const { tenant_id, student_name, student_id, date } = await c.req.json();
-    const schoolId = c.get('schoolId') as string;
+    const body = c.get('botBody');
+    const { student_name, student_id, date } = body as {
+      student_name?: string; student_id?: string; date?: string;
+    };
+    const schoolId = c.get('schoolId');
+
+    if (!student_id && !student_name) {
+      return c.json({ success: false, error: 'missing_param', message: '缺少 student_id 或 student_name' }, 400);
+    }
 
     let students;
     if (student_id) {
@@ -75,12 +90,13 @@ app.post('/late', async (c) => {
         .where(and(eq(manageStudents.tenantId, schoolId), eq(manageStudents.id, student_id)));
     } else {
       students = await db.select().from(manageStudents)
-        .where(and(eq(manageStudents.tenantId, schoolId), eq(manageStudents.name, student_name)));
+        .where(and(eq(manageStudents.tenantId, schoolId), eq(manageStudents.name, student_name!)));
     }
 
     if (students.length === 0) {
+      const safeName = (student_name || '').replace(/[%_\\]/g, '');
       const suggestions = await db.select().from(manageStudents)
-        .where(and(eq(manageStudents.tenantId, schoolId), like(manageStudents.name, `%${student_name}%`)))
+        .where(and(eq(manageStudents.tenantId, schoolId), like(manageStudents.name, `%${safeName}%`)))
         .limit(5);
       return c.json({
         success: false, error: 'student_not_found',
@@ -123,8 +139,11 @@ app.post('/late', async (c) => {
 // POST /attendance/list
 app.post('/list', async (c) => {
   try {
-    const { tenant_id, class_name, date } = await c.req.json();
-    const schoolId = c.get('schoolId') as string;
+    const body = c.get('botBody');
+    const { class_name, date } = body as {
+      class_name?: string; date?: string;
+    };
+    const schoolId = c.get('schoolId');
     const targetDate = date || new Date().toISOString().split('T')[0];
 
     const records = await db.select({
@@ -167,15 +186,23 @@ app.post('/list', async (c) => {
 // POST /attendance/report
 app.post('/report', async (c) => {
   try {
-    const { tenant_id, student_name, start_date, end_date } = await c.req.json();
-    const schoolId = c.get('schoolId') as string;
+    const body = c.get('botBody');
+    const { student_name, start_date, end_date } = body as {
+      student_name?: string; start_date?: string; end_date?: string;
+    };
+    const schoolId = c.get('schoolId');
+
+    if (!student_name) {
+      return c.json({ success: false, error: 'missing_param', message: '缺少 student_name' }, 400);
+    }
 
     const students = await db.select().from(manageStudents)
       .where(and(eq(manageStudents.tenantId, schoolId), eq(manageStudents.name, student_name)));
 
     if (students.length === 0) {
+      const safeName = (student_name || '').replace(/[%_\\]/g, '');
       const suggestions = await db.select().from(manageStudents)
-        .where(and(eq(manageStudents.tenantId, schoolId), like(manageStudents.name, `%${student_name}%`)))
+        .where(and(eq(manageStudents.tenantId, schoolId), like(manageStudents.name, `%${safeName}%`)))
         .limit(5);
       return c.json({
         success: false,

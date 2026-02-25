@@ -70,9 +70,10 @@ app.use('*', cors({
   maxAge: 86400,
 }))
 
-// Demo login — registered before /api/* middleware to avoid auth interception
-app.post('/api/auth/demo', (c) => handleDemoLogin(c))
-app.get('/api/auth/demo', (c) => handleDemoLogin(c))
+// Demo login — only available in non-production environments
+if (process.env.NODE_ENV !== 'production') {
+  app.post('/api/auth/demo', (c) => handleDemoLogin(c))
+}
 
 // Global rate limiting (100 requests/min)
 app.use('/api/*', rateLimit())
@@ -111,7 +112,23 @@ app.route('/api/internal', internalRoutes)
 // LINE webhook (public, no auth, no tenant middleware)
 app.route('/api/line', lineRoutes)
 
-// Public routes (no auth)
+// Bot routes — require bot API key in production
+if (process.env.NODE_ENV === 'production') {
+  app.use('/api/bot/*', async (c, next) => {
+    const key = c.req.header('X-Bot-Key')
+    if (!key || key !== process.env.BOT_API_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+    await next()
+  })
+  app.use('/api/bot-ext/*', async (c, next) => {
+    const key = c.req.header('X-Bot-Key')
+    if (!key || key !== process.env.BOT_API_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+    await next()
+  })
+}
 app.route('/api/bot', botRoutes)
 app.route('/api/bot-ext', botExtRoutes)
 app.route('/api/auth', authRoutes)
@@ -137,16 +154,18 @@ if (process.env.NODE_ENV !== 'production') {
   app.route('/api/test/errors', errorTestRoutes)
 }
 
-// Public debug endpoint (no auth)
-app.get('/debug/test', (c) => {
-  return c.json({ success: true, message: 'Debug endpoint works' })
-})
+// Debug endpoints (development only)
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/debug/test', (c) => {
+    return c.json({ success: true, message: 'Debug endpoint works' })
+  })
 
-app.get('/debug/tables', async (c) => {
-  try {
-    const result = await db.execute(sql`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name`)
-    return c.json({ success: true, tables: result })
-  } catch (error) {
-    return c.json({ success: false, error: String(error) }, 500)
-  }
-})
+  app.get('/debug/tables', async (c) => {
+    try {
+      const result = await db.execute(sql`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name`)
+      return c.json({ success: true, tables: result })
+    } catch (error) {
+      return c.json({ success: false, error: String(error) }, 500)
+    }
+  })
+}

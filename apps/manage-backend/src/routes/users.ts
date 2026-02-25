@@ -16,7 +16,6 @@ import { HTTPException } from 'hono/http-exception'
 import { db } from '../db'
 import { users, userPermissions } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
-import { createHash, randomBytes } from 'crypto'
 import { authMiddleware } from '../middleware/auth'
 import {
   Role,
@@ -38,14 +37,20 @@ import {
   internalError,
 } from '../utils/response'
 
-// Password hashing with salt
-function hashPassword(password: string): string {
-  const salt = randomBytes(16).toString('hex')
-  const hash = createHash('sha256').update(password + salt).digest('hex')
-  return `${salt}:${hash}`
+// Password hashing with bcrypt
+async function hashPassword(password: string): Promise<string> {
+  const bcrypt = await import('bcryptjs')
+  return bcrypt.default.hash(password, 10)
 }
 
-function verifyPassword(password: string, stored: string): boolean {
+async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  // Support both bcrypt and legacy sha256+salt format
+  if (stored.startsWith('$2a$') || stored.startsWith('$2b$')) {
+    const bcrypt = await import('bcryptjs')
+    return bcrypt.default.compare(password, stored)
+  }
+  // Legacy sha256+salt: "salt:hash"
+  const { createHash } = await import('crypto')
   const [salt, hash] = stored.split(':')
   if (!salt || !hash) return false
   const check = createHash('sha256').update(password + salt).digest('hex')
@@ -122,7 +127,7 @@ app.get('/admin/users', requireRole(Role.ADMIN), async (c) => {
     })
     
     return success(c, { users: usersWithPermissions })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching users:', error)
     return internalError(c, error)
   }
@@ -159,8 +164,8 @@ app.post('/admin/users', requireRole(Role.ADMIN), zValidator('json', createUserW
       return conflict(c, 'Email already exists')
     }
     
-    const hashedPassword = hashPassword(body.password)
-    
+    const hashedPassword = await hashPassword(body.password)
+
     const [newUser] = await db
       .insert(users)
       .values({
@@ -182,7 +187,7 @@ app.post('/admin/users', requireRole(Role.ADMIN), zValidator('json', createUserW
       message: 'User created successfully',
       user: newUser,
     }, 201)
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error creating user:', error)
     return internalError(c, error)
   }
@@ -245,7 +250,7 @@ app.put('/admin/users/:id/role', requireRole(Role.ADMIN),
         message: 'Role updated successfully',
         user: updatedUser,
       })
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating user role:', error)
       return internalError(c, error)
     }
@@ -297,7 +302,7 @@ app.delete('/admin/users/:id', requireRole(Role.ADMIN),
       )
       
       return success(c, { message: 'User deleted successfully' })
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error deleting user:', error)
       return internalError(c, error)
     }
@@ -342,7 +347,7 @@ app.get('/auth/me', async (c) => {
       permissions: permissions || [],
       customPermissions: customPermissionList,
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching user info:', error)
     return internalError(c, error)
   }
@@ -382,17 +387,17 @@ app.put('/auth/password', zValidator('json', changePasswordSchema), async (c) =>
     }
     
     // Verify current password
-    if (!verifyPassword(body.currentPassword, dbUser.password)) {
+    if (!await verifyPassword(body.currentPassword, dbUser.password)) {
       return badRequest(c, 'Current password is incorrect')
     }
-    
+
     // Prevent reusing the same password
-    if (verifyPassword(body.newPassword, dbUser.password)) {
+    if (await verifyPassword(body.newPassword, dbUser.password)) {
       return badRequest(c, 'New password must be different from current password')
     }
-    
+
     // Update password
-    const hashedPassword = hashPassword(body.newPassword)
+    const hashedPassword = await hashPassword(body.newPassword)
     
     await db
       .update(users)
@@ -408,7 +413,7 @@ app.put('/auth/password', zValidator('json', changePasswordSchema), async (c) =>
       )
     
     return success(c, { message: 'Password changed successfully' })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error changing password:', error)
     return internalError(c, error)
   }

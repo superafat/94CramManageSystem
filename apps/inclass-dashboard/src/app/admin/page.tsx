@@ -38,10 +38,8 @@ function isUser(value: unknown): value is User {
 const API_BASE = ''
 
 function getAuthHeaders() {
-  const token = localStorage.getItem('token')
   return {
     'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
   }
 }
 
@@ -61,9 +59,8 @@ export default function AdminPage() {
 
   useEffect(() => {
     // Check auth
-    const token = localStorage.getItem('token')
     const userData = localStorage.getItem('user')
-    if (!token || !userData) {
+    if (!userData) {
       router.push('/login')
       return
     }
@@ -94,7 +91,7 @@ export default function AdminPage() {
   // 取得班級列表
   const fetchClasses = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/classes`, { headers: getAuthHeaders() })
+      const res = await fetch(`${API_BASE}/api/classes`, { headers: getAuthHeaders(), credentials: 'include' })
       if (!res.ok) {
         console.error('Failed to fetch classes:', res.status)
         return
@@ -124,6 +121,7 @@ export default function AdminPage() {
       const res = await fetch(url, {
         method,
         headers: getAuthHeaders(),
+        credentials: 'include',
         body: JSON.stringify(classForm)
       })
       
@@ -160,7 +158,8 @@ export default function AdminPage() {
     try {
       const res = await fetch(`${API_BASE}/api/classes/${id}`, {
         method: 'DELETE',
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'include'
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: '刪除失敗' }))
@@ -176,7 +175,8 @@ export default function AdminPage() {
   const fetchUsers = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/admin/pending-users`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'include'
       })
       
       if (!res.ok) {
@@ -200,7 +200,8 @@ export default function AdminPage() {
     try {
       const res = await fetch(`${API_BASE}/api/admin/users/${userId}/approve`, {
         method: 'POST',
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'include'
       })
       
       const data = await res.json()
@@ -225,7 +226,8 @@ export default function AdminPage() {
     try {
       const res = await fetch(`${API_BASE}/api/admin/users/${userId}/reject`, {
         method: 'POST',
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'include'
       })
       
       const data = await res.json()

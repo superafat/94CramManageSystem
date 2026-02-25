@@ -53,11 +53,7 @@ export default function BillingPage() {
   const API_BASE = ''
 
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('token')
-    return {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    }
+    return { 'Content-Type': 'application/json' }
   }
 
   useEffect(() => {
@@ -74,8 +70,14 @@ export default function BillingPage() {
     setLoading(true)
     try {
       const res = await fetch(`${API_BASE}/api/w8/courses?limit=100`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'include',
       })
+      if (!res.ok) {
+        showMessage('❌ 讀取課程失敗')
+        setLoading(false)
+        return
+      }
       const data = await res.json()
       setCourses(data.data?.courses || [])
       if (data.data?.courses?.length > 0) {
@@ -93,7 +95,8 @@ export default function BillingPage() {
     setLoading(true)
     try {
       const res = await fetch(`${API_BASE}/api/admin/billing/course/${selectedCourseId}?periodMonth=${selectedMonth}`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'include',
       })
       const data = await res.json()
       if (data.success) {
@@ -169,6 +172,7 @@ export default function BillingPage() {
       const res = await fetch(`${API_BASE}/api/admin/billing/payment-records/batch`, {
         method: 'POST',
         headers: getAuthHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ records })
       })
       const data = await res.json()
@@ -190,6 +194,7 @@ export default function BillingPage() {
       const res = await fetch(`${API_BASE}/api/admin/courses/${selectedCourseId}/fees`, {
         method: 'PUT',
         headers: getAuthHeaders(),
+        credentials: 'include',
         body: JSON.stringify(feeForm)
       })
       const data = await res.json()
@@ -322,7 +327,7 @@ export default function BillingPage() {
         
         <select
           value={paymentType}
-          onChange={e => setPaymentType(e.target.value as any)}
+          onChange={e => setPaymentType(e.target.value as 'monthly' | 'quarterly' | 'semester' | 'yearly')}
           className="px-3 py-2 border border-border rounded-lg bg-white text-sm whitespace-nowrap"
         >
           <option value="monthly">月費</option>

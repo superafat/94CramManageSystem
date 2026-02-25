@@ -3,14 +3,14 @@ import { db } from '../../db'
 import { manageStudents, managePayments, manageEnrollments } from '@94cram/shared/db'
 import { eq, and, like, sql, gte, lte } from 'drizzle-orm'
 
-type BotExtVariables = { tenantId: string; botRequest: boolean }
+type BotExtVariables = { tenantId: string; botRequest: boolean; botBody: Record<string, unknown> }
 
 const app = new Hono<{ Variables: BotExtVariables }>()
 
 // POST /finance/payment
 app.post('/payment', async (c) => {
   try {
-    const { tenant_id, student_name, student_id, amount, payment_type, date, note } = await c.req.json()
+    const { tenant_id, student_name, student_id, amount, payment_type, date, note } = c.get('botBody') as any
     const tenantId = c.get('tenantId') as string
 
     let students
@@ -23,8 +23,9 @@ app.post('/payment', async (c) => {
     }
 
     if (students.length === 0) {
+      const safeName = (student_name || '').replace(/[%_\\]/g, '');
       const suggestions = await db.select().from(manageStudents)
-        .where(and(eq(manageStudents.tenantId, tenantId), like(manageStudents.name, `%${student_name}%`)))
+        .where(and(eq(manageStudents.tenantId, tenantId), like(manageStudents.name, `%${safeName}%`)))
         .limit(5)
       return c.json({
         success: false, error: 'student_not_found',
@@ -74,7 +75,7 @@ app.post('/payment', async (c) => {
 // POST /finance/summary
 app.post('/summary', async (c) => {
   try {
-    const { tenant_id, start_date, end_date } = await c.req.json()
+    const { tenant_id, start_date, end_date } = c.get('botBody') as any
     const tenantId = c.get('tenantId') as string
 
     const conditions = [eq(managePayments.tenantId, tenantId), eq(managePayments.status, 'paid')]
@@ -98,7 +99,7 @@ app.post('/summary', async (c) => {
 // POST /finance/history
 app.post('/history', async (c) => {
   try {
-    const { tenant_id, student_name, student_id } = await c.req.json()
+    const { tenant_id, student_name, student_id } = c.get('botBody') as any
     const tenantId = c.get('tenantId') as string
 
     let students

@@ -21,7 +21,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /app /app
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 --ingroup nodejs appuser
 WORKDIR /app/apps/manage-backend
 ENV NODE_ENV=production
+USER appuser
 EXPOSE 8080
 CMD ["node", "dist/index.js"]

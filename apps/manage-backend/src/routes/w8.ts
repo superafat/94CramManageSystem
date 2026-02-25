@@ -83,7 +83,7 @@ w8Routes.get('/teachers', requirePermission(Permission.SCHEDULE_READ), zValidato
     `)
     
     return success(c, { teachers: rows(result) })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching teachers:', error)
     return internalError(c, error)
   }
@@ -109,7 +109,7 @@ w8Routes.get('/teachers/:id', requirePermission(Permission.SCHEDULE_READ), zVali
     }
     
     return success(c, { teacher })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching teacher:', error)
     return internalError(c, error)
   }
@@ -128,9 +128,9 @@ w8Routes.post('/teachers', requireRole(Role.ADMIN, Role.MANAGER), zValidator('js
     `)
     
     return success(c, { teacher: first(result) }, 201)
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error creating teacher:', error)
-    if (error.code === '23505') {
+    if (error instanceof Error && (error as any).code === '23505') {
       return conflict(c, 'Teacher already exists')
     }
     return internalError(c, error)
@@ -163,7 +163,7 @@ w8Routes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER),
       }
       
       return success(c, { teacher })
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating teacher:', error)
       return internalError(c, error)
     }
@@ -187,7 +187,7 @@ w8Routes.delete('/teachers/:id', requireRole(Role.ADMIN), zValidator('param', z.
     }
     
     return success(c, { message: 'Teacher deleted', teacher })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error deleting teacher:', error)
     return internalError(c, error)
   }
@@ -228,7 +228,7 @@ w8Routes.get('/courses', requirePermission(Permission.SCHEDULE_READ), zValidator
     `)
     
     return success(c, { courses: rows(result) })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching courses:', error)
     return internalError(c, error)
   }
@@ -238,12 +238,13 @@ w8Routes.get('/courses/:id', requirePermission(Permission.SCHEDULE_READ), zValid
   try {
     const { id } = c.req.valid('param')
     
-    const courseResult = await db.execute(sql`SELECT * FROM courses WHERE id = ${id}`)
+    const user = c.get('user')
+    const courseResult = await db.execute(sql`SELECT * FROM courses WHERE id = ${id} AND tenant_id = ${user?.tenant_id}`)
     const course = first(courseResult)
     if (!course) {
       return notFound(c, 'Course')
     }
-    
+
     const studentsResult = await db.execute(sql`
       SELECT s.id, s.full_name, s.grade_level
       FROM course_enrollments ce
@@ -258,7 +259,7 @@ w8Routes.get('/courses/:id', requirePermission(Permission.SCHEDULE_READ), zValid
         students: rows(studentsResult),
       },
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching course:', error)
     return internalError(c, error)
   }
@@ -277,7 +278,7 @@ w8Routes.post('/courses', requirePermission(Permission.SCHEDULE_WRITE), zValidat
     `)
     
     return success(c, { course: first(result) }, 201)
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error creating course:', error)
     return internalError(c, error)
   }
@@ -325,7 +326,7 @@ w8Routes.get('/schedules', requirePermission(Permission.SCHEDULE_READ), zValidat
     `)
     
     return success(c, { schedules: rows(result) })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching schedules:', error)
     return internalError(c, error)
   }
@@ -335,6 +336,7 @@ w8Routes.get('/schedules/:id', requirePermission(Permission.SCHEDULE_READ), zVal
   try {
     const { id } = c.req.valid('param')
     
+    const user = c.get('user')
     const scheduleResult = await db.execute(sql`
       SELECT s.*,
         c.name as course_name, c.subject, c.duration_minutes,
@@ -342,7 +344,7 @@ w8Routes.get('/schedules/:id', requirePermission(Permission.SCHEDULE_READ), zVal
       FROM schedules s
       JOIN courses c ON s.course_id = c.id
       LEFT JOIN teachers t ON s.teacher_id = t.id
-      WHERE s.id = ${id}
+      WHERE s.id = ${id} AND s.tenant_id = ${user?.tenant_id}
     `)
     
     const schedule = first(scheduleResult)
@@ -365,7 +367,7 @@ w8Routes.get('/schedules/:id', requirePermission(Permission.SCHEDULE_READ), zVal
         students: rows(studentsResult).map((s: any) => ({ id: s.id, full_name: s.full_name, grade_level: s.grade_level })),
       },
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching schedule:', error)
     return internalError(c, error)
   }
@@ -383,9 +385,9 @@ w8Routes.post('/schedules', requirePermission(Permission.SCHEDULE_WRITE), zValid
     `)
     
     return success(c, { schedule: first(result) }, 201)
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error creating schedule:', error)
-    if (error.code === '23503') {
+    if (error instanceof Error && (error as any).code === '23503') {
       return badRequest(c, 'Course or Teacher not found')
     }
     return internalError(c, error)
@@ -419,7 +421,7 @@ w8Routes.put('/schedules/:id', requirePermission(Permission.SCHEDULE_WRITE),
       }
       
       return success(c, { schedule })
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating schedule:', error)
       return internalError(c, error)
     }
@@ -549,7 +551,7 @@ w8Routes.post('/schedules/:id/change', requirePermission(Permission.SCHEDULE_WRI
         affectedStudents: affected,
         notification: notificationResult,
       })
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error changing schedule:', error)
       return internalError(c, error)
     }
@@ -602,7 +604,7 @@ w8Routes.get('/salary/calculate', requireRole(Role.ADMIN, Role.MANAGER),
         grandTotalClasses: teachers.reduce((sum: number, r: any) => sum + (r.total_classes || 0), 0),
         grandTotalAmount: teachers.reduce((sum: number, r: any) => sum + parseFloat(r.total_amount || 0), 0),
       })
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error calculating salary:', error)
       return internalError(c, error)
     }
@@ -655,7 +657,7 @@ w8Routes.post('/salary/records', requireRole(Role.ADMIN), zValidator('json', cre
     `)
     
     return success(c, { record: first(insertResult) }, 201)
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error creating salary record:', error)
     return internalError(c, error)
   }
@@ -688,7 +690,7 @@ w8Routes.get('/salary/records', requireRole(Role.ADMIN, Role.MANAGER),
       `)
       
       return success(c, { records: rows(result) })
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching salary records:', error)
       return internalError(c, error)
     }
@@ -715,7 +717,7 @@ w8Routes.put('/salary/records/:id/confirm', requireRole(Role.ADMIN),
       }
       
       return success(c, { record })
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error confirming salary:', error)
       return internalError(c, error)
     }
@@ -742,7 +744,7 @@ w8Routes.put('/salary/records/:id/pay', requireRole(Role.ADMIN),
       }
       
       return success(c, { record })
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error marking salary as paid:', error)
       return internalError(c, error)
     }

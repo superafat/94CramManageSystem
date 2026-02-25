@@ -11,9 +11,6 @@ export const BRANCH_ID = 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d'
 export const apiHeaders = (): Record<string, string> => ({
   'Content-Type': 'application/json',
   'X-Tenant-Id': TENANT_ID,
-  ...(localStorage.getItem('token') ? {
-    Authorization: `Bearer ${localStorage.getItem('token')}`
-  } : {})
 })
 
 // Color constants for charts and UI

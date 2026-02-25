@@ -127,7 +127,7 @@ class EventBus {
       if (event) {
         try {
           await this.emit(event)
-        } catch (error: any) {
+        } catch (error) {
           console.error(`[EventBus] Error processing event:`, error)
         }
       }
@@ -167,14 +167,14 @@ class EventBus {
           `[EventBus] Handler ${handler.name} completed:`,
           `sent=${result.sentCount}, failed=${result.failedCount}, skipped=${result.skippedCount}`
         )
-      } catch (error: any) {
+      } catch (error) {
         console.error(`[EventBus] Handler ${handler.name} error:`, error)
         results.push({
           success: false,
           sentCount: 0,
           failedCount: event.payload.recipientIds.length,
           skippedCount: 0,
-          errors: [{ recipientId: 'all', error: error.message }]
+          errors: [{ recipientId: 'all', error: error instanceof Error ? error.message : String(error) }]
         })
       }
     }
@@ -197,7 +197,7 @@ class EventBus {
     for (const listener of listeners) {
       try {
         await listener(event)
-      } catch (error: any) {
+      } catch (error) {
         console.error(`[EventBus] Listener error:`, error)
       }
     }

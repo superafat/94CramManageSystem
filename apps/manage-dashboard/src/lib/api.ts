@@ -136,9 +136,17 @@ async function enhancedFetch<T>(
     
     for (let attempt = 0; attempt <= retry; attempt++) {
       try {
-        const res = await fetch(url, fetchOptions)
+        const res = await fetch(url, { ...fetchOptions, credentials: 'include' })
         
         if (!res.ok) {
+          // 401 = token expired or invalid → redirect to login
+          if (res.status === 401 && typeof window !== 'undefined') {
+            localStorage.removeItem('user')
+            localStorage.removeItem('tenantId')
+            localStorage.removeItem('branchId')
+            window.location.href = '/login'
+            return undefined as never
+          }
           const errorText = await res.text().catch(() => res.statusText)
           throw new APIError(
             `HTTP ${res.status}: ${errorText}`,
@@ -191,7 +199,7 @@ export class APIError extends Error {
 
 export async function fetchTenants(): Promise<Tenant[]> {
   const data = await enhancedFetch<{ tenants: Tenant[] }>(
-    `${API_BASE}/admin/tenants`,
+    `${API_BASE}/api/admin/tenants`,
     { headers: headers(), useCache: true, cacheTTL: 300000 } // 5 min cache
   )
   return data.tenants ?? []
@@ -199,14 +207,14 @@ export async function fetchTenants(): Promise<Tenant[]> {
 
 export async function fetchTenantStats(tenantId: string): Promise<TenantStats> {
   return enhancedFetch<TenantStats>(
-    `${API_BASE}/admin/tenants/${tenantId}/stats`,
+    `${API_BASE}/api/admin/tenants/${tenantId}/stats`,
     { headers: headers(), useCache: true, cacheTTL: 30000 } // 30s cache
   )
 }
 
 export async function aiQuery(query: string, userId = 'dashboard-test'): Promise<AIQueryResult> {
   return enhancedFetch<AIQueryResult>(
-    `${API_BASE}/bot/ai-query`,
+    `${API_BASE}/api/bot/ai-query`,
     {
       method: 'POST',
       headers: headers(),
@@ -221,7 +229,7 @@ export async function aiQuery(query: string, userId = 'dashboard-test'): Promise
 
 export async function ragSearch(query: string, topK = 5): Promise<{ sources: RAGSource[]; count: number }> {
   return enhancedFetch<{ sources: RAGSource[]; count: number }>(
-    `${API_BASE}/bot/rag-search`,
+    `${API_BASE}/api/bot/rag-search`,
     {
       method: 'POST',
       headers: headers(),
@@ -236,7 +244,7 @@ export async function ragSearch(query: string, topK = 5): Promise<{ sources: RAG
 
 export async function ingestKnowledge(content: string, title?: string): Promise<{ ok: boolean; stored: number }> {
   return enhancedFetch<{ ok: boolean; stored: number }>(
-    `${API_BASE}/admin/knowledge/ingest`,
+    `${API_BASE}/api/admin/knowledge/ingest`,
     {
       method: 'POST',
       headers: headers(),
@@ -250,8 +258,8 @@ export async function ingestKnowledge(content: string, title?: string): Promise<
 
 export async function healthCheck(): Promise<{ status: string }> {
   return enhancedFetch<{ status: string }>(
-    '/api/health',
-    { useCache: true, cacheTTL: 10000 } // 10s cache
+    `${API_BASE}/api/health`,
+    { headers: headers(), useCache: true, cacheTTL: 10000 } // 10s cache
   )
 }
 
@@ -273,25 +281,36 @@ export interface Student {
 
 export async function fetchStudents(): Promise<Student[]> {
   const data = await enhancedFetch<{ students: Student[] }>(
-    `${API_BASE}/admin/students`,
+    `${API_BASE}/api/admin/students`,
     { headers: headers(), useCache: true, cacheTTL: 60000 } // 1 min cache
   )
-  return data.students ?? []
+  const payload = (data && typeof data === 'object' && 'data' in data)
+    ? (data as { data: { students: Student[] } }).data
+    : data
+  return payload.students ?? []
 }
 
 // Generic API fetch utility
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       'X-Tenant-Id': getCurrentTenantId(),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
   })
-  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  if (!res.ok) {
+    if (res.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('user')
+      localStorage.removeItem('tenantId')
+      localStorage.removeItem('branchId')
+      window.location.href = '/login'
+      return undefined as never
+    }
+    throw new Error(`API ${res.status}: ${res.statusText}`)
+  }
   return res.json()
 }
 
@@ -318,26 +337,26 @@ export interface TrialListResponse {
 }
 
 export async function fetchTrials(): Promise<Trial[]> {
-  const data = await apiFetch<TrialListResponse>('/admin/trials')
+  const data = await apiFetch<TrialListResponse>('/api/admin/trials')
   return data.trials || []
 }
 
 export async function approveTrial(tenantId: string, notes?: string): Promise<{ message: string }> {
-  return apiFetch<{ message: string }>(`/admin/trials/${tenantId}/approve`, {
+  return apiFetch<{ message: string }>(`/api/admin/trials/${tenantId}/approve`, {
     method: 'POST',
     body: JSON.stringify({ notes }),
   })
 }
 
 export async function rejectTrial(tenantId: string, notes: string): Promise<{ message: string }> {
-  return apiFetch<{ message: string }>(`/admin/trials/${tenantId}/reject`, {
+  return apiFetch<{ message: string }>(`/api/admin/trials/${tenantId}/reject`, {
     method: 'POST',
     body: JSON.stringify({ notes }),
   })
 }
 
 export async function revokeTrial(tenantId: string, notes?: string): Promise<{ message: string }> {
-  return apiFetch<{ message: string }>(`/admin/trials/${tenantId}/revoke`, {
+  return apiFetch<{ message: string }>(`/api/admin/trials/${tenantId}/revoke`, {
     method: 'POST',
     body: JSON.stringify({ notes }),
   })

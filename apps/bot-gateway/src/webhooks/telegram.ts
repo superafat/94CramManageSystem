@@ -18,7 +18,13 @@ import type { TelegramUpdate } from '../utils/telegram';
 export const telegramWebhook = new Hono();
 
 telegramWebhook.post('/', async (c) => {
-  const update: TelegramUpdate = await c.req.json();
+  let update: TelegramUpdate;
+  try {
+    update = await c.req.json();
+  } catch {
+    console.error('[Telegram] Invalid JSON in webhook request');
+    return c.json({ ok: true });
+  }
   const msg = parseTelegramUpdate(update);
   if (!msg) return c.json({ ok: true });
 
@@ -30,26 +36,49 @@ telegramWebhook.post('/', async (c) => {
 
   // Callback query (confirm/cancel)
   if (msg.messageType === 'callback') {
-    await handleCallback(msg);
+    try {
+      await handleCallback(msg);
+    } catch (error) {
+      console.error('[Telegram] handleCallback error:', error);
+    }
     return c.json({ ok: true });
   }
 
   // Commands
   const text = msg.content.trim();
   if (text.startsWith('/bind')) {
-    await handleBind(msg.chatId, msg.userId, text.replace('/bind', '').trim());
+    try {
+      await handleBind(msg.chatId, msg.userId, text.replace('/bind', '').trim());
+    } catch (error) {
+      console.error('[Telegram] handleBind error:', error);
+      await sendMessage(msg.chatId, '⚠️ 綁定操作失敗，請稍後再試').catch(() => {});
+    }
     return c.json({ ok: true });
   }
   if (text.startsWith('/switch')) {
-    await handleSwitch(msg.chatId, msg.userId, text.replace('/switch', '').trim());
+    try {
+      await handleSwitch(msg.chatId, msg.userId, text.replace('/switch', '').trim());
+    } catch (error) {
+      console.error('[Telegram] handleSwitch error:', error);
+      await sendMessage(msg.chatId, '⚠️ 切換操作失敗，請稍後再試').catch(() => {});
+    }
     return c.json({ ok: true });
   }
   if (text === '/sync') {
-    await handleSync(msg.chatId, msg.userId);
+    try {
+      await handleSync(msg.chatId, msg.userId);
+    } catch (error) {
+      console.error('[Telegram] handleSync error:', error);
+      await sendMessage(msg.chatId, '⚠️ 同步操作失敗，請稍後再試').catch(() => {});
+    }
     return c.json({ ok: true });
   }
   if (text === '/help' || text === '/start') {
-    await handleHelp(msg.chatId);
+    try {
+      await handleHelp(msg.chatId);
+    } catch (error) {
+      console.error('[Telegram] handleHelp error:', error);
+    }
     return c.json({ ok: true });
   }
 
@@ -69,7 +98,9 @@ telegramWebhook.post('/', async (c) => {
     const intent = await parseIntent(text, cache);
 
     // Track AI usage (fire-and-forget)
-    incrementUsage(auth.tenantId, 'ai_calls').catch(() => {});
+    incrementUsage(auth.tenantId, 'ai_calls').catch((err: unknown) => {
+      console.error('[Webhook] Failed to increment ai_calls usage:', err);
+    });
 
     if (intent.need_clarification) {
       await sendMessage(msg.chatId, `🤔 ${intent.clarification_question}`);
@@ -100,7 +131,9 @@ telegramWebhook.post('/', async (c) => {
     // Query intents: execute directly
     if (isQueryIntent(intent.intent)) {
       const result = await executeIntent(intent, auth);
-      incrementUsage(auth.tenantId, 'api_calls').catch(() => {});
+      incrementUsage(auth.tenantId, 'api_calls').catch((err: unknown) => {
+        console.error('[Webhook] Failed to increment api_calls usage:', err);
+      });
       await sendMessage(msg.chatId, formatResponse(result));
       return c.json({ ok: true });
     }

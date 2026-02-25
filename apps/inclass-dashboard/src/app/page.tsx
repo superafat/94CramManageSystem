@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
 export default function HomePage() {
-  const { token, loading } = useAuth()
+  const { user, loading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
     if (!loading) {
-      if (token) {
+      if (user) {
         // 已登入 → 點名系統
         router.push('/main')
       } else {
@@ -18,7 +18,7 @@ export default function HomePage() {
         router.push('/landing')
       }
     }
-  }, [token, loading, router])
+  }, [user, loading, router])
 
   // 載入中
   return (

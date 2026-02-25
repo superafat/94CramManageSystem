@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
 import { db } from '../db/index.js'
-import { inclassAttendances, inclassNfcCards, manageStudents } from '@94cram/shared/db'
+import { inclassAttendances, inclassNfcCards, manageStudents, manageEnrollments } from '@94cram/shared/db'
 import { and, eq, gte, lt } from 'drizzle-orm'
 import type { Variables } from '../middleware/auth.js'
 
@@ -24,10 +24,6 @@ attendanceRouter.post('/checkin', zValidator('json', checkinSchema), async (c) =
     const body = c.req.valid('json')
     const schoolId = c.get('schoolId')
 
-    if (!body.classId) {
-      return c.json({ error: 'classId is required' }, 400)
-    }
-
     let studentId = body.studentId
     if (!studentId && body.nfcId) {
       const [card] = await db.select().from(inclassNfcCards).where(
@@ -42,6 +38,23 @@ attendanceRouter.post('/checkin', zValidator('json', checkinSchema), async (c) =
       and(eq(manageStudents.id, studentId), eq(manageStudents.tenantId, schoolId))
     )
     if (!student) return c.json({ error: 'Student not found' }, 404)
+
+    // Auto-resolve classId from student's active enrollment if not provided
+    let classId = body.classId
+    if (!classId) {
+      const [enrollment] = await db.select().from(manageEnrollments).where(
+        and(
+          eq(manageEnrollments.tenantId, schoolId),
+          eq(manageEnrollments.studentId, student.id),
+          eq(manageEnrollments.status, 'active')
+        )
+      )
+      classId = enrollment?.courseId ?? undefined
+    }
+
+    if (!classId) {
+      return c.json({ error: 'classId is required (student has no active enrollment)' }, 400)
+    }
 
     const now = new Date()
     const start = new Date(now)
@@ -64,7 +77,7 @@ attendanceRouter.post('/checkin', zValidator('json', checkinSchema), async (c) =
     const [record] = await db.insert(inclassAttendances).values({
       tenantId: schoolId,
       studentId: student.id,
-      courseId: body.classId,
+      courseId: classId,
       date: now,
       status: body.status === 'arrived' ? 'present' : body.status,
       checkInTime: now,

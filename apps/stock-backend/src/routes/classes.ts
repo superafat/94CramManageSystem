@@ -8,6 +8,23 @@ import { z } from 'zod';
 
 const app = new Hono();
 const uuidString = z.string().uuid();
+const uuidParamSchema = z.object({ id: z.string().uuid() });
+
+const classBodySchema = z.object({
+  name: z.string().trim().min(1),
+  grade: z.string().optional(),
+  subject: z.string().optional(),
+  schoolYear: z.string().optional(),
+  studentCount: z.number().int().nonnegative().optional(),
+  isActive: z.boolean().optional(),
+});
+
+const classMaterialBodySchema = z.object({
+  itemId: z.string().uuid(),
+  quantityPerStudent: z.number().int().positive().optional(),
+  notes: z.string().optional(),
+});
+
 const distributeSchema = z.object({
   records: z.array(z.object({
     warehouseId: uuidString,
@@ -28,14 +45,24 @@ app.get('/', async (c) => {
 
 app.post('/', async (c) => {
   const tenantId = getTenantId(c);
-  const body = await c.req.json();
+  let requestBody: unknown;
+  try {
+    requestBody = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+  const parsed = classBodySchema.safeParse(requestBody);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid input' }, 400);
+  }
+  const body = parsed.data;
   const [created] = await db.insert(stockClasses).values({
     tenantId,
     name: body.name,
     grade: body.grade,
     subject: body.subject,
     schoolYear: body.schoolYear,
-    studentCount: body.studentCount || 0,
+    studentCount: body.studentCount ?? 0,
     isActive: body.isActive ?? true,
   }).returning();
   return c.json(created, 201);
@@ -43,8 +70,22 @@ app.post('/', async (c) => {
 
 app.put('/:id', async (c) => {
   const tenantId = getTenantId(c);
-  const id = c.req.param('id');
-  const body = await c.req.json();
+  const parsedParams = uuidParamSchema.safeParse({ id: c.req.param('id') });
+  if (!parsedParams.success) {
+    return c.json({ error: 'Invalid class id' }, 400);
+  }
+  const { id } = parsedParams.data;
+  let requestBody: unknown;
+  try {
+    requestBody = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+  const parsed = classBodySchema.safeParse(requestBody);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid input' }, 400);
+  }
+  const body = parsed.data;
   const [updated] = await db.update(stockClasses).set({
     name: body.name,
     grade: body.grade,
@@ -81,13 +122,27 @@ app.get('/:id/materials', async (c) => {
 
 app.post('/:id/materials', async (c) => {
   const tenantId = getTenantId(c);
-  const id = c.req.param('id');
-  const body = await c.req.json();
+  const parsedParams = uuidParamSchema.safeParse({ id: c.req.param('id') });
+  if (!parsedParams.success) {
+    return c.json({ error: 'Invalid class id' }, 400);
+  }
+  const { id } = parsedParams.data;
+  let requestBody: unknown;
+  try {
+    requestBody = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+  const parsed = classMaterialBodySchema.safeParse(requestBody);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid input' }, 400);
+  }
+  const body = parsed.data;
   const [created] = await db.insert(stockClassMaterials).values({
     tenantId,
     classId: id,
     itemId: body.itemId,
-    quantityPerStudent: body.quantityPerStudent || 1,
+    quantityPerStudent: body.quantityPerStudent ?? 1,
     notes: body.notes,
   }).returning();
   return c.json(created, 201);

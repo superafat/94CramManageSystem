@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { db } from '../db/index';
 import { stockItems } from '@94cram/shared/db';
 import { eq, and } from 'drizzle-orm';
+import { authMiddleware } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { z } from 'zod';
 
@@ -23,7 +24,7 @@ const itemUpdateSchema = itemCreateSchema.partial().refine(
   { message: 'At least one field is required' }
 );
 
-app.use('*', tenantMiddleware);
+app.use('*', authMiddleware, tenantMiddleware);
 
 // GET all items for a tenant
 app.get('/', async (c) => {

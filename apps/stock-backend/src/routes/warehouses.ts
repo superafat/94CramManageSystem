@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { db } from '../db/index';
 import { stockWarehouses } from '@94cram/shared/db';
 import { and, eq } from 'drizzle-orm';
+import { authMiddleware } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { z } from 'zod';
 
@@ -18,7 +19,7 @@ const warehouseUpdateSchema = warehouseCreateSchema.partial().refine(
   { message: 'At least one field is required' }
 );
 
-app.use('*', tenantMiddleware);
+app.use('*', authMiddleware, tenantMiddleware);
 
 // GET all warehouses
 app.get('/', async (c) => {

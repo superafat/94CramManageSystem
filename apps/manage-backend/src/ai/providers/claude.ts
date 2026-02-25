@@ -78,9 +78,9 @@ export class ClaudeProvider implements LLMProvider {
         tokensUsed: data.usage?.input_tokens + data.usage?.output_tokens,
         finishReason: data.stop_reason || 'stop',
       }
-    } catch (error: any) {
+    } catch (error) {
       this.healthScore = Math.max(0, this.healthScore - 10)
-      throw this.wrapError(error)
+      throw this.wrapError(error instanceof Error ? error : new Error(String(error)))
     }
   }
 

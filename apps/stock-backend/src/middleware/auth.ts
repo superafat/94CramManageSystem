@@ -4,7 +4,7 @@
  */
 import type { Context, Next } from 'hono';
 import { eq } from 'drizzle-orm';
-import { verify } from '@94cram/shared/auth';
+import { verify, extractToken } from '@94cram/shared/auth';
 import { users } from '@94cram/shared/db';
 import { config } from '../config';
 import { db } from '../db';
@@ -18,8 +18,7 @@ export interface AuthUser {
 }
 
 export async function authMiddleware(c: Context, next: Next) {
-  const authHeader = c.req.header('Authorization') || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const token = extractToken(c);
 
   if (!token) {
     return c.json({ error: 'Unauthorized' }, 401);

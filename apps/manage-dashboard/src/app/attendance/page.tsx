@@ -36,24 +36,25 @@ export default function AttendancePage() {
     try {
       setLoading(true)
       setError(null)
-      const token = localStorage.getItem('token')
-      
+
       // 載入出席記錄
       const attRes = await fetch(`${API_BASE}/api/admin/attendance?from=${selectedDate}&to=${selectedDate}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include',
       })
       if (attRes.ok) {
-        const data = await attRes.json()
-        setRecords(data.attendance || [])
+        const json = await attRes.json()
+        const attPayload = json.data ?? json
+        setRecords(attPayload.attendance || [])
       }
-      
+
       // 載入學生清單（用於新增點名）
       const stuRes = await fetch(`${API_BASE}/api/admin/students?limit=100`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include',
       })
       if (stuRes.ok) {
-        const data = await stuRes.json()
-        setStudents(data.students || [])
+        const json2 = await stuRes.json()
+        const stuPayload = json2.data ?? json2
+        setStudents(stuPayload.students || [])
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '載入失敗')
@@ -72,16 +73,13 @@ export default function AttendancePage() {
     if (Object.keys(changes).length === 0) return
     
     setSaving(true)
-    const token = localStorage.getItem('token')
-    
+
     try {
       for (const [studentId, status] of Object.entries(changes)) {
         await fetch(`${API_BASE}/api/admin/attendance`, {
           method: 'POST',
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({
             studentId,
             date: selectedDate,

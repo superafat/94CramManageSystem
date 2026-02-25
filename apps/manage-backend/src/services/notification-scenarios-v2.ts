@@ -13,6 +13,55 @@ import {
 } from '../events/helpers'
 import type { NotificationChannel } from '../db/schema'
 
+interface ScheduleRow {
+  id: string
+  course_id: string
+  start_time: string | Date
+  end_time: string | Date
+  course_name: string
+  teacher_name?: string | null
+}
+
+interface RecipientRow {
+  recipient_id: string | null
+  student_id: string
+  student_name: string
+}
+
+interface InvoiceRow {
+  id: string
+  amount: number
+  due_date: string | Date
+  student_id: string
+  student_name: string
+}
+
+interface ParentRow {
+  parent_id: string | null
+}
+
+interface AttendanceRow {
+  status: string
+  date: string | Date
+}
+
+interface StudentRow {
+  name: string
+}
+
+interface GradeRow {
+  id: string
+  score: number
+  exam_type: string
+  student_id: string
+  student_name: string
+  course_name?: string | null
+}
+
+function normalizeRows<T>(result: unknown): T[] {
+  return Array.isArray(result) ? result : Array.from(result as Iterable<T>)
+}
+
 const DEFAULT_TENANT_ID = '11111111-1111-1111-1111-111111111111'
 
 /**
@@ -59,15 +108,16 @@ export async function sendScheduleChangeNotification(
       WHERE s.id = ${scheduleId}
     `)
 
-    if ((scheduleResult as any[]).length === 0) {
+    const scheduleRows = normalizeRows<ScheduleRow>(scheduleResult)
+    if (scheduleRows.length === 0) {
       throw new Error(`Schedule ${scheduleId} not found`)
     }
 
-    const schedule = (scheduleResult as any[])[0]
+    const schedule = scheduleRows[0]
 
     // 查詢該課程的所有學生和家長
     const recipientsResult = await db.execute(sql`
-      SELECT DISTINCT 
+      SELECT DISTINCT
         COALESCE(s.user_id, ps.parent_id) as recipient_id,
         s.id as student_id,
         s.name as student_name
@@ -77,12 +127,13 @@ export async function sendScheduleChangeNotification(
       WHERE ce.course_id = ${schedule.course_id}
     `)
 
-    if ((recipientsResult as any[]).length === 0) {
+    const recipientRows = normalizeRows<RecipientRow>(recipientsResult)
+    if (recipientRows.length === 0) {
       return { success: true, sentCount: 0 }
     }
 
-    const recipientIds = (recipientsResult as any[]).map((r: any) => r.recipient_id).filter(Boolean)
-    const studentId = (recipientsResult as any[])[0]?.student_id
+    const recipientIds = recipientRows.map((r: RecipientRow) => r.recipient_id).filter((id): id is string => id !== null)
+    const studentId = recipientRows[0]?.student_id ?? ''
 
     // 使用事件驅動發送通知
     const originalTime = options?.originalTime || schedule.start_time
@@ -93,7 +144,7 @@ export async function sendScheduleChangeNotification(
       recipientIds,
       studentId,
       courseName: schedule.course_name,
-      teacherName: schedule.teacher_name,
+      teacherName: schedule.teacher_name ?? undefined,
       originalTime: formatDateTime(originalTime),
       newTime: formatDateTime(newTime),
       reason: options?.reason,
@@ -108,9 +159,9 @@ export async function sendScheduleChangeNotification(
       sentCount: totalSent,
       error: hasError ? 'Some notifications failed' : undefined
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('sendScheduleChangeNotification error:', error)
-    return { success: false, sentCount: 0, error: error.message }
+    return { success: false, sentCount: 0, error: error instanceof Error ? error.message : String(error) }
   }
 }
 
@@ -129,11 +180,12 @@ export async function sendBillingReminder(
       WHERE i.id = ${invoiceId}
     `)
 
-    if ((invoiceResult as any[]).length === 0) {
+    const invoiceRows = normalizeRows<InvoiceRow>(invoiceResult)
+    if (invoiceRows.length === 0) {
       throw new Error(`Invoice ${invoiceId} not found`)
     }
 
-    const invoice = (invoiceResult as any[])[0]
+    const invoice = invoiceRows[0]
 
     // 查詢家長
     const parentsResult = await db.execute(sql`
@@ -142,7 +194,7 @@ export async function sendBillingReminder(
       WHERE student_id = ${invoice.student_id}
     `)
 
-    const recipientIds = (parentsResult as any[]).map((r: any) => r.parent_id)
+    const recipientIds = normalizeRows<ParentRow>(parentsResult).map((r: ParentRow) => r.parent_id).filter((id): id is string => id !== null)
 
     if (recipientIds.length === 0) {
       return { success: true, sentCount: 0 }
@@ -173,9 +225,9 @@ export async function sendBillingReminder(
       sentCount: totalSent,
       error: hasError ? 'Some notifications failed' : undefined
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('sendBillingReminder error:', error)
-    return { success: false, sentCount: 0, error: error.message }
+    return { success: false, sentCount: 0, error: error instanceof Error ? error.message : String(error) }
   }
 }
 
@@ -198,7 +250,7 @@ export async function checkAndSendAttendanceAlert(
 
     // 檢查連續缺席
     let consecutiveAbsences = 0
-    for (const record of attendanceResult as any[]) {
+    for (const record of normalizeRows<AttendanceRow>(attendanceResult)) {
       if (record.status === 'absent') {
         consecutiveAbsences++
       } else {
@@ -216,11 +268,12 @@ export async function checkAndSendAttendanceAlert(
       SELECT name FROM students WHERE id = ${studentId}
     `)
 
-    if ((studentResult as any[]).length === 0) {
+    const studentRows = normalizeRows<StudentRow>(studentResult)
+    if (studentRows.length === 0) {
       throw new Error(`Student ${studentId} not found`)
     }
 
-    const studentName = (studentResult as any[])[0].name
+    const studentName = studentRows[0].name
 
     // 查詢家長
     const parentsResult = await db.execute(sql`
@@ -229,7 +282,7 @@ export async function checkAndSendAttendanceAlert(
       WHERE student_id = ${studentId}
     `)
 
-    const recipientIds = (parentsResult as any[]).map((r: any) => r.parent_id)
+    const recipientIds = normalizeRows<ParentRow>(parentsResult).map((r: ParentRow) => r.parent_id).filter((id): id is string => id !== null)
 
     if (recipientIds.length === 0) {
       return { success: true, sentCount: 0, alertSent: false }
@@ -254,9 +307,9 @@ export async function checkAndSendAttendanceAlert(
       alertSent: true,
       error: hasError ? 'Some notifications failed' : undefined
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('checkAndSendAttendanceAlert error:', error)
-    return { success: false, sentCount: 0, alertSent: false, error: error.message }
+    return { success: false, sentCount: 0, alertSent: false, error: error instanceof Error ? error.message : String(error) }
   }
 }
 
@@ -277,11 +330,12 @@ export async function sendGradeNotification(
       WHERE g.id = ${gradeId}
     `)
 
-    if ((gradeResult as any[]).length === 0) {
+    const gradeRows = normalizeRows<GradeRow>(gradeResult)
+    if (gradeRows.length === 0) {
       throw new Error(`Grade ${gradeId} not found`)
     }
 
-    const grade = (gradeResult as any[])[0]
+    const grade = gradeRows[0]
 
     // 查詢家長
     const parentsResult = await db.execute(sql`
@@ -290,7 +344,7 @@ export async function sendGradeNotification(
       WHERE student_id = ${grade.student_id}
     `)
 
-    const recipientIds = (parentsResult as any[]).map((r: any) => r.parent_id)
+    const recipientIds = normalizeRows<ParentRow>(parentsResult).map((r: ParentRow) => r.parent_id).filter((id): id is string => id !== null)
 
     if (recipientIds.length === 0) {
       return { success: true, sentCount: 0 }
@@ -316,9 +370,9 @@ export async function sendGradeNotification(
       sentCount: totalSent,
       error: hasError ? 'Some notifications failed' : undefined
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('sendGradeNotification error:', error)
-    return { success: false, sentCount: 0, error: error.message }
+    return { success: false, sentCount: 0, error: error instanceof Error ? error.message : String(error) }
   }
 }
 

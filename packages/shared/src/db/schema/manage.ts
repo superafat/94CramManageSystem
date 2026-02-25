@@ -1,5 +1,5 @@
 // 94Manage Schema - 學員管理專屬表
-import { pgTable, uuid, varchar, text, timestamp, boolean, integer, decimal } from '../connection';
+import { pgTable, uuid, varchar, text, timestamp, boolean, integer, decimal, jsonb, uniqueIndex } from '../connection';
 
 // 課程
 export const manageCourses = pgTable('manage_courses', {
@@ -68,3 +68,14 @@ export const managePayments = pgTable('manage_payments', {
   status: varchar('status', { length: 20 }).default('pending'), // pending, paid, overdue
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+// 系統設定（每個 tenant 一筆）
+export const manageSettings = pgTable('manage_settings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().unique(),
+  settings: jsonb('settings').notNull().default({}),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  updatedBy: uuid('updated_by'),
+}, (table) => ({
+  tenantIdx: uniqueIndex('manage_settings_tenant_id_idx').on(table.tenantId),
+}));

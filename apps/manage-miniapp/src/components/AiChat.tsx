@@ -25,8 +25,10 @@ export default function AiChat({ onClose }: { onClose: () => void }) {
       const res = await fetch(`${API_BASE}/bot/ai-query`, {
         method: 'POST',
         headers: apiHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ query: q, branchId: BRANCH_ID, userId: 'miniapp' }),
       })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setMessages(prev => [...prev, { role: 'ai', text: data.answer ?? '抱歉，出了點問題', ts: Date.now() }])
     } catch {

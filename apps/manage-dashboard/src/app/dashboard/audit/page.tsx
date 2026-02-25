@@ -27,11 +27,7 @@ export default function AuditLogsPage() {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3100'
 
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('token')
-    return {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    }
+    return { 'Content-Type': 'application/json' }
   }
 
   const fetchLogs = async () => {
@@ -41,9 +37,10 @@ export default function AuditLogsPage() {
       if (filter.tableName) query.set('tableName', filter.tableName)
       if (filter.action) query.set('action', filter.action)
       if (filter.needsAlert === 'true') query.set('needsAlert', 'true')
-      
+
       const res = await fetch(`${API_BASE}/api/admin/audit-logs?${query}`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'include',
       })
       const data = await res.json()
       if (data.success) {
@@ -63,7 +60,8 @@ export default function AuditLogsPage() {
     try {
       await fetch(`${API_BASE}/api/admin/alerts/${id}/confirm`, {
         method: 'POST',
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'include',
       })
       fetchLogs()
     } catch (e) {

@@ -1,11 +1,112 @@
 import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
+import { z } from 'zod'
 import { db } from '../db/index.js'
 import { users, tenants } from '@94cram/shared/db'
 import { eq } from 'drizzle-orm'
-import { sign } from '@94cram/shared/auth'
+import { sign, setAuthCookie, clearAuthCookie } from '@94cram/shared/auth'
+import bcrypt from 'bcryptjs'
 import type { Variables } from '../middleware/auth.js'
 
 const auth = new Hono<{ Variables: Variables }>()
+
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+})
+
+const registerSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  password: z.string().min(6),
+  role: z.string().optional(),
+})
+
+auth.post('/login', zValidator('json', loginSchema), async (c) => {
+  try {
+    const { email, password } = c.req.valid('json')
+
+    const [user] = await db.select().from(users).where(eq(users.email, email))
+    if (!user || !user.isActive) {
+      return c.json({ error: 'Invalid email or password' }, 401)
+    }
+
+    const valid = await bcrypt.compare(password, user.passwordHash)
+    if (!valid) {
+      return c.json({ error: 'Invalid email or password' }, 401)
+    }
+
+    let school = null
+    if (user.tenantId) {
+      const [tenant] = await db.select().from(tenants).where(eq(tenants.id, user.tenantId))
+      if (tenant) school = { id: tenant.id, name: tenant.name, code: tenant.slug }
+    }
+
+    const token = await sign({
+      userId: user.id,
+      tenantId: user.tenantId ?? '',
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      systems: ['inclass'],
+    })
+
+    setAuthCookie(c, token)
+    return c.json({
+      token,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      school,
+    })
+  } catch (e) {
+    console.error('[API Error]', c.req.path, 'Login error:', e instanceof Error ? e.message : 'Unknown error')
+    return c.json({ error: 'Failed to login' }, 500)
+  }
+})
+
+auth.post('/register', zValidator('json', registerSchema), async (c) => {
+  try {
+    const { name, email, password, role } = c.req.valid('json')
+
+    const [existing] = await db.select().from(users).where(eq(users.email, email))
+    if (existing) {
+      return c.json({ error: 'Email already registered' }, 409)
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10)
+    const [user] = await db
+      .insert(users)
+      .values({
+        email,
+        passwordHash,
+        name,
+        role: role ?? 'staff',
+        isActive: true,
+      })
+      .returning()
+
+    if (!user) {
+      return c.json({ error: 'Failed to create user' }, 500)
+    }
+
+    const token = await sign({
+      userId: user.id,
+      tenantId: user.tenantId ?? '',
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      systems: ['inclass'],
+    })
+
+    setAuthCookie(c, token)
+    return c.json({
+      token,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+    }, 201)
+  } catch (e) {
+    console.error('[API Error]', c.req.path, 'Register error:', e instanceof Error ? e.message : 'Unknown error')
+    return c.json({ error: 'Failed to register' }, 500)
+  }
+})
 
 auth.get('/me', async (c) => {
   try {
@@ -57,11 +158,17 @@ auth.post('/demo', async (c) => {
       systems: ['inclass'],
     })
 
+    setAuthCookie(c, token)
     return c.json({ token, user: demoUser, school: demoSchool })
   } catch (e) {
     console.error('[API Error]', c.req.path, 'Demo login error:', e instanceof Error ? e.message : 'Unknown error')
     return c.json({ error: 'Failed to create demo session' }, 500)
   }
+})
+
+auth.post('/logout', async (c) => {
+  clearAuthCookie(c)
+  return c.json({ success: true })
 })
 
 export default auth

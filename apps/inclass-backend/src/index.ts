@@ -18,7 +18,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { z, ZodError } from 'zod'
-import { verify } from '@94cram/shared/auth'
+import { verify, extractToken } from '@94cram/shared/auth'
 import { db } from './db/index.js'
 import { tenants } from '@94cram/shared/db'
 import { rateLimit, getClientIP } from './middleware/rateLimit.js'
@@ -107,11 +107,10 @@ app.use('/api/*', async (c, next) => {
   if (c.req.path.startsWith('/api/webhooks/')) return next()
   // Bot routes use GCP IAM auth via botAuth middleware
   if (c.req.path.startsWith('/api/bot/')) return next()
-  const authHeader = c.req.header('Authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const token = extractToken(c)
+  if (!token) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
-  const token = authHeader.substring(7)
   try {
     const payload = await verify(token)
     const parsedPayload = jwtPayloadSchema.parse(payload)
@@ -194,7 +193,7 @@ app.onError((err, c) => {
 })
 export default app
 // ===== Start Server =====
-const port = parseInt(process.env.PORT || '3100')
+const port = parseInt(process.env.PORT || '3102')
 console.info(`🐝 BeeClass Backend starting on port ${port}...`)
 const serve = async () => {
   const { serve } = await import('@hono/node-server')

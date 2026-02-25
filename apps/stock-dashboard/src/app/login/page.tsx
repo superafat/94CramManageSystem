@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAxiosError } from 'axios';
 import api from '@/lib/api';
-import { setToken } from '@/lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,7 +19,9 @@ export default function LoginPage() {
     setError('');
     try {
       const res = await api.post('/auth/login', { email, password });
-      setToken(res.data.token);
+      if (res.data.user) {
+        localStorage.setItem('user', JSON.stringify(res.data.user));
+      }
       router.push('/dashboard');
     } catch (err: unknown) {
       setError(isAxiosError<ErrorResponse>(err) ? err.response?.data?.error || '登入失敗' : '登入失敗');
