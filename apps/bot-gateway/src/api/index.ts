@@ -222,7 +222,7 @@ apiRouter.get('/settings', async (c) => {
   return c.json(settings ?? {
     tenant_id: user.tenantId,
     enabled_modules: ['manage', 'inclass', 'stock'],
-    welcome_message: '歡迎使用 94CramBot！',
+    welcome_message: '歡迎使用 蜂神榜 AI 補習班助手系統！',
     plan: 'free',
     max_bindings: 5,
     max_ai_calls: 100,

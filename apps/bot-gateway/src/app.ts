@@ -8,7 +8,7 @@ export const app = new Hono();
 
 app.use('/*', cors());
 
-app.get('/', (c) => c.json({ message: '94CramBot Gateway API', status: 'running' }));
+app.get('/', (c) => c.json({ message: '蜂神榜 AI 補習班助手系統 Gateway API', status: 'running' }));
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }));
 
 // Telegram webhooks

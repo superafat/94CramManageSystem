@@ -18,7 +18,7 @@ export default function HomePage() {
           </p>
           <p className="text-sm md:text-base text-[#7b7387] mb-8 max-w-xl mx-auto">
             老師用對話操作三大系統，家長即時掌握孩子動態。<br />
-            Telegram Bot + Gemini AI，補習班管理從此不開電腦。
+            Telegram Bot + AI，補習班管理從此不開電腦。
           </p>
           <Link
             href="/login"
@@ -47,7 +47,7 @@ export default function HomePage() {
                 </div>
               </div>
               <p className="text-sm text-[#5d5468] mb-4">
-                蜂神榜 L3 — 專為補習班老師、班主任、管理員設計。用自然語言操作點名、繳費、庫存等三大系統，Gemini AI 理解指令，寫入操作二次確認。
+                蜂神榜 L3 — 專為補習班老師、班主任、管理員設計。用自然語言操作點名、繳費、庫存等三大系統，AI 理解指令，寫入操作二次確認。
               </p>
               <div className="space-y-2">
                 {[
@@ -205,8 +205,8 @@ export default function HomePage() {
           <div className="space-y-4">
             {[
               {
-                q: '94CramBot 是什麼？',
-                a: '94CramBot 是補習班專屬的 Telegram AI 助手，包含千里眼（老師管理用）和順風耳（家長服務用）兩個 Bot，讓補習班管理不再需要打開電腦。',
+                q: '蜂神榜 AI 補習班助手系統 是什麼？',
+                a: '蜂神榜 AI 補習班助手系統 是補習班專屬的 Telegram AI 助手，包含千里眼（老師管理用）和順風耳（家長服務用）兩個 Bot，讓補習班管理不再需要打開電腦。',
               },
               {
                 q: '千里眼支援哪些操作？',
@@ -218,7 +218,7 @@ export default function HomePage() {
               },
               {
                 q: '需要額外安裝 APP 嗎？',
-                a: '不需要。94CramBot 運行在 Telegram 上，只要安裝 Telegram 就能使用，無需額外下載任何 APP。',
+                a: '不需要。蜂神榜 AI 補習班助手系統 運行在 Telegram 上，只要安裝 Telegram 就能使用，無需額外下載任何 APP。',
               },
               {
                 q: 'AI Calls 用完了怎麼辦？',

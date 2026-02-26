@@ -46,7 +46,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="text-5xl mb-3">🤖</div>
-          <h1 className="text-2xl font-bold text-[#4b4355]">94CramBot</h1>
+          <h1 className="text-2xl font-bold text-[#4b4355]">蜂神榜 AI 補習班助手系統</h1>
           <p className="text-sm text-[#7b7387] mt-1">登入您的帳號</p>
         </div>
 

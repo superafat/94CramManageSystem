@@ -36,7 +36,7 @@ const systems = [
   {
     key: 'bot',
     emoji: '🤖',
-    name: '94CramBot AI 助手',
+    name: '蜂神榜 AI 補習班助手系統 AI 助手',
     tagline: 'Telegram 對話即操作，管理不開電腦',
     description: '透過 Telegram 聊天機器人，用自然語言完成點名、繳費、出貨等操作。Gemini AI 理解你的指令，寫入前二次確認，安全又方便。',
     url: process.env.BOT_DASHBOARD_URL || 'https://t.me/cram94bot',
@@ -48,7 +48,7 @@ const systems = [
 const faqs = [
   {
     q: '四個系統可以單獨購買嗎？',
-    a: '可以。每個系統獨立運作、按需選購。整合使用時，出勤、成績、庫存資料可自動串接，無需重複輸入。94CramBot 搭配任一系統使用即可。',
+    a: '可以。每個系統獨立運作、按需選購。整合使用時，出勤、成績、庫存資料可自動串接，無需重複輸入。蜂神榜 AI 補習班助手系統 搭配任一系統使用即可。',
   },
   {
     q: '點名系統需要購買特殊硬體嗎？',
@@ -56,22 +56,22 @@ const faqs = [
   },
   {
     q: '資料存放在哪裡？安全嗎？',
-    a: '全部存放於 Google Cloud Platform 台灣/亞太區機房，SSL 加密傳輸，定期備份，符合個資法規範。94CramBot 的寫入操作皆需二次確認，不會誤操作。',
+    a: '全部存放於 Google Cloud Platform 台灣/亞太區機房，SSL 加密傳輸，定期備份，符合個資法規範。蜂神榜 AI 補習班助手系統 的寫入操作皆需二次確認，不會誤操作。',
   },
   {
     q: '連鎖多校區可以統一管理嗎？',
-    a: '可以。94Manage 和 94Stock 均支援多分校架構，總部可統一查看各校區數據，各分校也可獨立操作。94CramBot 支援一鍵切換不同校區。',
+    a: '可以。94Manage 和 94Stock 均支援多分校架構，總部可統一查看各校區數據，各分校也可獨立操作。蜂神榜 AI 補習班助手系統 支援一鍵切換不同校區。',
   },
   {
     q: '免費試用結束後資料會消失嗎？',
     a: '不會。試用期結束後資料保留 30 天，可選擇升級繼續使用，或匯出資料離開，不強制綁定。',
   },
   {
-    q: '94CramBot 是什麼？怎麼用？',
-    a: '94CramBot 是 Telegram 聊天機器人 AI 助手。綁定補習班帳號後，直接用自然語言對話即可操作三大系統，例如「陳小明今天請假」、「高二陳小明繳 5000 元」。所有寫入操作都會先確認才執行。',
+    q: '蜂神榜 AI 補習班助手系統 是什麼？怎麼用？',
+    a: '蜂神榜 AI 補習班助手系統 是 Telegram 聊天機器人 AI 助手。綁定補習班帳號後，直接用自然語言對話即可操作三大系統，例如「陳小明今天請假」、「高二陳小明繳 5000 元」。所有寫入操作都會先確認才執行。',
   },
   {
-    q: '94CramBot 支援哪些操作？',
+    q: '蜂神榜 AI 補習班助手系統 支援哪些操作？',
     a: '目前支援：出缺勤登記與查詢、繳費登記與查詢、學生資料查詢與新增、庫存查詢與進出貨。查詢類操作即時回覆，寫入類操作需點擊確認按鈕才會執行。',
   },
   {
@@ -148,7 +148,7 @@ export default function HomePage() {
             <a href={process.env.BOT_DASHBOARD_URL || 'https://t.me/cram94bot'} className="bg-white rounded-xl p-5 border border-[#d8d1c6] hover:shadow-md transition text-left">
               <p className="font-bold text-[#4b5c53] mb-2">🤖 想用手機對話操作系統</p>
               <p className="text-[#6b7c73] text-xs mb-3">Telegram AI 助手，說話就能辦事</p>
-              <span className="text-[#A89BB5] font-semibold text-xs">→ 前往 94CramBot</span>
+              <span className="text-[#A89BB5] font-semibold text-xs">→ 前往 蜂神榜 AI 補習班助手系統</span>
             </a>
           </div>
         </div>
@@ -174,12 +174,12 @@ export default function HomePage() {
       <footer className="bg-[#4b5c53] text-[#c8d5cc] px-6 py-10 text-center text-sm">
         <div className="mx-auto max-w-4xl">
           <p className="text-lg font-semibold text-white mb-2">🐝 蜂神榜 Ai 教育管理平台</p>
-          <p className="mb-5 text-[#a8b9b2] text-xs">94Manage · 94inClass · 94Stock · 94CramBot</p>
+          <p className="mb-5 text-[#a8b9b2] text-xs">94Manage · 94inClass · 94Stock · 蜂神榜 AI 補習班助手系統</p>
           <div className="flex flex-wrap justify-center gap-6 mb-5 text-[#a8b9b2] text-xs">
             <a href={process.env.MANAGE_URL || '#'} className="hover:text-white transition">94Manage 學員管理</a>
             <a href={process.env.INCLASS_URL || '#'} className="hover:text-white transition">94inClass 點名系統</a>
             <a href={process.env.STOCK_URL || '#'} className="hover:text-white transition">94Stock 庫存管理</a>
-            <a href={process.env.BOT_DASHBOARD_URL || 'https://t.me/cram94bot'} className="hover:text-white transition">94CramBot AI 助手</a>
+            <a href={process.env.BOT_DASHBOARD_URL || 'https://t.me/cram94bot'} className="hover:text-white transition">蜂神榜 AI 補習班助手系統 AI 助手</a>
           </div>
           <p className="text-[#6b7c73] text-xs">© 2026 94cram.com · 蜂神榜 Ai 教育科技 · All rights reserved.</p>
         </div>

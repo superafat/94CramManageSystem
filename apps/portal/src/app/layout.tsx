@@ -4,9 +4,9 @@ import './globals.css';
 export const metadata: Metadata = {
   title: '蜂神榜 Ai 教育管理平台 | 補習班管理、點名、庫存、AI 助手一站整合',
   description:
-    '蜂神榜 Ai 教育管理平台整合四大系統：94Manage 補習班學員管理、94inClass AI 點名系統、94Stock 教材庫存管理、94CramBot Telegram AI 助手。專為台灣補習班、才藝教室、連鎖教育機構設計，免費試用。',
+    '蜂神榜 Ai 教育管理平台整合四大系統：94Manage 補習班學員管理、94inClass AI 點名系統、94Stock 教材庫存管理、蜂神榜 AI 補習班助手系統 Telegram AI 助手。專為台灣補習班、才藝教室、連鎖教育機構設計，免費試用。',
   keywords:
-    '補習班管理系統, 補習班點名系統, 補習班庫存管理, 補習班AI助手, Telegram機器人, 學員管理系統, NFC點名, AI點名, 教育管理平台, 補習班軟體, 才藝教室管理, 安親班管理, 蜂神榜, 94cram, 94CramBot',
+    '補習班管理系統, 補習班點名系統, 補習班庫存管理, 補習班AI助手, Telegram機器人, 學員管理系統, NFC點名, AI點名, 教育管理平台, 補習班軟體, 才藝教室管理, 安親班管理, 蜂神榜, 94cram, 蜂神榜 AI 補習班助手系統',
   authors: [{ name: '蜂神榜 Ai 教育科技' }],
   openGraph: {
     title: '蜂神榜 Ai 教育管理平台 | 補習班管理、點名、庫存、AI 助手四合一',
@@ -42,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   "name": "四個系統可以單獨購買嗎？",
                   "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "可以。每個系統獨立運作、按需選購。整合使用時，出勤、成績、庫存資料可自動串接，無需重複輸入。94CramBot 搭配任一系統使用即可。"
+                    "text": "可以。每個系統獨立運作、按需選購。整合使用時，出勤、成績、庫存資料可自動串接，無需重複輸入。蜂神榜 AI 補習班助手系統 搭配任一系統使用即可。"
                   }
                 },
                 {
@@ -58,7 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   "name": "資料存放在哪裡？安全嗎？",
                   "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "全部存放於 Google Cloud Platform 台灣/亞太區機房，SSL 加密傳輸，定期備份，符合個資法規範。94CramBot 的寫入操作皆需二次確認，不會誤操作。"
+                    "text": "全部存放於 Google Cloud Platform 台灣/亞太區機房，SSL 加密傳輸，定期備份，符合個資法規範。蜂神榜 AI 補習班助手系統 的寫入操作皆需二次確認，不會誤操作。"
                   }
                 },
                 {
@@ -66,7 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   "name": "連鎖多校區可以統一管理嗎？",
                   "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "可以。94Manage 和 94Stock 均支援多分校架構，總部可統一查看各校區數據，各分校也可獨立操作。94CramBot 支援一鍵切換不同校區。"
+                    "text": "可以。94Manage 和 94Stock 均支援多分校架構，總部可統一查看各校區數據，各分校也可獨立操作。蜂神榜 AI 補習班助手系統 支援一鍵切換不同校區。"
                   }
                 },
                 {
@@ -79,15 +79,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 },
                 {
                   "@type": "Question",
-                  "name": "94CramBot 是什麼？怎麼用？",
+                  "name": "蜂神榜 AI 補習班助手系統 是什麼？怎麼用？",
                   "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "94CramBot 是 Telegram 聊天機器人 AI 助手。綁定補習班帳號後，直接用自然語言對話即可操作三大系統，例如「陳小明今天請假」、「高二陳小明繳 5000 元」。所有寫入操作都會先確認才執行。"
+                    "text": "蜂神榜 AI 補習班助手系統 是 Telegram 聊天機器人 AI 助手。綁定補習班帳號後，直接用自然語言對話即可操作三大系統，例如「陳小明今天請假」、「高二陳小明繳 5000 元」。所有寫入操作都會先確認才執行。"
                   }
                 },
                 {
                   "@type": "Question",
-                  "name": "94CramBot 支援哪些操作？",
+                  "name": "蜂神榜 AI 補習班助手系統 支援哪些操作？",
                   "acceptedAnswer": {
                     "@type": "Answer",
                     "text": "目前支援：出缺勤登記與查詢、繳費登記與查詢、學生資料查詢與新增、庫存查詢與進出貨。查詢類操作即時回覆，寫入類操作需點擊確認按鈕才會執行。"

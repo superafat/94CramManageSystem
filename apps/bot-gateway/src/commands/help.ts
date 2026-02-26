@@ -3,7 +3,7 @@ import { sendMessage } from '../utils/telegram';
 export async function handleHelp(chatId: string): Promise<void> {
   await sendMessage(
     chatId,
-    `🤖 <b>94CramBot 使用說明</b>
+    `🤖 <b>蜂神榜 AI 補習班助手系統 使用說明</b>
 
 <b>📋 點名系統</b>
 • 「陳小明今天請假」→ 登記請假

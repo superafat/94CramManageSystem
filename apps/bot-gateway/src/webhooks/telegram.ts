@@ -87,7 +87,7 @@ telegramWebhook.post('/', async (c) => {
   if (!auth) {
     await sendMessage(
       msg.chatId,
-      '👋 歡迎使用 94CramBot！\n\n請先在 94Manage 後台生成綁定碼，然後輸入：\n/bind 123456'
+      '👋 歡迎使用 蜂神榜 AI 補習班助手系統！\n\n請先在 94Manage 後台生成綁定碼，然後輸入：\n/bind 123456'
     );
     return c.json({ ok: true });
   }

@@ -35,7 +35,7 @@ interface ConversationContext {
 const conversations = new Map<number, ConversationContext>();
 const TIMEOUT_MS = 30 * 60 * 1000; // 30 分鐘
 
-// ==================== Gemini AI 初始化 ====================
+// ==================== AI AI 初始化 ====================
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
@@ -141,7 +141,7 @@ function addMessage(chatId: number, role: 'user' | 'assistant', content: string)
 }
 
 /**
- * 使用 Gemini 生成自然回應
+ * 使用 AI 生成自然回應
  */
 async function generateNaturalResponse(
   systemPrompt: string,
@@ -159,7 +159,7 @@ ${context ? `對話脈絡：\n${context}\n` : ''}
     const result = await model.generateContent(prompt);
     return result.response.text();
   } catch (error) {
-    console.error('Gemini API 錯誤:', error);
+    console.error('AI API 錯誤:', error);
     return '不好意思，我需要一點時間整理思緒，請稍後再試一次 😊';
   }
 }
