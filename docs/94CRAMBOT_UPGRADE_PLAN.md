@@ -201,4 +201,252 @@ bot_notifications       → 通知紀錄（推播歷史）
 
 ---
 
+---
+
+## 十一、技術細節
+
+### 1. 資料模型
+
+#### Firestore Collections
+
+```typescript
+// bot_subscriptions - 租戶訂閱狀態
+interface BotSubscription {
+  tenantId: string;
+  adminBot: {
+    active: boolean;
+    plan: 'free' | 'basic' | 'pro' | 'enterprise';
+    aiCallsUsed: number;
+    aiCallsLimit: number;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+  parentBot: {
+    active: boolean;
+    plan: 'free' | 'basic' | 'pro' | 'enterprise';
+    parentCount: number;
+    parentLimit: number;
+    aiCallsUsed: number;
+    aiCallsLimit: number;
+    created    updatedAt: Date;
+  };
+}
+
+// bot_parent_bindings - 家長At: Date;
+綁定
+interface ParentBinding {
+  id: string;
+  tenantId: string;
+  studentId: string;
+  parentTelegramId: string;
+  parentName: string;
+  parentPhone?: string;
+  boundAt: Date;
+  active: boolean;
+}
+
+// bot_parent_invites - 家長邀請碼
+interface ParentInvite {
+  id: string;
+  tenantId: string;
+  studentId: string;
+  studentName: string;
+  inviteCode: string; // 6位數
+  expiresAt: Date;
+  usedAt?: Date;
+  usedByTelegramId?: string;
+  createdBy: string; // admin user id
+  createdAt: Date;
+}
+
+// bot_notifications - 通知紀錄
+interface BotNotification {
+  id: string;
+  tenantId: string;
+  type: 'attendance' | 'grades' | 'payments' | 'schedule' | 'system';
+  title: string;
+  message: string;
+  telegramChatId: string;
+  sentAt: Date;
+  delivered: boolean;
+  error?: string;
+}
+
+// bot_bind_codes - 管理員 Bot 綁定碼（現有結構擴充）
+interface BindCode {
+  code: string;
+  tenantId: string;
+  role: 'admin' | 'teacher';
+  userId: string;
+  createdAt: Date;
+  usedAt?: Date;
+}
+```
+
+### 2. API 閘道設計
+
+```
+                        ┌─────────────────────┐
+                        │   Telegram Users    │
+                        └──────────┬──────────┘
+                                   │
+                    ┌──────────────┴──────────────┐
+                    │                             │
+           ┌────────▼────────┐          ┌────────▼────────┐
+           │ 千里眼 Webhook  │          │ 順風耳 Webhook  │
+           │ /webhook/telegram│         │/webhook/telegram-parent│
+           └────────┬────────┘          └────────┬────────┘
+                    │                             │
+           ┌────────▼────────────────────────────▼────────┐
+           │              bot-gateway                  │
+           │  ┌─────────────────────────────────────┐   │
+           │  │         AI Engine (ai-engine.ts)   │   │
+           │  │  - 千里眼 Prompt (Chapter 6)       │   │
+           │  │  - 順風耳 Prompt (Chapter 6)       │   │
+           │  └─────────────────────────────────────┘   │
+           │         │                   │              │
+           │  ┌──────▼──────┐   ┌───────▼──────┐       │
+           │  │ Intent Router│   │ Parent Router│       │
+           │  │ (管理員)     │   │ (家長查詢)   │       │
+           │  └──────┬──────┘   └───────┬──────┘       │
+           │         │                   │              │
+           └─────────┼───────────────────┼──────────────┘
+                     │                   │
+           ┌─────────▼─────┐   ┌────────▼────────┐
+           │  manage-backend│   │  inclass-backend│
+           │  (繳費/庫存)  │   │  (點名/成績)   │
+           └───────────────┘   └────────────────┘
+```
+
+### 3. 訊息流程
+
+#### 千里眼（管理員）
+```
+User → Telegram → Webhook → Intent Router → AI Engine (千里眼 Prompt)
+    → Execute Intent →三大系統 API → Response → Telegram
+```
+
+#### 順風耳（家長）
+```
+User → Telegram → Webhook → Parent Router → AI Engine (順風耳 Prompt)
+    → 查詢意圖分類 → Parent API → Response → Telegram
+    （唯讀：只能查詢，不能寫入）
+```
+
+### 4. 安全設計
+
+| 項目 | 實作 |
+|------|------|
+| 身份驗證 | JWT Token（共用 94 SSO） |
+| Telegram 驗證 | HMAC-SHA256 簽名驗證 |
+| API 授權 | Bearer Token + Tenant ID 檢查 |
+| Rate Limiting | 每分鐘 20 則訊息/用戶 |
+| 敏感資料 | 家長只能查自己孩子的資料 |
+| 寫入限制 | 順風耳完全唯讀 |
+
+---
+
+## 十二、API 規格
+
+### A. Dashboard API（需要 JWT）
+
+#### Auth
+| Method | Path | 說明 |
+|--------|------|------|
+| POST | `/api/auth/login` | SSO 登入（共用現有） |
+| POST | `/api/auth/verify` | 驗證 JWT Token |
+
+#### Subscriptions
+| Method | Path | 說明 |
+|--------|------|------|
+| GET | `/api/subscriptions` | 取得租戶訂閱狀態 |
+| PUT | `/api/subscriptions` | 更新訂閱方案 |
+
+#### Bind Codes
+| Method | Path | 說明 |
+|--------|------|------|
+| GET | `/api/bind-codes` | 取得綁定碼列表 |
+| POST | `/api/bind-codes` | 產生新綁定碼 |
+| DELETE | `/api/bind-codes/:code` | 刪除綁定碼 |
+
+#### Parent Invites
+| Method | Path | 說明 |
+|--------|------|------|
+| GET | `/api/parent-invites` | 取得家長邀請碼列表 |
+| POST | `/api/parent-invites` | 產生家長邀請碼 |
+| DELETE | `/api/parent-invites/:id` | 刪除邀請碼 |
+
+#### Parent Bindings
+| Method | Path | 說明 |
+|--------|------|------|
+| GET | `/api/parent-bindings` | 取得家長綁定列表 |
+| DELETE | `/api/parent-bindings/:id` | 解除綁定 |
+
+#### Usage
+| Method | Path | 說明 |
+|--------|------|------|
+| GET | `/api/usage` | 取得 AI 用量統計 |
+| GET | `/api/usage/daily` | 每日用量 |
+| GET | `/api/usage/monthly` | 每月用量 |
+
+### B. Parent 查詢 API（bot-gateway 內部）
+
+| Method | Path | 說明 | 權限 |
+|--------|------|------|------|
+| GET | `/api/parent/attendance` | 查孩子出缺勤 | 綁定家長 |
+| GET | `/api/parent/grades` | 查孩子成績 | 綁定家長 |
+| GET | `/api/parent/payments` | 查繳費狀態 | 綁定家長 |
+| GET | `/api/parent/schedule` | 查課表 | 綁定家長 |
+| GET | `/api/parent/children` | 查綁定孩子列表 | 綁定家長 |
+
+### C. Webhook Endpoints
+
+| Bot | Path | Method | 說明 |
+|-----|------|--------|------|
+| 千里眼 | `/webhook/telegram` | POST | 管理員 Bot 更新 |
+| 順風耳 | `/webhook/telegram-parent` | POST | 家長 Bot 更新 |
+
+### D. Event Webhooks（推播用）
+
+| Event | 觸發來源 | 推播目標 |
+|-------|---------|---------|
+| `student.checkin` | inclass-backend | 綁定家長 |
+| `student.checkout` | inclass-backend | 綁定家長 |
+| `student.absent` | inclass-backend | 綁定家長 |
+| `grade.updated` | inclass-backend | 綁定家長 |
+| `payment.overdue` | manage-backend | 綁定家長 |
+
+---
+
+## 十三、測試計畫
+
+### Unit Tests
+- Intent Router 意圖分類準確率
+- Parent Router 資料隔離
+- API 授權檢查
+
+### Integration Tests
+- 千里眼 → 三大系統 API 串接
+- 順風耳 → Parent API 串接
+- Webhook → Telegram 訊息傳遞
+
+### E2E Tests
+- 管理員完整流程：登入 → 產生邀請碼 → 查看用量
+- 家長完整流程：收到邀請 → /bind → 查詢出缺勤 → 收到推播
+
+---
+
+## 十四、里程碑
+
+| 階段 | 完成條件 | 預估天數 |
+|------|---------|---------|
+| M1 | Phase 1 完成（bot-dashboard 首頁） | 1 天 |
+| M2 | Phase 2 完成（Dashboard 管理介面） | 2 天 |
+| M3 | Phase 3 完成（bot-gateway 擴充） | 2 天 |
+| M4 | Phase 4 完成（部署上線） | 1 天 |
+| M5 | Phase 5 完成（家長 Bot 完整功能） | 2 天 |
+| **總計** | | **8 天** |
+
+---
+
 **等老闆確認後開始執行。** 🎣
