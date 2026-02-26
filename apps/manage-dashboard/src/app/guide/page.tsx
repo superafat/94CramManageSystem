@@ -17,7 +17,7 @@ export default function GuidePage() {
         </button>
         <h1 className="text-3xl text-primary mb-2 flex items-center gap-3">
           <span className="text-4xl">📚</span>
-          蜂神榜 Ai 補習班管理系統 使用說明
+          蜂神榜 補習班 Ai 管理系統 使用說明
         </h1>
         <p className="text-text-muted text-base">完整功能教學，5 分鐘快速上手</p>
       </div>
@@ -97,15 +97,15 @@ export default function GuidePage() {
       </Section>
 
       {/* Integration */}
-      <Section emoji="🔗" title="與 蜂神榜 Ai 補習班點名系統 整合說明">
+      <Section emoji="🔗" title="與 蜂神榜 補習班 Ai 點名系統 整合說明">
         <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-6 rounded-2xl mb-5">
           <h3 className="text-xl text-primary mb-4 font-bold">
-            🐝 蜂神榜 Ai 補習班管理系統 + 蜂神榜 Ai 點名系統 = 完整解決方案
+            🐝 蜂神榜 補習班 Ai 管理系統 + 蜂神榜 補習班 Ai 點名系統 = 完整解決方案
           </h3>
           
           <div className="mb-5">
             <h4 className="text-base text-primary mb-2 font-bold">
-              蜂神榜 Ai 補習班點名系統（教學前線）
+              蜂神榜 補習班 Ai 點名系統（教學前線）
             </h4>
             <ul className="ml-5 text-text text-sm leading-relaxed">
               <li>NFC 刷卡點名 + AI 臉部辨識</li>
@@ -117,7 +117,7 @@ export default function GuidePage() {
 
           <div className="mb-5">
             <h4 className="text-base text-secondary mb-2 font-bold">
-              蜂神榜 Ai 補習班管理系統（營運後台）
+              蜂神榜 補習班 Ai 管理系統（營運後台）
             </h4>
             <ul className="ml-5 text-text text-sm leading-relaxed">
               <li>完整出勤歷史與分析</li>
@@ -154,7 +154,7 @@ export default function GuidePage() {
       {/* FAQ */}
       <Section emoji="❓" title="常見問題">
         <FAQ 
-          q="蜂神榜 Ai 補習班管理系統和點名系統有什麼不同？"
+          q="蜂神榜 補習班 Ai 管理系統和點名系統有什麼不同？"
           a="點名系統專注於「點名」（NFC、臉辨、LINE 通知），管理系統專注於「管理」（成績、帳務、薪資、AI）。可以單獨使用，也可以整合使用。"
         />
         

@@ -29,7 +29,7 @@ export function createBot(token: string, defaultBranchId: string) {
   // /start — Welcome
   bot.command('start', (ctx) => {
     ctx.reply(
-      '👋 你好！我是蜂神榜 AI 補習班助手系統。' +
+      '👋 你好！我是蜂神榜 補習班 Ai 助手系統。' +
       '你可以直接問我任何問題：\n' +
       '📅 「數學課什麼時候上？」\n' +
       '💰 「學費多少錢？」\n' +
@@ -46,7 +46,7 @@ export function createBot(token: string, defaultBranchId: string) {
   // /help
   bot.command('help', (ctx) => {
     ctx.reply(
-      '🤖 *蜂神榜 AI 補習班助手系統*' +
+      '🤖 *蜂神榜 補習班 Ai 助手系統*' +
       '📋 *可用指令：*\n' +
       '/start \\- 開始使用\n' +
       '/help \\- 顯示幫助\n' +

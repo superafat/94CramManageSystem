@@ -12,7 +12,7 @@ app.use('/*', cors());
 // Body size limit: 1MB default
 app.use('/*', bodyLimit({ maxSize: 1024 * 1024 }));
 
-app.get('/', (c) => c.json({ message: '蜂神榜 AI 補習班助手系統 Gateway API', status: 'running' }));
+app.get('/', (c) => c.json({ message: '蜂神榜 補習班 Ai 助手系統 Gateway API', status: 'running' }));
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }));
 
 // Telegram webhooks

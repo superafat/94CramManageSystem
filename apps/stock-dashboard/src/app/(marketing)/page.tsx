@@ -74,7 +74,7 @@ export default function MarketingHomePage() {
       <section className="bg-gradient-to-br from-[#e8e1d7] via-[#dde6da] to-[#d3ddd2] px-6 py-20">
         <div className="mx-auto max-w-6xl text-center">
           <h1 className="text-4xl font-bold tracking-tight text-[#4b5c53] md:text-5xl">
-            蜂神榜 Ai 補習班庫存管理系統
+            蜂神榜 補習班 Ai 庫存管理系統
           </h1>
           <p className="mx-auto mt-6 max-w-3xl text-lg text-[#5d6c64]">
             專為教育機構設計的庫存管理解決方案，讓講義、教材、耗材管理更輕鬆

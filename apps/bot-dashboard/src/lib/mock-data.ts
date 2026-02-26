@@ -1,4 +1,4 @@
-// 蜂神榜 AI 補習班助手系統 Dashboard — Mock Data (Phase 2)
+// 蜂神榜 補習班 Ai 助手系統 Dashboard — Mock Data (Phase 2)
 // 所有資料為假資料，API 尚未建立（Phase 3）
 
 // ============================================================

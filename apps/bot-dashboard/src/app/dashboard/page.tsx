@@ -4,7 +4,7 @@ export default function DashboardPage() {
       {/* Welcome */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-[#4b4355]">歡迎回來 👋</h1>
-        <p className="text-sm text-[#7b7387] mt-1">蜂神榜 AI 補習班助手系統 管理面板 — 查看 Bot 狀態與用量統計</p>
+        <p className="text-sm text-[#7b7387] mt-1">蜂神榜 補習班 Ai 助手系統 管理面板 — 查看 Bot 狀態與用量統計</p>
       </div>
 
       {/* Stats Grid */}

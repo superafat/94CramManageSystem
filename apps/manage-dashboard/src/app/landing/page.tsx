@@ -19,7 +19,7 @@ export default function LandingPage() {
       <section className="px-5 py-10 text-center max-w-6xl mx-auto">
         <div className="text-5xl mb-3 animate-bounce">🐝</div>
         <h1 className="text-3xl md:text-4xl font-bold text-primary mb-3 leading-tight">
-          蜂神榜 Ai 補習班管理系統
+          蜂神榜 補習班 Ai 管理系統
         </h1>
         <p className="text-lg text-text font-medium mb-3">
           補習班管理系統
@@ -102,11 +102,11 @@ export default function LandingPage() {
       <section className="py-10 px-5 bg-gradient-to-br from-amber-50 to-orange-50">
         <div className="max-w-6xl mx-auto text-center">
           <h2 className="text-2xl text-primary mb-6 font-bold">
-            🔗 與 蜂神榜 Ai 補習班點名系統 完美整合
+            🔗 與 蜂神榜 補習班 Ai 點名系統 完美整合
           </h2>
           <p className="text-base text-text-muted mb-6 max-w-3xl mx-auto">
-            蜂神榜 Ai 補習班管理系統 專注於<strong className="text-text">營運後台</strong>（財務、成績、薪資），<br/>
-            蜂神榜 Ai 補習班點名系統 負責<strong className="text-text">教學前線</strong>（NFC 點名、臉部辨識）。<br/>
+            蜂神榜 補習班 Ai 管理系統 專注於<strong className="text-text">營運後台</strong>（財務、成績、薪資），<br/>
+            蜂神榜 補習班 Ai 點名系統 負責<strong className="text-text">教學前線</strong>（NFC 點名、臉部辨識）。<br/>
             兩個系統<strong className="text-primary">無縫整合</strong>，資料自動同步。
           </p>
           
@@ -280,7 +280,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="py-10 px-5 bg-morandi-dark text-white text-center">
-        <p className="mb-2">© 2026 蜂神榜 Ai 補習班管理系統. All rights reserved.</p>
+        <p className="mb-2">© 2026 蜂神榜 補習班 Ai 管理系統. All rights reserved.</p>
         <p className="text-sm opacity-80">
           <a href="/guide" className="text-white underline">使用說明</a>
           <span className="mx-3">·</span>

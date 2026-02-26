@@ -30,7 +30,7 @@ function MobileHeader() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-xl">🤖</span>
-          <span className="font-bold text-[#4b4355] text-sm">蜂神榜 AI 補習班助手系統</span>
+          <span className="font-bold text-[#4b4355] text-sm">蜂神榜 補習班 Ai 助手系統</span>
         </div>
         <div className="text-xs text-[#7b7387]">管理面板</div>
       </div>

@@ -11,7 +11,7 @@ export default function HomePage() {
           <h1 className="text-3xl md:text-5xl font-bold text-[#4b4355] leading-tight mb-4">
             蜂神榜
             <br />
-            Ai 補習班助手系統
+            補習班 Ai 助手系統
           </h1>
           <p className="text-lg md:text-xl text-[#5d5468] mb-2 font-medium">
             千里眼 × 順風耳，補習班智慧雙引擎
@@ -205,8 +205,8 @@ export default function HomePage() {
           <div className="space-y-4">
             {[
               {
-                q: '蜂神榜 AI 補習班助手系統 是什麼？',
-                a: '蜂神榜 AI 補習班助手系統 是補習班專屬的 Telegram AI 助手，包含千里眼（老師管理用）和順風耳（家長服務用）兩個 Bot，讓補習班管理不再需要打開電腦。',
+                q: '蜂神榜 補習班 Ai 助手系統 是什麼？',
+                a: '蜂神榜 補習班 Ai 助手系統 是補習班專屬的 Telegram AI 助手，包含千里眼（老師管理用）和順風耳（家長服務用）兩個 Bot，讓補習班管理不再需要打開電腦。',
               },
               {
                 q: '千里眼支援哪些操作？',
@@ -218,7 +218,7 @@ export default function HomePage() {
               },
               {
                 q: '需要額外安裝 APP 嗎？',
-                a: '不需要。蜂神榜 AI 補習班助手系統 運行在 Telegram 上，只要安裝 Telegram 就能使用，無需額外下載任何 APP。',
+                a: '不需要。蜂神榜 補習班 Ai 助手系統 運行在 Telegram 上，只要安裝 Telegram 就能使用，無需額外下載任何 APP。',
               },
               {
                 q: 'AI Calls 用完了怎麼辦？',
@@ -249,7 +249,7 @@ export default function HomePage() {
       {/* ── Footer ── */}
       <footer className="bg-[#4b4355] text-[#c8c0d0] px-4 py-10 text-center text-sm">
         <div className="mx-auto max-w-4xl">
-          <p className="text-lg font-semibold text-white mb-2">🤖 蜂神榜 Ai 補習班助手系統</p>
+          <p className="text-lg font-semibold text-white mb-2">🤖 蜂神榜 補習班 Ai 助手系統</p>
           <p className="mb-5 text-[#a89bb5] text-xs">千里眼 · 順風耳 · 蜂神榜 Ai 教育管理平台</p>
           <div className="flex flex-wrap justify-center gap-6 mb-5 text-[#a89bb5] text-xs">
             <a href="https://94cram.app" className="hover:text-white transition">蜂神榜平台</a>

@@ -27,7 +27,7 @@ export function Sidebar() {
         <div className="flex items-center gap-3">
           <span className="text-2xl">🤖</span>
           <div>
-            <div className="font-bold text-[#4b4355] text-sm">蜂神榜 AI 補習班助手系統</div>
+            <div className="font-bold text-[#4b4355] text-sm">蜂神榜 補習班 Ai 助手系統</div>
             <div className="text-[10px] text-[#7b7387]">AI 助手管理面板</div>
           </div>
         </div>
