@@ -24,7 +24,7 @@ export default function AuditLogsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState({ tableName: '', action: '', needsAlert: '' })
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3100'
+  const API_BASE = ''
 
   const getAuthHeaders = () => {
     return { 'Content-Type': 'application/json' }

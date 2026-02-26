@@ -140,5 +140,47 @@ export async function runMigrations() {
     console.info('Migration v11: audit_logs may already exist')
   }
   
+  // Migration v12: Ensure conversations table exists (for AI dialogue log)
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS conversations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id UUID REFERENCES tenants(id),
+        branch_id UUID REFERENCES branches(id),
+        user_id UUID REFERENCES users(id),
+        channel VARCHAR(20) NOT NULL DEFAULT 'web',
+        intent VARCHAR(30),
+        query TEXT NOT NULL,
+        answer TEXT NOT NULL,
+        model TEXT,
+        latency_ms INTEGER,
+        tokens_used INTEGER,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `)
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_conversations_tenant ON conversations(tenant_id)`)
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_conversations_branch ON conversations(branch_id)`)
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_conversations_created ON conversations(created_at)`)
+    console.info('Migration v12: conversations table created')
+  } catch (err) {
+    console.info('Migration v12: conversations may already exist')
+  }
+
+  // Migration v13: Ensure manage_settings table exists
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS manage_settings (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id UUID NOT NULL UNIQUE REFERENCES tenants(id),
+        settings JSONB NOT NULL DEFAULT '{}',
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_by UUID REFERENCES users(id)
+      )
+    `)
+    console.info('Migration v13: manage_settings table created')
+  } catch (err) {
+    console.info('Migration v13: manage_settings may already exist')
+  }
+
   console.info('All migrations complete!')
 }

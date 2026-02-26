@@ -33,7 +33,7 @@ interface Course {
   duration_minutes: number
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3100'
+const API_BASE = ''
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -65,11 +65,11 @@ export default function SchedulesPage() {
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [addForm, setAddForm] = useState({
-    course_id: '',
-    teacher_id: '',
-    scheduled_date: '',
-    start_time: '',
-    end_time: '',
+    courseId: '',
+    teacherId: '',
+    scheduledDate: '',
+    startTime: '',
+    endTime: '',
   })
 
   const weekDates = getWeekDates(weekOffset)
@@ -153,7 +153,7 @@ export default function SchedulesPage() {
       })
       if (res.ok) {
         setShowAddModal(false)
-        setAddForm({ course_id: '', teacher_id: '', scheduled_date: '', start_time: '', end_time: '' })
+        setAddForm({ courseId: '', teacherId: '', scheduledDate: '', startTime: '', endTime: '' })
         fetchSchedules()
       }
     } catch (err) {
@@ -307,8 +307,8 @@ export default function SchedulesPage() {
               <div>
                 <label className="block text-sm text-text-muted mb-1">課程 *</label>
                 <select
-                  value={addForm.course_id}
-                  onChange={(e) => setAddForm({ ...addForm, course_id: e.target.value })}
+                  value={addForm.courseId}
+                  onChange={(e) => setAddForm({ ...addForm, courseId: e.target.value })}
                   className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
                   required
                 >
@@ -321,8 +321,8 @@ export default function SchedulesPage() {
               <div>
                 <label className="block text-sm text-text-muted mb-1">講師 *</label>
                 <select
-                  value={addForm.teacher_id}
-                  onChange={(e) => setAddForm({ ...addForm, teacher_id: e.target.value })}
+                  value={addForm.teacherId}
+                  onChange={(e) => setAddForm({ ...addForm, teacherId: e.target.value })}
                   className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
                   required
                 >
@@ -336,8 +336,8 @@ export default function SchedulesPage() {
                 <label className="block text-sm text-text-muted mb-1">日期 *</label>
                 <input
                   type="date"
-                  value={addForm.scheduled_date}
-                  onChange={(e) => setAddForm({ ...addForm, scheduled_date: e.target.value })}
+                  value={addForm.scheduledDate}
+                  onChange={(e) => setAddForm({ ...addForm, scheduledDate: e.target.value })}
                   className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
                   required
                 />
@@ -347,8 +347,8 @@ export default function SchedulesPage() {
                   <label className="block text-sm text-text-muted mb-1">開始時間 *</label>
                   <input
                     type="time"
-                    value={addForm.start_time}
-                    onChange={(e) => setAddForm({ ...addForm, start_time: e.target.value })}
+                    value={addForm.startTime}
+                    onChange={(e) => setAddForm({ ...addForm, startTime: e.target.value })}
                     className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
                     required
                   />
@@ -357,8 +357,8 @@ export default function SchedulesPage() {
                   <label className="block text-sm text-text-muted mb-1">結束時間 *</label>
                   <input
                     type="time"
-                    value={addForm.end_time}
-                    onChange={(e) => setAddForm({ ...addForm, end_time: e.target.value })}
+                    value={addForm.endTime}
+                    onChange={(e) => setAddForm({ ...addForm, endTime: e.target.value })}
                     className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
                     required
                   />
@@ -429,7 +429,7 @@ export default function SchedulesPage() {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
-                        body: JSON.stringify({ change_type: 'cancelled', reason: '手動取消' }),
+                        body: JSON.stringify({ changeType: 'cancel', reason: '手動取消' }),
                       })
                       setSelectedSchedule(null)
                       fetchSchedules()
