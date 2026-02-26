@@ -3,14 +3,14 @@
 export type System = '94manage' | '94inclass' | '94stock';
 export type Role = 'admin' | 'teacher' | 'staff' | 'parent' | 'student';
 
-export interface ApiResponse<T = any> {
+export type { ApiResponse, SuccessResponse, ErrorResponse, BaseResponse } from './api-response';
+export { createSuccessResponse, createErrorResponse } from './api-response';
+
+export interface PaginatedResponse<T> {
   success: boolean;
-  data?: T;
+  data?: T[];
   error?: string;
   message?: string;
-}
-
-export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   pagination: {
     page: number;
     limit: number;

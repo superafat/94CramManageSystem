@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { jwtVerify } from 'jose';
+import { verify } from '@94cram/shared/auth';
 import { config } from '../config';
 import { dashboardAuth, type DashboardUser } from '../middleware/auth';
 import { getOrCreateSubscription, upsertSubscription } from '../firestore/subscriptions';
@@ -28,12 +28,11 @@ apiRouter.post('/auth/verify', async (c) => {
 
   const token = authHeader.slice(7);
   try {
-    const secret = new TextEncoder().encode(jwtSecret);
-    const { payload } = await jwtVerify(token, secret);
+    const payload = await verify(token, jwtSecret);
     return c.json({
       valid: true,
       user: {
-        userId: payload.userId ?? payload.sub,
+        userId: payload.userId,
         tenantId: payload.tenantId,
         email: payload.email,
         name: payload.name,

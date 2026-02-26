@@ -1,5 +1,5 @@
 // 94Manage Schema - 學員管理專屬表
-import { pgTable, uuid, varchar, text, timestamp, boolean, integer, decimal, jsonb, uniqueIndex } from '../connection';
+import { pgTable, uuid, varchar, text, timestamp, boolean, integer, decimal, jsonb, uniqueIndex, index } from '../connection';
 
 // 課程
 export const manageCourses = pgTable('manage_courses', {
@@ -14,8 +14,11 @@ export const manageCourses = pgTable('manage_courses', {
   feeSemester: decimal('fee_semester', { precision: 10, scale: 2 }),
   feeYearly: decimal('fee_yearly', { precision: 10, scale: 2 }),
   hours: integer('hours'), // 總時數
+  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+  tenantIdx: index('manage_courses_tenant_id_idx').on(table.tenantId),
+}));
 
 // 學生
 export const manageStudents = pgTable('manage_students', {
@@ -29,8 +32,11 @@ export const manageStudents = pgTable('manage_students', {
   guardianName: varchar('guardian_name', { length: 100 }),
   guardianPhone: varchar('guardian_phone', { length: 20 }),
   status: varchar('status', { length: 20 }).default('active'), // active, inactive, graduated
+  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+  tenantIdx: index('manage_students_tenant_id_idx').on(table.tenantId),
+}));
 
 // 報名/選課
 export const manageEnrollments = pgTable('manage_enrollments', {
@@ -41,8 +47,13 @@ export const manageEnrollments = pgTable('manage_enrollments', {
   startDate: timestamp('start_date'),
   endDate: timestamp('end_date'),
   status: varchar('status', { length: 20 }).default('active'), // active, completed, cancelled
+  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+  tenantIdx: index('manage_enrollments_tenant_id_idx').on(table.tenantId),
+  studentIdx: index('manage_enrollments_student_id_idx').on(table.studentId),
+  courseIdx: index('manage_enrollments_course_id_idx').on(table.courseId),
+}));
 
 // 老師
 export const manageTeachers = pgTable('manage_teachers', {
@@ -54,8 +65,11 @@ export const manageTeachers = pgTable('manage_teachers', {
   email: varchar('email', { length: 255 }),
   expertise: text('expertise'), // 專長科目
   hourlyRate: decimal('hourly_rate', { precision: 10, scale: 2 }),
+  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+  tenantIdx: index('manage_teachers_tenant_id_idx').on(table.tenantId),
+}));
 
 // 繳費記錄
 export const managePayments = pgTable('manage_payments', {
@@ -66,8 +80,11 @@ export const managePayments = pgTable('manage_payments', {
   paymentMethod: varchar('payment_method', { length: 20 }), // cash, transfer, credit
   paidAt: timestamp('paid_at'),
   status: varchar('status', { length: 20 }).default('pending'), // pending, paid, overdue
+  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+  tenantIdx: index('manage_payments_tenant_id_idx').on(table.tenantId),
+}));
 
 // 系統設定（每個 tenant 一筆）
 export const manageSettings = pgTable('manage_settings', {

@@ -11,6 +11,10 @@ const DEMO_TENANT_IDS = new Set([
   '22222222-2222-2222-2222-222222222222',
 ])
 
+// Simple tenant cache: Map<tenantId, expiresAt>
+const tenantCache = new Map<string, number>()
+const TENANT_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
 export async function tenantMiddleware(c: Context, next: Next) {
   let tenantId: string | undefined
 
@@ -25,9 +29,15 @@ export async function tenantMiddleware(c: Context, next: Next) {
 
   // Validate tenant exists in DB (skip for demo tenants and auth routes)
   if (!DEMO_TENANT_IDS.has(tenantId)) {
-    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId))
-    if (!tenant) {
-      return c.json({ error: 'Tenant not found' }, 404)
+    const cached = tenantCache.get(tenantId)
+    if (cached && Date.now() < cached) {
+      // Cache hit — tenant is valid
+    } else {
+      const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId))
+      if (!tenant) {
+        return c.json({ error: 'Tenant not found' }, 404)
+      }
+      tenantCache.set(tenantId, Date.now() + TENANT_CACHE_TTL)
     }
   }
 

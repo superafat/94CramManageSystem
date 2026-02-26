@@ -1,5 +1,12 @@
 import type { Metadata } from 'next';
+import { Noto_Sans_TC } from 'next/font/google'
 import './globals.css';
+
+const notoSansTC = Noto_Sans_TC({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: '蜂神榜 Ai 教育管理平台 | 補習班管理、點名、庫存、AI 助手一站整合',
@@ -26,10 +33,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh-TW">
       <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap"
-          rel="stylesheet"
-        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -134,7 +137,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className="min-h-screen bg-morandi-bg">
+      <body className={`${notoSansTC.className} min-h-screen bg-morandi-bg`}>
         {children}
       </body>
     </html>

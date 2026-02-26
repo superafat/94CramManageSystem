@@ -20,9 +20,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libjpeg62-turbo libgif7 librsvg2-2 \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY --from=builder /app /app
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 --ingroup nodejs appuser
+COPY --from=builder --chown=appuser:nodejs /app/apps/manage-backend/dist ./apps/manage-backend/dist
+COPY --from=builder --chown=appuser:nodejs /app/apps/manage-backend/package.json ./apps/manage-backend/package.json
+COPY --from=builder --chown=appuser:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=appuser:nodejs /app/packages ./packages
+COPY --from=builder --chown=appuser:nodejs /app/package.json ./package.json
 WORKDIR /app/apps/manage-backend
 ENV NODE_ENV=production
 USER appuser

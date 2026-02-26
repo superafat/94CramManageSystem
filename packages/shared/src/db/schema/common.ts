@@ -1,5 +1,5 @@
 // 共用 Schema - tenants, users, branches, permissions
-import { pgTable, serial, varchar, uuid, timestamp, boolean, text } from '../connection';
+import { pgTable, serial, varchar, uuid, timestamp, boolean, text, index } from '../connection';
 
 export const tenants = pgTable('tenants', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -16,7 +16,9 @@ export const branches = pgTable('branches', {
   address: text('address'),
   phone: varchar('phone', { length: 20 }),
   createdAt: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+  tenantIdx: index('branches_tenant_id_idx').on(table.tenantId),
+}));
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -31,7 +33,9 @@ export const users = pgTable('users', {
   lastLoginAt: timestamp('last_login_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-});
+}, (table) => ({
+  tenantIdx: index('users_tenant_id_idx').on(table.tenantId),
+}));
 
 export const userPermissions = pgTable('user_permissions', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -39,7 +43,9 @@ export const userPermissions = pgTable('user_permissions', {
   resource: varchar('resource', { length: 50 }).notNull(), // manage, inclass, stock
   action: varchar('action', { length: 20 }).notNull(), // read, write, admin
   createdAt: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+  userIdx: index('user_permissions_user_id_idx').on(table.userId),
+}));
 
 export const auditLogs = pgTable('audit_logs', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -51,4 +57,6 @@ export const auditLogs = pgTable('audit_logs', {
   details: text('details'), // JSON string
   ipAddress: varchar('ip_address', { length: 45 }),
   createdAt: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+  tenantIdx: index('audit_logs_tenant_id_idx').on(table.tenantId),
+}));

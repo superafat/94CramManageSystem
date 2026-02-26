@@ -2,6 +2,9 @@ import { SystemCard } from '@/components/SystemCard';
 
 export const dynamic = 'force-dynamic';
 
+const GCP_PROJECT_NUMBER = process.env.GCP_PROJECT_NUMBER || '1015149159553'
+const gcpOrigin = (service: string) => `https://${service}-${GCP_PROJECT_NUMBER}.asia-east1.run.app`
+
 const systems = [
   {
     key: 'manage',
@@ -9,7 +12,7 @@ const systems = [
     name: '94Manage 學員管理',
     tagline: '補習班全方位管理中樞',
     description: '學員資料、出勤追蹤、成績管理、帳務收費、薪資計算、AI 流失預警，一套解決補習班所有行政難題。',
-    url: process.env.MANAGE_URL || 'https://cram94-manage-dashboard-1015149159553.asia-east1.run.app',
+    url: process.env.MANAGE_URL || gcpOrigin('cram94-manage-dashboard'),
     color: '#A8B5A2',
     highlights: ['出勤 × 成績 × 帳務三合一', 'AI 學生流失預警', '薪資自動計算', '免費試用 30 天'],
   },
@@ -19,7 +22,7 @@ const systems = [
     name: '94inClass 點名系統',
     tagline: '1 秒點名，家長即時知情',
     description: 'NFC 刷卡比刷悠遊卡還快，AI 臉辨防代簽，學生到校立即 LINE 通知家長。免硬體費用，開箱即用。',
-    url: process.env.INCLASS_URL || 'https://cram94-inclass-dashboard-1015149159553.asia-east1.run.app',
+    url: process.env.INCLASS_URL || gcpOrigin('cram94-inclass-dashboard'),
     color: '#C4A9A1',
     highlights: ['NFC 刷卡 1 秒點名', 'AI 臉部辨識', 'LINE 家長即時通知', '免費試用 30 天'],
   },
@@ -29,7 +32,7 @@ const systems = [
     name: '94Stock 庫存管理',
     tagline: '教材零浪費，庫存一目瞭然',
     description: '管理講義、教材、耗材，支援多校區統一管理。AI 預測學期備貨量，低庫存自動預警，Telegram 即時推送。',
-    url: process.env.STOCK_URL || 'https://cram94-stock-dashboard-1015149159553.asia-east1.run.app',
+    url: process.env.STOCK_URL || gcpOrigin('cram94-stock-dashboard'),
     color: '#9CADB7',
     highlights: ['多倉庫統一管理', 'AI 備貨量預測', '低庫存自動預警', '免費試用 14 天'],
   },

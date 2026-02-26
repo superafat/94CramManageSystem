@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { compress } from 'hono/compress'
+import { bodyLimit } from 'hono/body-limit'
 import { botRoutes } from './routes/bot'
 import { authRoutes, handleDemoLogin } from './routes/auth'
 import { adminRoutes } from './routes/admin'
@@ -17,7 +18,7 @@ import botExtRoutes from './routes/bot-ext'
 import { errorHandler } from './middleware/errorHandler'
 import { tenantMiddleware } from './middleware/tenant'
 import { requestTrackingMiddleware } from './middleware/requestTracking'
-import { rateLimit } from './middleware/rateLimit'
+import { checkRateLimit, getClientIP } from '@94cram/shared/middleware'
 import { runMigrations } from './db/startup-migrations'
 import { checkDatabaseHealth, getDatabaseMetrics, db } from './db'
 import { sql } from 'drizzle-orm'
@@ -31,18 +32,22 @@ runMigrations().catch((err) => logger.error('Migration failed', { error: err }))
 // Initialize event system
 initializeEventSystem()
 
+const GCP_PROJECT_NUMBER = process.env.GCP_PROJECT_NUMBER || '1015149159553'
+const gcpOrigin = (service: string) => `https://${service}-${GCP_PROJECT_NUMBER}.asia-east1.run.app`
+
 export const app = new Hono()
 
 // Performance: gzip compression
 app.use('*', compress())
 
+// Body size limit: 1MB default for API
+app.use('/api/*', bodyLimit({ maxSize: 1024 * 1024 }))
+
 // Global error handler using onError
 app.onError((error, context) => errorHandler(error, context))
 
 // Request tracking middleware (adds requestId and logger to context)
-if (process.env.NODE_ENV !== 'production') {
-  app.use('*', requestTrackingMiddleware)
-}
+app.use('*', requestTrackingMiddleware)
 
 app.use('*', cors({
   origin: [
@@ -55,13 +60,13 @@ app.use('*', cors({
     'https://94manage-miniapp-855393865280.asia-east1.run.app',
     'https://94manage-dashboard-855393865280.asia-east1.run.app',
     // 新的 Cloud Run URLs (cram94- 前綴)
-    'https://cram94-manage-dashboard-1015149159553.asia-east1.run.app',
-    'https://cram94-manage-backend-1015149159553.asia-east1.run.app',
-    'https://cram94-inclass-dashboard-1015149159553.asia-east1.run.app',
-    'https://cram94-inclass-backend-1015149159553.asia-east1.run.app',
-    'https://cram94-stock-dashboard-1015149159553.asia-east1.run.app',
-    'https://cram94-stock-backend-1015149159553.asia-east1.run.app',
-    'https://cram94-portal-1015149159553.asia-east1.run.app',
+    gcpOrigin('cram94-manage-dashboard'),
+    gcpOrigin('cram94-manage-backend'),
+    gcpOrigin('cram94-inclass-dashboard'),
+    gcpOrigin('cram94-inclass-backend'),
+    gcpOrigin('cram94-stock-dashboard'),
+    gcpOrigin('cram94-stock-backend'),
+    gcpOrigin('cram94-portal'),
     // Custom domain
     'https://manage.94cram.com',
     'https://inclass.94cram.com',
@@ -77,7 +82,15 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Global rate limiting (100 requests/min)
-app.use('/api/*', rateLimit())
+app.use('/api/*', async (c, next) => {
+  if (c.req.method === 'OPTIONS') return next()
+  const ip = getClientIP(c)
+  const result = checkRateLimit(`api:${ip}`, { maxRequests: 100 })
+  if (!result.allowed) {
+    return c.json({ error: 'Too many requests. Please try again later.' }, 429)
+  }
+  await next()
+})
 
 app.use('/api/*', tenantMiddleware)
 
@@ -145,7 +158,7 @@ app.route('/api', usersRoutes)
 // Demo fallback (for /admin legacy path without /api prefix)
 app.route('/admin', demoRoutes)
 
-// W8: 講師排課 + 薪資系統 (無 auth, 用於 Dashboard)
+// W8: 講師排課 + 薪資系統 (JWT + RBAC protected)
 app.route('/api/w8', w8Routes)
 
 // Notification system routes

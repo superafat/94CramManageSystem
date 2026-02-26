@@ -1,6 +1,13 @@
 import type { Metadata } from 'next'
+import { Noto_Sans_TC } from 'next/font/google'
 import './globals.css'
 import { ToastProvider } from '@/components/ui/ToastProvider'
+
+const notoSansTC = Noto_Sans_TC({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: '94Manage 補習班管理系統 | 學員管理、帳務、薪資、AI分析 | 蜂神榜',
@@ -26,13 +33,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-TW">
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="antialiased">
+      <body className={`${notoSansTC.className} antialiased`}>
         <ToastProvider position="top-right">
           {children}
         </ToastProvider>

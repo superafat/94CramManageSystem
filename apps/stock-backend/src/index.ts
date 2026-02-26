@@ -1,8 +1,13 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { bodyLimit } from 'hono/body-limit';
+import { checkRateLimit, getClientIP, clearRateLimitTimer } from '@94cram/shared/middleware';
 import routes from './routes/index';
 import botRoutes from './routes/bot/index';
+
+const GCP_PROJECT_NUMBER = process.env.GCP_PROJECT_NUMBER || '1015149159553'
+const gcpOrigin = (service: string) => `https://${service}-${GCP_PROJECT_NUMBER}.asia-east1.run.app`
 
 const app = new Hono();
 
@@ -10,12 +15,12 @@ const app = new Hono();
 app.use('/*', cors({
   origin: [
     'https://stock.94cram.app',
-    'https://cram94-stock-dashboard-1015149159553.asia-east1.run.app',
+    gcpOrigin('cram94-stock-dashboard'),
     'https://manage.94cram.app',
-    'https://cram94-manage-dashboard-1015149159553.asia-east1.run.app',
+    gcpOrigin('cram94-manage-dashboard'),
     'https://inclass.94cram.app',
-    'https://cram94-inclass-dashboard-1015149159553.asia-east1.run.app',
-    'https://cram94-portal-1015149159553.asia-east1.run.app',
+    gcpOrigin('cram94-inclass-dashboard'),
+    gcpOrigin('cram94-portal'),
     'http://localhost:3000',
     'http://localhost:3200',
     'http://localhost:3201',
@@ -25,50 +30,30 @@ app.use('/*', cors({
   allowHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id'],
 }));
 
-// Simple in-memory rate limiter
-const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+// Body size limit: 1MB default
+app.use('/api/*', bodyLimit({ maxSize: 1024 * 1024 }));
+
+// Auth rate limiter (stricter: 10/min)
 app.use('/api/auth/*', async (c, next) => {
   if (c.req.method === 'OPTIONS') return next();
-  const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  const key = `auth:${ip}`;
-  const now = Date.now();
-  const entry = rateLimitStore.get(key);
-  if (entry && now < entry.resetAt) {
-    entry.count++;
-    if (entry.count > 10) {
-      return c.json({ error: 'Too many requests. Please try again later.' }, 429);
-    }
-  } else {
-    rateLimitStore.set(key, { count: 1, resetAt: now + 60000 });
+  const ip = getClientIP(c);
+  const result = checkRateLimit(`auth:${ip}`, { maxRequests: 10 });
+  if (!result.allowed) {
+    return c.json({ error: 'Too many requests. Please try again later.' }, 429);
   }
   await next();
 });
 
-// General API rate limiter
+// General API rate limiter (100/min)
 app.use('/api/*', async (c, next) => {
   if (c.req.method === 'OPTIONS') return next();
-  const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  const key = `api:${ip}`;
-  const now = Date.now();
-  const entry = rateLimitStore.get(key);
-  if (entry && now < entry.resetAt) {
-    entry.count++;
-    if (entry.count > 100) {
-      return c.json({ error: 'Too many requests. Please try again later.' }, 429);
-    }
-  } else {
-    rateLimitStore.set(key, { count: 1, resetAt: now + 60000 });
+  const ip = getClientIP(c);
+  const result = checkRateLimit(`api:${ip}`, { maxRequests: 100 });
+  if (!result.allowed) {
+    return c.json({ error: 'Too many requests. Please try again later.' }, 429);
   }
   await next();
 });
-
-// Periodic rate limit store cleanup (every 5 minutes)
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitStore) {
-    if (now >= entry.resetAt) rateLimitStore.delete(key);
-  }
-}, 300000);
 
 app.get('/', (c) => {
   return c.json({ message: '94Stock API' });
@@ -80,12 +65,25 @@ app.route('/api/bot', botRoutes);
 const port = parseInt(process.env.PORT || '3101');
 console.info(`Server is running on port ${port}`);
 
-try {
-  serve({
-    fetch: app.fetch,
-    port,
-  });
-} catch (error) {
-  console.error('[Startup] Failed to start 94Stock API:', error);
-  process.exit(1);
+const server = serve({
+  fetch: app.fetch,
+  port,
+});
+
+// Graceful shutdown
+const shutdown = async (signal: string) => {
+  console.info(`\n${signal} received, starting graceful shutdown...`)
+  try {
+    clearRateLimitTimer()
+    if (server && typeof server.close === 'function') {
+      server.close()
+    }
+    console.info('✅ Stock backend shutdown completed')
+    process.exit(0)
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error)
+    process.exit(1)
+  }
 }
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => shutdown('SIGINT'))

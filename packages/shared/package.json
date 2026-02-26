@@ -10,7 +10,12 @@
     "./db": "./src/db/index.ts",
     "./auth": "./src/auth/index.ts",
     "./types": "./src/types/index.ts",
-    "./utils": "./src/utils/index.ts"
+    "./utils": "./src/utils/index.ts",
+    "./middleware": {
+      "import": "./src/middleware/index.ts",
+      "types": "./src/middleware/index.ts"
+    },
+    "./styles/morandi-tokens.css": "./src/styles/morandi-tokens.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

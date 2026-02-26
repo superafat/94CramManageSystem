@@ -1,0 +1,17 @@
+/* 94Cram 莫蘭迪色系共用 Design Tokens */
+/* Usage: @import '@94cram/shared/styles/morandi-tokens.css'; */
+
+/* Base Morandi Palette */
+:root {
+  --morandi-sage: #A8B5A2;
+  --morandi-rose: #C4A4A0;
+  --morandi-blue: #9DAEBB;
+  --morandi-sand: #C8BFA9;
+  --morandi-mauve: #B5A4B8;
+  --morandi-cream: #F5F0EB;
+  --morandi-stone: #B0A99F;
+  --morandi-fog: #E8E4DF;
+  --morandi-dark: #5A5550;
+  --morandi-text: #4A4540;
+  --morandi-muted: #8A857F;
+}

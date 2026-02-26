@@ -17,11 +17,12 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
+import { bodyLimit } from 'hono/body-limit'
 import { z, ZodError } from 'zod'
 import { verify, extractToken } from '@94cram/shared/auth'
 import { db } from './db/index.js'
 import { tenants } from '@94cram/shared/db'
-import { rateLimit, getClientIP } from './middleware/rateLimit.js'
+import { checkRateLimit, getClientIP } from '@94cram/shared/middleware'
 // Route modules
 import authRoutes from './routes/auth.js'
 import studentsRoutes from './routes/students.js'
@@ -40,6 +41,9 @@ type Variables = {
   schoolId: string
   userId: string
 }
+const GCP_PROJECT_NUMBER = process.env.GCP_PROJECT_NUMBER || '1015149159553'
+const gcpOrigin = (service: string) => `https://${service}-${GCP_PROJECT_NUMBER}.asia-east1.run.app`
+
 const app = new Hono<{ Variables: Variables }>()
 // ===== Environment Validation =====
 if (!process.env.JWT_SECRET) {
@@ -54,12 +58,12 @@ const jwtPayloadSchema = z.object({
 app.use('/*', cors({
   origin: [
     'https://inclass.94cram.app',
-    'https://cram94-inclass-dashboard-1015149159553.asia-east1.run.app',
+    gcpOrigin('cram94-inclass-dashboard'),
     'https://manage.94cram.app',
-    'https://cram94-manage-dashboard-1015149159553.asia-east1.run.app',
+    gcpOrigin('cram94-manage-dashboard'),
     'https://stock.94cram.app',
-    'https://cram94-stock-dashboard-1015149159553.asia-east1.run.app',
-    'https://cram94-portal-1015149159553.asia-east1.run.app',
+    gcpOrigin('cram94-stock-dashboard'),
+    gcpOrigin('cram94-portal'),
     'https://inclass.94cram.com',
     'https://manage.94cram.com',
     'https://stock.94cram.com',
@@ -72,13 +76,15 @@ app.use('/*', cors({
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id'],
 }))
+// Body size limit: 1MB default
+app.use('/api/*', bodyLimit({ maxSize: 1024 * 1024 }))
 // Request Logger
 app.use('*', logger())
 // Rate limiter for auth routes (skip OPTIONS & demo)
 app.use('/api/auth/*', async (c, next) => {
   if (c.req.method === 'OPTIONS') return next()
   const ip = getClientIP(c)
-  const result = rateLimit(`auth:${ip}`)
+  const result = checkRateLimit(`auth:${ip}`, { maxRequests: 10, enableBlocking: true })
   if (!result.allowed) {
     if (result.blocked) {
       return c.json({ error: 'Too many failed attempts. IP blocked for 15 minutes.' }, 429)
@@ -91,7 +97,7 @@ app.use('/api/auth/*', async (c, next) => {
 app.use('/api/*', async (c, next) => {
   if (c.req.method === 'OPTIONS') return next()
   const ip = getClientIP(c)
-  const result = rateLimit(`api:${ip}`)
+  const result = checkRateLimit(`api:${ip}`, { maxRequests: 100 })
   if (!result.allowed) {
     return c.json({ error: 'Too many requests. Please try again later.' }, 429)
   }
@@ -202,8 +208,25 @@ const port = parseInt(process.env.PORT || '3102')
 console.info(`🐝 BeeClass Backend starting on port ${port}...`)
 const serve = async () => {
   const { serve } = await import('@hono/node-server')
-  serve({ port, fetch: app.fetch })
+  const server = serve({ port, fetch: app.fetch })
   console.info(`✅ BeeClass Backend running at http://localhost:${port}`)
+
+  // Graceful shutdown
+  const shutdown = async (signal: string) => {
+    console.info(`\n${signal} received, starting graceful shutdown...`)
+    try {
+      if (server && typeof server.close === 'function') {
+        server.close()
+      }
+      console.info('✅ BeeClass backend shutdown completed')
+      process.exit(0)
+    } catch (error) {
+      console.error('❌ Error during shutdown:', error)
+      process.exit(1)
+    }
+  }
+  process.on('SIGTERM', () => shutdown('SIGTERM'))
+  process.on('SIGINT', () => shutdown('SIGINT'))
 }
 
 serve().catch((error) => {
