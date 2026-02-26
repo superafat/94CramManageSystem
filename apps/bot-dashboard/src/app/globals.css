@@ -1,4 +1,4 @@
-@import '@94cram/shared/styles/morandi-tokens.css';
+@import '../../../../packages/shared/src/styles/morandi-tokens.css';
 @import "tailwindcss";
 
 /* 94CramBot 莫蘭迪紫色調 */
