@@ -9,7 +9,9 @@ export default function HomePage() {
         <div className="mx-auto max-w-3xl">
           <div className="text-6xl mb-4 animate-float">🤖</div>
           <h1 className="text-3xl md:text-5xl font-bold text-[#4b4355] leading-tight mb-4">
-            94CramBot AI 助手
+            蜂神榜
+            <br />
+            Ai 補習班助手系統
           </h1>
           <p className="text-lg md:text-xl text-[#5d5468] mb-2 font-medium">
             千里眼 × 順風耳，補習班智慧雙引擎
@@ -247,7 +249,7 @@ export default function HomePage() {
       {/* ── Footer ── */}
       <footer className="bg-[#4b4355] text-[#c8c0d0] px-4 py-10 text-center text-sm">
         <div className="mx-auto max-w-4xl">
-          <p className="text-lg font-semibold text-white mb-2">🤖 94CramBot AI 助手</p>
+          <p className="text-lg font-semibold text-white mb-2">🤖 蜂神榜 Ai 補習班助手系統</p>
           <p className="mb-5 text-[#a89bb5] text-xs">千里眼 · 順風耳 · 蜂神榜 Ai 教育管理平台</p>
           <div className="flex flex-wrap justify-center gap-6 mb-5 text-[#a89bb5] text-xs">
             <a href="https://94cram.app" className="hover:text-white transition">蜂神榜平台</a>
