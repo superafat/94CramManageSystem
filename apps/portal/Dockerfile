@@ -7,7 +7,8 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/portal/package.json ./apps/portal/
 COPY packages/shared/package.json ./packages/shared/
-RUN pnpm install --frozen-lockfile
+RUN echo "shamefully-hoist=true" > .npmrc
+RUN pnpm install --no-frozen-lockfile
 
 # ---- builder ----
 FROM base AS builder

@@ -10,7 +10,8 @@ COPY packages/ packages/
 COPY apps/bot-gateway/package.json apps/bot-gateway/
 
 # 安裝所有依賴（包含 workspace 依賴）
-RUN pnpm install --frozen-lockfile || pnpm install
+RUN echo "shamefully-hoist=true" > .npmrc
+RUN pnpm install --no-frozen-lockfile
 
 # 複製 bot-gateway 原始碼並建置
 COPY apps/bot-gateway/ apps/bot-gateway/

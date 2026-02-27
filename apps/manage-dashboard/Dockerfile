@@ -7,7 +7,8 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/manage-dashboard/package.json apps/manage-dashboard/
 
-RUN pnpm install --frozen-lockfile || pnpm install
+RUN echo "shamefully-hoist=true" > .npmrc
+RUN pnpm install --no-frozen-lockfile
 
 COPY packages/shared/ packages/shared/
 COPY apps/manage-dashboard/ apps/manage-dashboard/
