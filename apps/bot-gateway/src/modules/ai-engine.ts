@@ -357,7 +357,7 @@ export async function parseIntent(
   cache: TenantCache | null
 ): Promise<IntentResult> {
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash-lite',
     generationConfig: {
       temperature: 0,
       responseMimeType: 'application/json',
@@ -390,7 +390,7 @@ export async function parseParentIntent(
   parentCtx: ParentContext | null
 ): Promise<IntentResult> {
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash-lite',
     generationConfig: {
       temperature: 0,
       responseMimeType: 'application/json',

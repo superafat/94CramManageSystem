@@ -35,7 +35,7 @@ export class GeminiProvider implements LLMProvider {
     }
 
     const model = this.client.getGenerativeModel({
-      model: 'gemini-2.0-flash-lite',
+      model: 'gemini-2.5-flash-lite',
       systemInstruction: fullSystemPrompt,
     })
 
@@ -64,7 +64,7 @@ export class GeminiProvider implements LLMProvider {
 
       return {
         content,
-        modelName: 'gemini-2.0-flash-lite',
+        modelName: 'gemini-2.5-flash-lite',
         finishReason: 'stop',
       }
     } catch (error) {
@@ -91,7 +91,7 @@ export class GeminiProvider implements LLMProvider {
   }
 
   estimateCost(params: ChatParams): number {
-    // Gemini 2.0 Flash Lite: $0.075 / 1M input, $0.30 / 1M output
+    // Gemini 2.5 Flash Lite: $0.075 / 1M input, $0.30 / 1M output
     const estimatedInputTokens = (params.query.length + params.systemPrompt.length) / 4
     const estimatedOutputTokens = (params.maxTokens || 300)
     return (estimatedInputTokens * 0.075 + estimatedOutputTokens * 0.30) / 1_000_000
