@@ -8,7 +8,8 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
 COPY packages/ packages/
 COPY apps/manage-backend/package.json apps/manage-backend/
-RUN pnpm install --frozen-lockfile || pnpm install
+RUN echo "shamefully-hoist=true" > .npmrc
+RUN pnpm install --no-frozen-lockfile
 RUN cd node_modules/.pnpm/canvas@3.2.1/node_modules/canvas && npm run install || true
 RUN cd /app && cd packages/manage-errors && pnpm build && cd ../..
 COPY apps/manage-backend/ apps/manage-backend/
