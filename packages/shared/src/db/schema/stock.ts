@@ -114,6 +114,7 @@ export const stockTransactions = pgTable('stock_transactions', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   tenantIdx: index('stock_transactions_tenant_id_idx').on(table.tenantId),
+  tenantCreatedIdx: index('stock_transactions_tenant_created_idx').on(table.tenantId, table.createdAt),
 }));
 
 export const stockAuditLogs = pgTable('stock_audit_logs', {

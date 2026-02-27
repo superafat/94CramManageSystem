@@ -13,6 +13,7 @@ import { handleHelp } from '../commands/help';
 import { sendMessage } from '../utils/telegram';
 import { checkRateLimit } from '../utils/rate-limit';
 import { incrementUsage } from '../firestore/usage';
+import { logger } from '../utils/logger';
 import type { TelegramUpdate } from '../utils/telegram';
 
 export const telegramWebhook = new Hono();
@@ -22,7 +23,7 @@ telegramWebhook.post('/', async (c) => {
   try {
     update = await c.req.json();
   } catch {
-    console.error('[Telegram] Invalid JSON in webhook request');
+    logger.error('[Telegram] Invalid JSON in webhook request');
     return c.json({ ok: true });
   }
   const msg = parseTelegramUpdate(update);
@@ -39,7 +40,7 @@ telegramWebhook.post('/', async (c) => {
     try {
       await handleCallback(msg);
     } catch (error) {
-      console.error('[Telegram] handleCallback error:', error);
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Telegram] handleCallback error')
     }
     return c.json({ ok: true });
   }
@@ -50,8 +51,8 @@ telegramWebhook.post('/', async (c) => {
     try {
       await handleBind(msg.chatId, msg.userId, text.replace('/bind', '').trim());
     } catch (error) {
-      console.error('[Telegram] handleBind error:', error);
-      await sendMessage(msg.chatId, '⚠️ 綁定操作失敗，請稍後再試').catch(() => {});
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Telegram] handleBind error')
+      await sendMessage(msg.chatId, '⚠️ 綁定操作失敗，請稍後再試').catch((e: unknown) => { logger.warn({ err: e instanceof Error ? e : new Error(String(e)) }, '[Telegram] sendMessage failed after bind error'); });
     }
     return c.json({ ok: true });
   }
@@ -59,8 +60,8 @@ telegramWebhook.post('/', async (c) => {
     try {
       await handleSwitch(msg.chatId, msg.userId, text.replace('/switch', '').trim());
     } catch (error) {
-      console.error('[Telegram] handleSwitch error:', error);
-      await sendMessage(msg.chatId, '⚠️ 切換操作失敗，請稍後再試').catch(() => {});
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Telegram] handleSwitch error')
+      await sendMessage(msg.chatId, '⚠️ 切換操作失敗，請稍後再試').catch((e: unknown) => { logger.warn({ err: e instanceof Error ? e : new Error(String(e)) }, '[Telegram] sendMessage failed after switch error'); });
     }
     return c.json({ ok: true });
   }
@@ -68,8 +69,8 @@ telegramWebhook.post('/', async (c) => {
     try {
       await handleSync(msg.chatId, msg.userId);
     } catch (error) {
-      console.error('[Telegram] handleSync error:', error);
-      await sendMessage(msg.chatId, '⚠️ 同步操作失敗，請稍後再試').catch(() => {});
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Telegram] handleSync error')
+      await sendMessage(msg.chatId, '⚠️ 同步操作失敗，請稍後再試').catch((e: unknown) => { logger.warn({ err: e instanceof Error ? e : new Error(String(e)) }, '[Telegram] sendMessage failed after sync error'); });
     }
     return c.json({ ok: true });
   }
@@ -77,7 +78,7 @@ telegramWebhook.post('/', async (c) => {
     try {
       await handleHelp(msg.chatId);
     } catch (error) {
-      console.error('[Telegram] handleHelp error:', error);
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Telegram] handleHelp error')
     }
     return c.json({ ok: true });
   }
@@ -99,7 +100,7 @@ telegramWebhook.post('/', async (c) => {
 
     // Track AI usage (fire-and-forget)
     incrementUsage(auth.tenantId, 'ai_calls').catch((err: unknown) => {
-      console.error('[Webhook] Failed to increment ai_calls usage:', err);
+      logger.error({ err: err instanceof Error ? err : new Error(String(err)) }, '[Webhook] Failed to increment ai_calls usage')
     });
 
     if (intent.need_clarification) {
@@ -132,7 +133,7 @@ telegramWebhook.post('/', async (c) => {
     if (isQueryIntent(intent.intent)) {
       const result = await executeIntent(intent, auth);
       incrementUsage(auth.tenantId, 'api_calls').catch((err: unknown) => {
-        console.error('[Webhook] Failed to increment api_calls usage:', err);
+        logger.error({ err: err instanceof Error ? err : new Error(String(err)) }, '[Webhook] Failed to increment api_calls usage')
       });
       await sendMessage(msg.chatId, formatResponse(result));
       return c.json({ ok: true });
@@ -146,7 +147,7 @@ telegramWebhook.post('/', async (c) => {
 
     await sendMessage(msg.chatId, '🤔 我不確定要怎麼處理這個指令');
   } catch (error) {
-    console.error('[Webhook] Error processing message:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Webhook] Error processing message')
     await sendMessage(msg.chatId, '⚠️ 系統發生錯誤，請稍後再試');
   }
 

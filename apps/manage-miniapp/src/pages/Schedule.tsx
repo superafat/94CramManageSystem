@@ -11,26 +11,26 @@ export default function Schedule() {
   const [selectedDay, setSelectedDay] = useState(new Date().getDay() || 7) // 0=Sun→7
   
   // 使用 W8 API（有真實資料）
-  const { data: rawData, loading, error, refetch } = useApi<any>(
+  const { data: rawData, loading, error, refetch } = useApi<Record<string, unknown> | Record<string, unknown>[]>(
     '/w8/schedules'
   )
 
   // Normalize W8 schedule data
-  const schedule = rawData 
-    ? (Array.isArray(rawData) ? rawData : rawData.schedules || []).map((s: any) => normalizeScheduleSlot(s)) 
+  const schedule = rawData
+    ? (Array.isArray(rawData) ? rawData : (rawData.schedules as Record<string, unknown>[] || [])).map((s: Record<string, unknown>) => normalizeScheduleSlot(s))
     : null
   const displaySchedule = schedule || DEMO_SCHEDULE
   const isDemo = !schedule
 
-  const todaySlots = useMemo(() => 
-    displaySchedule.filter((s: any) => s.day === selectedDay),
+  const todaySlots = useMemo(() =>
+    displaySchedule.filter((s) => s.day === selectedDay),
     [displaySchedule, selectedDay]
   )
 
-  const weeklyCounts = useMemo(() => 
+  const weeklyCounts = useMemo(() =>
     [1, 2, 3, 4, 5, 6].map(d => ({
       day: d,
-      count: displaySchedule.filter((s: any) => s.day === d).length
+      count: displaySchedule.filter((s) => s.day === d).length
     })),
     [displaySchedule]
   )
@@ -70,7 +70,7 @@ export default function Schedule() {
         {/* Time slots */}
         <div className="space-y-3">
           {todaySlots.length > 0 ? (
-            todaySlots.map((slot: any) => (
+            todaySlots.map((slot) => (
               <div 
                 key={slot.id} 
                 className="bg-white rounded-xl p-4 shadow-sm" 

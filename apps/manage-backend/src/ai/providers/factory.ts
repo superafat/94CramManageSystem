@@ -4,6 +4,7 @@ import type { ProviderName, ChatParams, ChatResult } from './types'
 import { GeminiProvider } from './gemini'
 import { ClaudeProvider } from './claude'
 import { MiniMaxProvider } from './minimax'
+import { logger } from '../../utils/logger'
 
 export type ProviderStrategy = 'web' | 'line-bot' | 'balanced'
 
@@ -120,17 +121,17 @@ export class ProviderFactory {
       try {
         const available = await provider.isAvailable()
         if (!available) {
-          console.warn(`[Factory] ${providerName} is not available, trying next...`)
+          logger.warn(`[Factory] ${providerName} is not available, trying next...`)
           continue
         }
 
         const rateLimit = provider.getRateLimitInfo()
         if (rateLimit.isLimited) {
-          console.warn(`[Factory] ${providerName} rate limit exceeded, trying next...`)
+          logger.warn(`[Factory] ${providerName} rate limit exceeded, trying next...`)
           continue
         }
 
-        console.info(`[Factory] Using provider: ${providerName}`)
+        logger.info(`[Factory] Using provider: ${providerName}`)
         const result = await provider.chat(params)
         
         return {
@@ -139,11 +140,11 @@ export class ProviderFactory {
         }
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error))
-        console.warn(`[Factory] ${providerName} failed: ${err.message}`)
+        logger.warn(`[Factory] ${providerName} failed: ${err.message}`)
         attempts.push({ provider: providerName, error: err })
 
         if (!(error instanceof Error) || !(error as NodeJS.ErrnoException & { retryable?: boolean }).retryable) {
-          console.warn(`[Factory] ${providerName} error is not retryable, trying next provider...`)
+          logger.warn(`[Factory] ${providerName} error is not retryable, trying next provider...`)
         }
       }
     }

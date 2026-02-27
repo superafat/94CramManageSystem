@@ -4,13 +4,14 @@
  */
 
 import { createHmac } from 'crypto'
+import { logger } from '../utils/logger'
 
 const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN
 
 function getLineAccessToken(): string | null {
   if (!LINE_CHANNEL_ACCESS_TOKEN) {
-    console.error('[LINE] Missing LINE_CHANNEL_ACCESS_TOKEN')
+    logger.error('[LINE] Missing LINE_CHANNEL_ACCESS_TOKEN')
     return null
   }
   return LINE_CHANNEL_ACCESS_TOKEN
@@ -26,17 +27,17 @@ export function verifyLineSignature(body: string, signature: string): boolean {
   try {
     // 驗證輸入
     if (!body || typeof body !== 'string') {
-      console.error('[LINE] Invalid body for signature verification')
+      logger.error('[LINE] Invalid body for signature verification')
       return false
     }
     
     if (!signature || typeof signature !== 'string') {
-      console.error('[LINE] Invalid signature')
+      logger.error('[LINE] Invalid signature')
       return false
     }
     
     if (!LINE_CHANNEL_SECRET) {
-      console.error('[LINE] Missing LINE_CHANNEL_SECRET')
+      logger.error('[LINE] Missing LINE_CHANNEL_SECRET')
       return false
     }
     
@@ -47,7 +48,7 @@ export function verifyLineSignature(body: string, signature: string): boolean {
     // 使用常數時間比較防止 timing attack
     return hash.length === signature.length && hash === signature
   } catch (error) {
-    console.error('[LINE] Signature verification error:', error instanceof Error ? error.message : String(error))
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[LINE] Signature verification error')
     return false
   }
 }
@@ -99,14 +100,14 @@ export async function sendLineReplyMessage(
 
     if (!response.ok) {
       const errorBody = await response.text()
-      console.error('[LINE] Reply API error:', response.status, errorBody)
+      logger.error({ status: response.status, body: errorBody }, '[LINE] Reply API error')
       return { success: false, error: `LINE API error: ${response.status}` }
     }
 
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    console.error('[LINE] Reply error:', message, error instanceof Error ? error.stack : undefined)
+    logger.error({ err: error instanceof Error ? error : new Error(message) }, '[LINE] Reply error')
     return { success: false, error: message }
   }
 }
@@ -158,14 +159,14 @@ export async function sendLinePushMessage(
 
     if (!response.ok) {
       const errorBody = await response.text()
-      console.error('[LINE] Push API error:', response.status, errorBody)
+      logger.error({ status: response.status, body: errorBody }, '[LINE] Push API error')
       return { success: false, error: `LINE API error: ${response.status}` }
     }
 
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    console.error('[LINE] Push error:', message, error instanceof Error ? error.stack : undefined)
+    logger.error({ err: error instanceof Error ? error : new Error(message) }, '[LINE] Push error')
     return { success: false, error: message }
   }
 }
@@ -208,7 +209,7 @@ export async function getLineProfile(userId: string): Promise<{
 
     if (!response.ok) {
       const errorBody = await response.text()
-      console.error('[LINE] Profile API error:', response.status, errorBody)
+      logger.error({ status: response.status, body: errorBody }, '[LINE] Profile API error')
       return { success: false, error: `LINE API error: ${response.status}` }
     }
 
@@ -222,7 +223,7 @@ export async function getLineProfile(userId: string): Promise<{
     return { success: true, profile }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    console.error('[LINE] Profile fetch error:', message, error instanceof Error ? error.stack : undefined)
+    logger.error({ err: error instanceof Error ? error : new Error(message) }, '[LINE] Profile fetch error')
     return { success: false, error: message }
   }
 }

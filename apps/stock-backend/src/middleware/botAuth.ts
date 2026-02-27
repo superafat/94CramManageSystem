@@ -1,5 +1,6 @@
 import { createMiddleware } from 'hono/factory';
 import { OAuth2Client } from 'google-auth-library';
+import { logger } from '../utils/logger';
 
 const client = new OAuth2Client();
 const BOT_SERVICE_ACCOUNT = 'cram94-bot-gateway@cram94-manage-system.iam.gserviceaccount.com';
@@ -14,7 +15,7 @@ export const botAuth = createMiddleware(async (c, next) => {
     const token = authHeader.split(' ')[1];
     const serviceUrl = process.env.SERVICE_URL;
     if (!serviceUrl) {
-      console.error('[botAuth] SERVICE_URL is not configured');
+      logger.error('[botAuth] SERVICE_URL is not configured');
       return c.json({ success: false, error: '服務未設定' }, 503);
     }
     const ticket = await client.verifyIdToken({
@@ -37,7 +38,7 @@ export const botAuth = createMiddleware(async (c, next) => {
     c.set('botBody', body);
     await next();
   } catch (error) {
-    console.error('[botAuth] Error:', error instanceof Error ? error.message : error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[botAuth] Error')
     return c.json({ success: false, error: '認證失敗' }, 401);
   }
 });

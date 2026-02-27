@@ -1,4 +1,5 @@
 import { firestore } from './client';
+import { logger } from '../utils/logger';
 
 export interface TenantCache {
   students: Array<{ id: string; name: string; class_name: string }>;
@@ -49,7 +50,7 @@ export async function getCache(tenantId: string): Promise<TenantCache | null> {
   // Try memory cache first
   const memResult = getFromMemCache(tenantId);
   if (memResult) {
-    console.log(`[Cache] HIT (memory) for ${tenantId}`);
+    logger.info(`[Cache] HIT (memory) for ${tenantId}`);
     return memResult;
   }
 
@@ -57,7 +58,7 @@ export async function getCache(tenantId: string): Promise<TenantCache | null> {
   // if (useRedis) { ... }
 
   // Fallback to Firestore
-  console.log(`[Cache] MISS for ${tenantId}, fetching from Firestore`);
+  logger.info(`[Cache] MISS for ${tenantId}, fetching from Firestore`);
   const doc = await col.doc(tenantId).get();
   if (!doc.exists) return null;
 

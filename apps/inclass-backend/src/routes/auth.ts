@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm'
 import { sign, setAuthCookie, clearAuthCookie } from '@94cram/shared/auth'
 import bcrypt from 'bcryptjs'
 import type { Variables } from '../middleware/auth.js'
+import { logger } from '../utils/logger.js'
 
 const auth = new Hono<{ Variables: Variables }>()
 
@@ -58,7 +59,7 @@ auth.post('/login', zValidator('json', loginSchema), async (c) => {
       school,
     })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Login error:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Login error`)
     return c.json({ error: 'Failed to login' }, 500)
   }
 })
@@ -103,7 +104,7 @@ auth.post('/register', zValidator('json', registerSchema), async (c) => {
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
     }, 201)
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Register error:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Register error`)
     return c.json({ error: 'Failed to register' }, 500)
   }
 })
@@ -130,7 +131,7 @@ auth.get('/me', async (c) => {
       school: { id: tenant.id, name: tenant.name, code: tenant.slug }
     })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Get me error:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Get me error`)
     return c.json({ error: 'Failed to get user' }, 500)
   }
 })
@@ -161,7 +162,7 @@ auth.post('/demo', async (c) => {
     setAuthCookie(c, token)
     return c.json({ token, user: demoUser, school: demoSchool })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Demo login error:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Demo login error`)
     return c.json({ error: 'Failed to create demo session' }, 500)
   }
 })

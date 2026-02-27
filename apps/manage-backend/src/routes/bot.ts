@@ -7,6 +7,7 @@ import { logConversation } from '../ai/logger'
 import { authMiddleware } from '../middleware/auth'
 import type { RBACVariables } from '../middleware/rbac'
 import type { ChatRequest, RAGSearchRequest } from '../ai/types'
+import { logger } from '../utils/logger'
 
 interface BotVariables extends RBACVariables {
   tenantId: string
@@ -56,7 +57,7 @@ botRoutes.post('/ai-query', zValidator('json', aiQuerySchema), async (c) => {
       }
     } catch (ragErr) {
       // RAG failure is non-fatal, log but continue
-      console.warn('[ai-query] RAG search failed:', ragErr instanceof Error ? ragErr.message : String(ragErr))
+      logger.warn({ err: ragErr }, '[ai-query] RAG search failed')
     }
 
     const chatReq: ChatRequest = { ...payload, tenantId }
@@ -64,13 +65,12 @@ botRoutes.post('/ai-query', zValidator('json', aiQuerySchema), async (c) => {
 
     // Log conversation asynchronously with tenantId
     logConversation(body.branchId, 'api', body.query, result, body.userId, tenantId).catch(logErr => {
-      console.error('[ai-query] Failed to log conversation:', logErr instanceof Error ? logErr.message : String(logErr))
+      logger.error({ err: logErr }, '[ai-query] Failed to log conversation')
     })
 
     return c.json(result)
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
-    console.error('[ai-query] error:', errorMessage, err)
+    logger.error({ err }, '[ai-query] error')
     return c.json({ error: 'AI query failed' }, 500)
   }
 })
@@ -91,8 +91,7 @@ botRoutes.post('/rag-search', zValidator('json', ragSearchSchema), async (c) => 
     const sources = await ragSearch(searchReq)
     return c.json({ sources, count: sources.length })
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
-    console.error('[rag-search] error:', errorMessage, err)
+    logger.error({ err }, '[rag-search] error')
     return c.json({ error: 'RAG search failed' }, 500)
   }
 })

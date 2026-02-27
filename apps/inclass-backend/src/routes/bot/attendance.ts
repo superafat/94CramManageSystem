@@ -3,6 +3,7 @@ import { db } from '../../db/index.js';
 import { manageStudents, manageCourses, inclassAttendances } from '@94cram/shared/db';
 import { eq, and, like, sql, gte, lte } from 'drizzle-orm';
 import type { Variables } from '../../middleware/auth.js';
+import { logger } from '../../utils/logger.js';
 
 const app = new Hono<{ Variables: Variables }>();
 
@@ -66,7 +67,7 @@ app.post('/leave', async (c) => {
       data: { student_name: student.name, class_name: student.grade, date: targetDate, status: 'leave' },
     });
   } catch (error) {
-    console.error('[Bot] leave error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Bot] leave error')
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });
@@ -131,7 +132,7 @@ app.post('/late', async (c) => {
       data: { student_name: student.name, class_name: student.grade, date: targetDate, status: 'late' },
     });
   } catch (error) {
-    console.error('[Bot] late error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Bot] late error')
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });
@@ -178,7 +179,7 @@ app.post('/list', async (c) => {
       },
     });
   } catch (error) {
-    console.error('[Bot] list error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Bot] list error')
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });
@@ -251,7 +252,7 @@ app.post('/report', async (c) => {
       },
     });
   } catch (error) {
-    console.error('[Bot] report error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Bot] report error')
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });

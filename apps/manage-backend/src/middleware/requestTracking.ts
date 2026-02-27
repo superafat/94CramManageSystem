@@ -14,11 +14,11 @@ export async function requestTrackingMiddleware(c: Context, next: Next) {
   c.set('logger', logger)
   
   // Log incoming request
-  logger.info('Incoming request', {
+  logger.info({
     method: c.req.method,
     path: c.req.path,
     userAgent: c.req.header('user-agent'),
-  })
+  }, 'Incoming request')
   
   const startTime = Date.now()
   
@@ -26,12 +26,12 @@ export async function requestTrackingMiddleware(c: Context, next: Next) {
   
   // Log response
   const duration = Date.now() - startTime
-  logger.info('Request completed', {
+  logger.info({
     method: c.req.method,
     path: c.req.path,
     status: c.res.status,
     duration: `${duration}ms`,
-  })
+  }, 'Request completed')
   
   // Add requestId to response header
   c.res.headers.set('x-request-id', requestId)

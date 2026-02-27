@@ -10,8 +10,8 @@ interface AuditLog {
   table_name: string
   record_id: string
   change_summary: string
-  old_value: any
-  new_value: any
+  old_value: unknown
+  new_value: unknown
   needs_alert: boolean
   alert_sent: boolean
   parent_notified: boolean

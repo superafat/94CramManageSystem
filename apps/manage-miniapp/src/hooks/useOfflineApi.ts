@@ -30,11 +30,11 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-const memoryCache = new Map<string, CacheEntry<any>>();
+const memoryCache = new Map<string, CacheEntry<unknown>>();
 
 const DEFAULT_CACHE_TIME = 5 * 60 * 1000; // 5 minutes
 
-export function useOfflineApi<T = any>(
+export function useOfflineApi<T = unknown>(
   url: string,
   options: UseApiOptions = {}
 ): UseApiResult<T> {
@@ -66,7 +66,7 @@ export function useOfflineApi<T = any>(
       // Try memory cache first
       const memoryCached = memoryCache.get(cacheKey);
       if (memoryCached && Date.now() - memoryCached.timestamp < cacheTime) {
-        setData(memoryCached.data);
+        setData(memoryCached.data as T);
         setIsFromCache(true);
         setLoading(false);
         return;
@@ -77,7 +77,7 @@ export function useOfflineApi<T = any>(
         try {
           const cached = await storage.getCachedData<T>(url);
           if (cached) {
-            setData(cached as any);
+            setData(cached as T);
             setIsFromCache(true);
             setLoading(false);
             

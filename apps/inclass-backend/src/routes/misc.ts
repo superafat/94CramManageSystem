@@ -16,6 +16,7 @@ import {
 } from '@94cram/shared/db'
 import { and, eq, gte, lt, sql, desc } from 'drizzle-orm'
 import type { Variables } from '../middleware/auth.js'
+import { logger } from '../utils/logger.js'
 
 const miscRouter = new Hono<{ Variables: Variables }>()
 
@@ -33,7 +34,7 @@ miscRouter.get('/teachers', async (c) => {
     const teachers = await db.select().from(manageTeachers).where(eq(manageTeachers.tenantId, schoolId))
     return c.json({ teachers })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error fetching teachers:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching teachers`)
     return c.json({ error: 'Failed to fetch teachers' }, 500)
   }
 })
@@ -51,7 +52,7 @@ miscRouter.post('/teachers', zValidator('json', teacherSchema), async (c) => {
     }).returning()
     return c.json({ success: true, teacher }, 201)
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error creating teacher:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error creating teacher`)
     return c.json({ error: 'Failed to create teacher' }, 500)
   }
 })
@@ -63,7 +64,7 @@ miscRouter.get('/schedules', async (c) => {
     const schedules = await db.select().from(inclassSchedules).where(eq(inclassSchedules.tenantId, schoolId))
     return c.json({ schedules })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error fetching schedules:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching schedules`)
     return c.json({ error: 'Failed to fetch schedules' }, 500)
   }
 })
@@ -104,7 +105,7 @@ miscRouter.get('/dashboard/stats', async (c) => {
       }
     })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error fetching dashboard stats:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching dashboard stats`)
     return c.json({ error: 'Failed to fetch dashboard stats' }, 500)
   }
 })
@@ -150,7 +151,7 @@ miscRouter.get('/reports/attendance', async (c) => {
       }
     })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error fetching attendance report:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching attendance report`)
     return c.json({ error: 'Failed to fetch attendance report' }, 500)
   }
 })
@@ -169,7 +170,7 @@ miscRouter.get('/payment-records', async (c) => {
     const records = await db.select().from(inclassPaymentRecords).where(and(...conditions))
     return c.json({ records })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error fetching payment records:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching payment records`)
     return c.json({ error: 'Failed to fetch payment records' }, 500)
   }
 })
@@ -211,7 +212,7 @@ miscRouter.post('/payment-records/batch', zValidator('json', batchSchema), async
 
     return c.json({ success: true, records: inserted }, 201)
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error creating payment records:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error creating payment records`)
     return c.json({ error: 'Failed to create payment records' }, 500)
   }
 })
@@ -250,7 +251,7 @@ miscRouter.get('/classes/:classId/billing', async (c) => {
       }
     })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error fetching billing:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching billing`)
     return c.json({ error: 'Failed to fetch billing' }, 500)
   }
 })
@@ -296,7 +297,7 @@ miscRouter.post('/notify/absence', zValidator('json', notifySchema), async (c) =
               }),
             })
           } catch (err) {
-            console.error('[Notify] Failed to send notification to parent:', parent.id, err instanceof Error ? err.message : 'Unknown error')
+            logger.error({ err: err instanceof Error ? err : new Error(String(err)) }, `[Notify] Failed to send notification to parent: ${parent.id}`)
           }
         }
       }
@@ -308,7 +309,7 @@ miscRouter.post('/notify/absence', zValidator('json', notifySchema), async (c) =
       message: `Notification sent to ${parents.filter(p => p.lineUserId).length} parent(s)`,
     })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error sending notification:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error sending notification`)
     return c.json({ error: 'Failed to send notification' }, 500)
   }
 })
@@ -351,7 +352,7 @@ miscRouter.get('/alerts', async (c) => {
 
     return c.json({ alerts })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error fetching alerts:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching alerts`)
     return c.json({ error: 'Failed to fetch alerts' }, 500)
   }
 })

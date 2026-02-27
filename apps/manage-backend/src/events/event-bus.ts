@@ -11,6 +11,7 @@ import type {
   EventSubscriptionOptions,
   EventHandlerResult
 } from './types'
+import { logger } from '../utils/logger'
 
 /**
  * 事件總線類
@@ -44,11 +45,11 @@ class EventBus {
     const key = handler.supportedChannel
     
     if (this.handlers.has(key)) {
-      console.warn(`[EventBus] Handler for channel ${key} already exists, overwriting`)
+      logger.warn({ channel: key }, '[EventBus] Handler already exists, overwriting')
     }
-    
+
     this.handlers.set(key, handler)
-    console.info(`[EventBus] Registered handler: ${handler.name} for channel: ${key}`)
+    logger.info({ handler: handler.name, channel: key }, '[EventBus] Registered handler')
   }
 
   /**
@@ -56,7 +57,7 @@ class EventBus {
    */
   unregisterHandler(channel: string): void {
     this.handlers.delete(channel)
-    console.info(`[EventBus] Unregistered handler for channel: ${channel}`)
+    logger.info({ channel }, '[EventBus] Unregistered handler')
   }
 
   /**
@@ -90,7 +91,7 @@ class EventBus {
    * 發布事件（同步）
    */
   async emit(event: NotificationEvent): Promise<EventHandlerResult[]> {
-    console.info(`[EventBus] Emitting event: ${event.type}`)
+    logger.info({ eventType: event.type }, '[EventBus] Emitting event')
     
     // 記錄事件
     this.logEvent(event)
@@ -128,7 +129,7 @@ class EventBus {
         try {
           await this.emit(event)
         } catch (error) {
-          console.error(`[EventBus] Error processing event:`, error)
+          logger.error({ err: error }, '[EventBus] Error processing event')
         }
       }
     }
@@ -149,7 +150,7 @@ class EventBus {
       const handler = this.handlers.get(channel)
       
       if (!handler) {
-        console.warn(`[EventBus] No handler found for channel: ${channel}`)
+        logger.warn({ channel }, '[EventBus] No handler found for channel')
         continue
       }
       
@@ -163,12 +164,9 @@ class EventBus {
         // 記錄結果
         this.logEventResult(event, result)
         
-        console.info(
-          `[EventBus] Handler ${handler.name} completed:`,
-          `sent=${result.sentCount}, failed=${result.failedCount}, skipped=${result.skippedCount}`
-        )
+        logger.info({ handler: handler.name, sent: result.sentCount, failed: result.failedCount, skipped: result.skippedCount }, '[EventBus] Handler completed')
       } catch (error) {
-        console.error(`[EventBus] Handler ${handler.name} error:`, error)
+        logger.error({ err: error, handler: handler.name }, '[EventBus] Handler error')
         results.push({
           success: false,
           sentCount: 0,
@@ -198,7 +196,7 @@ class EventBus {
       try {
         await listener(event)
       } catch (error) {
-        console.error(`[EventBus] Listener error:`, error)
+        logger.error({ err: error }, '[EventBus] Listener error')
       }
     }
   }

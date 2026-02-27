@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { db } from '../../db/index';
 import { stockItems, stockWarehouses, stockInventory, stockTransactions } from '@94cram/shared/db';
 import { eq, and, like, desc } from 'drizzle-orm';
+import { logger } from '../../utils/logger';
 
 type Env = { Variables: { tenantId: string; botBody: Record<string, unknown> } };
 const app = new Hono<Env>();
@@ -100,7 +101,7 @@ app.post('/ship', async (c) => {
       },
     });
   } catch (error) {
-    console.error('[Bot] ship error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Bot] ship error')
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });
@@ -176,7 +177,7 @@ app.post('/restock', async (c) => {
       data: { item_name: item.name, quantity_added: quantity, stock_before: stockBefore, stock_after: stockBefore + quantity },
     });
   } catch (error) {
-    console.error('[Bot] restock error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Bot] restock error')
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });
@@ -272,7 +273,7 @@ app.post('/history', async (c) => {
       },
     });
   } catch (error) {
-    console.error('[Bot] history error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Bot] history error')
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });

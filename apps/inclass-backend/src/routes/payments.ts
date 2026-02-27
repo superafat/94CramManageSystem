@@ -5,6 +5,7 @@ import { db } from '../db/index.js'
 import { inclassPaymentRecords, manageStudents, manageCourses } from '@94cram/shared/db'
 import { and, eq } from 'drizzle-orm'
 import type { Variables } from '../middleware/auth.js'
+import { logger } from '../utils/logger.js'
 
 const paymentsRouter = new Hono<{ Variables: Variables }>()
 
@@ -31,7 +32,7 @@ paymentsRouter.get('/', async (c) => {
     )
     return c.json({ records })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error fetching payments:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching payments`)
     return c.json({ error: 'Failed to fetch payments' }, 500)
   }
 })

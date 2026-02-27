@@ -3,24 +3,25 @@ import { app } from './app'
 import { config } from './config'
 import { createBot, startBot } from './bot/telegram'
 import { closeDatabaseConnection } from './db'
+import { logger } from './utils/logger'
 const port = Number(process.env.PORT) || 3100
 const DEFAULT_BRANCH_ID = process.env.DEFAULT_BRANCH_ID ?? 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d'
 const server = serve({ fetch: app.fetch, port }, (info) => {
-  console.info(`🐝 HiveMind Backend running on http://localhost:${info.port}`)
+  logger.info(`🐝 HiveMind Backend running on http://localhost:${info.port}`)
   // Start Telegram bot if token is configured (non-blocking)
   if (config.TELEGRAM_BOT_TOKEN) {
     const bot = createBot(config.TELEGRAM_BOT_TOKEN, DEFAULT_BRANCH_ID)
     startBot(bot, 'polling').catch(err => {
-      console.error('❌ Telegram Bot failed to start:', err.message)
-      console.error('   API server continues running without bot.')
+      logger.error('❌ Telegram Bot failed to start:', err.message)
+      logger.error('   API server continues running without bot.')
     })
   } else {
-    console.info('ℹ️  No TELEGRAM_BOT_TOKEN set, bot disabled')
+    logger.info('ℹ️  No TELEGRAM_BOT_TOKEN set, bot disabled')
   }
 })
 // Graceful shutdown
 const shutdown = async (signal: string) => {
-  console.info(`\n${signal} received, starting graceful shutdown...`)
+  logger.info(`\n${signal} received, starting graceful shutdown...`)
   
   try {
     // Close database connections
@@ -31,10 +32,10 @@ const shutdown = async (signal: string) => {
       server.close()
     }
     
-    console.info('✅ Graceful shutdown completed')
+    logger.info('✅ Graceful shutdown completed')
     process.exit(0)
   } catch (error) {
-    console.error('❌ Error during shutdown:', error)
+    logger.error({ err: error }, '❌ Error during shutdown:')
     process.exit(1)
   }
 }

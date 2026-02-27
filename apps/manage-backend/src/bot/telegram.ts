@@ -7,6 +7,7 @@ import { logConversation } from '../ai/logger'
 import { parseCommand, handleCommand } from './commands'
 import { generateAttendanceChart, generateGradeTrendChart, generateRevenueChart } from './charts'
 import { InputFile } from 'grammy'
+import { logger } from '../utils/logger'
 
 interface SessionData {
   branchId: string
@@ -94,7 +95,7 @@ export function createBot(token: string, defaultBranchId: string) {
       ).join('\n\n')
       ctx.reply(`🔍 找到 ${sources.length} 筆相關資料：\n\n${text}`)
     } catch (err) {
-      console.error('[bot/search]', err)
+      logger.error({ err: err }, '[bot/search]')
       ctx.reply('❌ 搜尋時發生錯誤，請稍後再試。')
     }
   })
@@ -171,7 +172,7 @@ export function createBot(token: string, defaultBranchId: string) {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.error('[callback]', msg)
+      logger.error({ err }, `[callback]: ${msg}`)
       await ctx.reply(`❌ 生成失敗：${msg}`)
     }
   })
@@ -267,7 +268,7 @@ export function createBot(token: string, defaultBranchId: string) {
       logConversation(ctx.session.branchId, 'telegram', query, result, userId)
 
     } catch (err) {
-      console.error('[bot] error:', err instanceof Error ? err.message : String(err))
+      logger.error({ err }, '[bot] error')
       await ctx.reply('抱歉，處理您的問題時遇到了錯誤 😔\n請稍後再試，或直接撥打櫃台電話。')
     }
   })
@@ -305,20 +306,20 @@ export async function startBot(bot: Bot<BotContext>, mode: 'polling' | 'webhook'
   if (mode === 'polling') {
     // Delete any existing webhook first
     await bot.api.deleteWebhook()
-    console.info('🤖 Telegram Bot starting (long polling)...')
+    logger.info('🤖 Telegram Bot starting (long polling)...')
 
     // Retry with backoff if 409 conflict (another instance still polling)
     const maxRetries = 5
     for (let i = 0; i < maxRetries; i++) {
       try {
         await bot.start({
-          onStart: (info) => console.info(`🤖 Telegram Bot @${info.username} is running!`),
+          onStart: (info) => logger.info(`🤖 Telegram Bot @${info.username} is running!`),
         })
         return // success
       } catch (err) {
         if (err instanceof Error && (err as any).error_code === 409 && i < maxRetries - 1) {
           const delay = (i + 1) * 3000
-          console.warn(`⚠️ Bot polling conflict (409), retrying in ${delay/1000}s... (${i+1}/${maxRetries})`)
+          logger.warn(`⚠️ Bot polling conflict (409), retrying in ${delay/1000}s... (${i+1}/${maxRetries})`)
           await new Promise(r => setTimeout(r, delay))
         } else {
           throw err

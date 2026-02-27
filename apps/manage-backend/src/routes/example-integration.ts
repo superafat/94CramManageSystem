@@ -18,6 +18,7 @@ import {
 } from '@94cram/errors'
 import { success } from '../utils/response'
 import { defaultCache, cacheable } from '../lib/cache'
+import { logger } from '../utils/logger'
 
 const exampleRoutes = new Hono()
 
@@ -174,7 +175,7 @@ exampleRoutes.post('/transfer', async (c) => {
 class UserService {
   @cacheable({ ttl: 60000 }) // 快取 1 分鐘
   async getUserById(id: string) {
-    console.info(`Fetching user ${id} from database...`)
+    logger.info(`Fetching user ${id} from database...`)
     return await findUserById(id)
   }
 
@@ -183,7 +184,7 @@ class UserService {
     keyGenerator: (email: string) => `user:email:${email}`
   })
   async getUserByEmail(email: string) {
-    console.info(`Fetching user ${email} from database...`)
+    logger.info(`Fetching user ${email} from database...`)
     return await findUserByEmail(email)
   }
 }
@@ -217,7 +218,7 @@ exampleRoutes.get('/stats', async (c) => {
   
   if (!stats) {
     // 快取未命中，計算統計數據
-    console.info('Computing stats...')
+    logger.info('Computing stats...')
     stats = {
       totalUsers: 1000,
       activeUsers: 750,
@@ -259,36 +260,59 @@ exampleRoutes.get('/cache/info', async (c) => {
   })
 })
 
+// ===== Type definitions =====
+
+interface User {
+  id: string
+  email: string
+  name: string
+  password: string
+  status: string
+  role: string
+  balance?: number
+}
+
+interface CreateUserData {
+  email: string
+  name: string
+  password: string
+}
+
+interface UpdateUserData {
+  name?: string
+  email?: string
+}
+
 // ===== Mock 函數（實際使用時替換為真實實現） =====
 
-async function findUserByEmail(email: string) {
+async function findUserByEmail(_email: string): Promise<User | null> {
   // 實現查詢邏輯
   return null
 }
 
-async function findUserById(id: string) {
+async function findUserById(_id: string): Promise<User | null> {
   // 實現查詢邏輯
   return null
 }
 
-async function verifyPassword(input: string, hash: string) {
+async function verifyPassword(_input: string, _hash: string): Promise<boolean> {
   // 實現密碼驗證
   return false
 }
 
-async function generateToken(user: any) {
+async function generateToken(_user: User): Promise<string> {
   // 實現 JWT token 生成
   return 'token'
 }
 
-async function createUser(data: any) {
+async function createUser(data: CreateUserData): Promise<User> {
   // 實現用戶建立
-  return data
+  return { ...data, id: '', status: 'active', role: 'user' }
 }
 
-async function updateUser(id: string, data: any) {
+async function updateUser(_id: string, data: UpdateUserData): Promise<User> {
   // 實現用戶更新
-  return data
+  return { id: _id, email: data.email ?? '', name: data.name ?? '', password: '', status: 'active', role: 'user' }
 }
 
 async function performTransfer(from: string, to: string, amount: number) {
@@ -296,9 +320,9 @@ async function performTransfer(from: string, to: string, amount: number) {
   return { from, to, amount }
 }
 
-function sanitizeUser(user: any) {
+function sanitizeUser(user: User) {
   // 移除敏感資訊
-  const { password, ...safe } = user
+  const { password: _password, ...safe } = user
   return safe
 }
 

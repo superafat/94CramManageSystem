@@ -39,7 +39,7 @@ const Reports: React.FC = () => {
   // API expects YYYY-MM format, not "week"/"month"/"semester"
   const apiPeriod = periodToYearMonth(period);
 
-  const { data: rawData, loading, error, refetch } = useApi<any>(
+  const { data: rawData, loading, error, refetch } = useApi<Record<string, unknown>>(
     `/admin/reports/branch/${BRANCH_ID}?period=${apiPeriod}`,
     { retry: true, cacheTime: 2 * 60 * 1000 }
   );
@@ -53,23 +53,28 @@ const Reports: React.FC = () => {
   const reportData = useMemo(() => {
     if (!rawData) return null;
 
-    const summary = rawData.summary || {};
-    const students = rawData.students || [];
-    const courseStats = rawData.courseStats || [];
+    interface StudentStat { name?: string; studentName?: string; avgScore?: number; avgGrade?: number; courses?: string[]; subjects?: string[]; revenue?: number; riskLevel?: string }
+    interface CourseStat { courseName?: string; name?: string; revenue?: number; totalRevenue?: number }
+    interface ChurnAlert { riskLevel?: string }
+    interface Summary { avgAttendanceRate?: number; totalStudents?: number; activeStudents?: number; avgGrade?: number; totalRevenue?: number }
+
+    const summary = (rawData.summary || {}) as Summary;
+    const students = (rawData.students || []) as StudentStat[];
+    const courseStats = (rawData.courseStats || []) as CourseStat[];
 
     // Build grade distribution from students
-    const gradeDistribution = students.slice(0, 8).map((s: any) => ({
+    const gradeDistribution = students.slice(0, 8).map((s) => ({
       name: s.name || s.studentName || '?',
       grade: s.avgScore ?? s.avgGrade ?? 0,
     }));
 
     // Build revenue by course from courseStats or students
     const revenueByClass = courseStats.length > 0
-      ? courseStats.map((c: any) => ({
+      ? courseStats.map((c) => ({
           name: c.courseName || c.name || '?',
           revenue: c.revenue || c.totalRevenue || 0,
         }))
-      : students.slice(0, 5).map((s: any) => ({
+      : students.slice(0, 5).map((s) => ({
           name: (s.courses || s.subjects || ['未知'])[0] || '未知',
           revenue: s.revenue || 0,
         }));
@@ -81,11 +86,11 @@ const Reports: React.FC = () => {
     };
 
     // Build risk data
-    const churnAlerts = rawData.churnAlerts || [];
-    const highRisk = students.filter((s: any) => s.riskLevel === 'high').length + 
-                     churnAlerts.filter((a: any) => a.riskLevel === 'high').length;
-    const medRisk = students.filter((s: any) => s.riskLevel === 'medium').length +
-                    churnAlerts.filter((a: any) => a.riskLevel === 'medium').length;
+    const churnAlerts = (rawData.churnAlerts || []) as ChurnAlert[];
+    const highRisk = students.filter((s) => s.riskLevel === 'high').length +
+                     churnAlerts.filter((a) => a.riskLevel === 'high').length;
+    const medRisk = students.filter((s) => s.riskLevel === 'medium').length +
+                    churnAlerts.filter((a) => a.riskLevel === 'medium').length;
 
     return {
       summary: {
@@ -148,10 +153,10 @@ const Reports: React.FC = () => {
   };
 
   const gradeChartData = {
-    labels: reportData.gradeDistribution.map((d: any) => d.name),
+    labels: reportData.gradeDistribution.map((d) => d.name),
     datasets: [{
       label: '平均成績',
-      data: reportData.gradeDistribution.map((d: any) => d.grade),
+      data: reportData.gradeDistribution.map((d) => d.grade),
       backgroundColor: ['#94a7b8', '#c9a9a6', '#b8a5c4', '#c4b5a0', '#8fa89a', '#94a7b8', '#c9a9a6', '#b8a5c4'],
       borderRadius: 8,
     }],
@@ -235,15 +240,15 @@ const Reports: React.FC = () => {
         </div>
 
         {/* Revenue chart (admin only) */}
-        {canViewRevenue && reportData.revenueByClass.length > 0 && reportData.revenueByClass.some((r: any) => r.revenue > 0) && (
+        {canViewRevenue && reportData.revenueByClass.length > 0 && reportData.revenueByClass.some((r) => r.revenue > 0) && (
           <div className="bg-white rounded-xl p-4 shadow-sm">
             <h3 className="font-semibold mb-3" style={{ color: '#4a5568' }}>💰 課程營收</h3>
             <div className="h-48">
               <Doughnut 
                 data={{
-                  labels: reportData.revenueByClass.map((r: any) => r.name),
+                  labels: reportData.revenueByClass.map((r) => r.name),
                   datasets: [{
-                    data: reportData.revenueByClass.map((r: any) => r.revenue),
+                    data: reportData.revenueByClass.map((r) => r.revenue),
                     backgroundColor: ['#c9a9a6', '#94a7b8', '#b8a5c4', '#8fa89a', '#c4b5a0'],
                     borderWidth: 0,
                   }],

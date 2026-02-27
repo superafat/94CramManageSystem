@@ -10,14 +10,26 @@ const app = new Hono<Env>();
 app.post('/items', async (c) => {
   try {
     const tenantId = c.get('tenantId') as string;
-    const items = await db.select().from(stockItems)
-      .where(and(eq(stockItems.tenantId, tenantId), eq(stockItems.isActive, true)));
 
-    const result = await Promise.all(items.map(async (item) => {
-      const inv = await db.select().from(stockInventory)
-        .where(and(eq(stockInventory.tenantId, tenantId), eq(stockInventory.itemId, item.id)));
-      const total = inv.reduce((sum, r) => sum + r.quantity, 0);
-      return { item_id: item.id, name: item.name, stock: total, unit: item.unit };
+    // 批次查詢：一次取得所有 items 和 inventory，避免 N+1 查詢
+    const [items, allInventory] = await Promise.all([
+      db.select().from(stockItems)
+        .where(and(eq(stockItems.tenantId, tenantId), eq(stockItems.isActive, true))),
+      db.select().from(stockInventory)
+        .where(eq(stockInventory.tenantId, tenantId)),
+    ]);
+
+    // 在記憶體中依 itemId 加總庫存
+    const stockByItemId = new Map<string, number>();
+    for (const inv of allInventory) {
+      stockByItemId.set(inv.itemId, (stockByItemId.get(inv.itemId) ?? 0) + inv.quantity);
+    }
+
+    const result = items.map((item) => ({
+      item_id: item.id,
+      name: item.name,
+      stock: stockByItemId.get(item.id) ?? 0,
+      unit: item.unit,
     }));
 
     return c.json({ success: true, data: result });

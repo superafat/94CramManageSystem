@@ -15,7 +15,7 @@ export interface PendingSync {
   id?: number;
   action: 'create' | 'update' | 'delete';
   store: string;
-  data: any;
+  data: unknown;
   endpoint: string;
   createdAt: number;
   retryCount?: number;

@@ -1,6 +1,7 @@
 // src/bot/enrollment.ts - 招生對話引擎
 import { Context } from 'grammy';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { logger } from '../utils/logger'
 
 // ==================== 類型定義 ====================
 
@@ -119,7 +120,7 @@ function getConversation(chatId: number): ConversationContext {
 /**
  * 更新對話狀態
  */
-function updateState(chatId: number, newState: EnrollmentState, data?: any) {
+function updateState(chatId: number, newState: EnrollmentState, data?: Partial<ConversationContext['data']>) {
   const conv = getConversation(chatId);
   conv.state = newState;
   if (data) {
@@ -159,7 +160,7 @@ ${context ? `對話脈絡：\n${context}\n` : ''}
     const result = await model.generateContent(prompt);
     return result.response.text();
   } catch (error) {
-    console.error('AI API 錯誤:', error);
+    logger.error({ err: error }, 'AI API 錯誤:');
     return '不好意思，我需要一點時間整理思緒，請稍後再試一次 😊';
   }
 }
@@ -238,7 +239,7 @@ function formatCourseRecommendation(courses: Course[]): string {
 async function createLead(data: ConversationContext['data']): Promise<boolean> {
   try {
     // 這裡應該呼叫你的資料庫 API
-    console.info('Creating lead:', data);
+    logger.info('Creating lead:', data);
     
     // 實際應該是：
     // await fetch('http://localhost:3100/api/admin/leads', {
@@ -257,7 +258,7 @@ async function createLead(data: ConversationContext['data']): Promise<boolean> {
     
     return true;
   } catch (error) {
-    console.error('建立 lead 失敗:', error);
+    logger.error({ err: error }, '建立 lead 失敗:');
     return false;
   }
 }
@@ -298,7 +299,7 @@ async function handleNeedAnalysis(ctx: Context, conv: ConversationContext, userM
   const parentName = await extractInfo(userMessage, '家長姓名');
   const phone = await extractInfo(userMessage, '電話');
   
-  const updates: any = {};
+  const updates: Partial<ConversationContext['data']> = {};
   if (grade) updates.studentGrade = grade;
   if (subjects) updates.interestSubjects = subjects.split(/[,、，]/);
   if (parentName) updates.parentName = parentName;
@@ -486,7 +487,7 @@ export async function handleEnrollmentConversation(ctx: Context) {
         break;
     }
   } catch (error) {
-    console.error('處理對話錯誤:', error);
+    logger.error({ err: error }, '處理對話錯誤:');
     await ctx.reply('不好意思，系統出了點小狀況，請稍後再試 🙏');
   }
 }
@@ -515,7 +516,7 @@ export function checkTimeouts() {
     
     if (timeSinceLastActivity > TIMEOUT_MS && conv.state !== EnrollmentState.COMPLETED) {
       // 這裡可以發送提醒訊息（需要 bot 實例）
-      console.info(`對話超時: ${chatId}, 狀態: ${conv.state}`);
+      logger.info(`對話超時: ${chatId}, 狀態: ${conv.state}`);
     }
   }
 }

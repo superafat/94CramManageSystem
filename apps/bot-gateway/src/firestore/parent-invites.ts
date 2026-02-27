@@ -1,3 +1,4 @@
+import { randomInt } from 'crypto';
 import { firestore } from './client';
 
 export interface ParentInvite {
@@ -39,5 +40,5 @@ export async function listParentInvites(tenantId: string): Promise<ParentInvite[
 }
 
 export function generateInviteCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(randomInt(100000, 1000000));
 }

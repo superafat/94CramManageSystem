@@ -1,6 +1,6 @@
 /**
  * BeeClass API - Main Entry Point
- * 
+ *
  * Modular route architecture:
  *   /api/auth/*       → routes/auth.ts
  *   /api/students/*   → routes/students.ts
@@ -16,13 +16,15 @@
  */
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { logger } from 'hono/logger'
+import { secureHeaders } from 'hono/secure-headers'
+import { logger as honoLogger } from 'hono/logger'
 import { bodyLimit } from 'hono/body-limit'
 import { z, ZodError } from 'zod'
 import { verify, extractToken } from '@94cram/shared/auth'
 import { db } from './db/index.js'
 import { tenants } from '@94cram/shared/db'
 import { checkRateLimit, getClientIP } from '@94cram/shared/middleware'
+import { logger } from './utils/logger.js'
 // Route modules
 import authRoutes from './routes/auth.js'
 import studentsRoutes from './routes/students.js'
@@ -41,7 +43,7 @@ type Variables = {
   schoolId: string
   userId: string
 }
-const GCP_PROJECT_NUMBER = process.env.GCP_PROJECT_NUMBER || '1015149159553'
+const GCP_PROJECT_NUMBER = process.env.GCP_PROJECT_NUMBER || ''
 const gcpOrigin = (service: string) => `https://${service}-${GCP_PROJECT_NUMBER}.asia-east1.run.app`
 
 const app = new Hono<{ Variables: Variables }>()
@@ -54,6 +56,8 @@ const jwtPayloadSchema = z.object({
   userId: z.string().min(1),
 })
 // ===== Global Middleware =====
+// Security headers
+app.use('*', secureHeaders())
 // CORS - MUST be first (before rate limiter, before auth)
 app.use('/*', cors({
   origin: [
@@ -79,7 +83,7 @@ app.use('/*', cors({
 // Body size limit: 1MB default
 app.use('/api/*', bodyLimit({ maxSize: 1024 * 1024 }))
 // Request Logger
-app.use('*', logger())
+app.use('*', honoLogger())
 // Rate limiter for auth routes (skip OPTIONS & demo)
 app.use('/api/auth/*', async (c, next) => {
   if (c.req.method === 'OPTIONS') return next()
@@ -150,7 +154,7 @@ app.get('/health', async (c) => {
       version: '1.0.0'
     })
   } catch (error) {
-    console.error('[Health Check] Database connection failed:', error instanceof Error ? error.message : 'Unknown error')
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Health Check] Database connection failed')
     return c.json({
       status: 'error',
       database: 'disconnected',
@@ -181,7 +185,7 @@ app.route('/api/webhooks', webhookRoutes)
 app.route('/internal', internalRoutes)
 // ===== Global Error Handler =====
 app.onError((err, c) => {
-  console.error('[Global Error Handler]', c.req.path, err)
+  logger.error({ err }, `[Global Error Handler] ${c.req.path}`)
   // Zod validation errors
   if (err instanceof ZodError) {
     return c.json({
@@ -205,23 +209,23 @@ app.onError((err, c) => {
 export default app
 // ===== Start Server =====
 const port = parseInt(process.env.PORT || '3102')
-console.info(`🐝 BeeClass Backend starting on port ${port}...`)
+logger.info(`🐝 BeeClass Backend starting on port ${port}...`)
 const serve = async () => {
   const { serve } = await import('@hono/node-server')
   const server = serve({ port, fetch: app.fetch })
-  console.info(`✅ BeeClass Backend running at http://localhost:${port}`)
+  logger.info(`✅ BeeClass Backend running at http://localhost:${port}`)
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {
-    console.info(`\n${signal} received, starting graceful shutdown...`)
+    logger.info(`\n${signal} received, starting graceful shutdown...`)
     try {
       if (server && typeof server.close === 'function') {
         server.close()
       }
-      console.info('✅ BeeClass backend shutdown completed')
+      logger.info('✅ BeeClass backend shutdown completed')
       process.exit(0)
     } catch (error) {
-      console.error('❌ Error during shutdown:', error)
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '❌ Error during shutdown')
       process.exit(1)
     }
   }
@@ -230,6 +234,6 @@ const serve = async () => {
 }
 
 serve().catch((error) => {
-  console.error('[Startup] Failed to start BeeClass Backend:', error)
+  logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Startup] Failed to start BeeClass Backend')
   process.exit(1)
 })

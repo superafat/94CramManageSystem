@@ -9,6 +9,7 @@ import { callParentApi } from '../modules/parent-api-client';
 import { sendMessage } from '../utils/telegram';
 import { checkRateLimit } from '../utils/rate-limit';
 import { getAdminChatId } from '../firestore/admin-lookup';
+import { logger } from '../utils/logger';
 import type { TelegramUpdate } from '../utils/telegram';
 
 export const telegramParentWebhook = new Hono();
@@ -18,7 +19,7 @@ telegramParentWebhook.post('/', async (c) => {
   try {
     update = await c.req.json();
   } catch {
-    console.error('[ParentBot] Invalid JSON in webhook request');
+    logger.error('[ParentBot] Invalid JSON in webhook request');
     return c.json({ ok: true });
   }
 
@@ -52,8 +53,8 @@ telegramParentWebhook.post('/', async (c) => {
     try {
       await handleParentBind(msg.chatId, msg.userId, msg.userName, text.replace('/bind', '').trim());
     } catch (error) {
-      console.error('[ParentBot] handleParentBind error:', error);
-      await sendMessage(msg.chatId, '⚠️ 綁定操作失敗，請稍後再試', undefined, 'parent').catch(() => {});
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[ParentBot] handleParentBind error')
+      await sendMessage(msg.chatId, '⚠️ 綁定操作失敗，請稍後再試', undefined, 'parent').catch((e: unknown) => { logger.warn({ err: e instanceof Error ? e : new Error(String(e)) }, '[ParentBot] sendMessage failed after bind error'); });
     }
     return c.json({ ok: true });
   }
@@ -72,7 +73,7 @@ telegramParentWebhook.post('/', async (c) => {
 
   // Update last active (fire-and-forget)
   updateParentLastActive(msg.userId).catch((err: unknown) => {
-    console.error('[ParentBot] Failed to update last_active_at:', err);
+    logger.error({ err: err instanceof Error ? err : new Error(String(err)) }, '[ParentBot] Failed to update last_active_at')
   });
 
   // Parse intent and respond
@@ -104,7 +105,7 @@ telegramParentWebhook.post('/', async (c) => {
     const response = await executeParentIntent(intentResult, binding);
     await sendMessage(msg.chatId, response, undefined, 'parent');
   } catch (error) {
-    console.error('[ParentBot] Error processing message:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[ParentBot] Error processing message')
     await sendMessage(msg.chatId, '⚠️ 系統發生錯誤，請稍後再試', undefined, 'parent');
   }
 
@@ -196,7 +197,7 @@ async function handleLeaveRequest(
       await notifyAdminOfParentRequest(adminChatId, requestId, childName ?? '學生', { date: params.date, reason });
     }
   } catch (error) {
-    console.error('[ParentBot] Failed to notify admin:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[ParentBot] Failed to notify admin')
   }
 
   // Confirm to parent

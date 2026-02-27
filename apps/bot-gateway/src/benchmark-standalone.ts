@@ -64,14 +64,14 @@ console.log(`✅ Rate limiter 運作正常`);
 console.log('\n=== Test 2: In-Memory Cache (5min TTL) ===');
 
 interface CacheEntry {
-  data: any;
+  data: unknown;
   expiresAt: number;
 }
 
 const memCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
-function getFromMemCache(tenantId: string): any | null {
+function getFromMemCache(tenantId: string): unknown | null {
   const entry = memCache.get(tenantId);
   if (entry && Date.now() < entry.expiresAt) {
     return entry.data;
@@ -80,7 +80,7 @@ function getFromMemCache(tenantId: string): any | null {
   return null;
 }
 
-function setInMemCache(tenantId: string, data: any): void {
+function setInMemCache(tenantId: string, data: unknown): void {
   memCache.set(tenantId, {
     data,
     expiresAt: Date.now() + CACHE_TTL_MS,

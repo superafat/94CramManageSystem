@@ -5,6 +5,7 @@
 import type { ParentBinding, ParentChild } from '../firestore/parent-bindings';
 import { callParentApi, type ParentApiResponse } from '../modules/parent-api-client';
 import { searchKnowledge } from '../firestore/knowledge-base';
+import { logger } from '../utils/logger';
 
 export type ParentIntent =
   | 'parent.attendance'
@@ -415,7 +416,7 @@ export async function tryKnowledgeBase(
       return `💡 ${best.title}\n\n${best.content}`;
     }
   } catch (error) {
-    console.error('[ParentRouter] Knowledge base search error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[ParentRouter] Knowledge base search error')
   }
 
   return null;

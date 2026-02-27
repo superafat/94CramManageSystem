@@ -54,7 +54,7 @@ export class MiniMaxProvider implements LLMProvider {
         signal: AbortSignal.timeout(timeoutMs),
       })
 
-      const data = await resp.json() as any
+      const data = await resp.json() as { base_resp?: { status_code?: number; status_msg?: string }; choices?: Array<{ message?: { content?: string }; finish_reason?: string }>; usage?: { total_tokens?: number } }
 
       if (data.base_resp?.status_code && data.base_resp.status_code !== 0) {
         throw new Error(`MiniMax API error: ${data.base_resp.status_msg}`)
@@ -123,12 +123,14 @@ export class MiniMaxProvider implements LLMProvider {
     }
   }
 
-  private wrapError(error: any): Error {
-    const err: any = new Error(`MiniMax error: ${error.message}`)
+  private wrapError(error: unknown): Error {
+    const message = error instanceof Error ? error.message : String(error)
+    const status = (error instanceof Error && 'status' in error) ? (error as Error & { status?: number }).status : undefined
+    const err = new Error(`MiniMax error: ${message}`) as Error & { provider?: string; retryable?: boolean; quotaExceeded?: boolean; statusCode?: number }
     err.provider = 'minimax'
-    err.retryable = error.message?.includes('timeout') || error.message?.includes('503')
-    err.quotaExceeded = error.message?.includes('quota') || error.message?.includes('429')
-    err.statusCode = error.status
+    err.retryable = message.includes('timeout') || message.includes('503')
+    err.quotaExceeded = message.includes('quota') || message.includes('429')
+    err.statusCode = status
     return err
   }
 }

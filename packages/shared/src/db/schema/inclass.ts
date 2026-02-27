@@ -1,11 +1,12 @@
 // 94inClass Schema - 點名系統專屬表
 import { pgTable, uuid, varchar, timestamp, boolean, integer, text, decimal, index } from '../connection';
 import { manageStudents, manageCourses, manageTeachers } from './manage';
+import { tenants } from './common';
 
 // 點名記錄
 export const inclassAttendances = pgTable('inclass_attendances', {
   id: uuid('id').defaultRandom().primaryKey(),
-  tenantId: uuid('tenant_id').notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
   studentId: uuid('student_id').notNull(), // 對應 manage_students
   courseId: uuid('course_id').notNull(),
   date: timestamp('date').notNull(),
@@ -19,12 +20,13 @@ export const inclassAttendances = pgTable('inclass_attendances', {
   tenantIdx: index('inclass_attendances_tenant_id_idx').on(table.tenantId),
   studentIdx: index('inclass_attendances_student_id_idx').on(table.studentId),
   dateIdx: index('inclass_attendances_date_idx').on(table.date),
+  tenantCourseDateIdx: index('inclass_attendances_tenant_course_date_idx').on(table.tenantId, table.courseId, table.date),
 }));
 
 // 考試
 export const inclassExams = pgTable('inclass_exams', {
   id: uuid('id').defaultRandom().primaryKey(),
-  tenantId: uuid('tenant_id').notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
   courseId: uuid('course_id').notNull(),
   name: varchar('name', { length: 255 }).notNull(),
   examDate: timestamp('exam_date').notNull(),
@@ -51,7 +53,7 @@ export const inclassExamScores = pgTable('inclass_exam_scores', {
 // 家長
 export const inclassParents = pgTable('inclass_parents', {
   id: uuid('id').defaultRandom().primaryKey(),
-  tenantId: uuid('tenant_id').notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
   studentId: uuid('student_id').references(() => manageStudents.id).notNull(),
   name: varchar('name', { length: 100 }).notNull(),
   phone: varchar('phone', { length: 20 }),
@@ -67,7 +69,7 @@ export const inclassParents = pgTable('inclass_parents', {
 // 繳費記錄（inclass 專用，以學生+課程+期間為維度）
 export const inclassPaymentRecords = pgTable('inclass_payment_records', {
   id: uuid('id').defaultRandom().primaryKey(),
-  tenantId: uuid('tenant_id').notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
   studentId: uuid('student_id').references(() => manageStudents.id).notNull(),
   courseId: uuid('course_id').references(() => manageCourses.id).notNull(),
   paymentType: varchar('payment_type', { length: 20 }).notNull(), // monthly/quarterly/semester/yearly
@@ -87,7 +89,7 @@ export const inclassPaymentRecords = pgTable('inclass_payment_records', {
 // 課表
 export const inclassSchedules = pgTable('inclass_schedules', {
   id: uuid('id').defaultRandom().primaryKey(),
-  tenantId: uuid('tenant_id').notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
   courseId: uuid('course_id').references(() => manageCourses.id).notNull(),
   teacherId: uuid('teacher_id').references(() => manageTeachers.id),
   dayOfWeek: integer('day_of_week').notNull(), // 0-6 (Sunday-Saturday)
@@ -103,7 +105,7 @@ export const inclassSchedules = pgTable('inclass_schedules', {
 // NFC 卡
 export const inclassNfcCards = pgTable('inclass_nfc_cards', {
   id: uuid('id').defaultRandom().primaryKey(),
-  tenantId: uuid('tenant_id').notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
   cardUid: varchar('card_uid', { length: 100 }).notNull().unique(),
   studentId: uuid('student_id'),
   isActive: boolean('is_active').default(true),

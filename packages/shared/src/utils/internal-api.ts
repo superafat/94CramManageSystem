@@ -9,7 +9,7 @@ const SERVICE_URLS: Record<string, string> = {
   stock: process.env.STOCK_API_URL || 'http://localhost:3101',
 };
 
-export async function internalFetch<T = any>(
+export async function internalFetch<T = unknown>(
   service: string,
   path: string,
   options?: RequestInit,
@@ -17,12 +17,15 @@ export async function internalFetch<T = any>(
   const baseUrl = SERVICE_URLS[service];
   if (!baseUrl) throw new Error(`Unknown service: ${service}`);
 
+  const apiKey = process.env.INTERNAL_API_KEY;
+  if (!apiKey) throw new Error('INTERNAL_API_KEY is not configured');
+
   const url = `${baseUrl}/api/internal${path}`;
   const res = await fetch(url, {
     ...options,
     headers: {
       ...options?.headers,
-      'X-Internal-Key': process.env.INTERNAL_API_KEY || '',
+      'X-Internal-Key': apiKey,
       'Content-Type': 'application/json',
     },
   });

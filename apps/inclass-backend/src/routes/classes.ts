@@ -5,6 +5,7 @@ import { db } from '../db/index.js'
 import { manageCourses } from '@94cram/shared/db'
 import { and, eq } from 'drizzle-orm'
 import type { Variables } from '../middleware/auth.js'
+import { logger } from '../utils/logger.js'
 
 const classesRouter = new Hono<{ Variables: Variables }>()
 
@@ -29,7 +30,7 @@ classesRouter.get('/', async (c) => {
     const allClasses = await db.select().from(manageCourses).where(eq(manageCourses.tenantId, schoolId))
     return c.json({ success: true, data: { classes: allClasses }, error: null })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error fetching classes:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching classes`)
     return c.json({ success: false, data: null, error: 'Failed to fetch classes' }, 500)
   }
 })
@@ -54,7 +55,7 @@ classesRouter.post('/', zValidator('json', classSchema), async (c) => {
     }).returning()
     return c.json({ success: true, data: { class: newClass }, error: null }, 201)
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error creating class:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error creating class`)
     return c.json({ success: false, data: null, error: 'Failed to create class' }, 500)
   }
 })
@@ -68,7 +69,7 @@ classesRouter.get('/:id', zValidator('param', classIdParamSchema), async (c) => 
     if (!classData) return c.json({ success: false, data: null, error: 'Class not found' }, 404)
     return c.json({ success: true, data: { class: classData }, error: null })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error fetching class:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching class`)
     return c.json({ success: false, data: null, error: 'Failed to fetch class' }, 500)
   }
 })
@@ -95,7 +96,7 @@ classesRouter.put('/:id', zValidator('param', classIdParamSchema), zValidator('j
     const [updated] = await db.update(manageCourses).set(updateData).where(and(eq(manageCourses.id, id), eq(manageCourses.tenantId, schoolId))).returning()
     return c.json({ success: true, data: { class: updated }, error: null })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error updating class:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error updating class`)
     return c.json({ success: false, data: null, error: 'Failed to update class' }, 500)
   }
 })
@@ -110,7 +111,7 @@ classesRouter.delete('/:id', zValidator('param', classIdParamSchema), async (c) 
     await db.delete(manageCourses).where(and(eq(manageCourses.id, id), eq(manageCourses.tenantId, schoolId)))
     return c.json({ success: true, data: { deleted: true }, error: null })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error deleting class:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error deleting class`)
     return c.json({ success: false, data: null, error: 'Failed to delete class' }, 500)
   }
 })

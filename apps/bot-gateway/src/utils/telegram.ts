@@ -1,4 +1,5 @@
 import { config } from '../config'
+import { logger } from './logger'
 import PQueue from 'p-queue'
 
 const ADMIN_BASE = `https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}`
@@ -42,7 +43,7 @@ export interface InlineKeyboardButton {
 
 const queue = new PQueue({ concurrency: 1 })
 
-async function doSend(base: string, body: any) {
+async function doSend(base: string, body: Record<string, unknown>) {
   const res = await fetch(`${base}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -51,9 +52,9 @@ async function doSend(base: string, body: any) {
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    const err: any = new Error('Telegram sendMessage failed')
+    const err = new Error('Telegram sendMessage failed') as Error & { status?: number; response?: string }
     err.status = res.status
-    err.body = text
+    err.response = text
     throw err
   }
   return res.json()
@@ -75,16 +76,17 @@ export async function sendMessage(
       try {
         const result = await doSend(base, { chat_id: chatId, text, ...options })
         return result.result
-      } catch (err: any) {
+      } catch (err: unknown) {
         attempts++
+        const telegramErr = err as Error & { status?: number; response?: string }
         // 400-499 non-retryable except 429
-        if (err.status && err.status >= 400 && err.status < 500 && err.status !== 429) {
-          console.error('[Telegram] Non-retryable error', err.status, err.body)
-          throw err
+        if (telegramErr.status && telegramErr.status >= 400 && telegramErr.status < 500 && telegramErr.status !== 429) {
+          logger.error({ err: telegramErr, status: telegramErr.status, response: telegramErr.response }, '[Telegram] Non-retryable error')
+          throw telegramErr
         }
         if (attempts >= maxAttempts) {
-          console.error('[Telegram] sendMessage failed after retries', err)
-          throw err
+          logger.error({ err: telegramErr }, '[Telegram] sendMessage failed after retries')
+          throw telegramErr
         }
         const backoff = Math.pow(2, attempts) * 200
         await new Promise((r) => setTimeout(r, backoff))

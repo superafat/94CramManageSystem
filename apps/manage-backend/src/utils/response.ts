@@ -5,6 +5,7 @@
 import type { Context } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { ZodError } from 'zod'
+import { logger } from '../utils/logger'
 
 // ===== Response Types =====
 
@@ -109,7 +110,7 @@ export function error(
   code: ErrorCodeType,
   message: string,
   status: ContentfulStatusCode = 400,
-  details?: any
+  details?: unknown
 ): Response {
   const response: ErrorResponse = {
     success: false,
@@ -125,7 +126,7 @@ export function error(
 /**
  * 400 Bad Request
  */
-export function badRequest(c: Context, message: string, details?: any): Response {
+export function badRequest(c: Context, message: string, details?: unknown): Response {
   return error(c, ErrorCode.VALIDATION_ERROR, message, 400, details)
 }
 
@@ -167,7 +168,7 @@ export function internalError(c: Context, err?: unknown): Response {
     : errorObj.message || 'Internal server error'
 
   if (err) {
-    console.error('[API Error]', errorObj)
+    logger.error({ err: errorObj }, '[API Error]')
   }
   
   return error(c, ErrorCode.INTERNAL_ERROR, message, 500)

@@ -1,6 +1,7 @@
 /**
  * Notification Service - 整合 imStudy 通知系統
  */
+import { logger } from '../utils/logger.js'
 
 const IMSTUDY_API_URL = process.env.IMSTUDY_API_URL
 if (!IMSTUDY_API_URL) {
@@ -54,16 +55,16 @@ export async function sendToParent(
 
     if (!response.ok) {
       const error = await response.text()
-      console.error('❌ 通知發送失敗:', error)
+      logger.error({ err: new Error(error) }, '通知發送失敗')
       return false
     }
 
     const result = await response.json()
-    console.info('✅ 通知已發送:', result)
+    logger.info({ result }, '通知已發送')
     return true
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error('❌ 通知發送異常:', message)
+    logger.error({ err: error instanceof Error ? error : new Error(message) }, '通知發送異常')
     return false
   }
 }
@@ -77,8 +78,8 @@ export async function notifyAttendance(
   parentLineId: string,
   checkInTime: Date
 ): Promise<boolean> {
-  const time = checkInTime.toLocaleTimeString('zh-TW', { 
-    hour: '2-digit', 
+  const time = checkInTime.toLocaleTimeString('zh-TW', {
+    hour: '2-digit',
     minute: '2-digit',
     timeZone: 'Asia/Taipei'
   })
@@ -102,8 +103,8 @@ export async function notifyLate(
   parentLineId: string,
   checkInTime: Date
 ): Promise<boolean> {
-  const time = checkInTime.toLocaleTimeString('zh-TW', { 
-    hour: '2-digit', 
+  const time = checkInTime.toLocaleTimeString('zh-TW', {
+    hour: '2-digit',
     minute: '2-digit',
     timeZone: 'Asia/Taipei'
   })

@@ -78,7 +78,7 @@ export async function generateBranchReport(
       COUNT(*) FILTER (WHERE status = 'dropped')::int as dropped
     FROM students
     WHERE tenant_id = ${tenantId} AND branch_id = ${branchId}
-  `) as unknown as any[]
+  `) as unknown as Record<string, unknown>[]
   const t = totalRows[0]
 
   // Attendance rate for the month
@@ -92,8 +92,8 @@ export async function generateBranchReport(
       AND s.branch_id = ${branchId}
       AND a.date >= ${startDate}::date
       AND a.date <= ${endDate}::date
-  `) as unknown as any[]
-  const avgAttendanceRate = attRows[0]?.total > 0 ? attRows[0].attended / attRows[0].total : 0
+  `) as unknown as Record<string, unknown>[]
+  const avgAttendanceRate = Number(attRows[0]?.total) > 0 ? Number(attRows[0].attended) / Number(attRows[0].total) : 0
 
   // Average grade for the month
   const gradeRows = await db.execute(sql`
@@ -104,7 +104,7 @@ export async function generateBranchReport(
       AND s.branch_id = ${branchId}
       AND g.date >= ${startDate}::date
       AND g.date <= ${endDate}::date
-  `) as unknown as any[]
+  `) as unknown as Record<string, unknown>[]
   const avgGrade = gradeRows[0]?.avg_score ? Number(gradeRows[0].avg_score) : 0
 
   // Revenue (sum of monthly fees for active enrollments)
@@ -115,7 +115,7 @@ export async function generateBranchReport(
     WHERE e.tenant_id = ${tenantId}
       AND s.branch_id = ${branchId}
       AND e.status = 'active'
-  `) as unknown as any[]
+  `) as unknown as Record<string, unknown>[]
   const totalRevenue = revRows[0]?.revenue ?? 0
 
   // Per-student summary
@@ -143,7 +143,7 @@ export async function generateBranchReport(
       AND s.branch_id = ${branchId}
       AND s.status = 'active'
     ORDER BY s.name
-  `) as unknown as any[]
+  `) as unknown as Record<string, unknown>[]
 
   // Course stats
   const courseRows = await db.execute(sql`
@@ -158,7 +158,7 @@ export async function generateBranchReport(
       AND e.status = 'active'
     GROUP BY e.course_name
     ORDER BY student_count DESC
-  `) as unknown as any[]
+  `) as unknown as Record<string, unknown>[]
 
   // Churn risks
   const churnRisks = await analyzeChurnRisk(tenantId, branchId, 60)
@@ -178,13 +178,13 @@ export async function generateBranchReport(
 
   const churnMap = new Map(churnRisks.map(c => [c.studentId, c]))
 
-  const students: StudentSummary[] = studentRows.map((r: any) => ({
-    name: r.name,
-    grade: r.grade,
-    courses: studentCourses[r.id] ?? [],
+  const students: StudentSummary[] = studentRows.map((r) => ({
+    name: String(r.name),
+    grade: String(r.grade),
+    courses: studentCourses[String(r.id)] ?? [],
     attendanceRate: Number(r.attendance_rate) || 0,
     avgScore: r.avg_score ? Number(r.avg_score) : null,
-    riskLevel: churnMap.get(r.id)?.riskLevel ?? 'low',
+    riskLevel: churnMap.get(String(r.id))?.riskLevel ?? 'low',
   }))
 
   const churnAlerts: ChurnAlert[] = churnRisks
@@ -197,12 +197,12 @@ export async function generateBranchReport(
       recommendation: r.recommendation,
     }))
 
-  const courseStats: CourseStat[] = courseRows.map((r: any) => ({
-    courseName: r.course_name,
-    studentCount: r.student_count,
+  const courseStats: CourseStat[] = courseRows.map((r) => ({
+    courseName: String(r.course_name),
+    studentCount: Number(r.student_count),
     avgAttendance: 0, // TODO: per-course attendance
     avgGrade: null,
-    monthlyRevenue: r.monthly_revenue,
+    monthlyRevenue: Number(r.monthly_revenue),
   }))
 
   return {
@@ -211,13 +211,13 @@ export async function generateBranchReport(
     period,
     generatedAt: new Date().toISOString(),
     summary: {
-      totalStudents: t.total,
-      activeStudents: t.active,
-      newStudents: t.new_students,
-      droppedStudents: t.dropped,
+      totalStudents: Number(t.total),
+      activeStudents: Number(t.active),
+      newStudents: Number(t.new_students),
+      droppedStudents: Number(t.dropped),
       avgAttendanceRate,
       avgGrade,
-      totalRevenue,
+      totalRevenue: Number(totalRevenue),
     },
     students,
     churnAlerts,
@@ -250,7 +250,7 @@ export async function generateStudentReport(
   const studentRows = await db.execute(sql`
     SELECT id, name, grade, parent_name, phone, branch_id
     FROM students WHERE id = ${studentId} AND tenant_id = ${tenantId}
-  `) as unknown as any[]
+  `) as unknown as Record<string, unknown>[]
 
   if (!studentRows.length) return null
   const s = studentRows[0]
@@ -259,26 +259,26 @@ export async function generateStudentReport(
     SELECT course_name, fee_monthly, day_of_week, time_slot
     FROM enrollments
     WHERE student_id = ${studentId} AND tenant_id = ${tenantId} AND status = 'active'
-  `) as unknown as any[]
+  `) as unknown as Record<string, unknown>[]
 
   const attendance = await db.execute(sql`
     SELECT date::text, status FROM attendance
     WHERE student_id = ${studentId} AND tenant_id = ${tenantId}
     ORDER BY date DESC LIMIT 30
-  `) as unknown as any[]
+  `) as unknown as Record<string, unknown>[]
 
   const totalAtt = attendance.length
-  const presentCount = attendance.filter((a: any) => a.status === 'present' || a.status === 'late').length
+  const presentCount = attendance.filter((a) => a.status === 'present' || a.status === 'late').length
   const attendanceRate = totalAtt > 0 ? presentCount / totalAtt : 1
 
   const grades = await db.execute(sql`
     SELECT exam_name, score, date::text FROM grades
     WHERE student_id = ${studentId} AND tenant_id = ${tenantId}
     ORDER BY date ASC
-  `) as unknown as any[]
+  `) as unknown as Record<string, unknown>[]
 
   const avgScore = grades.length > 0
-    ? grades.reduce((s: number, g: any) => s + Number(g.score), 0) / grades.length
+    ? grades.reduce((acc: number, g) => acc + Number(g.score), 0) / grades.length
     : null
 
   let scoreTrend: StudentReport['scoreTrend'] = 'stable'
@@ -289,22 +289,22 @@ export async function generateStudentReport(
     else if (first - last >= 5) scoreTrend = 'declining'
   }
 
-  const churnRisks = await analyzeChurnRisk(tenantId, s.branch_id ?? '', 60)
+  const churnRisks = await analyzeChurnRisk(tenantId, String(s.branch_id ?? ''), 60)
   const myRisk = churnRisks.find(r => r.studentId === studentId)
 
   return {
     studentId,
-    studentName: s.name,
-    grade: s.grade,
-    parentName: s.parent_name,
-    courses: courses.map((c: any) => ({
-      name: c.course_name,
-      fee: c.fee_monthly,
+    studentName: String(s.name),
+    grade: String(s.grade),
+    parentName: s.parent_name != null ? String(s.parent_name) : null,
+    courses: courses.map((c) => ({
+      name: String(c.course_name),
+      fee: Number(c.fee_monthly),
       schedule: `${c.day_of_week ?? ''} ${c.time_slot ?? ''}`.trim(),
     })),
-    attendanceHistory: attendance.map((a: any) => ({ date: a.date, status: a.status })),
+    attendanceHistory: attendance.map((a) => ({ date: String(a.date), status: String(a.status) })),
     attendanceRate,
-    gradeHistory: grades.map((g: any) => ({ examName: g.exam_name, score: Number(g.score), date: g.date })),
+    gradeHistory: grades.map((g) => ({ examName: String(g.exam_name), score: Number(g.score), date: String(g.date) })),
     avgScore: avgScore ? Math.round(avgScore * 10) / 10 : null,
     scoreTrend,
     riskLevel: myRisk?.riskLevel ?? 'low',

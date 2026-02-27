@@ -1,6 +1,7 @@
 import { db } from '../db/index'
 import { sql } from 'drizzle-orm'
 import type { ChatResponse } from './types'
+import { logger } from '../utils/logger'
 
 export async function logConversation(
   branchId: string,
@@ -16,6 +17,6 @@ export async function logConversation(
       VALUES (${branchId}, ${tenantId ?? null}, ${channel}, ${query}, ${response.answer}, ${response.model}, ${response.intent}, ${response.latencyMs}, ${response.tokensUsed ?? null})
     `)
   } catch (err) {
-    console.error('[logger] failed to log conversation:', err instanceof Error ? err.message : String(err))
+    logger.error({ err }, '[logger] failed to log conversation')
   }
 }

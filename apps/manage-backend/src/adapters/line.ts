@@ -3,6 +3,8 @@
  * 提供統一的 LINE 訊息發送接口
  */
 
+import { logger } from '../utils/logger'
+
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN
 const LINE_API_BASE = 'https://api.line.me/v2/bot'
 
@@ -20,7 +22,7 @@ export interface SendResult {
 export interface LineMessage {
   type: 'text' | 'image' | 'video' | 'audio' | 'location' | 'sticker'
   text?: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 /**
@@ -51,7 +53,7 @@ class LineAdapter {
     }
 
     if (!LINE_CHANNEL_ACCESS_TOKEN) {
-      console.error('[LINE Adapter] Missing LINE_CHANNEL_ACCESS_TOKEN')
+      logger.error('[LINE Adapter] Missing LINE_CHANNEL_ACCESS_TOKEN')
       return { success: false, error: 'LINE_CHANNEL_ACCESS_TOKEN is not configured' }
     }
 
@@ -70,14 +72,14 @@ class LineAdapter {
 
       if (!response.ok) {
         const errorBody = await response.text()
-        console.error('[LINE] Push API error:', response.status, errorBody)
+        logger.error({ status: response.status, body: errorBody }, '[LINE] Push API error')
         return { success: false, error: `LINE API error: ${response.status}` }
       }
 
       return { success: true }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      console.error('[LINE] Push error:', message)
+      logger.error({ err: error instanceof Error ? error : new Error(message) }, '[LINE] Push error')
       return { success: false, error: message }
     }
   }

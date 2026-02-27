@@ -8,7 +8,7 @@ const envSchema = z.object({
   DB_POOL_MAX_LIFETIME: z.coerce.number().default(3600),
   DB_QUERY_TIMEOUT: z.coerce.number().default(30000),
   DB_CONNECT_TIMEOUT: z.coerce.number().default(10),
-  GEMINI_API_KEY: z.string().min(1),
+  GEMINI_API_KEY: z.string().optional(),
   MINIMAX_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   TELEGRAM_BOT_TOKEN: z.string().optional(),

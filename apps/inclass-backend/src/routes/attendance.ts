@@ -5,6 +5,7 @@ import { db } from '../db/index.js'
 import { inclassAttendances, inclassNfcCards, manageStudents, manageEnrollments } from '@94cram/shared/db'
 import { and, eq, gte, lt } from 'drizzle-orm'
 import type { Variables } from '../middleware/auth.js'
+import { logger } from '../utils/logger.js'
 
 const attendanceRouter = new Hono<{ Variables: Variables }>()
 
@@ -86,7 +87,7 @@ attendanceRouter.post('/checkin', zValidator('json', checkinSchema), async (c) =
 
     return c.json({ success: true, record })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Checkin error:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Checkin error`)
     return c.json({ error: 'Check-in failed' }, 500)
   }
 })
@@ -118,7 +119,7 @@ attendanceRouter.get('/today', async (c) => {
       attendances: records
     })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error fetching today attendance:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching today attendance`)
     return c.json({ error: 'Failed to fetch attendance' }, 500)
   }
 })

@@ -73,17 +73,42 @@ export function churnRisksToMd(risks: ChurnRisk[]): string {
   return md
 }
 
-export function studentsToMd(students: any[]): string {
+interface StudentMarkdown {
+  name?: string
+  grade?: string
+  status?: string
+  courses?: Array<{ course?: string }>
+  [key: string]: unknown
+}
+
+interface InvoiceMarkdown {
+  student_name?: string
+  total?: number | string
+  status?: string
+  [key: string]: unknown
+}
+
+interface SlotMarkdown {
+  day_of_week?: number
+  start_time?: string
+  end_time?: string
+  student_name?: string
+  subject?: string
+  teacher_name?: string
+  [key: string]: unknown
+}
+
+export function studentsToMd(students: StudentMarkdown[]): string {
   let md = `# 👥 學生名單\n\n`
   md += `| 姓名 | 年級 | 狀態 | 課程 |\n|------|------|------|------|\n`
   for (const s of students) {
-    const courses = s.courses?.map((c: any) => c.course).join('、') ?? '—'
+    const courses = s.courses?.map((c) => c.course).join('、') ?? '—'
     md += `| ${s.name} | ${s.grade} | ${s.status} | ${courses} |\n`
   }
   return md
 }
 
-export function invoicesToMd(invoices: any[], period: string): string {
+export function invoicesToMd(invoices: InvoiceMarkdown[], period: string): string {
   let md = `# 💰 ${period} 學費帳單\n\n`
   md += `| 學生 | 金額 | 狀態 |\n|------|------|------|\n`
   let total = 0
@@ -96,20 +121,21 @@ export function invoicesToMd(invoices: any[], period: string): string {
   return md
 }
 
-export function scheduleToMd(slots: any[]): string {
+export function scheduleToMd(slots: SlotMarkdown[]): string {
   const dayNames = ['', '一', '二', '三', '四', '五', '六', '日']
   let md = `# 📅 週課表\n\n`
 
-  const byDay = new Map<number, any[]>()
+  const byDay = new Map<number, SlotMarkdown[]>()
   for (const s of slots) {
-    if (!byDay.has(s.day_of_week)) byDay.set(s.day_of_week, [])
-    byDay.get(s.day_of_week)!.push(s)
+    const day = s.day_of_week ?? 0
+    if (!byDay.has(day)) byDay.set(day, [])
+    byDay.get(day)!.push(s)
   }
 
   for (const [day, daySlots] of [...byDay].sort((a, b) => a[0] - b[0])) {
     md += `## 週${dayNames[day]}\n\n`
     md += `| 時間 | 學生 | 科目 | 教練 |\n|------|------|------|------|\n`
-    for (const s of daySlots.sort((a: any, b: any) => a.start_time.localeCompare(b.start_time))) {
+    for (const s of daySlots.sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? ''))) {
       md += `| ${s.start_time?.slice(0, 5)}-${s.end_time?.slice(0, 5)} | ${s.student_name} | ${s.subject} | ${s.teacher_name ?? '—'} |\n`
     }
     md += '\n'

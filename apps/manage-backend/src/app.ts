@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { secureHeaders } from 'hono/secure-headers'
 import { compress } from 'hono/compress'
 import { bodyLimit } from 'hono/body-limit'
 import { botRoutes } from './routes/bot'
@@ -27,15 +28,18 @@ import { createSuccessResponse } from './types/api-response'
 import { logger } from './utils/logger'
 
 // Run migrations on startup
-runMigrations().catch((err) => logger.error('Migration failed', { error: err }))
+runMigrations().catch((err) => logger.error({ err }, 'Migration failed'))
 
 // Initialize event system
 initializeEventSystem()
 
-const GCP_PROJECT_NUMBER = process.env.GCP_PROJECT_NUMBER || '1015149159553'
+const GCP_PROJECT_NUMBER = process.env.GCP_PROJECT_NUMBER || ''
 const gcpOrigin = (service: string) => `https://${service}-${GCP_PROJECT_NUMBER}.asia-east1.run.app`
 
 export const app = new Hono()
+
+// Security headers
+app.use('*', secureHeaders())
 
 // Performance: gzip compression
 app.use('*', compress())

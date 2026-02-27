@@ -6,6 +6,7 @@ import { adminOnly } from '../middleware/auth.js'
 import { getFailedLogins, getBlockedIPs } from '../middleware/rateLimit.js'
 import { isValidUUID } from '../utils/date.js'
 import type { AdminVariables } from '../middleware/auth.js'
+import { logger } from '../utils/logger.js'
 
 const adminRouter = new Hono<{ Variables: AdminVariables }>()
 adminRouter.use('*', adminOnly())
@@ -16,7 +17,7 @@ adminRouter.get('/pending-users', async (c) => {
     const tenantUsers = await db.select().from(users).where(eq(users.tenantId, schoolId))
     return c.json({ users: tenantUsers.filter(u => !u.isActive) })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Admin error:', e)
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Admin error`)
     return c.json({ error: 'Failed to get pending users' }, 500)
   }
 })
@@ -29,7 +30,7 @@ adminRouter.post('/users/:id/approve', async (c) => {
     if (!updated) return c.json({ error: 'User not found' }, 404)
     return c.json({ success: true, user: updated })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Approve error:', e)
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Approve error`)
     return c.json({ error: 'Failed to approve user' }, 500)
   }
 })
@@ -42,7 +43,7 @@ adminRouter.post('/users/:id/reject', async (c) => {
     if (!updated) return c.json({ error: 'User not found' }, 404)
     return c.json({ success: true, user: updated })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Reject error:', e)
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Reject error`)
     return c.json({ error: 'Failed to reject user' }, 500)
   }
 })
@@ -53,7 +54,7 @@ adminRouter.get('/security/failed-logins', async (c) => {
     const logins = getFailedLogins(hours)
     return c.json({ failedLogins: logins, summary: { total: logins.length, uniqueIPs: [...new Set(logins.map(l => l.ip))].length, blockedIPs: getBlockedIPs() } })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Security error:', e)
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Security error`)
     return c.json({ error: 'Failed to get security data' }, 500)
   }
 })

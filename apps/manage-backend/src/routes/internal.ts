@@ -6,6 +6,7 @@ import { timingSafeEqual, createHash } from 'crypto';
 import { Hono } from 'hono';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
+import { logger } from '../utils/logger'
 
 const app = new Hono();
 
@@ -64,9 +65,12 @@ app.post('/seed', async (c) => {
     
     if (users.length === 0) {
       const userId = crypto.randomUUID()
+      const { randomBytes } = await import('crypto')
       const bcrypt = await import('bcryptjs')
-      const passwordHash = await bcrypt.default.hash('admin123', 10)
-      
+      const oneTimePassword = randomBytes(16).toString('hex')
+      const passwordHash = await bcrypt.default.hash(oneTimePassword, 12)
+      logger.info(`[SEED] 臨時管理員密碼: ${oneTimePassword} — 請立即更改`)
+
       await db.execute(sql`
         INSERT INTO users (id, tenant_id, username, full_name, email, role, password_hash, is_active, created_at)
         VALUES (${userId}, ${tenantId}, 'admin', '系統管理員', 'admin@94cram.app', 'superadmin', ${passwordHash}, true, NOW())

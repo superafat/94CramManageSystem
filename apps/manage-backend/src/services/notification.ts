@@ -8,6 +8,7 @@ import { db } from '../db'
 import { notifications, notificationPreferences, users } from '../db/schema'
 import type { NotificationType, NotificationChannel, NotificationStatus } from '../db/schema'
 import { sendLinePushMessage } from './line'
+import { logger } from '../utils/logger'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN
@@ -137,7 +138,7 @@ export async function createAndSendNotification(params: {
 
     // 如果用戶明確關閉此類通知，則跳過
     if (preference && !preference.enabled) {
-    console.info(`User ${params.recipientId} has disabled ${params.type} notifications`)
+    logger.info(`User ${params.recipientId} has disabled ${params.type} notifications`)
       
       // 建立 skipped 記錄
       const [notification] = await db.insert(notifications).values({
@@ -190,23 +191,15 @@ export async function createAndSendNotification(params: {
       )
 
       if (!result.success) {
-        console.error('Telegram notification failed, attempting LINE fallback', {
-          notificationId: notification.id,
-          errorMessage: result.error
-        })
+        logger.error({ notificationId: notification.id, errorMessage: result.error }, 'Telegram notification failed, attempting LINE fallback')
 
         const fallbackResult = await attemptLineFallback(user, params)
 
         if (fallbackResult.success) {
-          console.info('LINE fallback succeeded for Telegram notification', {
-            notificationId: notification.id
-          })
+          logger.info({ notificationId: notification.id }, 'LINE fallback succeeded for Telegram notification')
           result = fallbackResult
         } else {
-          console.error('LINE fallback also failed', {
-            notificationId: notification.id,
-            errorMessage: fallbackResult.error
-          })
+          logger.error({ notificationId: notification.id, errorMessage: fallbackResult.error }, 'LINE fallback also failed')
           const combinedError = [result.error, fallbackResult.error].filter(Boolean).join(' | ')
           result = {
             success: false,
@@ -275,7 +268,7 @@ export async function createAndSendNotification(params: {
       return { success: false, notificationId: notification.id, error: result.error }
     }
   } catch (error) {
-    console.error('createAndSendNotification error:', error)
+    logger.error({ err: error }, 'createAndSendNotification error:')
     return { success: false, error: getErrorMessage(error) }
   }
 }

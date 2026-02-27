@@ -11,6 +11,7 @@
  * 7. ✅ 增加 UUID 驗證
  */
 import { Hono } from 'hono'
+import type { Context } from 'hono'
 import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
 import { ingestChunk } from '../ai/rag'
@@ -44,6 +45,8 @@ import {
   internalError,
 } from '../utils/response'
 import { providerFactory, quotaManager } from '../ai/providers'
+import type { QuotaUsage } from '../ai/quota'
+import { logger } from '../utils/logger'
 
 export const adminRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -57,9 +60,11 @@ const getUserBranchId = (user: unknown): string | null => {
   return typeof branchId === 'string' && isUUID(branchId) ? branchId : null
 }
 
+type QueryResult = Record<string, unknown>
+
 /** Convert result to array */
-const rows = (result: any): any[] => Array.isArray(result) ? result : (result?.rows ?? [])
-const first = (result: any) => rows(result)[0]
+const rows = (result: unknown): QueryResult[] => Array.isArray(result) ? result as QueryResult[] : ((result as { rows?: QueryResult[] })?.rows ?? [])
+const first = (result: unknown): QueryResult | undefined => rows(result)[0]
 const isBranchInTenant = async (branchId: string, tenantId: string): Promise<boolean> => {
   const result = await db.execute(sql`
     SELECT 1
@@ -71,13 +76,13 @@ const isBranchInTenant = async (branchId: string, tenantId: string): Promise<boo
 }
 
 /** Check if request wants markdown response */
-function wantsMd(c: any): boolean {
+function wantsMd(c: Context): boolean {
   const accept = c.req.header('Accept') ?? ''
   return accept.includes('text/markdown') || c.req.query('format') === 'md'
 }
 
 /** Send markdown response */
-function mdResponse(c: any, text: string) {
+function mdResponse(c: Context, text: string) {
   return c.text(text, 200, { 'Content-Type': 'text/markdown; charset=utf-8' })
 }
 
@@ -121,7 +126,7 @@ adminRoutes.post('/knowledge/ingest', requireRole(Role.ADMIN), zValidator('json'
     }
     return badRequest(c, 'Provide "content" or "chunks" array')
   } catch (err) {
-    console.error('Ingest error:', err)
+    logger.error({ err: err }, 'Ingest error:')
     return internalError(c, err)
   }
 })
@@ -1044,8 +1049,8 @@ adminRoutes.get('/billing',
             ORDER BY p.due_date DESC
           `)
           const feeList = rows(fees)
-          const totalDue = feeList.reduce((sum: number, f: any) => sum + Number(f.amount || 0), 0)
-          const totalPaid = feeList.reduce((sum: number, f: any) => sum + Number(f.paid_amount || 0), 0)
+          const totalDue = feeList.reduce((sum: number, f: QueryResult) => sum + Number(f.amount || 0), 0)
+          const totalPaid = feeList.reduce((sum: number, f: QueryResult) => sum + Number(f.paid_amount || 0), 0)
           result.push({
             studentId: s.id,
             name: s.full_name,
@@ -1448,7 +1453,7 @@ adminRoutes.get('/billing/course/:courseId',
     
     const students = rows(studentRows)
     const total = students.length
-    const paid = students.filter((s: any) => s.payment_id).length
+    const paid = students.filter((s: QueryResult) => s.payment_id).length
     
     return success(c, {
       course,
@@ -1545,8 +1550,8 @@ async function createAuditLog(
   action: string,
   tableName: string,
   recordId: string | null,
-  oldValue: any,
-  newValue: any,
+  oldValue: unknown,
+  newValue: unknown,
   changeSummary: string,
   needsAlert: boolean = false
 ) {
@@ -1592,7 +1597,7 @@ async function createAuditLog(
         })
       })
     } catch (err) {
-      console.error('Failed to sync to 94inClass:', err)
+      logger.error({ err: err }, 'Failed to sync to 94inClass:')
     }
   }
 }
@@ -1795,8 +1800,8 @@ adminRoutes.get('/ai/quota/:provider/history',
         history,
         total: {
           requests: history.length,
-          tokens: history.reduce((sum: number, h: any) => sum + h.tokens, 0),
-          cost: history.reduce((sum: number, h: any) => sum + h.estimatedCost, 0),
+          tokens: history.reduce((sum: number, h: QuotaUsage) => sum + h.tokens, 0),
+          cost: history.reduce((sum: number, h: QuotaUsage) => sum + h.estimatedCost, 0),
         },
       })
     } catch (err) {

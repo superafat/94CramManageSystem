@@ -8,6 +8,7 @@ import { analyzeChurnRisk } from '../ai/churn'
 import { generateBranchReport } from '../ai/reports'
 import { generateInvoices } from '../ai/billing'
 import { checkConflicts, createTimeSlot } from '../ai/scheduling'
+import { logger } from '../utils/logger'
 
 const DEFAULT_TENANT = '11111111-1111-1111-1111-111111111111'
 
@@ -109,7 +110,7 @@ export async function handleCommand(
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.error(`[cmd/${action}]`, msg)
+    logger.error({ err }, `[cmd/${action}]: ${msg}`)
     return `❌ 執行失敗：${msg}`
   }
 }

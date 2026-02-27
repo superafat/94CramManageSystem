@@ -1,5 +1,6 @@
 import { GoogleAuth } from 'google-auth-library';
 import { config } from '../config';
+import { logger } from '../utils/logger';
 
 const SERVICES = {
   manage: config.MANAGE_URL,
@@ -39,7 +40,7 @@ export async function callBotApi(
     return res.data;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown API error';
-    console.error(`[API Client] ${service}${path} failed:`, message);
+    logger.error({ err: error instanceof Error ? error : new Error(message) }, `[API Client] ${service}${path} failed`)
     return { success: false, error: 'api_error', message };
   }
 }

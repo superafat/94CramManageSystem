@@ -23,8 +23,8 @@ import type { PgTable } from 'drizzle-orm/pg-core'
 export async function batchFindByIds<T extends PgTable>(
   table: T,
   ids: string[],
-  idColumn: any = 'id'
-): Promise<any[]> {
+  idColumn: string = 'id'
+): Promise<Record<string, unknown>[]> {
   if (ids.length === 0) return []
   
   // @ts-ignore - Drizzle 类型推断问题
@@ -63,7 +63,7 @@ export function createDataLoader<K extends string | number, V>(
   let queue: Array<{
     key: K
     resolve: (value: V | null) => void
-    reject: (error: any) => void
+    reject: (error: unknown) => void
   }> = []
   let batchTimeout: NodeJS.Timeout | null = null
   
@@ -219,7 +219,7 @@ export async function batchLoadRelated<T extends PgTable>(
 export async function eagerLoad<T, R>(
   records: T[],
   recordKey: keyof T,
-  loadFn: (keys: any[]) => Promise<R[]>,
+  loadFn: (keys: T[keyof T][]) => Promise<R[]>,
   foreignKey: keyof R,
   targetField: string
 ): Promise<(T & { [key: string]: R[] })[]> {

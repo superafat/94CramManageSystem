@@ -9,6 +9,7 @@ import { notifications, notificationPreferences, users } from '../../db/schema'
 import type { NotificationStatus } from '../../db/schema'
 import type { NotificationEvent, EventHandler, EventHandlerResult } from '../types'
 import { telegramAdapter } from '../../adapters/telegram'
+import { logger } from '../../utils/logger'
 
 /**
  * Telegram 事件處理器類
@@ -109,7 +110,7 @@ class TelegramEventHandler implements EventHandler {
           })
         }
       } catch (error) {
-        console.error(`[TelegramHandler] Error processing recipient ${recipientId}:`, error)
+        logger.error({ err: error }, `[TelegramHandler] Error processing recipient ${recipientId}:`)
         results.failedCount++
         results.errors.push({
           recipientId,
@@ -134,7 +135,7 @@ class TelegramEventHandler implements EventHandler {
     status: NotificationStatus,
     errorMessage?: string
   ): Promise<void> {
-    const updateData: any = { status }
+    const updateData: Record<string, unknown> = { status }
 
     if (status === 'sent') {
       updateData.sentAt = new Date()

@@ -20,7 +20,7 @@ export interface SuccessResponse<T = unknown> extends BaseResponse {
       total: number
       totalPages: number
     }
-    [key: string]: any
+    [key: string]: unknown
   }
 }
 

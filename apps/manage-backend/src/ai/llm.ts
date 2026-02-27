@@ -3,6 +3,7 @@ import { classifyIntent, getRoute } from './router'
 import { providerFactory } from './providers/factory'
 import { quotaManager } from './quota'
 import type { ConversationMessage as ProviderMessage } from './providers/types'
+import { logger } from '../utils/logger'
 
 export interface ConversationMessage {
   role: 'user' | 'model'
@@ -68,7 +69,7 @@ export async function chat(
       tokensUsed: result.tokensUsed,
     }
   } catch (err) {
-    console.error('[LLM] All providers failed:', err instanceof Error ? err.message : String(err))
+    logger.error({ err }, '[LLM] All providers failed')
     throw err
   }
 }

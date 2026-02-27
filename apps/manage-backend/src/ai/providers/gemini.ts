@@ -113,11 +113,12 @@ export class GeminiProvider implements LLMProvider {
     }
   }
 
-  private wrapError(error: any): Error {
-    const err: any = new Error(`Gemini error: ${error.message}`)
+  private wrapError(error: unknown): Error {
+    const message = error instanceof Error ? error.message : String(error)
+    const err = new Error(`Gemini error: ${message}`) as Error & { provider?: string; retryable?: boolean; quotaExceeded?: boolean }
     err.provider = 'gemini'
-    err.retryable = error.message?.includes('timeout') || error.message?.includes('503')
-    err.quotaExceeded = error.message?.includes('quota') || error.message?.includes('429')
+    err.retryable = message.includes('timeout') || message.includes('503')
+    err.quotaExceeded = message.includes('quota') || message.includes('429')
     return err
   }
 }

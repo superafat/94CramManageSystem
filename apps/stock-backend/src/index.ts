@@ -1,15 +1,20 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { secureHeaders } from 'hono/secure-headers';
 import { bodyLimit } from 'hono/body-limit';
 import { checkRateLimit, getClientIP, clearRateLimitTimer } from '@94cram/shared/middleware';
 import routes from './routes/index';
 import botRoutes from './routes/bot/index';
+import { logger } from './utils/logger';
 
-const GCP_PROJECT_NUMBER = process.env.GCP_PROJECT_NUMBER || '1015149159553'
+const GCP_PROJECT_NUMBER = process.env.GCP_PROJECT_NUMBER || ''
 const gcpOrigin = (service: string) => `https://${service}-${GCP_PROJECT_NUMBER}.asia-east1.run.app`
 
 const app = new Hono();
+
+// Security headers
+app.use('/*', secureHeaders());
 
 // CORS whitelist
 app.use('/*', cors({
@@ -63,7 +68,7 @@ app.route('/api', routes);
 app.route('/api/bot', botRoutes);
 
 const port = parseInt(process.env.PORT || '3101');
-console.info(`Server is running on port ${port}`);
+logger.info(`Server is running on port ${port}`);
 
 const server = serve({
   fetch: app.fetch,
@@ -72,16 +77,16 @@ const server = serve({
 
 // Graceful shutdown
 const shutdown = async (signal: string) => {
-  console.info(`\n${signal} received, starting graceful shutdown...`)
+  logger.info(`\n${signal} received, starting graceful shutdown...`)
   try {
     clearRateLimitTimer()
     if (server && typeof server.close === 'function') {
       server.close()
     }
-    console.info('✅ Stock backend shutdown completed')
+    logger.info('✅ Stock backend shutdown completed')
     process.exit(0)
   } catch (error) {
-    console.error('❌ Error during shutdown:', error)
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '❌ Error during shutdown')
     process.exit(1)
   }
 }

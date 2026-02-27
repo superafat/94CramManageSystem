@@ -87,13 +87,14 @@ export const defaultCache = new MemoryCache()
 
 interface CacheableOptions {
   ttl?: number
-  keyGenerator?: (...args: any[]) => string
+  keyGenerator?: (...args: unknown[]) => string
   cache?: MemoryCache
 }
 
 export function cacheable(options: CacheableOptions = {}) {
   return function (
-    target: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    target: any, // decorator target must be any per TypeScript decorator spec
     propertyKey: string,
     descriptor: PropertyDescriptor
   ) {
@@ -101,7 +102,7 @@ export function cacheable(options: CacheableOptions = {}) {
     const cache = options.cache || defaultCache
     const ttl = options.ttl
 
-    descriptor.value = async function (...args: any[]) {
+    descriptor.value = async function (...args: unknown[]) {
       const cacheKey = options.keyGenerator
         ? options.keyGenerator(...args)
         : `${propertyKey}:${JSON.stringify(args)}`

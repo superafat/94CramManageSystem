@@ -5,12 +5,13 @@
 
 import { eventBus } from './event-bus'
 import { telegramEventHandler, lineEventHandler } from './handlers'
+import { logger } from '../utils/logger'
 
 /**
  * 初始化事件系統
  */
 export function initializeEventSystem(): void {
-  console.info('[EventSystem] Initializing event system...')
+  logger.info('[EventSystem] Initializing event system...')
   
   // 註冊 Telegram 處理器
   eventBus.registerHandler(telegramEventHandler)
@@ -21,17 +22,17 @@ export function initializeEventSystem(): void {
   // 可選：訂閱全局事件監聽器（用於調試）
   if (process.env.NODE_ENV === 'development') {
     eventBus.subscribe(async (event) => {
-      console.info('[EventSystem] Event emitted:', {
+      logger.info({
         type: event.type,
         recipientCount: event.payload.recipientIds.length,
         channels: event.payload.channels,
         timestamp: event.timestamp
-      })
+      }, '[EventSystem] Event emitted')
     })
   }
   
   const stats = eventBus.getStats()
-  console.info('[EventSystem] Event system initialized:', stats)
+  logger.info({ stats }, '[EventSystem] Event system initialized')
 }
 
 // 導出事件總線相關功能

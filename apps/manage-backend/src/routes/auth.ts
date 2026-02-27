@@ -28,13 +28,14 @@ function generateId(): string {
   })
 }
 import { loginSchema, telegramLoginSchema, trialSignupSchema } from '../utils/validation'
-import { 
-  success, 
-  badRequest, 
-  unauthorized, 
-  forbidden, 
-  internalError 
+import {
+  success,
+  badRequest,
+  unauthorized,
+  forbidden,
+  internalError
 } from '../utils/response'
+import { logger } from '../utils/logger'
 
 export const authRoutes = new Hono()
 
@@ -91,7 +92,7 @@ async function getFirebasePublicKeys(): Promise<Record<string, string>> {
       firebaseKeysFetchedAt = now
     }
   } catch (error) {
-    console.error('Failed to fetch Firebase public keys:', error)
+    logger.error({ err: error }, 'Failed to fetch Firebase public keys:')
   }
   return firebasePublicKeys
 }
@@ -206,7 +207,7 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
         },
       })
     } catch (err: unknown) {
-      console.error('Login DB error:', errorMessage(err))
+      logger.error({ err }, 'Login DB error')
     return internalError(c, err instanceof Error ? err : undefined)
     }
   }
@@ -281,27 +282,10 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
         })
       }
 
-      // 建立訪客 token
-      const jwt = await generateToken({
-        sub: payload.sub as string,
-        email: payload.email as string,
-        role: 'parent',
-        tenant_id: '38068f5a-6bad-4edc-b26b-66bc6ac90fb3', // 預設 tenant
-      })
-
-      setAuthCookie(c, jwt)
-      return success(c, {
-        token: jwt,
-        user: {
-          id: payload.sub,
-          email: payload.email,
-          role: 'parent',
-          permissions: getUserPermissions(Role.PARENT),
-        },
-        isGuest: true,
-      })
+      // 未綁定的 Firebase 用戶不允許直接存取系統
+      return unauthorized(c, '此帳號尚未綁定補習班，請聯繫管理員進行帳號綁定')
     } catch (err: unknown) {
-      console.error('Firebase login error:', errorMessage(err))
+      logger.error({ err }, 'Firebase login error')
       if (isJwtExpiredError(err)) {
         return unauthorized(c, 'Firebase token expired')
       }
@@ -341,7 +325,8 @@ authRoutes.post('/telegram', zValidator('json', telegramLoginSchema), async (c) 
           return c.json({ error: 'Telegram auth expired' }, 401)
         }
       }
-    } else if (process.env.NODE_ENV === 'production') {
+    } else {
+      // Fail closed: 無論環境，缺少 hash 或 botToken 時都拒絕
       return c.json({ error: 'Telegram hash verification required' }, 401)
     }
 
@@ -409,7 +394,7 @@ authRoutes.post('/telegram', zValidator('json', telegramLoginSchema), async (c) 
       isGuest: true,
     })
   } catch (err: unknown) {
-    console.error('Telegram login error:', errorMessage(err))
+    logger.error({ err }, 'Telegram login error')
     return internalError(c, err instanceof Error ? err : undefined)
   }
 })
@@ -472,7 +457,7 @@ authRoutes.post('/trial-signup', rateLimit('trial-signup'), zValidator('json', t
       tenantId,
     })
   } catch (err: unknown) {
-    console.error('Trial signup error:', errorMessage(err))
+    logger.error({ err }, 'Trial signup error')
     return internalError(c, err instanceof Error ? err : undefined)
   }
 })
@@ -533,9 +518,12 @@ authRoutes.post('/seed', async (c) => {
       VALUES (${tenantId}, 'Default Tenant', 'active', NOW())
     `)
 
-    // Create admin user with bcrypt password hash
+    // Create admin user with bcrypt password hash (random one-time password)
+    const { randomBytes } = await import('crypto')
     const bcrypt = await import('bcryptjs')
-    const passwordHash = await bcrypt.default.hash('admin123', 10)
+    const oneTimePassword = randomBytes(16).toString('hex')
+    const passwordHash = await bcrypt.default.hash(oneTimePassword, 12)
+    logger.info(`[SEED] 臨時管理員密碼: ${oneTimePassword} — 請立即更改`)
 
     const userId = generateId()
     await db.execute(sql`
@@ -545,7 +533,7 @@ authRoutes.post('/seed', async (c) => {
 
     return success(c, { message: 'Admin user created', userId, tenantId })
   } catch (error) {
-    console.error('Seed error:', error)
+    logger.error({ err: error }, 'Seed error:')
     return internalError(c, error instanceof Error ? error : undefined)
   }
 })
@@ -613,7 +601,7 @@ export async function handleDemoLogin(c: import('hono').Context) {
       },
     })
   } catch (error) {
-    console.error('Demo login error:', error)
+    logger.error({ err: error }, 'Demo login error:')
     return internalError(c, error instanceof Error ? error : undefined)
   }
 }

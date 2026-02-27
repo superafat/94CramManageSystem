@@ -63,7 +63,7 @@ export interface UseFormReturn<T> {
   isSubmitting: boolean
   isValid: boolean
   
-  setValue: (field: keyof T, value: any) => void
+  setValue: <K extends keyof T>(field: K, value: T[K]) => void
   setValues: (values: Partial<T>) => void
   setError: (field: keyof T, error: string) => void
   setErrors: (errors: Partial<Record<keyof T, string>>) => void
@@ -77,7 +77,7 @@ export interface UseFormReturn<T> {
   reset: () => void
 }
 
-export function useForm<T extends Record<string, any>>(
+export function useForm<T extends object>(
   config: UseFormConfig<T>
 ): UseFormReturn<T> {
   const {
@@ -143,7 +143,7 @@ export function useForm<T extends Record<string, any>>(
 
   // Set single value
   const setValue = useCallback(
-    (field: keyof T, value: any) => {
+    <K extends keyof T>(field: K, value: T[K]) => {
       setValuesState((prev) => ({ ...prev, [field]: value }))
       
       if (validateOnChange) {
@@ -189,7 +189,7 @@ export function useForm<T extends Record<string, any>>(
   const handleChange = useCallback(
     (field: keyof T) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
       const value = e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value
-      setValue(field, value)
+      setValue(field, value as T[keyof T])
     },
     [setValue]
   )

@@ -1,4 +1,5 @@
 import { config } from '../config';
+import { logger } from '../utils/logger';
 
 const SERVICES = {
   manage: config.MANAGE_URL,
@@ -42,7 +43,7 @@ export async function callParentApi(
     return await res.json() as ParentApiResponse;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown API error';
-    console.error(`[Parent API] ${service}${path} failed:`, message);
+    logger.error({ err: error instanceof Error ? error : new Error(message) }, `[Parent API] ${service}${path} failed`)
     return { success: false, error: 'api_error', message };
   }
 }

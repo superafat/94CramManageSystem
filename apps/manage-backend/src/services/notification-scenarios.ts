@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm'
 import { db } from '../db'
 import { sendBulkNotifications } from './notification'
 import type { NotificationType, NotificationChannel } from '../db/schema'
+import { logger } from '../utils/logger'
 
 const DEFAULT_TENANT_ID = '11111111-1111-1111-1111-111111111111'
 
@@ -178,7 +179,7 @@ export async function sendScheduleChangeNotification(
       error: result.errors.length > 0 ? result.errors[0].error : undefined
     }
   } catch (error) {
-    console.error('sendScheduleChangeNotification error:', error)
+    logger.error({ err: error }, 'sendScheduleChangeNotification error:')
     return { success: false, sentCount: 0, error: error instanceof Error ? error.message : String(error) }
   }
 }
@@ -261,7 +262,7 @@ export async function sendBillingReminder(
       error: result.errors.length > 0 ? result.errors[0].error : undefined
     }
   } catch (error) {
-    console.error('sendBillingReminder error:', error)
+    logger.error({ err: error }, 'sendBillingReminder error:')
     return { success: false, sentCount: 0, error: error instanceof Error ? error.message : String(error) }
   }
 }
@@ -359,7 +360,7 @@ export async function checkAndSendAttendanceAlert(
       error: result.errors.length > 0 ? result.errors[0].error : undefined
     }
   } catch (error) {
-    console.error('checkAndSendAttendanceAlert error:', error)
+    logger.error({ err: error }, 'checkAndSendAttendanceAlert error:')
     return { success: false, sentCount: 0, alertSent: false, error: error instanceof Error ? error.message : String(error) }
   }
 }
@@ -447,7 +448,7 @@ export async function sendGradeNotification(
       error: result.errors.length > 0 ? result.errors[0].error : undefined
     }
   } catch (error) {
-    console.error('sendGradeNotification error:', error)
+    logger.error({ err: error }, 'sendGradeNotification error:')
     return { success: false, sentCount: 0, error: error instanceof Error ? error.message : String(error) }
   }
 }
@@ -486,7 +487,7 @@ export async function sendScheduleChangeNotifications(
   const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN
 
   if (!telegramBotToken) {
-    console.error('sendScheduleChangeNotifications error: TELEGRAM_BOT_TOKEN is not configured')
+    logger.error('sendScheduleChangeNotifications error: TELEGRAM_BOT_TOKEN is not configured')
     return { sent: 0, failed: recipients.length }
   }
 

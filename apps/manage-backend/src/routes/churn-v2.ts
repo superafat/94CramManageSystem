@@ -28,6 +28,7 @@ import { authMiddleware } from '../middleware/auth'
 import { requireRole, requirePermission, Role, Permission, type RBACVariables } from '../middleware/rbac'
 import { uuidSchema } from '../utils/validation'
 import { success, notFound, internalError, badRequest } from '../utils/response'
+import { logger } from '../utils/logger'
 
 // ===== Row Interfaces =====
 interface BranchRow {
@@ -137,7 +138,7 @@ churnV2Routes.get('/admin/churn/:branchId',
         generatedAt: new Date().toISOString(),
       })
     } catch (err) {
-      console.error('Churn risk error:', err)
+      logger.error({ err: err }, 'Churn risk error:')
       return internalError(c, err)
     }
   }
@@ -207,7 +208,7 @@ churnV2Routes.get('/admin/churn/:branchId/history',
         period: { days },
       })
     } catch (err) {
-      console.error('Churn history error:', err)
+      logger.error({ err: err }, 'Churn history error:')
       return internalError(c, err)
     }
   }
@@ -251,7 +252,7 @@ churnV2Routes.post('/admin/churn/:branchId/scan',
         scannedAt: new Date().toISOString(),
       })
     } catch (err) {
-      console.error('Churn scan error:', err)
+      logger.error({ err: err }, 'Churn scan error:')
       return internalError(c, err)
     }
   }
@@ -313,7 +314,7 @@ churnV2Routes.get('/admin/churn/student/:studentId',
         period: { days },
       })
     } catch (err) {
-      console.error('Student churn detail error:', err)
+      logger.error({ err: err }, 'Student churn detail error:')
       return internalError(c, err)
     }
   }
@@ -350,7 +351,7 @@ churnV2Routes.get('/admin/churn/:branchId/export',
       // JSON 格式（預設）
       return success(c, { risks, exportedAt: new Date().toISOString() })
     } catch (err) {
-      console.error('Churn export error:', err)
+      logger.error({ err: err }, 'Churn export error:')
       return internalError(c, err)
     }
   }

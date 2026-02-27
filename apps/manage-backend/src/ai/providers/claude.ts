@@ -60,7 +60,7 @@ export class ClaudeProvider implements LLMProvider {
         throw new Error(`Claude API error ${resp.status}: ${errorText}`)
       }
 
-      const data = await resp.json() as any
+      const data = await resp.json() as { content?: Array<{ text?: string }>; usage?: { input_tokens?: number; output_tokens?: number }; stop_reason?: string }
 
       const content = data.content?.[0]?.text || ''
       
@@ -75,7 +75,7 @@ export class ClaudeProvider implements LLMProvider {
       return {
         content,
         modelName: 'claude-3-5-haiku-20241022',
-        tokensUsed: data.usage?.input_tokens + data.usage?.output_tokens,
+        tokensUsed: (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0),
         finishReason: data.stop_reason || 'stop',
       }
     } catch (error) {
@@ -122,12 +122,14 @@ export class ClaudeProvider implements LLMProvider {
     }
   }
 
-  private wrapError(error: any): Error {
-    const err: any = new Error(`Claude error: ${error.message}`)
+  private wrapError(error: unknown): Error {
+    const message = error instanceof Error ? error.message : String(error)
+    const status = (error instanceof Error && 'status' in error) ? (error as Error & { status?: number }).status : undefined
+    const err = new Error(`Claude error: ${message}`) as Error & { provider?: string; retryable?: boolean; quotaExceeded?: boolean; statusCode?: number }
     err.provider = 'claude'
-    err.retryable = error.message?.includes('timeout') || error.message?.includes('503') || error.message?.includes('529')
-    err.quotaExceeded = error.message?.includes('quota') || error.message?.includes('429')
-    err.statusCode = error.status
+    err.retryable = message.includes('timeout') || message.includes('503') || message.includes('529')
+    err.quotaExceeded = message.includes('quota') || message.includes('429')
+    err.statusCode = status
     return err
   }
 }

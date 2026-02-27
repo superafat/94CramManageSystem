@@ -21,14 +21,14 @@ export default function Students() {
     }
   }
   
-  const { data: rawData, loading, error, refetch } = useApi<any>(
+  const { data: rawData, loading, error, refetch } = useApi<Record<string, unknown>>(
     getStudentsEndpoint()
   )
   
   // API 回傳 { students: [...], pagination: {...} }
-  const rawStudents = rawData?.students ?? (Array.isArray(rawData) ? rawData : null)
-  const students = rawStudents 
-    ? rawStudents.map((s: any) => normalizeStudent(s))
+  const rawStudents = (rawData?.students as Record<string, unknown>[] | undefined) ?? (Array.isArray(rawData) ? rawData as Record<string, unknown>[] : null)
+  const students = rawStudents
+    ? rawStudents.map((s) => normalizeStudent(s))
     : null
   
   const [search, setSearch] = useState('')
@@ -41,15 +41,15 @@ export default function Students() {
 
   // Memoize filtered students for performance
   const filtered = useMemo(() => {
-    return displayStudents.filter((s: any) => {
+    return displayStudents.filter((s) => {
       if (search && !s.name.includes(search) && !s.grade.includes(search)) return false
       if (filter === 'risk' && !s.risk) return false
       return true
     })
   }, [displayStudents, search, filter])
 
-  const riskCount = useMemo(() => 
-    displayStudents.filter((s: any) => s.risk).length, 
+  const riskCount = useMemo(() =>
+    displayStudents.filter((s) => s.risk).length,
     [displayStudents]
   )
 
@@ -103,7 +103,7 @@ export default function Students() {
         )}
 
         <div className="space-y-3">
-          {filtered.map((s: any) => {
+          {filtered.map((s) => {
             const isExpanded = expandedId === s.id
             return (
               <div 

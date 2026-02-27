@@ -61,6 +61,7 @@ import { eq, sql, and } from 'drizzle-orm'
 import { chat, type ConversationMessage } from '../ai/llm'
 import { classifyIntent } from '../ai/router'
 import { sanitizeString } from '../utils/validation'
+import { logger } from '../utils/logger'
 
 // ===== Type Definitions =====
 
@@ -114,9 +115,9 @@ function getErrorMessage(error: unknown): string {
 
 function logLineError(label: string, error: unknown) {
   if (error instanceof Error) {
-    console.error(label, error.message, error.stack)
+    logger.error({ err: error }, label)
   } else {
-    console.error(label, error)
+    logger.error({ err: new Error(String(error)) }, label)
   }
 }
 
@@ -241,7 +242,7 @@ async function processBinding(lineUserId: string, studentName: string, phoneLast
 
   const crossTenantId = await findCrossTenantBinding(lineUserId)
   if (crossTenantId) {
-    console.warn('[LINE Binding] lineUserId bound to another tenant:', crossTenantId)
+    logger.warn({ crossTenantId }, '[LINE Binding] lineUserId bound to another tenant')
     return {
       success: false,
       message: '此 LINE 帳號已綁定其他補習班，請聯繫客服協助'
@@ -297,7 +298,7 @@ async function processBinding(lineUserId: string, studentName: string, phoneLast
     if (existingBinding.length > 0) {
       const boundUser = existingBinding[0]
       if (boundUser.tenantId !== DEFAULT_TENANT_ID) {
-        console.warn('[LINE Binding] lineUserId bound to another tenant:', boundUser.tenantId)
+        logger.warn({ tenantId: boundUser.tenantId }, '[LINE Binding] lineUserId bound to another tenant')
         return {
           success: false,
           message: '此 LINE 帳號已綁定其他補習班，請聯繫客服協助'
@@ -382,7 +383,7 @@ async function findCrossTenantBinding(lineUserId: string): Promise<string | null
 async function getConversationHistory(lineUserId: string, limit = 6): Promise<ConversationMessage[]> {
   // 驗證輸入
   if (!lineUserId || typeof lineUserId !== 'string' || lineUserId.trim().length === 0) {
-    console.warn('[LINE] Invalid lineUserId for history')
+    logger.warn('[LINE] Invalid lineUserId for history')
     return []
   }
   
@@ -435,7 +436,7 @@ async function saveConversation(params: {
 }): Promise<void> {
   // 驗證必要參數
   if (!params.lineUserId || !params.userMessage || !params.botReply) {
-    console.error('[LINE] Missing required params for save')
+    logger.error('[LINE] Missing required params for save')
     return
   }
   
@@ -489,25 +490,25 @@ app.post('/webhook', async (c) => {
     
     // 驗證簽章存在
     if (!signature || typeof signature !== 'string') {
-      console.warn('[LINE] Missing or invalid signature')
+      logger.warn('[LINE] Missing or invalid signature')
       return c.text('Forbidden', 403)
     }
     
     // 驗證 body 不為空
     if (!rawBody || rawBody.length === 0) {
-      console.warn('[LINE] Empty request body')
+      logger.warn('[LINE] Empty request body')
       return c.text('Bad Request', 400)
     }
     
     // 驗證 body 大小限制 (防止 DoS)
     if (rawBody.length > 1000000) { // 1MB
-      console.warn('[LINE] Request body too large:', rawBody.length)
+      logger.warn({ bodyLength: rawBody.length }, '[LINE] Request body too large')
       return c.text('Request Entity Too Large', 413)
     }
     
     // 驗證 LINE 簽章
     if (!verifyLineSignature(rawBody, signature)) {
-      console.warn('[LINE] Invalid signature')
+      logger.warn('[LINE] Invalid signature')
       return c.text('Forbidden', 403)
     }
 
@@ -522,7 +523,7 @@ app.post('/webhook', async (c) => {
     
     // 驗證 events 陣列
     if (!body.events || !Array.isArray(body.events)) {
-      console.warn('[LINE] Missing or invalid events array')
+      logger.warn('[LINE] Missing or invalid events array')
       return c.json({ success: true }) // LINE 期望 200
     }
     
@@ -556,13 +557,13 @@ app.post('/webhook', async (c) => {
 async function processEvent(event: LineEvent): Promise<void> {
   // 驗證事件結構
   if (!event || typeof event !== 'object' || !event.type) {
-    console.warn('[LINE] Invalid event structure')
+    logger.warn('[LINE] Invalid event structure')
     return
   }
   
   // 驗證必要的 source 和 userId（不是所有事件都有 userId）
   if (!event.source) {
-    console.warn('[LINE] Missing source in event')
+    logger.warn('[LINE] Missing source in event')
     return
   }
   
@@ -581,11 +582,11 @@ async function processEvent(event: LineEvent): Promise<void> {
       case 'unfollow':
         // 記錄取消追蹤
         if (event.source.userId) {
-          console.info('[LINE] User unfollowed:', event.source.userId)
+          logger.info({ userId: event.source.userId }, '[LINE] User unfollowed')
         }
         break
       default:
-        console.info('[LINE] Unhandled event type:', event.type)
+        logger.info({ eventType: event.type }, '[LINE] Unhandled event type')
     }
   } catch (error) {
     logLineError(`[LINE] Error processing ${event.type} event:`, error)
@@ -607,7 +608,7 @@ async function processEvent(event: LineEvent): Promise<void> {
 async function handleMessageEvent(event: LineEvent): Promise<void> {
   // 驗證事件結構
   if (!event.message || typeof event.message !== 'object') {
-    console.warn('[LINE] Invalid message event structure')
+    logger.warn('[LINE] Invalid message event structure')
     return
   }
   
@@ -618,18 +619,18 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
   
   // 驗證必要參數
   if (!lineUserId || typeof lineUserId !== 'string') {
-    console.error('[LINE] Missing or invalid lineUserId')
+    logger.error('[LINE] Missing or invalid lineUserId')
     return
   }
   
   if (!replyToken || typeof replyToken !== 'string') {
-    console.error('[LINE] Missing or invalid replyToken')
+    logger.error('[LINE] Missing or invalid replyToken')
     return
   }
 
   const crossTenantId = await findCrossTenantBinding(lineUserId)
   if (crossTenantId) {
-    console.warn('[LINE] lineUserId bound to another tenant:', crossTenantId)
+    logger.warn({ crossTenantId }, '[LINE] lineUserId bound to another tenant')
     try {
       await sendLineReplyMessage(replyToken, [
         { type: 'text', text: '此 LINE 帳號已綁定其他補習班，請聯繫客服協助' }
@@ -847,19 +848,19 @@ async function handleFollowEvent(event: LineEvent): Promise<void> {
   
   // 驗證必要參數
   if (!userId || typeof userId !== 'string') {
-    console.error('[LINE] Invalid userId in follow event')
+    logger.error('[LINE] Invalid userId in follow event')
     return
   }
   
   if (!replyToken || typeof replyToken !== 'string') {
-    console.error('[LINE] Invalid replyToken in follow event')
+    logger.error('[LINE] Invalid replyToken in follow event')
     return
   }
   
   try {
     const crossTenantId = await findCrossTenantBinding(userId)
     if (crossTenantId) {
-      console.warn('[LINE] lineUserId bound to another tenant in follow:', crossTenantId)
+      logger.warn({ crossTenantId }, '[LINE] lineUserId bound to another tenant in follow')
       try {
         await sendLineReplyMessage(replyToken, [
           { type: 'text', text: '此 LINE 帳號已綁定其他補習班，請聯繫客服協助' }

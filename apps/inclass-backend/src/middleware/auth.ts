@@ -32,6 +32,7 @@ export function getJWTSecret(): Uint8Array {
 /**
  * JWT Authentication Middleware
  * schoolId = tenantId（inclass 歷史命名）
+ * @deprecated 實際 JWT 驗證在 index.ts 中
  */
 export function jwtAuth() {
   return async (c: Context<{ Variables: Variables }>, next: Next) => {

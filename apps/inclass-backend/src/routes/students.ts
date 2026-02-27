@@ -5,6 +5,7 @@ import { db } from '../db/index.js'
 import { manageStudents, manageCourses, manageEnrollments } from '@94cram/shared/db'
 import { and, eq, sql } from 'drizzle-orm'
 import type { Variables } from '../middleware/auth.js'
+import { logger } from '../utils/logger.js'
 
 const studentsRouter = new Hono<{ Variables: Variables }>()
 
@@ -40,7 +41,7 @@ studentsRouter.get('/', zValidator('query', listStudentsQuerySchema), async (c) 
     const allStudents = await db.select().from(manageStudents).where(eq(manageStudents.tenantId, schoolId)).limit(limit).offset(offset)
     return c.json({ students: allStudents, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error fetching students:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching students`)
     return c.json({ error: 'Failed to fetch students' }, 500)
   }
 })
@@ -71,7 +72,7 @@ studentsRouter.post('/', zValidator('json', studentSchema), async (c) => {
     }
     return c.json({ success: true, student: newStudent }, 201)
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error creating student:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error creating student`)
     return c.json({ error: 'Failed to create student' }, 500)
   }
 })
@@ -85,7 +86,7 @@ studentsRouter.get('/:id', zValidator('param', studentIdParamSchema), async (c) 
     if (!student) return c.json({ error: 'Student not found' }, 404)
     return c.json({ student })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error fetching student:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching student`)
     return c.json({ error: 'Failed to fetch student' }, 500)
   }
 })
@@ -116,7 +117,7 @@ studentsRouter.put('/:id', zValidator('param', studentIdParamSchema), zValidator
 
     return c.json({ success: true, student: updated })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error updating student:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error updating student`)
     return c.json({ error: 'Failed to update student' }, 500)
   }
 })
@@ -131,7 +132,7 @@ studentsRouter.delete('/:id', zValidator('param', studentIdParamSchema), async (
     await db.delete(manageStudents).where(and(eq(manageStudents.id, id), eq(manageStudents.tenantId, schoolId)))
     return c.json({ success: true })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error deleting student:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error deleting student`)
     return c.json({ error: 'Failed to delete student' }, 500)
   }
 })

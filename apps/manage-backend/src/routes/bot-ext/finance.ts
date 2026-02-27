@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { db } from '../../db'
 import { manageStudents, managePayments, manageEnrollments } from '@94cram/shared/db'
 import { eq, and, like, sql, gte, lte } from 'drizzle-orm'
+import { logger } from '../../utils/logger'
 
 type BotExtVariables = { tenantId: string; botRequest: boolean; botBody: Record<string, unknown> }
 
@@ -67,7 +68,7 @@ app.post('/payment', async (c) => {
 
     return c.json({ success: false, error: 'no_enrollment', message: `${student.name} 尚未報名任何課程` })
   } catch (error) {
-    console.error('[Bot] payment error:', error)
+    logger.error({ err: error }, '[Bot] payment error:')
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500)
   }
 })

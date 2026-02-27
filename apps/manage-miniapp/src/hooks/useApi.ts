@@ -21,11 +21,11 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-const cache = new Map<string, CacheEntry<any>>();
+const cache = new Map<string, CacheEntry<unknown>>();
 
 const DEFAULT_CACHE_TIME = 5 * 60 * 1000; // 5 minutes
 
-export function useApi<T = any>(
+export function useApi<T = unknown>(
   url: string,
   options: UseApiOptions = {}
 ): UseApiResult<T> {
@@ -54,7 +54,7 @@ export function useApi<T = any>(
       const cached = cache.get(cacheKey);
       
       if (cached && Date.now() - cached.timestamp < cacheTime) {
-        setData(cached.data);
+        setData(cached.data as T);
         setLoading(false);
         return;
       }

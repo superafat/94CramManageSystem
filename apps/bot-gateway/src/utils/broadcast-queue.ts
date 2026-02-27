@@ -1,4 +1,5 @@
 import PQueue from 'p-queue';
+import { logger } from './logger';
 
 // ── P1: Broadcast Queue System ──
 // Ready for Pub/Sub upgrade (currently local queue)
@@ -49,7 +50,7 @@ export async function enqueueBroadcast(
   // Add to queue
   broadcastQueue.add(async () => {
     job.status = 'processing';
-    console.log(`[Broadcast] Starting job ${jobId} to ${chatIds.length} users`);
+    logger.info(`[Broadcast] Starting job ${jobId} to ${chatIds.length} users`);
 
     for (const chatId of chatIds) {
       await broadcastRateQueue.add(async () => {
@@ -60,13 +61,13 @@ export async function enqueueBroadcast(
           job.progress.succeeded++;
         } catch (err) {
           job.progress.failed++;
-          console.error(`[Broadcast] Failed to send to ${chatId}:`, err);
+          logger.error({ err: err instanceof Error ? err : new Error(String(err)) }, `[Broadcast] Failed to send to ${chatId}`)
         }
       });
     }
 
     job.status = job.progress.failed === job.progress.total ? 'failed' : 'completed';
-    console.log(`[Broadcast] Job ${jobId} completed: ${job.progress.succeeded}/${job.progress.total} succeeded`);
+    logger.info(`[Broadcast] Job ${jobId} completed: ${job.progress.succeeded}/${job.progress.total} succeeded`);
   });
 
   return jobId;

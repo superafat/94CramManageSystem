@@ -9,6 +9,7 @@ import { notifications, notificationPreferences, users } from '../../db/schema'
 import type { NotificationStatus } from '../../db/schema'
 import type { NotificationEvent, EventHandler, EventHandlerResult } from '../types'
 import { lineAdapter } from '../../adapters/line'
+import { logger } from '../../utils/logger'
 
 /**
  * LINE 事件處理器類
@@ -110,7 +111,7 @@ class LineEventHandler implements EventHandler {
           })
         }
       } catch (error) {
-        console.error(`[LineHandler] Error processing recipient ${recipientId}:`, error)
+        logger.error({ err: error }, `[LineHandler] Error processing recipient ${recipientId}:`)
         results.failedCount++
         results.errors.push({
           recipientId,

@@ -13,6 +13,13 @@ function getBranchId() {
   return typeof window !== 'undefined' ? localStorage.getItem('branchId') || '' : ''
 }
 
+interface StudentEnrollment {
+  id: string
+  course_name?: string
+  status?: string
+  start_date?: string
+}
+
 interface Student {
   id: string
   full_name: string
@@ -23,7 +30,7 @@ interface Student {
   status: string
   notes?: string
   enrollment_date?: string
-  enrollments?: any[]
+  enrollments?: StudentEnrollment[]
 }
 
 const GRADE_OPTIONS = [
@@ -252,7 +259,7 @@ export default function StudentsPage() {
               </div>
               {student.enrollments && student.enrollments.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {student.enrollments.slice(0, 3).map((e: any, idx: number) => (
+                  {student.enrollments.slice(0, 3).map((e: StudentEnrollment, idx: number) => (
                     <span key={idx} className="px-2 py-0.5 bg-surface-hover text-text-muted text-xs rounded-lg">
                       {e.course_name || '課程'}
                     </span>

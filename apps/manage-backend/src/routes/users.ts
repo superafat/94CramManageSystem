@@ -36,6 +36,7 @@ import {
   forbidden,
   internalError,
 } from '../utils/response'
+import { logger } from '../utils/logger'
 
 // Password hashing with bcrypt
 async function hashPassword(password: string): Promise<string> {
@@ -49,12 +50,13 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
     const bcrypt = await import('bcryptjs')
     return bcrypt.default.compare(password, stored)
   }
-  // Legacy sha256+salt: "salt:hash"
-  const { createHash } = await import('crypto')
+  // Legacy sha256+salt: "salt:hash" — 使用 timing-safe 比較
+  const { createHash, timingSafeEqual } = await import('crypto')
   const [salt, hash] = stored.split(':')
   if (!salt || !hash) return false
   const check = createHash('sha256').update(password + salt).digest('hex')
-  return check === hash
+  if (check.length !== hash.length) return false
+  return timingSafeEqual(Buffer.from(check, 'utf8'), Buffer.from(hash, 'utf8'))
 }
 
 // Password complexity validation
@@ -128,7 +130,7 @@ app.get('/admin/users', requireRole(Role.ADMIN), async (c) => {
     
     return success(c, { users: usersWithPermissions })
   } catch (error) {
-    console.error('Error fetching users:', error)
+    logger.error({ err: error }, 'Error fetching users:')
     return internalError(c, error)
   }
 })
@@ -188,7 +190,7 @@ app.post('/admin/users', requireRole(Role.ADMIN), zValidator('json', createUserW
       user: newUser,
     }, 201)
   } catch (error) {
-    console.error('Error creating user:', error)
+    logger.error({ err: error }, 'Error creating user:')
     return internalError(c, error)
   }
 })
@@ -251,7 +253,7 @@ app.put('/admin/users/:id/role', requireRole(Role.ADMIN),
         user: updatedUser,
       })
     } catch (error) {
-      console.error('Error updating user role:', error)
+      logger.error({ err: error }, 'Error updating user role:')
       return internalError(c, error)
     }
   }
@@ -303,7 +305,7 @@ app.delete('/admin/users/:id', requireRole(Role.ADMIN),
       
       return success(c, { message: 'User deleted successfully' })
     } catch (error) {
-      console.error('Error deleting user:', error)
+      logger.error({ err: error }, 'Error deleting user:')
       return internalError(c, error)
     }
   }
@@ -348,7 +350,7 @@ app.get('/auth/me', async (c) => {
       customPermissions: customPermissionList,
     })
   } catch (error) {
-    console.error('Error fetching user info:', error)
+    logger.error({ err: error }, 'Error fetching user info:')
     return internalError(c, error)
   }
 })
@@ -414,7 +416,7 @@ app.put('/auth/password', zValidator('json', changePasswordSchema), async (c) =>
     
     return success(c, { message: 'Password changed successfully' })
   } catch (error) {
-    console.error('Error changing password:', error)
+    logger.error({ err: error }, 'Error changing password:')
     return internalError(c, error)
   }
 })

@@ -9,6 +9,7 @@ import {
   manageEnrollments,
 } from '@94cram/shared/db';
 import { eq, and, gte, lte, desc, inArray } from 'drizzle-orm';
+import { logger } from '../utils/logger.js';
 
 const app = new Hono();
 
@@ -67,7 +68,7 @@ app.get('/attendance/:studentId', async (c) => {
       },
     });
   } catch (error) {
-    console.error('[parent-ext] GET /attendance/:studentId error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[parent-ext] GET /attendance/:studentId error')
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
@@ -134,7 +135,7 @@ app.get('/attendance/:studentId/summary', async (c) => {
       },
     });
   } catch (error) {
-    console.error('[parent-ext] GET /attendance/:studentId/summary error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[parent-ext] GET /attendance/:studentId/summary error')
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
@@ -198,7 +199,7 @@ app.get('/schedule/:studentId', async (c) => {
       data: { student_name: student.name, schedules },
     });
   } catch (error) {
-    console.error('[parent-ext] GET /schedule/:studentId error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[parent-ext] GET /schedule/:studentId error')
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
@@ -244,7 +245,7 @@ app.post('/leave', async (c) => {
       },
     });
   } catch (error) {
-    console.error('[parent-ext] POST /leave error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[parent-ext] POST /leave error')
     return c.json({ error: 'Internal server error' }, 500);
   }
 });

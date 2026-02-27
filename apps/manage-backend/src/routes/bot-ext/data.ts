@@ -3,6 +3,7 @@ import { db } from '../../db'
 import { manageStudents, manageCourses } from '@94cram/shared/db'
 import { eq } from 'drizzle-orm'
 import { Firestore } from '@google-cloud/firestore'
+import { logger } from '../../utils/logger'
 
 type BotExtVariables = { tenantId: string; botRequest: boolean; botBody: Record<string, unknown> }
 
@@ -63,7 +64,7 @@ app.post('/bindcode', async (c) => {
       data: { code, expires_at: expiresAt.toISOString() },
     })
   } catch (error) {
-    console.error('[Bot] bindcode error:', error)
+    logger.error({ err: error }, '[Bot] bindcode error:')
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500)
   }
 })

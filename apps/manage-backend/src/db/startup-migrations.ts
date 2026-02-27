@@ -4,9 +4,10 @@
  */
 import { db } from './index'
 import { sql } from 'drizzle-orm'
+import { logger } from '../utils/logger'
 
 export async function runMigrations() {
-  console.info('Running startup migrations...')
+  logger.info('Running startup migrations...')
   
   // Migration v0: Add essential columns to users table for password login
   try {
@@ -19,9 +20,9 @@ export async function runMigrations() {
       ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP,
       ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP;
     `)
-    console.info('Migration v0: users table columns added')
+    logger.info('Migration v0: users table columns added')
   } catch (err) {
-    console.info('Migration v0: users columns may already exist')
+    logger.info('Migration v0: users columns may already exist')
   }
   
   // Migration v1: Ensure tenants table exists
@@ -35,9 +36,9 @@ export async function runMigrations() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `)
-    console.info('Migration v1: tenants table created')
+    logger.info('Migration v1: tenants table created')
   } catch (err) {
-    console.info('Migration v1: tenants table may already exist')
+    logger.info('Migration v1: tenants table may already exist')
   }
   
   // Migration v2: Add tenant_id to users if not exists
@@ -45,9 +46,9 @@ export async function runMigrations() {
     await db.execute(sql`
       ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id)
     `)
-    console.info('Migration v2: users.tenant_id added')
+    logger.info('Migration v2: users.tenant_id added')
   } catch (err) {
-    console.info('Migration v2: users.tenant_id may already exist')
+    logger.info('Migration v2: users.tenant_id may already exist')
   }
   
   try {
@@ -61,10 +62,10 @@ export async function runMigrations() {
       ADD COLUMN IF NOT EXISTS trial_approved_at TIMESTAMP,
       ADD COLUMN IF NOT EXISTS trial_notes TEXT;
     `)
-    console.info('Migration v9: trial fields added')
+    logger.info('Migration v9: trial fields added')
   } catch (err) {
     // Ignore if columns already exist
-    console.info('Migration v9: columns may already exist')
+    logger.info('Migration v9: columns may already exist')
   }
 
   // Migration v10: Add fee fields to courses + payment_records table
@@ -76,9 +77,9 @@ export async function runMigrations() {
       ADD COLUMN IF NOT EXISTS fee_semester INTEGER,
       ADD COLUMN IF NOT EXISTS fee_yearly INTEGER
     `)
-    console.info('Migration v10: courses fee fields added')
+    logger.info('Migration v10: courses fee fields added')
   } catch (err) {
-    console.info('Migration v10: courses fee fields may already exist')
+    logger.info('Migration v10: courses fee fields may already exist')
   }
 
   try {
@@ -101,9 +102,9 @@ export async function runMigrations() {
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_payment_records_tenant ON payment_records(tenant_id)`)
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_payment_records_student ON payment_records(student_id)`)
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_payment_records_period ON payment_records(period_month)`)
-    console.info('Migration v10: payment_records table created')
+    logger.info('Migration v10: payment_records table created')
   } catch (err) {
-    console.info('Migration v10: payment_records may already exist')
+    logger.info('Migration v10: payment_records may already exist')
   }
 
   // Migration v11: Add audit_logs table
@@ -135,9 +136,9 @@ export async function runMigrations() {
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_table ON audit_logs(table_name)`)
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_alert ON audit_logs(needs_alert)`)
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at)`)
-    console.info('Migration v11: audit_logs table created')
+    logger.info('Migration v11: audit_logs table created')
   } catch (err) {
-    console.info('Migration v11: audit_logs may already exist')
+    logger.info('Migration v11: audit_logs may already exist')
   }
   
   // Migration v12: Ensure conversations table exists (for AI dialogue log)
@@ -161,9 +162,9 @@ export async function runMigrations() {
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_conversations_tenant ON conversations(tenant_id)`)
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_conversations_branch ON conversations(branch_id)`)
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_conversations_created ON conversations(created_at)`)
-    console.info('Migration v12: conversations table created')
+    logger.info('Migration v12: conversations table created')
   } catch (err) {
-    console.info('Migration v12: conversations may already exist')
+    logger.info('Migration v12: conversations may already exist')
   }
 
   // Migration v13: Ensure manage_settings table exists
@@ -177,10 +178,10 @@ export async function runMigrations() {
         updated_by UUID REFERENCES users(id)
       )
     `)
-    console.info('Migration v13: manage_settings table created')
+    logger.info('Migration v13: manage_settings table created')
   } catch (err) {
-    console.info('Migration v13: manage_settings may already exist')
+    logger.info('Migration v13: manage_settings may already exist')
   }
 
-  console.info('All migrations complete!')
+  logger.info('All migrations complete!')
 }

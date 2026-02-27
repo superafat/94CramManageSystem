@@ -38,7 +38,7 @@ export default function Alerts() {
     }
   };
   
-  const { data, loading, error, refetch } = useApi<any>(
+  const { data, loading, error, refetch } = useApi<Record<string, unknown>>(
     getAlertsEndpoint(),
     { retry: true }
   )
@@ -49,9 +49,9 @@ export default function Alerts() {
   }
 
   // API returns { total, students: [...] } — convert students to alerts
-  const rawAlerts = data?.alerts || data?.students || []
+  const rawAlerts = ((data?.alerts || data?.students || []) as Record<string, unknown>[])
   const alerts = rawAlerts.map(normalizeAlert)
-  const filtered = filter === 'all' ? alerts : alerts.filter((a: any) => a.level === filter)
+  const filtered = filter === 'all' ? alerts : alerts.filter((a) => a.level === filter)
 
   const toggleRead = (alertId: string) => {
     setReadAlerts(prev => {
@@ -79,9 +79,9 @@ export default function Alerts() {
         <div className="flex gap-2 overflow-x-auto">
           {([
             { key: 'all', label: `全部 (${alerts.length})` },
-            { key: 'critical', label: `🔴 緊急 (${alerts.filter((a: any) => a.level === 'critical').length})` },
-            { key: 'warning', label: `🟡 警告 (${alerts.filter((a: any) => a.level === 'warning').length})` },
-            { key: 'info', label: `🔵 提醒 (${alerts.filter((a: any) => a.level === 'info').length})` },
+            { key: 'critical', label: `🔴 緊急 (${alerts.filter((a) => a.level === 'critical').length})` },
+            { key: 'warning', label: `🟡 警告 (${alerts.filter((a) => a.level === 'warning').length})` },
+            { key: 'info', label: `🔵 提醒 (${alerts.filter((a) => a.level === 'info').length})` },
           ] as const).map(f => (
             <button 
               key={f.key} 
@@ -120,7 +120,7 @@ export default function Alerts() {
         {/* Alert list */}
         {!loading && !error && (
           <div className="space-y-3">
-            {filtered.map((alert: any) => {
+            {filtered.map((alert) => {
               const style = LEVEL_STYLES[alert.level] || LEVEL_STYLES.info
               const isRead = readAlerts.has(alert.id)
               return (

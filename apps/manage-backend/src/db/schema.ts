@@ -158,6 +158,29 @@ export const notificationPreferences = pgTable('notification_preferences', {
   uniqueUserTypeChannel: index('idx_notification_preferences_unique').on(table.userId, table.type, table.channel),
 }))
 
+// ===== Enrollment Leads =====
+export const manageLeads = pgTable('manage_leads', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id),
+  name: text('name').notNull(),
+  phone: varchar('phone', { length: 20 }),
+  studentName: text('student_name').notNull(),
+  studentGrade: varchar('student_grade', { length: 50 }),
+  interestSubjects: varchar('interest_subjects', { length: 200 }),
+  status: varchar('status', { length: 20 }).notNull().default('new'),
+  followUpDate: timestamp('follow_up_date'),
+  trialDate: timestamp('trial_date'),
+  trialTime: varchar('trial_time', { length: 100 }),
+  assignedTo: uuid('assigned_to').references(() => users.id),
+  notes: text('notes'),
+  deletedAt: timestamp('deleted_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  tenantIdx: index('manage_leads_tenant_id_idx').on(table.tenantId),
+  tenantStatusIdx: index('manage_leads_tenant_status_idx').on(table.tenantId, table.status),
+}))
+
 // ===== Type Exports =====
 export type NotificationType = typeof notificationTypeEnum.enumValues[number]
 export type NotificationChannel = typeof notificationChannelEnum.enumValues[number]

@@ -26,7 +26,7 @@ function parseConnectionUrl(url: string): postgres.Options<{}> {
       password: decodeURIComponent(parsed.password),
     };
   }
-  return { connection: { url } } as any;
+  return {} as postgres.Options<{}>; // 非 socket 連線由 postgres(url, ...) 直接處理
 }
 
 /**

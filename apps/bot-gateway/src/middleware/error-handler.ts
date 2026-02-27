@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import { logger } from '../utils/logger'
 
 export function withErrorHandler(handler: (c: Context) => Promise<any>) {
   return async (c: Context) => {
@@ -6,9 +7,9 @@ export function withErrorHandler(handler: (c: Context) => Promise<any>) {
       return await handler(c)
     } catch (err) {
       try {
-        console.error('[GlobalError] Unhandled error in request handler:', err)
+        logger.error({ err: err instanceof Error ? err : new Error(String(err)) }, '[GlobalError] Unhandled error in request handler')
       } catch (e) {
-        // ignore console errors
+        // ignore logger errors
       }
       // Don't expose error details to callers. Return generic OK to webhook provider to avoid retries.
       try {

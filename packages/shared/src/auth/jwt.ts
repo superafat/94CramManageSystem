@@ -20,6 +20,9 @@ function getSecret(secret?: string): Uint8Array {
   if (!s) {
     throw new Error('JWT_SECRET is required. Set JWT_SECRET environment variable or pass secret explicitly.');
   }
+  if (s.length < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters for HS256 security');
+  }
   return new TextEncoder().encode(s);
 }
 

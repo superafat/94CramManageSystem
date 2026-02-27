@@ -5,6 +5,7 @@ import { logOperation } from '../firestore/logs';
 import { incrementUsage } from '../firestore/usage';
 import { handleCrossBotDecision, notifyParentResult } from '../modules/cross-bot-bridge';
 import { answerCallbackQuery, editMessageText } from '../utils/telegram';
+import { logger } from '../utils/logger';
 import type { UnifiedMessage } from '../modules/platform-adapter';
 
 export async function handleCallback(msg: UnifiedMessage): Promise<void> {
@@ -70,7 +71,7 @@ export async function handleCallback(msg: UnifiedMessage): Promise<void> {
 
     const apiResponse = await executeIntent(intentResult, auth);
     incrementUsage(auth.tenantId, 'api_calls').catch((err: unknown) => {
-      console.error('[Callback] Failed to increment usage:', err);
+      logger.error({ err: err instanceof Error ? err : new Error(String(err)) }, '[Callback] Failed to increment usage')
     });
     const responseText = formatResponse(apiResponse);
 

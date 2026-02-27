@@ -1,6 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import { verify } from '@94cram/shared/auth';
 import { config } from '../config';
+import { logger } from '../utils/logger';
 
 export interface DashboardUser {
   userId: string;
@@ -22,7 +23,7 @@ export const dashboardAuth = createMiddleware<Env>(async (c, next) => {
 
   const jwtSecret = config.JWT_SECRET;
   if (!jwtSecret) {
-    console.error('[Auth] JWT_SECRET is not configured');
+    logger.error('[Auth] JWT_SECRET is not configured');
     return c.json({ error: 'Auth not configured' }, 500);
   }
 

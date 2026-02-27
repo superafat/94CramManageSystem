@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { db } from '../db/index.js'
 import { auditLogs } from '@94cram/shared/db'
+import { logger } from '../utils/logger.js'
 
 const webhookRouter = new Hono()
 const webhookSyncSchema = z.object({
@@ -13,7 +14,7 @@ const webhookSyncSchema = z.object({
 })
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET
-if (!WEBHOOK_SECRET) console.warn('[Warning] WEBHOOK_SECRET not set, webhook endpoints will be disabled')
+if (!WEBHOOK_SECRET) logger.warn('[Warning] WEBHOOK_SECRET not set, webhook endpoints will be disabled')
 
 webhookRouter.post('/sync', async (c) => {
   if (!WEBHOOK_SECRET) return c.json({ error: 'Webhook not configured' }, 503)
@@ -35,7 +36,7 @@ webhookRouter.post('/sync', async (c) => {
     })
     return c.json({ ok: true, message: 'Sync received' })
   } catch (e) {
-    console.error('[Webhook Error] Failed to process sync:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, '[Webhook Error] Failed to process sync')
     return c.json({ error: 'Failed to process sync' }, 500)
   }
 })

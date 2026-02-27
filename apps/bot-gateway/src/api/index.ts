@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { randomInt } from 'crypto';
 import { verify } from '@94cram/shared/auth';
 import { config } from '../config';
 import { dashboardAuth, type DashboardUser } from '../middleware/auth';
@@ -75,7 +76,7 @@ apiRouter.put('/subscriptions', async (c) => {
 // --- Bind Codes (千里眼 admin bot) ---
 apiRouter.post('/bind-codes', async (c) => {
   const user = c.get('user');
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const code = String(randomInt(100000, 1000000));
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min
 
   await firestore.collection('bot_bind_codes').doc(code).set({

@@ -12,6 +12,7 @@ import {
   emitGradeNotificationEvent
 } from '../events/helpers'
 import type { NotificationChannel } from '../db/schema'
+import { logger } from '../utils/logger'
 
 interface ScheduleRow {
   id: string
@@ -160,7 +161,7 @@ export async function sendScheduleChangeNotification(
       error: hasError ? 'Some notifications failed' : undefined
     }
   } catch (error) {
-    console.error('sendScheduleChangeNotification error:', error)
+    logger.error({ err: error }, 'sendScheduleChangeNotification error:')
     return { success: false, sentCount: 0, error: error instanceof Error ? error.message : String(error) }
   }
 }
@@ -226,7 +227,7 @@ export async function sendBillingReminder(
       error: hasError ? 'Some notifications failed' : undefined
     }
   } catch (error) {
-    console.error('sendBillingReminder error:', error)
+    logger.error({ err: error }, 'sendBillingReminder error:')
     return { success: false, sentCount: 0, error: error instanceof Error ? error.message : String(error) }
   }
 }
@@ -308,7 +309,7 @@ export async function checkAndSendAttendanceAlert(
       error: hasError ? 'Some notifications failed' : undefined
     }
   } catch (error) {
-    console.error('checkAndSendAttendanceAlert error:', error)
+    logger.error({ err: error }, 'checkAndSendAttendanceAlert error:')
     return { success: false, sentCount: 0, alertSent: false, error: error instanceof Error ? error.message : String(error) }
   }
 }
@@ -371,7 +372,7 @@ export async function sendGradeNotification(
       error: hasError ? 'Some notifications failed' : undefined
     }
   } catch (error) {
-    console.error('sendGradeNotification error:', error)
+    logger.error({ err: error }, 'sendGradeNotification error:')
     return { success: false, sentCount: 0, error: error instanceof Error ? error.message : String(error) }
   }
 }

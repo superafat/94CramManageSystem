@@ -10,8 +10,8 @@ const LazyDoughnut = lazy(() => import('react-chartjs-2').then(mod => ({ default
 
 interface ChartProps {
   type: 'line' | 'bar' | 'pie' | 'doughnut'
-  data: any
-  options?: any
+  data: Record<string, unknown>
+  options?: Record<string, unknown>
   fallback?: React.ReactNode
 }
 

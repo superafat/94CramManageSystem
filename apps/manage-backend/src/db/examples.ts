@@ -93,7 +93,7 @@ export async function getNotificationsWithUserDetails(notificationIds: string[])
   // 使用 DataLoader 批量加载用户信息
   // 即使有重复的 recipientId，也只会查询一次
   return await Promise.all(
-    notificationList.map(async (notification: any) => ({
+    notificationList.map(async (notification) => ({
       ...notification,
       recipient: await userLoader.load(notification.recipientId)
     }))
@@ -115,7 +115,7 @@ export async function getStudentsWithNotifications(studentIds: string[]) {
     'id',
     async (ids) => {
       return await db.query.notifications.findMany({
-        where: inArray(notifications.recipientId, ids)
+        where: inArray(notifications.recipientId, ids as string[])
       })
     },
     'recipientId',

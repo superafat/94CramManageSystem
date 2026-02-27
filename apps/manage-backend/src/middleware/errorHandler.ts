@@ -10,9 +10,9 @@ interface ErrorHandlerContext {
 function errorLogger(error: Error, context?: ErrorHandlerContext) {
   const payload = { ...context, stack: error.stack }
   if (context?.statusCode && context.statusCode >= 500) {
-    logger.error(error.message, payload)
+    logger.error({ ...payload }, error.message)
   } else {
-    logger.warn(error.message, context || payload)
+    logger.warn({ ...(context || payload) }, error.message)
   }
 }
 

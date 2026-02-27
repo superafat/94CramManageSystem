@@ -5,6 +5,7 @@ import { db } from '../db/index.js'
 import { inclassParents, manageStudents } from '@94cram/shared/db'
 import { and, eq } from 'drizzle-orm'
 import type { Variables } from '../middleware/auth.js'
+import { logger } from '../utils/logger.js'
 
 const parentsRouter = new Hono<{ Variables: Variables }>()
 
@@ -22,7 +23,7 @@ parentsRouter.get('/', async (c) => {
     const parents = await db.select().from(inclassParents).where(eq(inclassParents.tenantId, schoolId))
     return c.json({ parents })
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error fetching parents:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching parents`)
     return c.json({ error: 'Failed to fetch parents' }, 500)
   }
 })
@@ -48,7 +49,7 @@ parentsRouter.post('/', zValidator('json', parentSchema), async (c) => {
 
     return c.json({ success: true, parent }, 201)
   } catch (e) {
-    console.error('[API Error]', c.req.path, 'Error creating parent:', e instanceof Error ? e.message : 'Unknown error')
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error creating parent`)
     return c.json({ error: 'Failed to create parent' }, 500)
   }
 })

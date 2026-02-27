@@ -2,9 +2,10 @@
 
 import { db } from './index'
 import { sql } from 'drizzle-orm'
+import { logger } from '../utils/logger'
 
 async function migrate() {
-  console.info('Running migration v9: trial system...')
+  logger.info('Running migration v9: trial system...')
   
   // Add trial fields to tenants table
   await db.execute(sql`
@@ -17,7 +18,7 @@ async function migrate() {
     ADD COLUMN IF NOT EXISTS trial_notes TEXT;
   `)
   
-  console.info('Migration v9 completed!')
+  logger.info('Migration v9 completed!')
 }
 
-migrate().catch(console.error)
+migrate().catch((err) => logger.error({ err }, "Migration failed"))

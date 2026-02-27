@@ -2,6 +2,7 @@
  * Rate Limiting & Security Module
  */
 import type { Context } from 'hono'
+import { logger } from '../utils/logger.js'
 
 // ===== Advanced Rate Limiting & Security =====
 const rateLimitMap = new Map<string, {
@@ -70,7 +71,7 @@ export function recordFailedLogin(ip: string, email: string, userAgent: string) 
     record.failedCount++
     if (record.failedCount >= MAX_FAILED) {
       record.blockedUntil = now + BLOCK_DURATION
-      console.warn(`[Security] IP blocked for 15 minutes: ${ip} after ${MAX_FAILED} failed attempts`)
+      logger.warn(`[Security] IP blocked for 15 minutes: ${ip} after ${MAX_FAILED} failed attempts`)
     }
   }
 }

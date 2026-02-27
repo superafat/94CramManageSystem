@@ -49,6 +49,7 @@ import {
   internalError,
 } from '../utils/response'
 import type { NotificationType, NotificationChannel } from '../db/schema'
+import { logger } from '../utils/logger'
 
 const app = new Hono<{ Variables: RBACVariables }>()
 
@@ -128,7 +129,7 @@ app.post('/admin/notifications/send',
         errors: result.errors,
       })
     } catch (error) {
-      console.error('Send notification error:', error)
+      logger.error({ err: error }, 'Send notification error:')
       return internalError(c, error)
     }
   }
@@ -196,7 +197,7 @@ app.get('/admin/notifications',
 
       return successWithPagination(c, { notifications: notifs }, { page, limit, total })
     } catch (error) {
-      console.error('List notifications error:', error)
+      logger.error({ err: error }, 'List notifications error:')
       return internalError(c, error)
     }
   }
@@ -219,7 +220,7 @@ app.get('/notifications/preferences', authMiddleware, async (c) => {
 
     return success(c, { preferences })
   } catch (error) {
-    console.error('Get preferences error:', error)
+    logger.error({ err: error }, 'Get preferences error:')
     return internalError(c, error)
   }
 })
@@ -262,7 +263,7 @@ app.post('/notifications/preferences',
         preferences: updated,
       })
     } catch (error) {
-      console.error('Update preferences error:', error)
+      logger.error({ err: error }, 'Update preferences error:')
       return internalError(c, error)
     }
   }
@@ -309,7 +310,7 @@ app.post('/admin/notifications/trigger/schedule-change',
         error: result.error,
       })
     } catch (error) {
-      console.error('Schedule change notification error:', error)
+      logger.error({ err: error }, 'Schedule change notification error:')
       return internalError(c, error)
     }
   }
@@ -347,7 +348,7 @@ app.post('/admin/notifications/trigger/billing-reminder',
         error: result.error,
       })
     } catch (error) {
-      console.error('Billing reminder error:', error)
+      logger.error({ err: error }, 'Billing reminder error:')
       return internalError(c, error)
     }
   }
@@ -386,7 +387,7 @@ app.post('/admin/notifications/trigger/attendance-alert',
         error: result.error,
       })
     } catch (error) {
-      console.error('Attendance alert error:', error)
+      logger.error({ err: error }, 'Attendance alert error:')
       return internalError(c, error)
     }
   }
@@ -424,7 +425,7 @@ app.post('/admin/notifications/trigger/grade',
         error: result.error,
       })
     } catch (error) {
-      console.error('Grade notification error:', error)
+      logger.error({ err: error }, 'Grade notification error:')
       return internalError(c, error)
     }
   }
@@ -474,7 +475,7 @@ app.post('/notifications/beeclass', zValidator('json', beeClassSchema), async (c
     if (data.channel === 'line' && data.parentLineId) {
       const lineAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN
       if (!lineAccessToken) {
-        console.error('[BeeClass Notify] LINE_CHANNEL_ACCESS_TOKEN not configured')
+        logger.error('[BeeClass Notify] LINE_CHANNEL_ACCESS_TOKEN not configured')
         return internalError(c, new Error('LINE channel not configured'))
       }
       
@@ -494,7 +495,7 @@ app.post('/notifications/beeclass', zValidator('json', beeClassSchema), async (c
         sendResult.success = true
       } else {
         sendResult.error = await response.text()
-        console.error('[BeeClass Notify] LINE API error:', sendResult.error)
+        logger.error({ error: sendResult.error }, '[BeeClass Notify] LINE API error')
       }
     }
     
@@ -502,7 +503,7 @@ app.post('/notifications/beeclass', zValidator('json', beeClassSchema), async (c
     if (data.channel === 'telegram' && data.parentTelegramId) {
       const botToken = process.env.TELEGRAM_BOT_TOKEN
       if (!botToken) {
-        console.error('[BeeClass Notify] TELEGRAM_BOT_TOKEN not configured')
+        logger.error('[BeeClass Notify] TELEGRAM_BOT_TOKEN not configured')
         return internalError(c, new Error('Telegram bot not configured'))
       }
       
@@ -520,7 +521,7 @@ app.post('/notifications/beeclass', zValidator('json', beeClassSchema), async (c
         sendResult.success = true
       } else {
         sendResult.error = await response.text()
-        console.error('[BeeClass Notify] Telegram API error:', sendResult.error)
+        logger.error({ error: sendResult.error }, '[BeeClass Notify] Telegram API error')
       }
     }
     
@@ -534,7 +535,7 @@ app.post('/notifications/beeclass', zValidator('json', beeClassSchema), async (c
     })
     
   } catch (error) {
-    console.error('[BeeClass Notify] Unexpected error:', error)
+    logger.error({ err: error }, '[BeeClass Notify] Unexpected error:')
     return internalError(c, error)
   }
 })

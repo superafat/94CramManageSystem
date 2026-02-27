@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import { config } from '../config'
 import * as schema from '@94cram/shared/db'
+import { logger } from '../utils/logger'
 
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null
 let _client: ReturnType<typeof postgres> | null = null
@@ -57,13 +58,13 @@ function createPostgresClient() {
   const socketMatch = url.match(/\?host=(.+)$/)
   if (socketMatch) {
     const socketPath = decodeURIComponent(socketMatch[1])
-    
+
     // Manual parsing since URL can't handle @/database format
     const withoutProtocol = url.replace(/^postgres(ql)?:\/\//, '')
     const [credentials, rest] = withoutProtocol.split('@')
     const [username, password] = credentials.split(':')
     const database = rest.split('?')[0].replace(/^\//, '')
-    
+
     clientOptions = {
       host: socketPath,
       port: 5432,
@@ -79,11 +80,11 @@ function createPostgresClient() {
       fetch_types: false,
       // 监控钩子
       onnotice: (notice) => {
-        console.info('[DB Notice]', notice)
+        logger.info({ notice }, '[DB Notice]')
       },
       onparameter: (key, value) => {
         if (config.NODE_ENV === 'development') {
-        console.info('[DB Parameter]', key, value)
+          logger.info({ key, value }, '[DB Parameter]')
         }
       },
       connection: {
@@ -103,11 +104,11 @@ function createPostgresClient() {
       fetch_types: false,
       // 监控钩子
       onnotice: (notice) => {
-        console.info('[DB Notice]', notice)
+        logger.info({ notice }, '[DB Notice]')
       },
       onparameter: (key, value) => {
         if (config.NODE_ENV === 'development') {
-          console.info('[DB Parameter]', key, value)
+          logger.info({ key, value }, '[DB Parameter]')
         }
       },
       connection: {
@@ -117,7 +118,7 @@ function createPostgresClient() {
     }
   }
 
-  const client = socketMatch 
+  const client = socketMatch
     ? postgres(clientOptions)
     : postgres(url, clientOptions)
 
@@ -136,24 +137,24 @@ function setupConnectionMonitoring(client: ReturnType<typeof postgres>) {
     try {
       // 更新连接池统计
       // postgres.js 会自动管理连接，我们通过查询活动来估算
-      
+
       // 计算平均查询时间
       if (metrics.queryTimes.length > 0) {
         const sum = metrics.queryTimes.reduce((a, b) => a + b, 0)
         metrics.avgQueryTime = sum / metrics.queryTimes.length
-        
+
         // 只保留最近 1000 次查询的时间
         if (metrics.queryTimes.length > 1000) {
           metrics.queryTimes = metrics.queryTimes.slice(-1000)
         }
       }
-      
+
       // 估算活跃连接数（基于最近的查询活动）
       const recentQueries = metrics.queryTimes.slice(-10).length
       metrics.activeConnections = Math.min(recentQueries, config.DB_POOL_MAX)
-      
+
       if (config.NODE_ENV === 'development') {
-        console.info('[DB Metrics]', {
+        logger.info({
           totalQueries: metrics.totalQueries,
           slowQueries: metrics.slowQueries,
           timeouts: metrics.timeouts,
@@ -161,10 +162,10 @@ function setupConnectionMonitoring(client: ReturnType<typeof postgres>) {
           avgQueryTime: Math.round(metrics.avgQueryTime),
           reconnections: metrics.reconnections,
           activeConnections: metrics.activeConnections
-        })
+        }, '[DB Metrics]')
       }
     } catch (error) {
-      console.error('[DB Monitoring Error]', error)
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[DB Monitoring Error]')
     }
   }, 60000) // 每分钟
 }
@@ -191,18 +192,18 @@ export async function checkDatabaseHealth(): Promise<{
       // 触发初始化
       const _ = db.query
     }
-    
+
     // 执行简单的健康检查查询
     await _client!.unsafe('SELECT 1 as health_check')
     const latency = Date.now() - start
-    
+
     // 计算错误率
-    const errorRate = metrics.totalQueries > 0 
-      ? (metrics.errors / metrics.totalQueries) * 100 
+    const errorRate = metrics.totalQueries > 0
+      ? (metrics.errors / metrics.totalQueries) * 100
       : 0
-    
-    return { 
-      healthy: true, 
+
+    return {
+      healthy: true,
       latency,
       details: {
         totalQueries: metrics.totalQueries,
@@ -216,8 +217,8 @@ export async function checkDatabaseHealth(): Promise<{
   } catch (error: unknown) {
     metrics.errors++
     const errorMessage = error instanceof Error ? error.message : String(error)
-    return { 
-      healthy: false, 
+    return {
+      healthy: false,
       error: errorMessage,
       details: {
         totalQueries: metrics.totalQueries,
@@ -245,7 +246,7 @@ export function getDatabaseMetrics() {
       connectTimeout: config.DB_CONNECT_TIMEOUT
     },
     healthStatus: {
-      errorRate: metrics.totalQueries > 0 
+      errorRate: metrics.totalQueries > 0
         ? ((metrics.errors / metrics.totalQueries) * 100).toFixed(2) + '%'
         : '0%',
       slowQueryRate: metrics.totalQueries > 0
@@ -279,7 +280,7 @@ export async function executeWithMetrics<T>(
 ): Promise<T> {
   const start = Date.now()
   metrics.totalQueries++
-  
+
   // 创建超时 Promise
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => {
@@ -287,29 +288,29 @@ export async function executeWithMetrics<T>(
       reject(new Error(`Query timeout after ${config.DB_QUERY_TIMEOUT}ms: ${queryName || 'Unknown'}`))
     }, config.DB_QUERY_TIMEOUT)
   })
-  
+
   try {
     // 竞争查询和超时
     const result = await Promise.race([queryFn(), timeoutPromise])
     const duration = Date.now() - start
-    
+
     metrics.queryTimes.push(duration)
-    
+
     if (duration > SLOW_QUERY_THRESHOLD) {
       metrics.slowQueries++
-      console.warn(`[Slow Query] ${queryName || 'Unknown'} took ${duration}ms`)
+      logger.warn(`[Slow Query] ${queryName || 'Unknown'} took ${duration}ms`)
     }
-    
+
     return result
   } catch (error) {
     metrics.errors++
     const duration = Date.now() - start
-    
+
     // 记录错误查询的时间
     if (duration < config.DB_QUERY_TIMEOUT) {
       metrics.queryTimes.push(duration)
     }
-    
+
     throw error
   }
 }
@@ -326,29 +327,29 @@ export function createBatchLoader<K, V>(
 ) {
   const maxBatchSize = options?.maxBatchSize || 100
   const batchScheduleFn = options?.batchScheduleFn || ((cb) => setTimeout(cb, 0))
-  
+
   let queue: Array<{
     key: K
     resolve: (value: V | null) => void
     reject: (error: unknown) => void
   }> = []
   let scheduled = false
-  
+
   const dispatch = async () => {
     const batch = queue.splice(0, maxBatchSize)
     if (batch.length === 0) return
-    
+
     try {
       const keys = batch.map(item => item.key)
       const results = await batchLoadFn(keys)
-      
+
       batch.forEach((item, index) => {
         item.resolve(results[index] || null)
       })
     } catch (error) {
       batch.forEach(item => item.reject(error))
     }
-    
+
     if (queue.length > 0) {
       scheduled = true
       batchScheduleFn(dispatch)
@@ -356,11 +357,11 @@ export function createBatchLoader<K, V>(
       scheduled = false
     }
   }
-  
+
   return (key: K): Promise<V | null> => {
     return new Promise((resolve, reject) => {
       queue.push({ key, resolve, reject })
-      
+
       if (!scheduled) {
         scheduled = true
         batchScheduleFn(dispatch)
@@ -374,30 +375,30 @@ export function createBatchLoader<K, V>(
  */
 function initializeDatabase() {
   if (_db) return _db
-  
+
   try {
     _client = createPostgresClient()
     _db = drizzle(_client, { schema })
-    
-    console.info('[DB] Database connection initialized', {
+
+    logger.info({
       poolMax: config.DB_POOL_MAX,
       queryTimeout: config.DB_QUERY_TIMEOUT,
       nodeEnv: config.NODE_ENV
-    })
-    
+    }, '[DB] Database connection initialized')
+
     // 预热连接池
     checkDatabaseHealth().then(health => {
       if (health.healthy) {
-        console.info(`[DB] Health check passed, latency: ${health.latency}ms`)
+        logger.info(`[DB] Health check passed, latency: ${health.latency}ms`)
       } else {
-        console.error('[DB] Health check failed:', health.error)
+        logger.error({ err: new Error(health.error ?? 'unknown') }, '[DB] Health check failed')
       }
     })
-    
+
     return _db
   } catch (error) {
     metrics.errors++
-    console.error('[DB] Failed to initialize database:', error)
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[DB] Failed to initialize database')
     throw error
   }
 }
@@ -407,11 +408,11 @@ function initializeDatabase() {
  */
 export async function closeDatabaseConnection() {
   if (_client) {
-    console.info('[DB] Closing database connection...')
+    logger.info('[DB] Closing database connection...')
     await _client.end()
     _client = null
     _db = null
-    console.info('[DB] Database connection closed')
+    logger.info('[DB] Database connection closed')
   }
 }
 

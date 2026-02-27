@@ -19,7 +19,7 @@ interface ErrorResponse {
  */
 export function createErrorHandler(
   isDevelopment: boolean = process.env.NODE_ENV !== 'production',
-  logger?: (error: Error, context: any) => void
+  logger?: (error: Error, context: Record<string, unknown>) => void
 ): ErrorHandler {
   return (error: Error, c) => {
     // Generate request ID for tracking

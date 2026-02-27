@@ -1,10 +1,10 @@
 import { logger } from './logger'
 
-export interface BatchOptions {
+export interface BatchOptions<T = unknown> {
   batchSize?: number
   maxConcurrent?: number
   onProgress?: (completed: number, total: number) => void
-  onError?: (error: Error, item: any, index: number) => void
+  onError?: (error: Error, item: T, index: number) => void
 }
 
 export interface BatchResult<T, R> {
@@ -21,7 +21,7 @@ export interface BatchResult<T, R> {
 export async function processBatch<T, R>(
   items: T[],
   processor: (item: T, index: number) => Promise<R>,
-  options: BatchOptions = {}
+  options: BatchOptions<T> = {}
 ): Promise<BatchResult<T, R>> {
   const {
     batchSize = 10,
@@ -56,7 +56,7 @@ export async function processBatch<T, R>(
           completed++
           onProgress?.(completed, total)
           onError?.(err, item, globalIndex)
-          logger.error(`Batch processing failed for item ${globalIndex}`, { error: err })
+          logger.error({ err }, `Batch processing failed for item ${globalIndex}`)
           throw err
         }
       },
@@ -92,7 +92,7 @@ export async function processWithConcurrency<T, R>(
       })
       .catch(error => {
         // Error handling is done in the processor
-        results[i] = undefined as any
+        results[i] = undefined as unknown as R
       })
       .then(() => {
         executing.splice(executing.indexOf(wrappedPromise), 1)
@@ -153,7 +153,7 @@ export async function retry<T>(
       if (attempt < maxRetries) {
         const delay = Math.min(initialDelay * Math.pow(factor, attempt), maxDelay)
         onRetry?.(lastError, attempt + 1)
-        logger.warn(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`, { error: lastError })
+        logger.warn({ err: lastError }, `Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`)
         await new Promise(resolve => setTimeout(resolve, delay))
       }
     }

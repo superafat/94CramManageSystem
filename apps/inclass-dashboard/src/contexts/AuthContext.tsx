@@ -169,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSchool(null)
     localStorage.removeItem('user')
     localStorage.removeItem('school')
-    fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {})
+    fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch((err) => { console.warn('Logout request failed:', err) })
     router.push('/login')
   }
 

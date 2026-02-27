@@ -1,6 +1,7 @@
 // src/bot/notifications.ts - 通知系統
 import { Bot } from 'grammy';
 import schedule from 'node-schedule';
+import { logger } from '../utils/logger'
 
 // ==================== 類型定義 ====================
 
@@ -38,7 +39,7 @@ const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3100';
  */
 export async function notifyNewLead(bot: Telegraf, lead: Lead) {
   if (!ADMIN_CHAT_ID) {
-    console.warn('未設定 ADMIN_TELEGRAM_ID，無法發送通知');
+    logger.warn('未設定 ADMIN_TELEGRAM_ID，無法發送通知');
     return;
   }
   
@@ -61,9 +62,9 @@ ${lead.trial_date ? `📅 **試聽預約：** ${lead.trial_date} ${lead.trial_ti
       parse_mode: 'Markdown' 
     });
     
-    console.info(`新 lead 通知已發送: ${lead.name}`);
+    logger.info(`新 lead 通知已發送: ${lead.name}`);
   } catch (error) {
-    console.error('發送新 lead 通知失敗:', error);
+    logger.error({ err: error }, '發送新 lead 通知失敗:');
   }
 }
 
@@ -113,9 +114,9 @@ export async function sendTrialReminder(
     }
     
     await bot.telegram.sendMessage(chatId, message);
-    console.info(`試聽提醒已發送: ${lead.name} (${daysBefore} 天前)`);
+    logger.info(`試聽提醒已發送: ${lead.name} (${daysBefore} 天前)`);
   } catch (error) {
-    console.error('發送試聽提醒失敗:', error);
+    logger.error({ err: error }, '發送試聽提醒失敗:');
   }
 }
 
@@ -142,9 +143,9 @@ export async function sendFollowUpReminder(bot: Telegraf, leads: Lead[]) {
       parse_mode: 'Markdown'
     });
     
-    console.info(`跟進提醒已發送: ${leads.length} 筆`);
+    logger.info(`跟進提醒已發送: ${leads.length} 筆`);
   } catch (error) {
-    console.error('發送跟進提醒失敗:', error);
+    logger.error({ err: error }, '發送跟進提醒失敗:');
   }
 }
 
@@ -175,9 +176,9 @@ ${stats.conversionRate > 0.3 ? '🎉 表現優異！' : stats.conversionRate > 0
       parse_mode: 'Markdown'
     });
     
-    console.info('週報已發送');
+    logger.info('週報已發送');
   } catch (error) {
-    console.error('發送週報失敗:', error);
+    logger.error({ err: error }, '發送週報失敗:');
   }
 }
 
@@ -199,7 +200,7 @@ async function getUpcomingTrials(daysAhead: number): Promise<Lead[]> {
     
     return [];
   } catch (error) {
-    console.error('獲取試聽名單失敗:', error);
+    logger.error({ err: error }, '獲取試聽名單失敗:');
     return [];
   }
 }
@@ -212,7 +213,7 @@ async function getOverdueFollowUps(): Promise<Lead[]> {
     const response = await fetch(`${API_BASE_URL}/api/admin/leads/overdue`);
     return await response.json();
   } catch (error) {
-    console.error('獲取逾期跟進名單失敗:', error);
+    logger.error({ err: error }, '獲取逾期跟進名單失敗:');
     return [];
   }
 }
@@ -225,7 +226,7 @@ async function getWeeklyStats(): Promise<ConversionStats> {
     const response = await fetch(`${API_BASE_URL}/api/admin/enrollment/conversion?period=week`);
     return await response.json();
   } catch (error) {
-    console.error('獲取週報數據失敗:', error);
+    logger.error({ err: error }, '獲取週報數據失敗:');
     return {
       newLeads: 0,
       trialScheduled: 0,
@@ -244,7 +245,7 @@ async function getWeeklyStats(): Promise<ConversionStats> {
 export function setupNotificationSchedules(bot: Telegraf) {
   // 每天 9:00 - 發送當天試聽提醒
   schedule.scheduleJob('0 9 * * *', async () => {
-    console.info('執行當天試聽提醒...');
+    logger.info('執行當天試聽提醒...');
     const todayTrials = await getUpcomingTrials(0);
     
     for (const lead of todayTrials) {
@@ -255,7 +256,7 @@ export function setupNotificationSchedules(bot: Telegraf) {
   
   // 每天 18:00 - 發送明天試聽提醒
   schedule.scheduleJob('0 18 * * *', async () => {
-    console.info('執行明日試聽提醒...');
+    logger.info('執行明日試聽提醒...');
     const tomorrowTrials = await getUpcomingTrials(1);
     
     for (const lead of tomorrowTrials) {
@@ -265,7 +266,7 @@ export function setupNotificationSchedules(bot: Telegraf) {
   
   // 每天 8:30 - 發送跟進提醒給教室長
   schedule.scheduleJob('30 8 * * *', async () => {
-    console.info('執行跟進提醒...');
+    logger.info('執行跟進提醒...');
     const overdueLeads = await getOverdueFollowUps();
     
     if (overdueLeads.length > 0) {
@@ -275,12 +276,12 @@ export function setupNotificationSchedules(bot: Telegraf) {
   
   // 每週一 9:00 - 發送週報
   schedule.scheduleJob('0 9 * * 1', async () => {
-    console.info('執行週報發送...');
+    logger.info('執行週報發送...');
     const stats = await getWeeklyStats();
     await sendWeeklyReport(bot, stats);
   });
   
-  console.info('✅ 通知排程已設定');
+  logger.info('✅ 通知排程已設定');
 }
 
 // ==================== 輔助函式 ====================
@@ -340,7 +341,7 @@ export async function sendTestNotification(bot: Telegraf, type: string) {
       await sendWeeklyReport(bot, testStats);
       break;
     default:
-      console.info('未知的通知類型');
+      logger.info('未知的通知類型');
   }
 }
 
@@ -356,7 +357,7 @@ export async function onLeadCreated(bot: Telegraf, leadId: number) {
     
     await notifyNewLead(bot, lead);
   } catch (error) {
-    console.error('處理新 lead 通知失敗:', error);
+    logger.error({ err: error }, '處理新 lead 通知失敗:');
   }
 }
 
@@ -391,6 +392,6 @@ export async function onTrialScheduled(bot: Telegraf, leadId: number, chatId: nu
     // 通知教室長
     await notifyNewLead(bot, lead);
   } catch (error) {
-    console.error('處理試聽預約通知失敗:', error);
+    logger.error({ err: error }, '處理試聽預約通知失敗:');
   }
 }

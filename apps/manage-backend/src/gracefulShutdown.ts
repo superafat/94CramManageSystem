@@ -45,7 +45,7 @@ export class GracefulShutdown {
    */
   private async shutdown(signal: string) {
     if (this.isShuttingDown) {
-      logger.warn('Shutdown already in progress, ignoring signal', { signal })
+      logger.warn({ signal }, 'Shutdown already in progress, ignoring signal')
       return
     }
 
@@ -85,7 +85,7 @@ export class GracefulShutdown {
       process.exit(0)
     } catch (error) {
       clearTimeout(shutdownTimeout)
-      logger.error('❌ Error during shutdown', { error })
+      logger.error({ err: error }, '❌ Error during shutdown')
       process.exit(1)
     }
   }
