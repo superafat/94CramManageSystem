@@ -52,6 +52,9 @@ export function createAuthMiddleware(options?: { skipPaths?: string[] }) {
 export function createInternalKeyMiddleware() {
   const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
   if (!INTERNAL_API_KEY) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('INTERNAL_API_KEY is required in production. Set the INTERNAL_API_KEY environment variable.');
+    }
     console.warn('WARNING: INTERNAL_API_KEY not set. Internal API access is disabled.');
   }
 

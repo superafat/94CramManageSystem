@@ -34,8 +34,7 @@ export function LoginFormExample() {
     },
     validateOnChange: true,
     validateOnBlur: true,
-    onSubmit: async (values) => {
-      console.log('Submitting:', values)
+    onSubmit: async (_values) => {
       // API call here
     },
   })
@@ -124,8 +123,7 @@ export function RegisterFormExample() {
         return null
       },
     },
-    onSubmit: async (values) => {
-      console.log('Registering:', values)
+    onSubmit: async (_values) => {
       // API call here
     },
   })
@@ -189,11 +187,12 @@ export function ManualControlExample() {
   const handleCustomSubmit = () => {
     // Manual validation
     const isValid = form.validate()
-    
+
     if (isValid) {
-      console.log('Form is valid:', form.values)
+      // form.values is ready — trigger API call here
     } else {
-      console.log('Form has errors:', form.errors)
+      // form.errors contains validation failures
+      void isValid
     }
   }
 

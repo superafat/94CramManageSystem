@@ -29,112 +29,112 @@ export const metadata: Metadata = {
   },
 };
 
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "四個系統可以單獨購買嗎？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "可以。每個系統獨立運作、按需選購。整合使用時，出勤、成績、庫存資料可自動串接，無需重複輸入。94Bot 搭配任一系統使用即可。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "點名系統需要購買特殊硬體嗎？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "不需要。NFC 點名只需市售 NFC 讀卡機（約 NT$300），AI 臉辨使用一般網路攝影機即可，無需專屬設備。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "資料存放在哪裡？安全嗎？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "全部存放於 Google Cloud Platform 台灣/亞太區機房，SSL 加密傳輸，定期備份，符合個資法規範。94Bot 的寫入操作皆需二次確認，不會誤操作。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "連鎖多校區可以統一管理嗎？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "可以。94Manage 和 94Stock 均支援多分校架構，總部可統一查看各校區數據，各分校也可獨立操作。94Bot 支援一鍵切換不同校區。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "免費試用結束後資料會消失嗎？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "不會。試用期結束後資料保留 30 天，可選擇升級繼續使用，或匯出資料離開，不強制綁定。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "94Bot 是什麼？怎麼用？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "94Bot 是 Telegram 聊天機器人 AI 助手。綁定補習班帳號後，直接用自然語言對話即可操作三大系統，例如「陳小明今天請假」、「高二陳小明繳 5000 元」。所有寫入操作都會先確認才執行。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "94Bot 支援哪些操作？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "目前支援：出缺勤登記與查詢、繳費登記與查詢、學生資料查詢與新增、庫存查詢與進出貨。查詢類操作即時回覆，寫入類操作需點擊確認按鈕才會執行。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "適合多少學員規模？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "從 10 人個人工作室到 500 人連鎖補習班均適用。各系統均有免費/基礎/專業/企業版，按需升級。"
+      }
+    }
+  ]
+};
+
+const orgJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "蜂神榜 Ai 教育科技",
+  "alternateName": "94cram",
+  "url": "https://94cram.com",
+  "logo": "https://94cram.com/logo.png",
+  "description": "台灣補習班管理 SaaS 平台，整合學員管理、智能點名、庫存管理、AI 聊天助手四大系統。",
+  "foundingDate": "2026",
+  "sameAs": [
+    "https://t.me/cram94bot"
+  ],
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "contactType": "customer service",
+    "availableLanguage": ["zh-TW"]
+  },
+  "areaServed": {
+    "@type": "Country",
+    "name": "Taiwan"
+  },
+  "knowsAbout": ["補習班管理", "教育科技", "AI 點名系統", "庫存管理", "Telegram AI 助手"]
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-TW">
       <head>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "FAQPage",
-              "mainEntity": [
-                {
-                  "@type": "Question",
-                  "name": "四個系統可以單獨購買嗎？",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text": "可以。每個系統獨立運作、按需選購。整合使用時，出勤、成績、庫存資料可自動串接，無需重複輸入。94Bot 搭配任一系統使用即可。"
-                  }
-                },
-                {
-                  "@type": "Question",
-                  "name": "點名系統需要購買特殊硬體嗎？",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text": "不需要。NFC 點名只需市售 NFC 讀卡機（約 NT$300），AI 臉辨使用一般網路攝影機即可，無需專屬設備。"
-                  }
-                },
-                {
-                  "@type": "Question",
-                  "name": "資料存放在哪裡？安全嗎？",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text": "全部存放於 Google Cloud Platform 台灣/亞太區機房，SSL 加密傳輸，定期備份，符合個資法規範。94Bot 的寫入操作皆需二次確認，不會誤操作。"
-                  }
-                },
-                {
-                  "@type": "Question",
-                  "name": "連鎖多校區可以統一管理嗎？",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text": "可以。94Manage 和 94Stock 均支援多分校架構，總部可統一查看各校區數據，各分校也可獨立操作。94Bot 支援一鍵切換不同校區。"
-                  }
-                },
-                {
-                  "@type": "Question",
-                  "name": "免費試用結束後資料會消失嗎？",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text": "不會。試用期結束後資料保留 30 天，可選擇升級繼續使用，或匯出資料離開，不強制綁定。"
-                  }
-                },
-                {
-                  "@type": "Question",
-                  "name": "94Bot 是什麼？怎麼用？",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text": "94Bot 是 Telegram 聊天機器人 AI 助手。綁定補習班帳號後，直接用自然語言對話即可操作三大系統，例如「陳小明今天請假」、「高二陳小明繳 5000 元」。所有寫入操作都會先確認才執行。"
-                  }
-                },
-                {
-                  "@type": "Question",
-                  "name": "94Bot 支援哪些操作？",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text": "目前支援：出缺勤登記與查詢、繳費登記與查詢、學生資料查詢與新增、庫存查詢與進出貨。查詢類操作即時回覆，寫入類操作需點擊確認按鈕才會執行。"
-                  }
-                },
-                {
-                  "@type": "Question",
-                  "name": "適合多少學員規模？",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text": "從 10 人個人工作室到 500 人連鎖補習班均適用。各系統均有免費/基礎/專業/企業版，按需升級。"
-                  }
-                }
-              ]
-            })
-          }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Organization",
-              "name": "蜂神榜 Ai 教育科技",
-              "alternateName": "94cram",
-              "url": "https://94cram.com",
-              "logo": "https://94cram.com/logo.png",
-              "description": "台灣補習班管理 SaaS 平台，整合學員管理、智能點名、庫存管理、AI 聊天助手四大系統。",
-              "foundingDate": "2026",
-              "sameAs": [
-                "https://t.me/cram94bot"
-              ],
-              "contactPoint": {
-                "@type": "ContactPoint",
-                "contactType": "customer service",
-                "availableLanguage": ["zh-TW"]
-              },
-              "areaServed": {
-                "@type": "Country",
-                "name": "Taiwan"
-              },
-              "knowsAbout": ["補習班管理", "教育科技", "AI 點名系統", "庫存管理", "Telegram AI 助手"]
-            })
-          }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
         />
       </head>
       <body className={`${notoSansTC.className} min-h-screen bg-morandi-bg`}>

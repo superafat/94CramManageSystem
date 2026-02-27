@@ -3,12 +3,18 @@ import bcrypt from 'bcryptjs';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/index';
 import { tenants, users } from '@94cram/shared/db';
-import { sign, setAuthCookie, clearAuthCookie } from '@94cram/shared/auth';
+import { sign, signRefreshToken, verifyRefreshToken, setAuthCookie, setRefreshCookie, clearAuthCookie, extractRefreshToken } from '@94cram/shared/auth';
 import { authMiddleware, getAuthUser } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { z } from 'zod';
 
 const app = new Hono();
+
+async function setAuthTokens(c: import('hono').Context, accessToken: string, userId: string, tenantId: string) {
+  setAuthCookie(c, accessToken);
+  const refreshToken = await signRefreshToken({ userId, tenantId });
+  setRefreshCookie(c, refreshToken);
+}
 
 const loginSchema = z.object({
   email: z.string().trim().email(),
@@ -59,7 +65,7 @@ app.post('/login', async (c) => {
     systems: ['stock'],
   });
 
-  setAuthCookie(c, token);
+  await setAuthTokens(c, token, user.id, user.tenantId ?? '');
   return c.json({
     token,
     user: {
@@ -217,6 +223,42 @@ app.get('/users', async (c) => {
   }).from(users).where(eq(users.tenantId, tenantId));
 
   return c.json(tenantUsers);
+});
+
+app.post('/refresh', async (c) => {
+  const refreshToken = extractRefreshToken(c);
+  if (!refreshToken) {
+    return c.json({ error: 'No refresh token' }, 401);
+  }
+
+  try {
+    const { userId, tenantId } = await verifyRefreshToken(refreshToken);
+
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user || !user.isActive) {
+      clearAuthCookie(c);
+      return c.json({ error: 'User not found or inactive' }, 401);
+    }
+
+    const token = await sign({
+      userId: user.id,
+      tenantId: user.tenantId ?? '',
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      systems: ['stock'],
+    });
+
+    await setAuthTokens(c, token, user.id, user.tenantId ?? '');
+    return c.json({
+      success: true,
+      token,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+    });
+  } catch {
+    clearAuthCookie(c);
+    return c.json({ error: 'Invalid or expired refresh token' }, 401);
+  }
 });
 
 app.post('/logout', async (c) => {

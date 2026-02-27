@@ -34,7 +34,7 @@ jobs:
 
       - name: Build & Push
         run: |
-          docker build -f apps/manage-backend/Dockerfile \
+          docker build --platform linux/amd64 -f apps/manage-backend/Dockerfile \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-backend:${{ github.sha }} \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-backend:latest \
             .
@@ -74,7 +74,7 @@ jobs:
 
       - name: Build & Push
         run: |
-          docker build -f apps/manage-dashboard/Dockerfile \
+          docker build --platform linux/amd64 -f apps/manage-dashboard/Dockerfile \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-dashboard:${{ github.sha }} \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-dashboard:latest \
             .

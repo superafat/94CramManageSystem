@@ -11,7 +11,7 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import * as jose from 'jose'
-import { setAuthCookie, clearAuthCookie, extractToken } from '@94cram/shared/auth'
+import { setAuthCookie, setRefreshCookie, clearAuthCookie, extractToken, extractRefreshToken, signRefreshToken, verifyRefreshToken } from '@94cram/shared/auth'
 import { config } from '../config'
 import { db } from '../db'
 import { sql } from 'drizzle-orm'
@@ -98,19 +98,32 @@ async function getFirebasePublicKeys(): Promise<Record<string, string>> {
 }
 
 /** Verify password - supports bcrypt and legacy sha256+salt hash stored as "salt:hash" */
-async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  if (!stored) return false
+async function verifyPassword(password: string, stored: string): Promise<{ valid: boolean; isLegacy: boolean }> {
+  if (!stored) return { valid: false, isLegacy: false }
   // bcrypt hashes start with $2a$ or $2b$
   if (stored.startsWith('$2a$') || stored.startsWith('$2b$')) {
     const bcrypt = await import('bcryptjs')
-    return bcrypt.default.compare(password, stored)
+    const valid = await bcrypt.default.compare(password, stored)
+    return { valid, isLegacy: false }
   }
   // Legacy: sha256 with salt stored as "salt:hash"
-  if (!stored.includes(':')) return false
+  if (!stored.includes(':')) return { valid: false, isLegacy: false }
   const [salt, hash] = stored.split(':')
-  if (!salt || !hash) return false
+  if (!salt || !hash) return { valid: false, isLegacy: false }
   const check = createHash('sha256').update(password + salt).digest('hex')
-  return timingSafeEqual(check, hash)
+  return { valid: timingSafeEqual(check, hash), isLegacy: true }
+}
+
+/** Auto-migrate legacy SHA256 password to bcrypt (non-blocking) */
+async function migrateToBcrypt(userId: string, plainPassword: string): Promise<void> {
+  try {
+    const bcrypt = await import('bcryptjs')
+    const hashed = await bcrypt.default.hash(plainPassword, 10)
+    await db.execute(sql`UPDATE users SET password_hash = ${hashed} WHERE id = ${userId}`)
+    logger.info({ userId }, 'Migrated legacy SHA256 password to bcrypt')
+  } catch (err) {
+    logger.error({ err, userId }, 'Failed to migrate password to bcrypt')
+  }
 }
 
 /** Timing-safe string comparison */
@@ -143,8 +156,15 @@ async function generateToken(payload: {
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('7d')
+    .setExpirationTime('1h')
     .sign(secret)
+}
+
+/** Set both access + refresh token cookies */
+async function setAuthTokens(c: import('hono').Context, accessToken: string, userId: string, tenantId: string) {
+  setAuthCookie(c, accessToken)
+  const refreshToken = await signRefreshToken({ userId, tenantId })
+  setRefreshCookie(c, refreshToken)
 }
 
 // ========================================================================
@@ -175,27 +195,33 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
         return forbidden(c, '帳號已停用')
       }
 
-      if (!(await verifyPassword(body.password, dbUser.password_hash))) {
+      const { valid, isLegacy } = await verifyPassword(body.password, dbUser.password_hash)
+      if (!valid) {
         return unauthorized(c, '帳號或密碼錯誤')
+      }
+
+      // Auto-migrate legacy SHA256 to bcrypt (non-blocking)
+      if (isLegacy) {
+        migrateToBcrypt(dbUser.id, body.password).catch(() => {})
       }
 
       const role = dbUser.role as Role
       const permissions = getUserPermissions(role)
 
-        const jwt = await generateToken({
-          sub: dbUser.id,
-          name: (dbUser.full_name ?? dbUser.username) ?? undefined,
-          email: dbUser.email ?? undefined,
-          role: role,
-          tenant_id: dbUser.tenant_id,
-          branch_id: dbUser.branch_id ?? undefined,
-        })
+      const jwt = await generateToken({
+        sub: dbUser.id,
+        name: (dbUser.full_name ?? dbUser.username) ?? undefined,
+        email: dbUser.email ?? undefined,
+        role: role,
+        tenant_id: dbUser.tenant_id,
+        branch_id: dbUser.branch_id ?? undefined,
+      })
 
       // Update last_login_at (non-blocking)
       db.execute(sql`UPDATE users SET last_login_at = NOW() WHERE id = ${dbUser.id}`)
         .catch(() => { /* non-critical */ })
 
-      setAuthCookie(c, jwt)
+      await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id)
       return success(c, {
         token: jwt,
         user: {
@@ -269,7 +295,7 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
           branch_id: dbUser.branch_id ?? undefined,
         })
 
-        setAuthCookie(c, jwt)
+        await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id)
         return success(c, {
           token: jwt,
           user: {
@@ -358,7 +384,7 @@ authRoutes.post('/telegram', zValidator('json', telegramLoginSchema), async (c) 
           branch_id: dbUser.branch_id ?? undefined,
         })
 
-      setAuthCookie(c, jwt)
+      await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id)
       return success(c, {
         token: jwt,
         user: {
@@ -382,7 +408,7 @@ authRoutes.post('/telegram', zValidator('json', telegramLoginSchema), async (c) 
       branch_id: 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d',
     })
 
-    setAuthCookie(c, jwt)
+    await setAuthTokens(c, jwt, `tg-${telegramId}`, '11111111-1111-1111-1111-111111111111')
     return success(c, {
       token: jwt,
       user: {
@@ -546,6 +572,63 @@ authRoutes.post('/demo', async (c) => {
 })
 
 // ========================================================================
+// POST /refresh - Refresh access token using refresh token
+// ========================================================================
+authRoutes.post('/refresh', async (c) => {
+  const refreshToken = extractRefreshToken(c)
+  if (!refreshToken) {
+    return c.json({ error: 'No refresh token' }, 401)
+  }
+
+  try {
+    const { userId, tenantId } = await verifyRefreshToken(refreshToken)
+
+    // Look up user to get current info for new access token
+    const rows = await db.execute(sql`
+      SELECT id, username, full_name, email, role, tenant_id, branch_id, is_active
+      FROM users WHERE id = ${userId} AND tenant_id = ${tenantId} AND deleted_at IS NULL
+      LIMIT 1
+    `) as QueryResultRows<AuthUserRow>
+
+    const dbUser = firstRow(rows)
+    if (!dbUser || !dbUser.is_active) {
+      clearAuthCookie(c)
+      return c.json({ error: 'User not found or inactive' }, 401)
+    }
+
+    const role = dbUser.role as Role
+    const permissions = getUserPermissions(role)
+
+    const jwt = await generateToken({
+      sub: dbUser.id,
+      name: (dbUser.full_name ?? dbUser.username) ?? undefined,
+      email: dbUser.email ?? undefined,
+      role: role,
+      tenant_id: dbUser.tenant_id,
+      branch_id: dbUser.branch_id ?? undefined,
+    })
+
+    // Rotate: issue new access + refresh tokens
+    await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id)
+
+    return c.json({
+      success: true,
+      token: jwt,
+      user: {
+        id: dbUser.id,
+        name: (dbUser.full_name ?? dbUser.username) ?? undefined,
+        email: dbUser.email ?? undefined,
+        role: role,
+        permissions,
+      },
+    })
+  } catch {
+    clearAuthCookie(c)
+    return c.json({ error: 'Invalid or expired refresh token' }, 401)
+  }
+})
+
+// ========================================================================
 // POST /logout - Clear auth cookie
 // ========================================================================
 authRoutes.post('/logout', async (c) => {
@@ -587,7 +670,7 @@ export async function handleDemoLogin(c: import('hono').Context) {
       branch_id: account.branchId,
     })
 
-    setAuthCookie(c, jwt)
+    await setAuthTokens(c, jwt, account.id, account.tenantId)
     return success(c, {
       token: jwt,
       user: {

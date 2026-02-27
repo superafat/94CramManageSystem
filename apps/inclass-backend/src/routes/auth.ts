@@ -4,12 +4,19 @@ import { z } from 'zod'
 import { db } from '../db/index.js'
 import { users, tenants } from '@94cram/shared/db'
 import { eq } from 'drizzle-orm'
-import { sign, setAuthCookie, clearAuthCookie } from '@94cram/shared/auth'
+import { sign, signRefreshToken, verifyRefreshToken, setAuthCookie, setRefreshCookie, clearAuthCookie, extractRefreshToken } from '@94cram/shared/auth'
 import bcrypt from 'bcryptjs'
 import type { Variables } from '../middleware/auth.js'
 import { logger } from '../utils/logger.js'
 
 const auth = new Hono<{ Variables: Variables }>()
+
+/** Set both access + refresh token cookies */
+async function setAuthTokens(c: import('hono').Context, accessToken: string, userId: string, tenantId: string) {
+  setAuthCookie(c, accessToken)
+  const refreshToken = await signRefreshToken({ userId, tenantId })
+  setRefreshCookie(c, refreshToken)
+}
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -52,7 +59,7 @@ auth.post('/login', zValidator('json', loginSchema), async (c) => {
       systems: ['inclass'],
     })
 
-    setAuthCookie(c, token)
+    await setAuthTokens(c, token, user.id, user.tenantId ?? '')
     return c.json({
       token,
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
@@ -98,7 +105,7 @@ auth.post('/register', zValidator('json', registerSchema), async (c) => {
       systems: ['inclass'],
     })
 
-    setAuthCookie(c, token)
+    await setAuthTokens(c, token, user.id, user.tenantId ?? '')
     return c.json({
       token,
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
@@ -159,11 +166,47 @@ auth.post('/demo', async (c) => {
       systems: ['inclass'],
     })
 
-    setAuthCookie(c, token)
+    await setAuthTokens(c, token, demoUser.id, demoSchool.id)
     return c.json({ token, user: demoUser, school: demoSchool })
   } catch (e) {
     logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Demo login error`)
     return c.json({ error: 'Failed to create demo session' }, 500)
+  }
+})
+
+auth.post('/refresh', async (c) => {
+  const refreshToken = extractRefreshToken(c)
+  if (!refreshToken) {
+    return c.json({ error: 'No refresh token' }, 401)
+  }
+
+  try {
+    const { userId, tenantId } = await verifyRefreshToken(refreshToken)
+
+    const [user] = await db.select().from(users).where(eq(users.id, userId))
+    if (!user || !user.isActive) {
+      clearAuthCookie(c)
+      return c.json({ error: 'User not found or inactive' }, 401)
+    }
+
+    const token = await sign({
+      userId: user.id,
+      tenantId: user.tenantId ?? '',
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      systems: ['inclass'],
+    })
+
+    await setAuthTokens(c, token, user.id, user.tenantId ?? '')
+    return c.json({
+      success: true,
+      token,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+    })
+  } catch {
+    clearAuthCookie(c)
+    return c.json({ error: 'Invalid or expired refresh token' }, 401)
   }
 })
 

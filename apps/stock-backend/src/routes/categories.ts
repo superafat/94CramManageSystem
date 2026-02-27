@@ -22,7 +22,8 @@ app.get('/', async (c) => {
   const tenantId = getTenantId(c);
   const categories = await db.select()
     .from(stockCategories)
-    .where(eq(stockCategories.tenantId, tenantId));
+    .where(eq(stockCategories.tenantId, tenantId))
+    .limit(500);
   return c.json(categories);
 });
 

@@ -12,7 +12,7 @@ const envSchema = z.object({
   MINIMAX_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
-  JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   FIREBASE_PROJECT_ID: z.string().optional(),
 })

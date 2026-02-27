@@ -27,7 +27,7 @@ classesRouter.get('/', async (c) => {
   try {
     const schoolId = requireSchoolId(c.get('schoolId'))
     if (!schoolId) return c.json({ success: false, data: null, error: 'Unauthorized' }, 401)
-    const allClasses = await db.select().from(manageCourses).where(eq(manageCourses.tenantId, schoolId))
+    const allClasses = await db.select().from(manageCourses).where(eq(manageCourses.tenantId, schoolId)).limit(200)
     return c.json({ success: true, data: { classes: allClasses }, error: null })
   } catch (e) {
     logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching classes`)
@@ -40,7 +40,7 @@ classesRouter.post('/', zValidator('json', classSchema), async (c) => {
     const body = c.req.valid('json')
     const schoolId = requireSchoolId(c.get('schoolId'))
     if (!schoolId) return c.json({ success: false, data: null, error: 'Unauthorized' }, 401)
-    const [existingClass] = await db.select().from(manageCourses).where(and(eq(manageCourses.tenantId, schoolId), eq(manageCourses.name, body.name)))
+    const [existingClass] = await db.select().from(manageCourses).where(and(eq(manageCourses.tenantId, schoolId), eq(manageCourses.name, body.name))).limit(1)
     if (existingClass) return c.json({ success: false, data: null, error: 'Class name already exists' }, 400)
 
     const [newClass] = await db.insert(manageCourses).values({

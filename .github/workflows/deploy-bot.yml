@@ -32,7 +32,7 @@ jobs:
 
       - name: Build & Push
         run: |
-          docker build -f apps/bot-gateway/Dockerfile \
+          docker build --platform linux/amd64 -f apps/bot-gateway/Dockerfile \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/bot-gateway:${{ github.sha }} \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/bot-gateway:latest \
             .
@@ -70,7 +70,7 @@ jobs:
 
       - name: Build & Push
         run: |
-          docker build -f apps/bot-dashboard/Dockerfile \
+          docker build --platform linux/amd64 -f apps/bot-dashboard/Dockerfile \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/bot-dashboard:${{ github.sha }} \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/bot-dashboard:latest \
             .

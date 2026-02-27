@@ -19,7 +19,8 @@ app.get('/', async (c) => {
   const tenantId = getTenantId(c);
   const rows = await db.select().from(stockInventoryCounts)
     .where(eq(stockInventoryCounts.tenantId, tenantId))
-    .orderBy(desc(stockInventoryCounts.createdAt));
+    .orderBy(desc(stockInventoryCounts.createdAt))
+    .limit(1000);
   return c.json(rows);
 });
 

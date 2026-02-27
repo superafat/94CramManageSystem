@@ -33,7 +33,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link href="/dashboard/inventory-counts" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">盤點管理</Link>
             <Link href="/dashboard/barcodes" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">條碼管理</Link>
           </nav>
-          <div className="p-4 border-t border-gray-200">
+          <div className="p-4 border-t border-gray-200 space-y-2">
+            <a
+              href="https://94cram.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center w-full px-4 py-2 text-sm text-gray-600 bg-gray-100 border border-gray-200 rounded-md hover:bg-gray-200 transition-colors"
+              title="切換至其他系統"
+            >
+              🔀 系統切換
+            </a>
             <button
               onClick={() => {
                 removeToken();

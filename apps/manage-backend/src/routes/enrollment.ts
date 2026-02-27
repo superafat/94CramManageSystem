@@ -135,7 +135,7 @@ enrollment.get('/funnel', async (c) => {
         isNull(manageLeads.deletedAt),
         gte(manageLeads.createdAt, startDate)
       )
-    );
+    ).limit(5000);
 
     const totalLeads = leads.length;
     const statusCounts = {
@@ -224,7 +224,7 @@ enrollment.get('/conversion', async (c) => {
         isNull(manageLeads.deletedAt),
         gte(manageLeads.createdAt, startDate)
       )
-    );
+    ).limit(5000);
 
     const newLeads = leads.length;
     const contacted = leads.filter(l => ['contacted', 'trial_scheduled', 'trial_completed', 'enrolled'].includes(l.status)).length;
@@ -392,7 +392,7 @@ enrollment.get('/stats/daily', async (c) => {
         isNull(manageLeads.deletedAt),
         gte(manageLeads.createdAt, startDate)
       )
-    );
+    ).limit(5000);
 
     const dailyStats = [];
 
@@ -500,7 +500,7 @@ enrollment.get('/performance', async (c) => {
       whereConditions.push(eq(manageLeads.assignedTo, advisor_id));
     }
 
-    const leads = await db.select().from(manageLeads).where(and(...whereConditions));
+    const leads = await db.select().from(manageLeads).where(and(...whereConditions)).limit(5000);
 
     const performance = {
       advisor: advisor_id || 'all',

@@ -15,6 +15,7 @@ app.post('/students', async (c) => {
     const tenantId = c.get('tenantId') as string
     const students = await db.select().from(manageStudents)
       .where(eq(manageStudents.tenantId, tenantId))
+      .limit(1000)
 
     return c.json({
       success: true,
@@ -31,6 +32,7 @@ app.post('/classes', async (c) => {
     const tenantId = c.get('tenantId') as string
     const courses = await db.select().from(manageCourses)
       .where(eq(manageCourses.tenantId, tenantId))
+      .limit(500)
 
     return c.json({ success: true, data: courses.map(co => co.name) })
   } catch (error) {

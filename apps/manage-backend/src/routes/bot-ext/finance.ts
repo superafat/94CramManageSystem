@@ -18,9 +18,11 @@ app.post('/payment', async (c) => {
     if (student_id) {
       students = await db.select().from(manageStudents)
         .where(and(eq(manageStudents.tenantId, tenantId), eq(manageStudents.id, student_id)))
+        .limit(1)
     } else {
       students = await db.select().from(manageStudents)
         .where(and(eq(manageStudents.tenantId, tenantId), eq(manageStudents.name, student_name)))
+        .limit(1)
     }
 
     if (students.length === 0) {
@@ -83,7 +85,7 @@ app.post('/summary', async (c) => {
     if (start_date) conditions.push(gte(managePayments.paidAt, new Date(start_date)))
     if (end_date) conditions.push(lte(managePayments.paidAt, new Date(end_date)))
 
-    const payments = await db.select().from(managePayments).where(and(...conditions))
+    const payments = await db.select().from(managePayments).where(and(...conditions)).limit(1000)
 
     const total = payments.reduce((sum, p) => sum + Number(p.amount), 0)
 
@@ -107,9 +109,11 @@ app.post('/history', async (c) => {
     if (student_id) {
       students = await db.select().from(manageStudents)
         .where(and(eq(manageStudents.tenantId, tenantId), eq(manageStudents.id, student_id)))
+        .limit(1)
     } else {
       students = await db.select().from(manageStudents)
         .where(and(eq(manageStudents.tenantId, tenantId), eq(manageStudents.name, student_name)))
+        .limit(1)
     }
 
     if (students.length === 0) {
@@ -119,6 +123,7 @@ app.post('/history', async (c) => {
     const student = students[0]
     const enrollments = await db.select().from(manageEnrollments)
       .where(and(eq(manageEnrollments.tenantId, tenantId), eq(manageEnrollments.studentId, student.id)))
+      .limit(1000)
 
     const enrollmentIds = enrollments.map(e => e.id)
     let payments: (typeof managePayments.$inferSelect)[] = []

@@ -4,8 +4,10 @@
  */
 import type { Context } from 'hono'
 
-const COOKIE_NAME = 'token'
-const MAX_AGE = 7 * 24 * 60 * 60 // 7 days
+const ACCESS_COOKIE = 'token'
+const REFRESH_COOKIE = 'refresh_token'
+const ACCESS_MAX_AGE = 60 * 60 // 1 hour
+const REFRESH_MAX_AGE = 7 * 24 * 60 * 60 // 7 days
 
 interface CookieOptions {
   domain?: string
@@ -13,42 +15,52 @@ interface CookieOptions {
   sameSite?: 'Strict' | 'Lax' | 'None'
 }
 
-export function setAuthCookie(c: Context, token: string, options?: CookieOptions) {
+function buildCookie(name: string, value: string, maxAge: number, options?: CookieOptions): string {
   const secure = options?.secure ?? (process.env.NODE_ENV === 'production')
   const sameSite = options?.sameSite ?? 'Lax'
   const domainPart = options?.domain ? `; Domain=${options.domain}` : ''
+  return `${name}=${value}; HttpOnly; ${secure ? 'Secure; ' : ''}SameSite=${sameSite}; Path=/; Max-Age=${maxAge}${domainPart}`
+}
 
-  c.header('Set-Cookie',
-    `${COOKIE_NAME}=${token}; HttpOnly; ${secure ? 'Secure; ' : ''}SameSite=${sameSite}; Path=/; Max-Age=${MAX_AGE}${domainPart}`
-  )
+export function setAuthCookie(c: Context, token: string, options?: CookieOptions) {
+  c.header('Set-Cookie', buildCookie(ACCESS_COOKIE, token, ACCESS_MAX_AGE, options))
+}
+
+export function setRefreshCookie(c: Context, token: string, options?: CookieOptions) {
+  c.header('Set-Cookie', buildCookie(REFRESH_COOKIE, token, REFRESH_MAX_AGE, options), { append: true })
 }
 
 export function clearAuthCookie(c: Context, options?: CookieOptions) {
-  const secure = options?.secure ?? (process.env.NODE_ENV === 'production')
-  const sameSite = options?.sameSite ?? 'Lax'
-  const domainPart = options?.domain ? `; Domain=${options.domain}` : ''
-
-  c.header('Set-Cookie',
-    `${COOKIE_NAME}=; HttpOnly; ${secure ? 'Secure; ' : ''}SameSite=${sameSite}; Path=/; Max-Age=0${domainPart}`
-  )
+  c.header('Set-Cookie', buildCookie(ACCESS_COOKIE, '', 0, options))
+  c.header('Set-Cookie', buildCookie(REFRESH_COOKIE, '', 0, options), { append: true })
 }
 
 /**
- * Extract token from request — tries cookie first, then Authorization header
+ * Extract access token from request — tries cookie first, then Authorization header
  */
 export function extractToken(c: Context): string | null {
-  // 1. Try cookie
   const cookieHeader = c.req.header('Cookie')
   if (cookieHeader) {
     const match = cookieHeader.match(/(?:^|;\s*)token=([^;]+)/)
     if (match) return match[1]
   }
 
-  // 2. Fallback to Bearer header (backwards compatibility + API clients)
   const authHeader = c.req.header('Authorization')
   if (authHeader?.startsWith('Bearer ')) {
     return authHeader.slice(7)
   }
 
+  return null
+}
+
+/**
+ * Extract refresh token from cookie
+ */
+export function extractRefreshToken(c: Context): string | null {
+  const cookieHeader = c.req.header('Cookie')
+  if (cookieHeader) {
+    const match = cookieHeader.match(/(?:^|;\s*)refresh_token=([^;]+)/)
+    if (match) return match[1]
+  }
   return null
 }

@@ -190,8 +190,8 @@ app.onError((err, c) => {
   if (err instanceof ZodError) {
     return c.json({
       error: 'Validation failed',
-      details: err.errors.map(e => ({
-        field: e.path.join('.'),
+      details: err.issues.map(e => ({
+        field: e.path.map(String).join('.'),
         message: e.message
       }))
     }, 400)

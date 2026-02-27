@@ -35,6 +35,21 @@ export async function sign(payload: Omit<JWTPayload, 'sub'>, secret?: string): P
     role: payload.role,
     permissions: payload.permissions || [],
     systems: payload.systems || [],
+    type: 'access',
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(payload.userId)
+    .setIssuedAt()
+    .setExpirationTime('1h');
+
+  return jwt.sign(getSecret(secret));
+}
+
+export async function signRefreshToken(payload: Pick<JWTPayload, 'userId' | 'tenantId'>, secret?: string): Promise<string> {
+  const jwt = new SignJWT({
+    userId: payload.userId,
+    tenantId: payload.tenantId,
+    type: 'refresh',
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(payload.userId)
@@ -42,6 +57,23 @@ export async function sign(payload: Omit<JWTPayload, 'sub'>, secret?: string): P
     .setExpirationTime('7d');
 
   return jwt.sign(getSecret(secret));
+}
+
+export async function verifyRefreshToken(token: string, secret?: string): Promise<{ userId: string; tenantId: string }> {
+  const { payload } = await jwtVerify(token, getSecret(secret));
+
+  if (payload.type !== 'refresh') {
+    throw new Error('Invalid token type: expected refresh token');
+  }
+
+  const userId = (typeof payload.userId === 'string' ? payload.userId : null) ?? payload.sub ?? null;
+  const tenantId = typeof payload.tenantId === 'string' ? payload.tenantId : null;
+
+  if (!userId || !tenantId) {
+    throw new Error('Refresh token missing required fields');
+  }
+
+  return { userId, tenantId };
 }
 
 export async function verify(token: string, secret?: string): Promise<JWTPayload> {

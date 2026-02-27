@@ -31,7 +31,7 @@ jobs:
 
       - name: Build & Push
         run: |
-          docker build \
+          docker build --platform linux/amd64 \
             -f apps/portal/Dockerfile \
             -t ${{ env.REGISTRY }}/94portal:${{ github.sha }} \
             .

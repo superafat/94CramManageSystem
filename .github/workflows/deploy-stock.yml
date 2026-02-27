@@ -33,7 +33,7 @@ jobs:
 
       - name: Build & Push
         run: |
-          docker build -f apps/stock-backend/Dockerfile \
+          docker build --platform linux/amd64 -f apps/stock-backend/Dockerfile \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-backend:${{ github.sha }} \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-backend:latest \
             .
@@ -72,7 +72,7 @@ jobs:
 
       - name: Build & Push
         run: |
-          docker build -f apps/stock-dashboard/Dockerfile \
+          docker build --platform linux/amd64 -f apps/stock-dashboard/Dockerfile \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-dashboard:${{ github.sha }} \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-dashboard:latest \
             .

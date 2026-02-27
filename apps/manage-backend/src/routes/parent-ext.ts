@@ -49,6 +49,7 @@ app.get('/student/:studentId', async (c) => {
 
     return c.json({ success: true, data: student });
   } catch (error) {
+    console.error('parent-ext /student error:', error);
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });
@@ -95,6 +96,7 @@ app.get('/payments/:studentId', async (c) => {
       },
     });
   } catch (error) {
+    console.error('parent-ext /payments error:', error);
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });
@@ -167,6 +169,7 @@ app.get('/payments/:studentId/status', async (c) => {
       },
     });
   } catch (error) {
+    console.error('parent-ext /payments/status error:', error);
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });

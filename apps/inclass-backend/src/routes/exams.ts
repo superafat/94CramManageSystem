@@ -33,7 +33,7 @@ examsRouter.get('/', async (c) => {
     const schoolId = requireSchoolId(c.get('schoolId'))
     if (!schoolId) return c.json(fail('Unauthorized'), 401)
 
-    const schoolExams = await db.select().from(inclassExams).where(eq(inclassExams.tenantId, schoolId))
+    const schoolExams = await db.select().from(inclassExams).where(eq(inclassExams.tenantId, schoolId)).limit(500)
     return c.json(ok({
       exams: schoolExams.map((exam) => ({
         id: exam.id,

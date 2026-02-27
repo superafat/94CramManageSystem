@@ -33,7 +33,7 @@ jobs:
 
       - name: Build & Push
         run: |
-          docker build -f apps/inclass-backend/Dockerfile \
+          docker build --platform linux/amd64 -f apps/inclass-backend/Dockerfile \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/inclass-backend:${{ github.sha }} \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/inclass-backend:latest \
             .
@@ -72,7 +72,7 @@ jobs:
 
       - name: Build & Push
         run: |
-          docker build -f apps/inclass-dashboard/Dockerfile \
+          docker build --platform linux/amd64 -f apps/inclass-dashboard/Dockerfile \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/inclass-dashboard:${{ github.sha }} \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/inclass-dashboard:latest \
             .

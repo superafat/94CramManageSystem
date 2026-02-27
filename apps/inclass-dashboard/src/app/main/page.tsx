@@ -1,9 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
+import StatCard from './components/StatCard'
+import ToolButton from './components/ToolButton'
+import FormField from './components/FormField'
+import CheckInModal from './components/CheckInModal'
+import PaymentSection from './components/PaymentSection'
 
 interface Student {
   id: string
@@ -37,13 +42,6 @@ interface ClassInfo {
   feeYearly?: number
 }
 
-interface PaymentRecord {
-  id: string
-  studentId: string
-  periodMonth: string
-  status: string
-}
-
 type PaymentType = 'monthly' | 'quarterly' | 'semester' | 'yearly'
 
 interface AlertNotification {
@@ -55,9 +53,24 @@ interface AlertNotification {
   created_at: string
 }
 
-const isPaymentType = (value: string): value is PaymentType => (
-  value === 'monthly' || value === 'quarterly' || value === 'semester' || value === 'yearly'
-)
+// Simple modal wrapper used for the Add Student dialog
+function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+  return (
+    <div
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(74, 74, 74, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: '24px', maxWidth: '400px', width: '100%', boxShadow: 'var(--shadow-lg)', border: '2px solid var(--border)', position: 'relative' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button onClick={onClose} style={{ position: 'absolute', top: '12px', right: '12px', background: 'var(--error)', border: 'none', width: '32px', height: '32px', borderRadius: '50%', color: 'white', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold' }}>×</button>
+        <h3 style={{ fontSize: '20px', color: 'var(--primary)', fontWeight: 'bold', marginBottom: '16px' }}>{title}</h3>
+        {children}
+      </div>
+    </div>
+  )
+}
 
 export default function Home() {
   const { user, school, logout } = useAuth()
@@ -71,9 +84,7 @@ export default function Home() {
   const [newStudent, setNewStudent] = useState({ name: '', grade: '', nfcId: '' })
   const [nfcInput, setNfcInput] = useState('')
   const [message, setMessage] = useState('')
-  const [stream, setStream] = useState<MediaStream | null>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  
+
   // 繳費相關
   const [showPayment, setShowPayment] = useState(false)
   const [paymentStudent, setPaymentStudent] = useState<Student | null>(null)
@@ -84,7 +95,7 @@ export default function Home() {
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
   const [paymentNotes, setPaymentNotes] = useState('')
   const [submittingPayment, setSubmittingPayment] = useState(false)
-  
+
   // 警示通知
   const [alerts, setAlerts] = useState<AlertNotification[]>([])
   const [showAlerts, setShowAlerts] = useState(false)
@@ -93,13 +104,9 @@ export default function Home() {
 
   const fetchAlerts = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/alerts`, {
-        credentials: 'include'
-      })
+      const res = await fetch(`${API_BASE}/api/alerts`, { credentials: 'include' })
       const data: { alerts?: AlertNotification[] } = res.ok ? await res.json() : { alerts: [] }
-      if (data.alerts) {
-        setAlerts(data.alerts)
-      }
+      if (data.alerts) setAlerts(data.alerts)
     } catch (e) {
       console.error('Failed to fetch alerts:', e)
     }
@@ -108,12 +115,6 @@ export default function Home() {
   useEffect(() => {
     fetchData()
     fetchAlerts()
-    // Cleanup camera on unmount
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop())
-      }
-    }
   }, [])
 
   const fetchData = async () => {
@@ -143,33 +144,21 @@ export default function Home() {
     }
   }
 
-  const fetchClasses = async () => {
-    try {
-      const data = await api.getClasses()
-      setClasses(data.classes || [])
-    } catch (e) {
-      console.error('Failed to fetch classes:', e)
-    }
-  }
-
   const openPaymentModal = async (student: Student) => {
     setPaymentStudent(student)
     const data = await api.getClasses().catch(() => ({ classes: [] }))
     const fetchedClasses = data.classes || []
     setClasses(fetchedClasses)
-    
-    // 嘗試找到學生的班級
+
     if (student.classId) {
       setSelectedClass(student.classId)
       const cls = fetchedClasses.find((c: ClassInfo) => c.id === student.classId)
-      if (cls) {
-        setPaymentAmount(cls.feeMonthly || 0)
-      }
+      if (cls) setPaymentAmount(cls.feeMonthly || 0)
     } else if (fetchedClasses.length > 0) {
       setSelectedClass(fetchedClasses[0].id)
       setPaymentAmount(fetchedClasses[0].feeMonthly || 0)
     }
-    
+
     setShowPayment(true)
   }
 
@@ -186,12 +175,18 @@ export default function Home() {
     }
   }
 
+  const handlePaymentClassChange = (classId: string) => {
+    setSelectedClass(classId)
+    const cls = classes.find((c: ClassInfo) => c.id === classId)
+    if (cls) handlePaymentTypeChange(paymentType)
+  }
+
   const submitPayment = async () => {
     if (!paymentStudent || !selectedClass || paymentAmount <= 0) {
       showMessage('❌ 請填寫完整繳費資料')
       return
     }
-    
+
     setSubmittingPayment(true)
     try {
       const periodMonth = new Date().toISOString().substring(0, 7)
@@ -251,27 +246,6 @@ export default function Home() {
     }
   }
 
-  const startCamera = async () => {
-    setShowFaceCheckin(true)
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
-      setStream(mediaStream)
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream
-      }
-    } catch (e) {
-      showMessage('❌ 無法開啟攝影機')
-    }
-  }
-
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop())
-      setStream(null)
-    }
-    setShowFaceCheckin(false)
-  }
-
   const capturePhoto = () => {
     showMessage('📸 拍照成功！（辨識功能開發中）')
     // TODO: 整合 蜂神榜視覺辨識系統
@@ -306,7 +280,7 @@ export default function Home() {
         <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
           {user?.name} · {user?.email}
         </p>
-        <button 
+        <button
           onClick={logout}
           style={{ marginTop: '8px', padding: '6px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--error)', color: 'white', border: 'none', fontSize: '12px', cursor: 'pointer' }}
         >
@@ -416,7 +390,7 @@ export default function Home() {
                       {a.status === 'arrived' ? '✅' : a.status === 'late' ? '⏰' : '❌'}
                     </span>
                     {a.status !== 'absent' && (
-                      <button 
+                      <button
                         onClick={() => {
                           const student = students.find((s: Student) => s.name === a.studentName)
                           if (student) openPaymentModal(student)
@@ -436,7 +410,7 @@ export default function Home() {
 
       {/* Bottom Fixed Toolbar */}
       <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'var(--surface)', borderTop: '2px solid var(--border)', padding: '12px', display: 'flex', justifyContent: 'space-around', boxShadow: 'var(--shadow-lg)', zIndex: 100 }}>
-        <ToolButton emoji="📸" label="刷臉" onClick={startCamera} />
+        <ToolButton emoji="📸" label="刷臉" onClick={() => setShowFaceCheckin(true)} />
         <ToolButton emoji="📋" label="名單" onClick={() => setShowAddStudent(true)} />
         <ToolButton emoji="📊" label="儀表板" onClick={() => router.push('/dashboard')} />
         <ToolButton emoji="📝" label="成績" onClick={() => router.push('/grades')} />
@@ -460,94 +434,32 @@ export default function Home() {
 
       {/* Payment Modal */}
       {showPayment && paymentStudent && (
-        <Modal title="💰 繳費記錄" onClose={() => setShowPayment(false)}>
-          <div style={{ marginBottom: '12px' }}>
-            <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>學生</div>
-            <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--primary)' }}>{paymentStudent.name}</div>
-          </div>
-          
-          <div style={{ marginBottom: '12px' }}>
-            <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>班級</div>
-            <select 
-              value={selectedClass} 
-              onChange={(e) => {
-                setSelectedClass(e.target.value)
-                const cls = classes.find((c: ClassInfo) => c.id === e.target.value)
-                if (cls) handlePaymentTypeChange(paymentType)
-              }}
-              style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '14px' }}
-            >
-              {classes.map((c: ClassInfo) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ marginBottom: '12px' }}>
-            <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>費用類型</div>
-            <select 
-              value={paymentType} 
-              onChange={(e) => {
-                if (isPaymentType(e.target.value)) handlePaymentTypeChange(e.target.value)
-              }}
-              style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '14px' }}
-            >
-              <option value="monthly">月費</option>
-              <option value="quarterly">季費</option>
-              <option value="semester">學期費</option>
-              <option value="yearly">學年費</option>
-            </select>
-          </div>
-
-          <div style={{ marginBottom: '12px' }}>
-            <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>實收金額</div>
-            <input 
-              type="number" 
-              value={paymentAmount} 
-              onChange={(e) => setPaymentAmount(Number(e.target.value))}
-              style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '16px', fontWeight: 'bold' }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '12px' }}>
-            <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>繳費日期</div>
-            <input 
-              type="date" 
-              value={paymentDate} 
-              onChange={(e) => setPaymentDate(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '14px' }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '12px' }}>
-            <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>備註（選填）</div>
-            <input 
-              type="text" 
-              value={paymentNotes} 
-              onChange={(e) => setPaymentNotes(e.target.value)}
-              placeholder="例如：減免、優惠..."
-              style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '14px' }}
-            />
-          </div>
-
-          <button 
-            onClick={submitPayment}
-            disabled={submittingPayment}
-            style={{ width: '100%', padding: '14px', borderRadius: 'var(--radius-md)', background: 'var(--accent)', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer', opacity: submittingPayment ? 0.6 : 1 }}
-          >
-            {submittingPayment ? '處理中...' : '✅ 確認繳費'}
-          </button>
-        </Modal>
+        <PaymentSection
+          paymentStudent={paymentStudent}
+          classes={classes}
+          selectedClass={selectedClass}
+          paymentType={paymentType}
+          paymentAmount={paymentAmount}
+          paymentDate={paymentDate}
+          paymentNotes={paymentNotes}
+          submittingPayment={submittingPayment}
+          onClose={() => setShowPayment(false)}
+          onClassChange={handlePaymentClassChange}
+          onPaymentTypeChange={handlePaymentTypeChange}
+          onAmountChange={setPaymentAmount}
+          onDateChange={setPaymentDate}
+          onNotesChange={setPaymentNotes}
+          onSubmit={submitPayment}
+        />
       )}
 
       {/* Face Checkin Modal */}
       {showFaceCheckin && (
-        <Modal title="📸 刷臉點名" onClose={stopCamera} wide>
-          <video ref={videoRef} autoPlay playsInline style={{ width: '100%', borderRadius: 'var(--radius-md)', background: '#000', marginBottom: '12px' }} />
-          <button onClick={capturePhoto} style={{ width: '100%', padding: '14px', borderRadius: 'var(--radius-md)', background: 'var(--primary)', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>
-            📸 拍照辨識
-          </button>
-        </Modal>
+        <CheckInModal
+          onClose={() => setShowFaceCheckin(false)}
+          onCapture={capturePhoto}
+          onStreamReady={() => {}}
+        />
       )}
 
       {/* Toast Message */}
@@ -557,53 +469,5 @@ export default function Home() {
         </div>
       )}
     </main>
-  )
-}
-
-function StatCard({ emoji, label, value, color }: { emoji: string; label: string; value: number; color: string }) {
-  return (
-    <div style={{ background: color, borderRadius: '12px', padding: '12px', textAlign: 'center', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)' }}>
-      <div style={{ fontSize: '24px' }}>{emoji}</div>
-      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>{label}</div>
-      <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '4px' }}>{value}</div>
-    </div>
-  )
-}
-
-function ToolButton({ emoji, label, onClick }: { emoji: string; label: string; onClick: () => void }) {
-  return (
-    <button onClick={onClick} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '8px', gap: '4px' }}>
-      <div style={{ fontSize: '28px' }}>{emoji}</div>
-      <div style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 'bold' }}>{label}</div>
-    </button>
-  )
-}
-
-function Modal({ title, children, onClose, wide }: { title: string; children: React.ReactNode; onClose: () => void; wide?: boolean }) {
-  return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(74, 74, 74, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }} onClick={onClose}>
-      <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: '24px', maxWidth: wide ? '500px' : '400px', width: '100%', boxShadow: 'var(--shadow-lg)', border: '2px solid var(--border)', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} style={{ position: 'absolute', top: '12px', right: '12px', background: 'var(--error)', border: 'none', width: '32px', height: '32px', borderRadius: '50%', color: 'white', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold' }}>×</button>
-        <h3 style={{ fontSize: '20px', color: 'var(--primary)', fontWeight: 'bold', marginBottom: '16px' }}>{title}</h3>
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function FormField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
-  return (
-    <div style={{ marginBottom: '12px' }}>
-      <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '14px' }}>{label}</label>
-      <input 
-        type="text" 
-        value={value} 
-        onChange={(e) => onChange(e.target.value)} 
-        placeholder={placeholder} 
-        style={{ width: '100%', padding: '12px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '14px', outline: 'none' }}
-        onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
-        onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
-      />
-    </div>
   )
 }
