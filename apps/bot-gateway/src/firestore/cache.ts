@@ -1,5 +1,6 @@
 import { firestore } from './client';
 import { logger } from '../utils/logger';
+import { getRedis, isRedisAvailable } from '@94cram/shared/redis';
 
 export interface TenantCache {
   students: Array<{ id: string; name: string; class_name: string }>;
@@ -13,7 +14,7 @@ export interface TenantCache {
 
 const col = firestore.collection('bot_tenant_cache');
 
-// ── P1: In-memory cache layer (ready for Redis upgrade) ──
+// ── P1: In-memory cache layer ──
 interface CacheEntry {
   data: TenantCache;
   expiresAt: number;
@@ -21,10 +22,7 @@ interface CacheEntry {
 
 const memCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes TTL (configurable)
-
-// Check if Redis is available (placeholder for future upgrade)
-const REDIS_URL = process.env.REDIS_URL;
-const useRedis = !!REDIS_URL;
+const REDIS_TTL_SEC = 300; // 5 minutes in seconds
 
 function getFromMemCache(tenantId: string): TenantCache | null {
   const entry = memCache.get(tenantId);
@@ -42,41 +40,71 @@ function setInMemCache(tenantId: string, data: TenantCache): void {
   });
 }
 
-// TODO: Implement Redis version when REDIS_URL is set
-// async function getFromRedis(tenantId: string): Promise<TenantCache | null>
-// async function setInRedis(tenantId: string, data: TenantCache): Promise<void>
+async function getFromRedis(tenantId: string): Promise<TenantCache | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+  try {
+    return await redis.get<TenantCache>(`cache:tenant:${tenantId}`);
+  } catch {
+    return null;
+  }
+}
+
+async function setInRedis(tenantId: string, data: TenantCache): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    await redis.set(`cache:tenant:${tenantId}`, JSON.stringify(data), { ex: REDIS_TTL_SEC });
+  } catch {
+    // Redis write failure is non-fatal
+  }
+}
 
 export async function getCache(tenantId: string): Promise<TenantCache | null> {
-  // Try memory cache first
+  // Layer 1: memory cache
   const memResult = getFromMemCache(tenantId);
   if (memResult) {
-    logger.info(`[Cache] HIT (memory) for ${tenantId}`);
+    logger.info({ tenantId }, '[Cache] HIT (memory)');
     return memResult;
   }
 
-  // TODO: Try Redis when available
-  // if (useRedis) { ... }
+  // Layer 2: Redis cache
+  const redisResult = await getFromRedis(tenantId);
+  if (redisResult) {
+    logger.info({ tenantId }, '[Cache] HIT (redis)');
+    setInMemCache(tenantId, redisResult);
+    return redisResult;
+  }
 
-  // Fallback to Firestore
-  logger.info(`[Cache] MISS for ${tenantId}, fetching from Firestore`);
+  // Layer 3: Firestore
+  logger.info({ tenantId }, '[Cache] MISS, fetching from Firestore');
   const doc = await col.doc(tenantId).get();
   if (!doc.exists) return null;
 
   const data = doc.data() as TenantCache;
-  // Store in memory cache
   setInMemCache(tenantId, data);
+  await setInRedis(tenantId, data);
   return data;
 }
 
 export async function setCache(tenantId: string, data: TenantCache): Promise<void> {
   await col.doc(tenantId).set(data);
-  // Also update in-memory cache
+  // Write-through to all cache layers
   setInMemCache(tenantId, data);
+  await setInRedis(tenantId, data);
 }
 
 export async function invalidateCache(tenantId: string): Promise<void> {
   memCache.delete(tenantId);
-  // TODO: Invalidate Redis if present
+  // Also invalidate Redis
+  const redis = getRedis();
+  if (redis) {
+    try {
+      await redis.del(`cache:tenant:${tenantId}`);
+    } catch {
+      // Non-fatal
+    }
+  }
 }
 
 export async function isCacheStale(tenantId: string, maxAgeMs = 24 * 60 * 60 * 1000): Promise<boolean> {
@@ -90,7 +118,6 @@ export async function isCacheStale(tenantId: string, maxAgeMs = 24 * 60 * 60 * 1
 export function getCacheStats() {
   return {
     memCacheSize: memCache.size,
-    useRedis,
-    redisConfigured: !!REDIS_URL,
+    redisConnected: isRedisAvailable(),
   };
 }

@@ -15,12 +15,14 @@
       "import": "./src/middleware/index.ts",
       "types": "./src/middleware/index.ts"
     },
+    "./redis": "./src/redis/index.ts",
     "./styles/morandi-tokens.css": "./src/styles/morandi-tokens.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@upstash/redis": "^1.36.2",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.0.0",
     "jose": "^6.0.0",

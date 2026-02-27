@@ -88,7 +88,7 @@ app.use('*', honoLogger())
 app.use('/api/auth/*', async (c, next) => {
   if (c.req.method === 'OPTIONS') return next()
   const ip = getClientIP(c)
-  const result = checkRateLimit(`auth:${ip}`, { maxRequests: 10, enableBlocking: true })
+  const result = await checkRateLimit(`auth:${ip}`, { maxRequests: 10, enableBlocking: true })
   if (!result.allowed) {
     if (result.blocked) {
       return c.json({ error: 'Too many failed attempts. IP blocked for 15 minutes.' }, 429)
@@ -101,7 +101,7 @@ app.use('/api/auth/*', async (c, next) => {
 app.use('/api/*', async (c, next) => {
   if (c.req.method === 'OPTIONS') return next()
   const ip = getClientIP(c)
-  const result = checkRateLimit(`api:${ip}`, { maxRequests: 100 })
+  const result = await checkRateLimit(`api:${ip}`, { maxRequests: 100 })
   if (!result.allowed) {
     return c.json({ error: 'Too many requests. Please try again later.' }, 429)
   }

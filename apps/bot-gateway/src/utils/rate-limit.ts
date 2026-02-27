@@ -1,5 +1,6 @@
 import PQueue from 'p-queue'
 import type { Firestore } from '@google-cloud/firestore'
+import { getRedis } from '@94cram/shared/redis'
 
 // Token bucket per user
 interface Bucket {
@@ -64,7 +65,22 @@ function refill(bucket: Bucket) {
   }
 }
 
-export function checkRateLimit(userId: string): boolean {
+export async function checkRateLimit(userId: string): Promise<boolean> {
+  const redis = getRedis()
+
+  if (redis) {
+    // Redis fast path: atomic incr + 1-second window
+    try {
+      const key = `rl:bot:${userId}`
+      const count = await redis.incr(key)
+      if (count === 1) await redis.pexpire(key, 1000)
+      return count <= CAPACITY
+    } catch {
+      // Redis error — fall through to local bucket
+    }
+  }
+
+  // Fallback: local token bucket + Firestore sync
   if (!localBuckets.has(userId)) {
     localBuckets.set(userId, { tokens: CAPACITY, lastRefill: Date.now() })
     // Non-blocking: merge remote state on first encounter (conservative strategy)
@@ -87,6 +103,24 @@ export function checkRateLimit(userId: string): boolean {
     return true
   }
   return false
+}
+
+/**
+ * Global rate guard across all bot-gateway instances.
+ * Ensures combined send rate stays ≤25 msg/s (Telegram limit is ~30).
+ * Falls back to true (allow) when Redis is unavailable — per-instance PQueue handles it.
+ */
+export async function checkTelegramGlobalRate(): Promise<boolean> {
+  const redis = getRedis()
+  if (!redis) return true // fallback: per-instance PQueue handles rate
+  try {
+    const key = 'tg:global:send'
+    const count = await redis.incr(key)
+    if (count === 1) await redis.pexpire(key, 1000)
+    return count <= 25
+  } catch {
+    return true // Redis error — allow through
+  }
 }
 
 // Simple global queue for outgoing Telegram messages to avoid bursts

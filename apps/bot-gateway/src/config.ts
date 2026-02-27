@@ -14,6 +14,8 @@ const envSchema = z.object({
   BOT_DASHBOARD_URL: z.string().url().optional(),
   INTERNAL_API_KEY: z.string().min(1).optional(),
   GCP_PROJECT_ID: z.string().default('cram94-manage-system'),
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
 });
 
 export const config = envSchema.parse(process.env);

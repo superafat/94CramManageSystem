@@ -1,5 +1,7 @@
 import PQueue from 'p-queue';
 import { logger } from './logger';
+import { getRedis } from '@94cram/shared/redis';
+import { checkTelegramGlobalRate } from './rate-limit';
 
 // ── P1: Broadcast Queue System ──
 // Ready for Pub/Sub upgrade (currently local queue)
@@ -47,13 +49,26 @@ export async function enqueueBroadcast(
 
   broadcastJobs.set(jobId, job);
 
+  // Persist job to Redis (fire-and-forget, 24h TTL)
+  const redis = getRedis();
+  if (redis) {
+    redis.set(`broadcast:job:${jobId}`, JSON.stringify(job), { ex: 86400 }).catch(() => {});
+  }
+
   // Add to queue
   broadcastQueue.add(async () => {
     job.status = 'processing';
-    logger.info(`[Broadcast] Starting job ${jobId} to ${chatIds.length} users`);
+    logger.info({ jobId, total: chatIds.length }, '[Broadcast] Starting job');
+
+    let messagesSinceLastUpdate = 0;
 
     for (const chatId of chatIds) {
       await broadcastRateQueue.add(async () => {
+        // Global rate guard across all instances
+        while (!(await checkTelegramGlobalRate())) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+
         try {
           // Dynamic import to avoid circular deps
           const { sendMessage } = await import('../utils/telegram.js');
@@ -63,18 +78,45 @@ export async function enqueueBroadcast(
           job.progress.failed++;
           logger.error({ err: err instanceof Error ? err : new Error(String(err)) }, `[Broadcast] Failed to send to ${chatId}`)
         }
+
+        // Update Redis progress every 10 messages (fire-and-forget)
+        messagesSinceLastUpdate++;
+        if (messagesSinceLastUpdate >= 10) {
+          messagesSinceLastUpdate = 0;
+          const r = getRedis();
+          if (r) {
+            r.set(`broadcast:job:${jobId}`, JSON.stringify(job), { ex: 86400 }).catch(() => {});
+          }
+        }
       });
     }
 
     job.status = job.progress.failed === job.progress.total ? 'failed' : 'completed';
-    logger.info(`[Broadcast] Job ${jobId} completed: ${job.progress.succeeded}/${job.progress.total} succeeded`);
+    logger.info({ jobId, succeeded: job.progress.succeeded, total: job.progress.total }, '[Broadcast] Job completed');
+
+    // Final Redis update
+    const r = getRedis();
+    if (r) {
+      r.set(`broadcast:job:${jobId}`, JSON.stringify(job), { ex: 86400 }).catch(() => {});
+    }
   });
 
   return jobId;
 }
 
-export function getBroadcastJob(jobId: string): BroadcastJob | undefined {
-  return broadcastJobs.get(jobId);
+export async function getBroadcastJob(jobId: string): Promise<BroadcastJob | undefined> {
+  // Fast path: local map
+  const local = broadcastJobs.get(jobId);
+  if (local) return local;
+
+  // Fallback: Redis (cross-instance lookup)
+  const redis = getRedis();
+  if (!redis) return undefined;
+  try {
+    return await redis.get<BroadcastJob>(`broadcast:job:${jobId}`) ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function listBroadcastJobs(): BroadcastJob[] {

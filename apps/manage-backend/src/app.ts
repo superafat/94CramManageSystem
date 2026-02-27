@@ -89,7 +89,7 @@ if (process.env.NODE_ENV !== 'production') {
 app.use('/api/*', async (c, next) => {
   if (c.req.method === 'OPTIONS') return next()
   const ip = getClientIP(c)
-  const result = checkRateLimit(`api:${ip}`, { maxRequests: 100 })
+  const result = await checkRateLimit(`api:${ip}`, { maxRequests: 100 })
   if (!result.allowed) {
     return c.json({ error: 'Too many requests. Please try again later.' }, 429)
   }

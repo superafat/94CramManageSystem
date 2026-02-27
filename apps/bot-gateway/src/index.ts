@@ -4,9 +4,13 @@ import { config } from './config';
 import { firestore } from './firestore/client';
 import { initRateLimitStore } from './utils/rate-limit';
 import { logger } from './utils/logger';
+import { isRedisAvailable } from '@94cram/shared/redis';
 
 // Initialise shared rate-limit store so all Cloud Run instances share state
-initRateLimitStore(firestore);
+// Skip Firestore sync when Redis is available (Redis handles distributed state)
+if (!isRedisAvailable()) {
+  initRateLimitStore(firestore);
+}
 
 const port = config.PORT;
 logger.info(`🤖 蜂神榜 補習班 Ai 助手系統 Gateway starting on port ${port}...`);

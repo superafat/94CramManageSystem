@@ -5,9 +5,13 @@
  * 支援記憶體或 Redis 儲存
  */
 import { Context, Next } from 'hono'
+import { UpstashRedisStore, isRedisAvailable } from '@94cram/shared/redis'
 
 // 記憶體儲存（適合單一實例）
 const inMemoryStore: Map<string, { count: number; resetTime: number }> = new Map()
+
+// Redis store singleton（Redis 可用時才建立）
+const redisStore = isRedisAvailable() ? new UpstashRedisStore() : undefined
 
 // Redis 儲存介面（可選）
 interface RedisStore {
@@ -31,21 +35,24 @@ const defaultConfig: Record<string, RateLimitConfig> = {
     windowMs: 24 * 60 * 60 * 1000, // 24 小時
     maxRequests: 3,
     message: '您已超過試用申請次數上限，請明天再試',
-    keyPrefix: 'rl:trial'
+    keyPrefix: 'rl:trial',
+    store: redisStore
   },
   // 登入 - 每分鐘最多 10 次（防止暴力破解）
   'login': {
     windowMs: 60 * 1000, // 1 分鐘
     maxRequests: 10,
     message: '登入嘗試次數過多，請稍後再試',
-    keyPrefix: 'rl:login'
+    keyPrefix: 'rl:login',
+    store: redisStore
   },
   // 一般 API - 每分鐘最多 100 次（預設）
   'default': {
     windowMs: 60 * 1000, // 1 分鐘
     maxRequests: 100,
     message: '請求過於頻繁，請稍後再試',
-    keyPrefix: 'rl:api'
+    keyPrefix: 'rl:api',
+    store: redisStore
   }
 }
 

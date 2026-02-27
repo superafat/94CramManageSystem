@@ -42,7 +42,7 @@ app.use('/api/*', bodyLimit({ maxSize: 1024 * 1024 }));
 app.use('/api/auth/*', async (c, next) => {
   if (c.req.method === 'OPTIONS') return next();
   const ip = getClientIP(c);
-  const result = checkRateLimit(`auth:${ip}`, { maxRequests: 10 });
+  const result = await checkRateLimit(`auth:${ip}`, { maxRequests: 10 });
   if (!result.allowed) {
     return c.json({ error: 'Too many requests. Please try again later.' }, 429);
   }
@@ -53,7 +53,7 @@ app.use('/api/auth/*', async (c, next) => {
 app.use('/api/*', async (c, next) => {
   if (c.req.method === 'OPTIONS') return next();
   const ip = getClientIP(c);
-  const result = checkRateLimit(`api:${ip}`, { maxRequests: 100 });
+  const result = await checkRateLimit(`api:${ip}`, { maxRequests: 100 });
   if (!result.allowed) {
     return c.json({ error: 'Too many requests. Please try again later.' }, 429);
   }

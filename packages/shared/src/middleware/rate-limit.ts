@@ -1,7 +1,8 @@
 /**
  * 共用 Rate Limiter — 所有後端使用同一實作
- * In-memory Map-based，適合單 Cloud Run 實例
+ * Redis-backed when available，fallback 到 in-memory Map
  */
+import { getRedis } from '../redis'
 
 interface RateLimitEntry {
   count: number
@@ -59,7 +60,7 @@ export function clearRateLimitTimer() {
   }
 }
 
-export function checkRateLimit(key: string, config: RateLimitConfig = {}): RateLimitResult {
+export async function checkRateLimit(key: string, config: RateLimitConfig = {}): Promise<RateLimitResult> {
   ensureCleanup()
 
   const {
@@ -71,6 +72,48 @@ export function checkRateLimit(key: string, config: RateLimitConfig = {}): RateL
   } = config
 
   const now = Date.now()
+
+  // Redis path — blocking 保持 in-memory
+  const redis = getRedis()
+  if (redis) {
+    // 先檢查 in-memory blocking（安全功能 per-instance）
+    const entry = store.get(key)
+    if (entry?.blocked && entry.blockedUntil && now < entry.blockedUntil) {
+      return { allowed: false, blocked: true, remaining: 0, resetAt: entry.blockedUntil }
+    }
+
+    const redisKey = `rl:shared:${key}`
+    try {
+      const count = await redis.incr(redisKey)
+      if (count === 1) {
+        await redis.pexpire(redisKey, windowMs)
+      }
+      const allowed = count <= maxRequests
+
+      if (!allowed && enableBlocking) {
+        const violations = (violationCount.get(key) || 0) + 1
+        violationCount.set(key, violations)
+        if (violations >= blockAfterViolations) {
+          const blockEntry = store.get(key) || { count, resetAt: now + windowMs }
+          blockEntry.blocked = true
+          blockEntry.blockedUntil = now + blockDurationMs
+          store.set(key, blockEntry)
+          return { allowed: false, blocked: true, remaining: 0, resetAt: now + blockDurationMs }
+        }
+      }
+
+      return {
+        allowed,
+        blocked: false,
+        remaining: Math.max(0, maxRequests - count),
+        resetAt: Date.now() + windowMs,
+      }
+    } catch {
+      // Redis 失敗，fallback 到 in-memory
+    }
+  }
+
+  // In-memory path
   const entry = store.get(key)
 
   // 檢查是否被封鎖

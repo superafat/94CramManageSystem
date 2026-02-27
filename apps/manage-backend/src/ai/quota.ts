@@ -1,4 +1,5 @@
 import type { ProviderName } from './providers/types'
+import { getRedis } from '@94cram/shared/redis'
 
 export interface QuotaUsage {
   provider: ProviderName
@@ -57,6 +58,19 @@ export class QuotaManager {
 
     // 清理超過 24 小時的記錄
     this.cleanupOldRecords(provider)
+
+    // Redis fire-and-forget sync（跨實例追蹤）
+    const redis = getRedis()
+    if (redis) {
+      const minKey = `quota:${provider}:min:${Math.floor(Date.now() / 60000)}`
+      const dayKey = `quota:${provider}:day:${new Date().toISOString().slice(0, 10)}`
+      const costKey = `quota:${provider}:cost:${new Date().toISOString().slice(0, 10)}`
+      Promise.all([
+        redis.incr(minKey).then(() => redis.pexpire(minKey, 120000)),
+        redis.incr(dayKey).then(() => redis.pexpire(dayKey, 90000000)),
+        redis.incrbyfloat(costKey, cost).then(() => redis.pexpire(costKey, 90000000)),
+      ]).catch(() => {})
+    }
   }
 
   getStats(provider: ProviderName): QuotaStats {
@@ -100,7 +114,23 @@ export class QuotaManager {
     }
   }
 
-  checkLimit(provider: ProviderName): boolean {
+  async checkLimit(provider: ProviderName): Promise<boolean> {
+    const redis = getRedis()
+    if (redis) {
+      try {
+        const limits = this.limits.get(provider)
+        if (!limits) return true
+        const [minCount, dayCount, dayCost] = await Promise.all([
+          redis.get<number>(`quota:${provider}:min:${Math.floor(Date.now() / 60000)}`),
+          redis.get<number>(`quota:${provider}:day:${new Date().toISOString().slice(0, 10)}`),
+          redis.get<number>(`quota:${provider}:cost:${new Date().toISOString().slice(0, 10)}`),
+        ])
+        return (minCount ?? 0) < limits.requestsPerMinute
+            && (dayCount ?? 0) < limits.requestsPerDay
+            && (dayCost ?? 0) < limits.costPerDay
+      } catch { /* fall through to local */ }
+    }
+    // Fallback to local
     const stats = this.getStats(provider)
     return !stats.isLimited
   }

@@ -2,6 +2,7 @@
 import { Context } from 'grammy';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { logger } from '../utils/logger'
+import { getRedis } from '@94cram/shared/redis'
 
 // ==================== 類型定義 ====================
 
@@ -35,6 +36,15 @@ interface ConversationContext {
 
 const conversations = new Map<number, ConversationContext>();
 const TIMEOUT_MS = 30 * 60 * 1000; // 30 分鐘
+
+// ==================== Redis 同步 ====================
+
+function syncConvToRedis(chatId: number) {
+  const redis = getRedis()
+  const conv = conversations.get(chatId)
+  if (!redis || !conv) return
+  redis.set(`enroll:conv:${chatId}`, JSON.stringify(conv), { ex: 1800 }).catch(() => {})
+}
 
 // ==================== AI AI 初始化 ====================
 
@@ -126,6 +136,7 @@ function updateState(chatId: number, newState: EnrollmentState, data?: Partial<C
   if (data) {
     conv.data = { ...conv.data, ...data };
   }
+  syncConvToRedis(chatId);
 }
 
 /**
@@ -134,11 +145,12 @@ function updateState(chatId: number, newState: EnrollmentState, data?: Partial<C
 function addMessage(chatId: number, role: 'user' | 'assistant', content: string) {
   const conv = getConversation(chatId);
   conv.messageHistory.push({ role, content });
-  
+
   // 保留最近 20 條訊息
   if (conv.messageHistory.length > 20) {
     conv.messageHistory = conv.messageHistory.slice(-20);
   }
+  syncConvToRedis(chatId);
 }
 
 /**
@@ -497,6 +509,8 @@ export async function handleEnrollmentConversation(ctx: Context) {
  */
 export function resetConversation(chatId: number) {
   conversations.delete(chatId);
+  const redis = getRedis()
+  if (redis) redis.del(`enroll:conv:${chatId}`).catch(() => {})
 }
 
 /**

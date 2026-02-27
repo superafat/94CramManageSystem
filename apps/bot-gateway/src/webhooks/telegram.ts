@@ -30,7 +30,7 @@ telegramWebhook.post('/', async (c) => {
   if (!msg) return c.json({ ok: true });
 
   // Rate limit
-  if (!checkRateLimit(msg.userId)) {
+  if (!await checkRateLimit(msg.userId)) {
     await sendMessage(msg.chatId, '⚠️ 操作太頻繁，請稍後再試');
     return c.json({ ok: true });
   }

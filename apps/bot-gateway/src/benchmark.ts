@@ -18,7 +18,7 @@ const totalRequests = 100;
 // 瞬間發送 100 個請求，測試速率限制
 const start = Date.now();
 for (let i = 0; i < totalRequests; i++) {
-  if (checkRateLimit(userId)) {
+  if (await checkRateLimit(userId)) {
     allowed++;
   } else {
     denied++;
@@ -80,7 +80,7 @@ console.log(`已加入廣播佇列: ${jobId}`);
 
 // 檢查 job 狀態
 await new Promise(r => setTimeout(r, 100));
-const job = getBroadcastJob(jobId);
+const job = await getBroadcastJob(jobId);
 if (job) {
   console.log(`Job 狀態: ${job.status}`);
   console.log(`Progress: ${job.progress.succeeded}/${job.progress.total}`);

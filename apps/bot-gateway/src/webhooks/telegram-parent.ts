@@ -27,7 +27,7 @@ telegramParentWebhook.post('/', async (c) => {
   if (!msg) return c.json({ ok: true });
 
   // Rate limit
-  if (!checkRateLimit(`parent_${msg.userId}`)) {
+  if (!await checkRateLimit(`parent_${msg.userId}`)) {
     await sendMessage(msg.chatId, '⚠️ 操作太頻繁，請稍後再試', undefined, 'parent');
     return c.json({ ok: true });
   }
