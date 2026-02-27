@@ -1,10 +1,19 @@
 // 共用 Schema - tenants, users, branches, permissions
-import { pgTable, serial, varchar, uuid, timestamp, boolean, text, index } from '../connection';
+import { pgTable, serial, varchar, uuid, timestamp, boolean, text, jsonb, index } from '../connection';
 
 export const tenants = pgTable('tenants', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 255 }).notNull(),
   slug: varchar('slug', { length: 100 }).notNull().unique(),
+  status: varchar('status', { length: 20 }).default('active'),
+  settings: jsonb('settings').default({}),
+  // Trial system fields
+  trialStatus: varchar('trial_status', { length: 20 }).default('none'),
+  trialStartAt: timestamp('trial_start_at'),
+  trialEndAt: timestamp('trial_end_at'),
+  trialApprovedBy: uuid('trial_approved_by'),
+  trialApprovedAt: timestamp('trial_approved_at'),
+  trialNotes: text('trial_notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -24,6 +33,7 @@ export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').references(() => tenants.id),
   branchId: uuid('branch_id').references(() => branches.id),
+  username: varchar('username', { length: 100 }).unique(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   passwordHash: varchar('password_hash', { length: 255 }).notNull(),
   name: varchar('name', { length: 100 }).notNull(),
@@ -31,6 +41,7 @@ export const users = pgTable('users', {
   permissions: text('permissions').array(),
   isActive: boolean('is_active').default(true),
   lastLoginAt: timestamp('last_login_at'),
+  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => ({

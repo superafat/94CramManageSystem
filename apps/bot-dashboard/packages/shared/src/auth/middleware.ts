@@ -3,8 +3,14 @@
  * 三個系統共用：manage / inclass / stock
  */
 import type { Context, Next } from 'hono';
+import { timingSafeEqual } from 'node:crypto';
 import { verify, type JWTPayload } from './jwt';
 import { extractToken } from './cookie';
+
+function safeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
 
 /**
  * JWT Auth Middleware Factory
@@ -57,7 +63,7 @@ export function createInternalKeyMiddleware() {
 
   return async (c: Context, next: Next) => {
     const key = c.req.header('X-Internal-Key');
-    if (!INTERNAL_API_KEY || !key || key !== INTERNAL_API_KEY) {
+    if (!INTERNAL_API_KEY || !key || !safeCompare(key, INTERNAL_API_KEY)) {
       return c.json({ error: 'Forbidden' }, 403);
     }
     await next();
@@ -75,5 +81,5 @@ export function getAuthUser(c: Context): JWTPayload {
 export function verifyInternalKey(key: string): boolean {
   const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
   if (!INTERNAL_API_KEY) return false;
-  return key === INTERNAL_API_KEY;
+  return safeCompare(key, INTERNAL_API_KEY);
 }

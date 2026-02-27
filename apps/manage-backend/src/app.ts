@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { secureHeaders } from 'hono/secure-headers'
 import { compress } from 'hono/compress'
 import { bodyLimit } from 'hono/body-limit'
+import { timingSafeEqual } from 'node:crypto'
 import { botRoutes } from './routes/bot'
 import { authRoutes, handleDemoLogin } from './routes/auth'
 import { adminRoutes } from './routes/admin'
@@ -26,6 +27,11 @@ import { sql } from 'drizzle-orm'
 import { initializeEventSystem } from './events'
 import { createSuccessResponse } from './types/api-response'
 import { logger } from './utils/logger'
+
+function safeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
+}
 
 // Run migrations on startup
 runMigrations().catch((err) => logger.error({ err }, 'Migration failed'))
@@ -71,7 +77,11 @@ app.use('*', cors({
     gcpOrigin('cram94-stock-dashboard'),
     gcpOrigin('cram94-stock-backend'),
     gcpOrigin('cram94-portal'),
-    // Custom domain
+    // Custom domains (94cram.app)
+    'https://manage.94cram.app',
+    'https://inclass.94cram.app',
+    'https://stock.94cram.app',
+    // Custom domains (94cram.com)
     'https://manage.94cram.com',
     'https://inclass.94cram.com',
     'https://stock.94cram.com',
@@ -135,14 +145,14 @@ app.route('/api/line', lineRoutes)
 if (process.env.NODE_ENV === 'production') {
   app.use('/api/bot/*', async (c, next) => {
     const key = c.req.header('X-Bot-Key')
-    if (!key || key !== process.env.BOT_API_KEY) {
+    if (!key || !process.env.BOT_API_KEY || !safeCompare(key, process.env.BOT_API_KEY)) {
       return c.json({ error: 'Unauthorized' }, 401)
     }
     await next()
   })
   app.use('/api/bot-ext/*', async (c, next) => {
     const key = c.req.header('X-Bot-Key')
-    if (!key || key !== process.env.BOT_API_KEY) {
+    if (!key || !process.env.BOT_API_KEY || !safeCompare(key, process.env.BOT_API_KEY)) {
       return c.json({ error: 'Unauthorized' }, 401)
     }
     await next()

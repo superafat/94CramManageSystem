@@ -26,6 +26,12 @@ app.use('/*', cors({
     'https://inclass.94cram.app',
     gcpOrigin('cram94-inclass-dashboard'),
     gcpOrigin('cram94-portal'),
+    // Custom domains (94cram.com)
+    'https://stock.94cram.com',
+    'https://manage.94cram.com',
+    'https://inclass.94cram.com',
+    'https://94cram.com',
+    // Local development
     'http://localhost:3000',
     'http://localhost:3200',
     'http://localhost:3201',
@@ -62,6 +68,11 @@ app.use('/api/*', async (c, next) => {
 
 app.get('/', (c) => {
   return c.json({ message: '94Stock API' });
+});
+
+// Health check — Cloud Run uses this to determine instance readiness
+app.get('/health', (c) => {
+  return c.json({ service: '94stock', status: 'ok', timestamp: Date.now() });
 });
 
 app.route('/api', routes);

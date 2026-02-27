@@ -1,6 +1,6 @@
 // 94Manage Schema - 學員管理專屬表
 import { pgTable, uuid, varchar, text, timestamp, boolean, integer, decimal, jsonb, uniqueIndex, index } from '../connection';
-import { tenants, users } from './common';
+import { tenants, users, branches } from './common';
 
 // 課程
 export const manageCourses = pgTable('manage_courses', {
@@ -121,4 +121,24 @@ export const manageLeads = pgTable('manage_leads', {
 }, (table) => ({
   tenantIdx: index('manage_leads_tenant_id_idx').on(table.tenantId),
   tenantStatusIdx: index('manage_leads_tenant_status_idx').on(table.tenantId, table.status),
+}));
+
+// AI 對話記錄
+export const conversations = pgTable('conversations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id),
+  branchId: uuid('branch_id').references(() => branches.id),
+  userId: uuid('user_id').references(() => users.id),
+  channel: varchar('channel', { length: 20 }).notNull().default('web'),
+  intent: varchar('intent', { length: 30 }),
+  query: text('query').notNull(),
+  answer: text('answer').notNull(),
+  model: text('model'),
+  latencyMs: integer('latency_ms'),
+  tokensUsed: integer('tokens_used'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  tenantIdx: index('conversations_tenant_id_idx').on(table.tenantId),
+  branchIdx: index('conversations_branch_id_idx').on(table.branchId),
+  createdAtIdx: index('conversations_created_at_idx').on(table.createdAt),
 }));
