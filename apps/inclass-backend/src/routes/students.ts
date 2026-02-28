@@ -23,12 +23,7 @@ const studentSchema = z.object({
 const studentUpdateSchema = studentSchema.partial().refine((data) => Object.keys(data).length > 0, 'At least one field is required')
 const studentIdParamSchema = z.object({ id: z.string().uuid('Invalid student ID format') })
 const listStudentsQuerySchema = z.object({ page: z.coerce.number().int().min(1).max(1000).default(1), limit: z.coerce.number().int().min(1).max(100).default(50) })
-const schoolIdSchema = z.string().uuid('Invalid school ID format')
-const requireSchoolId = (schoolId: string | undefined): string | null => {
-  if (typeof schoolId !== 'string') return null
-  const parsed = schoolIdSchema.safeParse(schoolId.trim())
-  return parsed.success ? parsed.data : null
-}
+const requireSchoolId = (schoolId: string | undefined) => (typeof schoolId === 'string' && schoolId.trim() ? schoolId : null)
 
 studentsRouter.get('/', zValidator('query', listStudentsQuerySchema), async (c) => {
   try {

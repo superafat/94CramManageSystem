@@ -104,7 +104,10 @@ export default function Home() {
 
   const fetchAlerts = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/alerts`, { credentials: 'include' })
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch(`${API_BASE}/api/alerts`, { credentials: 'include', headers })
       const data: { alerts?: AlertNotification[] } = res.ok ? await res.json() : { alerts: [] }
       if (data.alerts) setAlerts(data.alerts)
     } catch (e) {
@@ -265,7 +268,7 @@ export default function Home() {
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
           <span style={{ fontSize: '16px', marginTop: '2px' }}>💡</span>
           <div style={{ flex: 1, fontSize: '12px', color: '#4A7C98', lineHeight: 1.5 }}>
-            <strong>提示：</strong>學生資料建議使用 <a href="https://hivemind-dashboard-855393865280.asia-east1.run.app" target="_blank" rel="noopener" style={{ color: '#3A6C88', textDecoration: 'underline', fontWeight: '500' }}>蜂神榜 Ai 管理系統</a> 統一管理。<br/>
+            <strong>提示：</strong>學生資料建議使用 <a href="https://cram94-manage-dashboard-1015149159553.asia-east1.run.app" target="_blank" rel="noopener" style={{ color: '#3A6C88', textDecoration: 'underline', fontWeight: '500' }}>蜂神榜 Ai 管理系統</a> 統一管理。<br/>
             蜂神榜 Ai 點名系統 專注於<strong>教學前線</strong>（點名、成績）。
           </div>
         </div>

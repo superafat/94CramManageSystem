@@ -78,9 +78,16 @@ interface NotificationInput {
 }
 
 function getAuthHeaders(): HeadersInit {
-  return {
+  const headers: HeadersInit = {
     'Content-Type': 'application/json',
   }
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('token')
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+  }
+  return headers
 }
 
 // Sleep utility for retry delays

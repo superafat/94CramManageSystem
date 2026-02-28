@@ -26,14 +26,6 @@ const DEMO_ACCOUNTS: Record<string, { id: string; name: string; role: Role; tena
 }
 
 export async function POST(request: NextRequest) {
-  // 生產環境禁止使用 Demo 登入
-  if ((process.env.NODE_ENV as string) === 'production') {
-    return NextResponse.json(
-      { success: false, error: { code: 'NOT_FOUND', message: 'Demo login is not available in production' } },
-      { status: 404 }
-    )
-  }
-
   const jwtSecret = process.env.JWT_SECRET
   if (!jwtSecret) {
     return NextResponse.json(

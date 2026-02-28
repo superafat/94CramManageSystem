@@ -110,7 +110,7 @@ export default function DashboardPage() {
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
           <span style={{ fontSize: '16px', marginTop: '2px' }}>💡</span>
           <div style={{ flex: 1, fontSize: '12px', color: '#8B6914', lineHeight: 1.5 }}>
-            <strong>提示：</strong>完整營運報表（財務、招生、流失預警）請使用 <a href="https://hivemind-dashboard-855393865280.asia-east1.run.app" target="_blank" rel="noopener" style={{ color: '#6B5014', textDecoration: 'underline', fontWeight: '500' }}>蜂神榜 Ai 管理系統</a>。<br/>
+            <strong>提示：</strong>完整營運報表（財務、招生、流失預警）請使用 <a href="https://cram94-manage-dashboard-1015149159553.asia-east1.run.app" target="_blank" rel="noopener" style={{ color: '#6B5014', textDecoration: 'underline', fontWeight: '500' }}>蜂神榜 Ai 管理系統</a>。<br/>
             這裡只顯示<strong>教室即時狀態</strong>。
           </div>
         </div>

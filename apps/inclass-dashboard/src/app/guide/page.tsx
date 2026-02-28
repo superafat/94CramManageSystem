@@ -121,7 +121,7 @@ export default function GuidePage() {
           </div>
 
           <a 
-            href="https://hivemind-dashboard-855393865280.asia-east1.run.app" 
+            href="https://cram94-manage-dashboard-1015149159553.asia-east1.run.app" 
             target="_blank" 
             rel="noopener"
             style={{ display: 'inline-block', marginTop: '16px', padding: '10px 20px', background: 'var(--accent)', color: 'white', borderRadius: 'var(--radius-sm)', textDecoration: 'none', fontWeight: 'bold' }}

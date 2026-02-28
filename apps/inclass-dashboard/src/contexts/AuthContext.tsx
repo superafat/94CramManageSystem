@@ -57,8 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchMe = async () => {
     try {
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
       const res = await fetch(`${API_BASE}/api/auth/me`, {
-        credentials: 'include'
+        credentials: 'include',
+        headers,
       })
       if (res.ok) {
         const text = await res.text()
@@ -109,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user)
     setSchool(data.school)
     localStorage.setItem('user', JSON.stringify(data.user))
+    if (data.token) localStorage.setItem('token', data.token)
     router.push('/')
   }
 
@@ -161,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSchool(data.school)
     localStorage.setItem('user', JSON.stringify(data.user))
     localStorage.setItem('school', JSON.stringify(data.school))
+    if (data.token) localStorage.setItem('token', data.token)
     router.push('/main')
   }
 
@@ -169,6 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSchool(null)
     localStorage.removeItem('user')
     localStorage.removeItem('school')
+    localStorage.removeItem('token')
     fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch((err) => { console.warn('Logout request failed:', err) })
     router.push('/login')
   }
