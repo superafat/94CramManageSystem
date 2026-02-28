@@ -15,6 +15,8 @@ import { checkRateLimit } from '../utils/rate-limit';
 import { incrementUsage } from '../firestore/usage';
 import { logger } from '../utils/logger';
 import type { TelegramUpdate } from '../utils/telegram';
+import { getDemoSession, handleDemoStart, handleDemoExit, handleDemoMessage, handleDemoCallback } from '../demo/index.js';
+import { getMemoryContext, recordTurn } from '../memory/index.js';
 
 export const telegramWebhook = new Hono();
 
@@ -38,6 +40,14 @@ telegramWebhook.post('/', async (c) => {
   // Callback query (confirm/cancel)
   if (msg.messageType === 'callback') {
     try {
+      // Demo callbacks
+      if (msg.content.startsWith('demo_confirm:') || msg.content.startsWith('demo_cancel:')) {
+        const demoSess = getDemoSession('admin', msg.userId);
+        if (demoSess) {
+          await handleDemoCallback(msg, demoSess);
+          return c.json({ ok: true });
+        }
+      }
       await handleCallback(msg);
     } catch (error) {
       logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Telegram] handleCallback error')
@@ -83,6 +93,36 @@ telegramWebhook.post('/', async (c) => {
     return c.json({ ok: true });
   }
 
+  // Demo mode
+  if (text === '/demo') {
+    try {
+      await handleDemoStart(msg.chatId, msg.userId, 'admin');
+    } catch (error) {
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Telegram] handleDemoStart error');
+    }
+    return c.json({ ok: true });
+  }
+  if (text === '/exit') {
+    try {
+      await handleDemoExit(msg.chatId, msg.userId, 'admin');
+    } catch (error) {
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Telegram] handleDemoExit error');
+    }
+    return c.json({ ok: true });
+  }
+
+  // Demo mode intercept (before auth check)
+  const demoSession = getDemoSession('admin', msg.userId);
+  if (demoSession) {
+    try {
+      await handleDemoMessage(msg, demoSession);
+    } catch (error) {
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Telegram] handleDemoMessage error');
+      await sendMessage(msg.chatId, '⚠️ Demo 操作失敗，請稍後再試');
+    }
+    return c.json({ ok: true });
+  }
+
   // Auth check
   const auth = await authenticate(msg.userId);
   if (!auth) {
@@ -95,8 +135,11 @@ telegramWebhook.post('/', async (c) => {
 
   // AI intent parsing
   try {
-    const cache = await getCache(auth.tenantId);
-    const intent = await parseIntent(text, cache);
+    const [cache, memoryCtx] = await Promise.all([
+      getCache(auth.tenantId),
+      getMemoryContext('admin', msg.userId, auth.tenantId),
+    ]);
+    const intent = await parseIntent(text, cache, memoryCtx);
 
     // Track AI usage (fire-and-forget)
     incrementUsage(auth.tenantId, 'ai_calls').catch((err: unknown) => {
@@ -105,11 +148,13 @@ telegramWebhook.post('/', async (c) => {
 
     if (intent.need_clarification) {
       await sendMessage(msg.chatId, `🤔 ${intent.clarification_question}`);
+      recordTurn('admin', msg.userId, auth.tenantId, text, intent.clarification_question ?? '沒聽懂', intent.intent);
       return c.json({ ok: true });
     }
 
     if (intent.intent === 'unknown') {
       await sendMessage(msg.chatId, '🤔 我沒聽懂，可以換個方式說嗎？\n輸入 /help 查看使用說明');
+      recordTurn('admin', msg.userId, auth.tenantId, text, '沒聽懂', intent.intent);
       return c.json({ ok: true });
     }
 
@@ -136,6 +181,8 @@ telegramWebhook.post('/', async (c) => {
         logger.error({ err: err instanceof Error ? err : new Error(String(err)) }, '[Webhook] Failed to increment api_calls usage')
       });
       await sendMessage(msg.chatId, formatResponse(result));
+      // Record conversation turn (fire-and-forget)
+      recordTurn('admin', msg.userId, auth.tenantId, text, formatResponse(result), intent.intent);
       return c.json({ ok: true });
     }
 

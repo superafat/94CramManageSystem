@@ -13,6 +13,9 @@ import { getAdminChatId } from '../firestore/admin-lookup';
 import { logger } from '../utils/logger';
 import type { TelegramUpdate } from '../utils/telegram';
 import type { ParentBinding, ParentChild } from '../firestore/parent-bindings';
+import { getDemoSession, handleDemoStart, handleDemoExit, handleDemoMessage } from '../demo/index.js';
+import { getMemoryContext, recordTurn } from '../memory/index.js';
+import type { MemoryContext } from '../memory/types.js';
 
 // Map AI intents to parent execution intents
 const AI_INTENT_MAP: Record<string, ParentIntent> = {
@@ -66,12 +69,13 @@ function matchChildFromAI(
 
 async function smartParseIntent(
   text: string,
-  binding: ParentBinding
+  binding: ParentBinding,
+  memoryCtx?: MemoryContext
 ): Promise<{ result: ParentIntentResult; clarification?: string }> {
   // Try AI first
   try {
     const parentCtx = buildParentContext(binding);
-    const ai = await parseParentIntentAI(text, parentCtx);
+    const ai = await parseParentIntentAI(text, parentCtx, memoryCtx ?? null);
 
     if (ai.need_clarification && ai.clarification_question) {
       return {
@@ -148,6 +152,36 @@ telegramParentWebhook.post('/', async (c) => {
     return c.json({ ok: true });
   }
 
+  // Demo mode
+  if (text === '/demo') {
+    try {
+      await handleDemoStart(msg.chatId, msg.userId, 'parent');
+    } catch (error) {
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[ParentBot] handleDemoStart error');
+    }
+    return c.json({ ok: true });
+  }
+  if (text === '/exit') {
+    try {
+      await handleDemoExit(msg.chatId, msg.userId, 'parent');
+    } catch (error) {
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[ParentBot] handleDemoExit error');
+    }
+    return c.json({ ok: true });
+  }
+
+  // Demo mode intercept
+  const demoSession = getDemoSession('parent', msg.userId);
+  if (demoSession) {
+    try {
+      await handleDemoMessage(msg, demoSession);
+    } catch (error) {
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[ParentBot] handleDemoMessage error');
+      await sendMessage(msg.chatId, '⚠️ Demo 操作失敗，請稍後再試', undefined, 'parent');
+    }
+    return c.json({ ok: true });
+  }
+
   // Auth check: parent must be bound
   const binding = await getParentBinding(msg.userId);
   if (!binding) {
@@ -173,11 +207,15 @@ telegramParentWebhook.post('/', async (c) => {
       return c.json({ ok: true });
     }
 
-    const { result: intentResult, clarification } = await smartParseIntent(text, binding);
+    // Fetch memory context
+    const memoryCtx = await getMemoryContext('parent', msg.userId, binding.tenant_id);
+
+    const { result: intentResult, clarification } = await smartParseIntent(text, binding, memoryCtx);
 
     // AI asked for clarification
     if (clarification) {
       await sendMessage(msg.chatId, `🤔 ${clarification}`, undefined, 'parent');
+      recordTurn('parent', msg.userId, binding.tenant_id, text, clarification, intentResult.intent);
       return c.json({ ok: true });
     }
 
@@ -192,6 +230,7 @@ telegramParentWebhook.post('/', async (c) => {
       const kbAnswer = await tryKnowledgeBase(text, binding.tenant_id);
       if (kbAnswer) {
         await sendMessage(msg.chatId, kbAnswer, undefined, 'parent');
+        recordTurn('parent', msg.userId, binding.tenant_id, text, kbAnswer, intentResult.intent);
         return c.json({ ok: true });
       }
     }
@@ -199,6 +238,7 @@ telegramParentWebhook.post('/', async (c) => {
     // Execute intent via real API
     const response = await executeParentIntent(intentResult, binding);
     await sendMessage(msg.chatId, response, undefined, 'parent');
+    recordTurn('parent', msg.userId, binding.tenant_id, text, response, intentResult.intent);
   } catch (error) {
     logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[ParentBot] Error processing message')
     await sendMessage(msg.chatId, '⚠️ 系統發生錯誤，請稍後再試', undefined, 'parent');

@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config';
 import type { TenantCache } from '../firestore/cache';
+import type { MemoryContext } from '../memory/types.js';
 
 const genAI = new GoogleGenerativeAI(config.GEMINI_API_KEY);
 
@@ -354,7 +355,8 @@ export const PARENT_BOT_SYSTEM_PROMPT = buildParentSystemPrompt(null);
 
 export async function parseIntent(
   userMessage: string,
-  cache: TenantCache | null
+  cache: TenantCache | null,
+  memoryCtx?: MemoryContext | null
 ): Promise<IntentResult> {
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash-lite',
@@ -364,10 +366,15 @@ export async function parseIntent(
     },
   });
 
-  const systemPrompt = buildAdminSystemPrompt(cache);
+  const systemPrompt = buildAdminSystemPrompt(cache) + (memoryCtx?.memoryPromptSection ?? '');
+
+  const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [
+    ...(memoryCtx?.conversationHistory ?? []),
+    { role: 'user', parts: [{ text: userMessage }] },
+  ];
 
   const result = await model.generateContent({
-    contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+    contents,
     systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
   });
 
@@ -387,7 +394,8 @@ export async function parseIntent(
 
 export async function parseParentIntent(
   userMessage: string,
-  parentCtx: ParentContext | null
+  parentCtx: ParentContext | null,
+  memoryCtx?: MemoryContext | null
 ): Promise<IntentResult> {
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash-lite',
@@ -397,10 +405,15 @@ export async function parseParentIntent(
     },
   });
 
-  const systemPrompt = buildParentSystemPrompt(parentCtx);
+  const systemPrompt = buildParentSystemPrompt(parentCtx) + (memoryCtx?.memoryPromptSection ?? '');
+
+  const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [
+    ...(memoryCtx?.conversationHistory ?? []),
+    { role: 'user', parts: [{ text: userMessage }] },
+  ];
 
   const result = await model.generateContent({
-    contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+    contents,
     systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
   });
 

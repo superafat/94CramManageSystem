@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ChatDemo } from '@/components/demo'
 
 export default function HomePage() {
   return (
@@ -91,6 +92,19 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ── 互動 Demo ── */}
+      <section className="bg-white/60 py-14 px-4">
+        <div className="mx-auto max-w-3xl">
+          <h2 className="text-2xl font-bold text-center text-[#4b4355] mb-2">
+            即時 Demo
+          </h2>
+          <p className="text-center text-[#7b7387] text-sm mb-10">
+            無需安裝，直接感受 AI 對話的威力
+          </p>
+          <ChatDemo />
         </div>
       </section>
 
