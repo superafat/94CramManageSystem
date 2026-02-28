@@ -8,10 +8,6 @@ const nextConfig: NextConfig = {
     const BACKEND_URL = process.env.BACKEND_URL || `https://cram94-manage-backend-${GCP_PROJECT_NUMBER}.asia-east1.run.app`
     return [
       {
-        source: '/api/:path*',
-        destination: `${BACKEND_URL}/api/:path*`,
-      },
-{
         source: '/health',
         destination: `${BACKEND_URL}/health`,
       },

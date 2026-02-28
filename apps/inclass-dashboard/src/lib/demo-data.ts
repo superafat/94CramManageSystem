@@ -142,6 +142,7 @@ export const DEMO_TENANT = DEMO_TENANT_ID
 export function getDemoResponse(method: string, path: string, searchParams: URLSearchParams): { status: number; body: unknown } | null {
   // GET endpoints
   if (method === 'GET') {
+    if (path === '/api/auth/me') return { status: 200, body: { id: 'demo-admin', name: 'Demo 管理員', email: 'demo@94cram.com', role: 'admin', tenantId: DEMO_TENANT_ID, branchId: 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d' } }
     if (path === '/api/students') return { status: 200, body: { students: STUDENTS } }
     if (path === '/api/classes') return { status: 200, body: { classes: CLASSES } }
     if (path === '/api/attendance/today') return { status: 200, body: getTodayAttendance() }

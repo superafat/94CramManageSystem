@@ -3,6 +3,8 @@ node_modules
 .gitignore
 .env
 .env.*
+**/.env
+**/.env.*
 *.md
 .vscode
 .idea

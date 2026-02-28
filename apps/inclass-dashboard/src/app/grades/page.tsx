@@ -263,7 +263,7 @@ export default function GradesPage() {
           {selectedExam.scores.length > 0 && (
             <div style={{ marginTop: '16px', background: 'var(--background)', borderRadius: 'var(--radius-sm)', padding: '12px' }}>
               <div style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--primary)', marginBottom: '8px' }}>🏆 排名</div>
-              {selectedExam.scores.slice(0, 5).map((s, index) => (
+              {[...selectedExam.scores].sort((a, b) => b.score - a.score).slice(0, 5).map((s, index) => (
                 <div key={s.id} style={{ padding: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                   <span>
                     {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`} {s.studentName}
