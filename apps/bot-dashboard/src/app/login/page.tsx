@@ -20,13 +20,16 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username: email, password }),
       })
 
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || '帳號或密碼錯誤')
+        const msg = typeof data.error === 'string'
+          ? data.error
+          : (data.error?.message || data.message || '帳號或密碼錯誤')
+        setError(msg)
         return
       }
 
