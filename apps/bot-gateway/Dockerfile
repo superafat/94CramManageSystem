@@ -33,4 +33,4 @@ WORKDIR /app/apps/bot-gateway
 ENV NODE_ENV=production
 USER appuser
 EXPOSE 3300
-CMD ["node", "dist/index.js"]
+CMD ["node", "--import", "tsx", "dist/index.js"]
