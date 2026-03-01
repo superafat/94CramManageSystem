@@ -218,8 +218,13 @@ telegramParentWebhook.post('/', async (c) => {
       return c.json({ ok: true });
     }
 
-    // Fetch memory context
-    const memoryCtx = await getMemoryContext('parent', msg.userId, binding.tenant_id);
+    // Fetch memory context (non-blocking — don't let memory failure break the bot)
+    let memoryCtx: MemoryContext | undefined;
+    try {
+      memoryCtx = await getMemoryContext('parent', msg.userId, binding.tenant_id);
+    } catch (memErr) {
+      logger.warn({ err: memErr instanceof Error ? memErr : new Error(String(memErr)) }, '[ParentBot] Memory context fetch failed, continuing without memory');
+    }
 
     const { result: intentResult, clarification, aiResponse } = await smartParseIntent(text, binding, memoryCtx);
 
@@ -266,7 +271,12 @@ telegramParentWebhook.post('/', async (c) => {
     recordTurn('parent', msg.userId, binding.tenant_id, text, reply, intentResult.intent);
   } catch (error) {
     logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[ParentBot] Error processing message')
-    await sendMessage(msg.chatId, '⚠️ 系統發生錯誤，請稍後再試', undefined, 'parent');
+    await sendMessage(
+      msg.chatId,
+      '不好意思，我剛剛沒接住 😅 可以再說一次嗎？\n\n您可以試試：「查出勤」「查學費」「查課表」',
+      undefined,
+      'parent'
+    );
   }
 
   return c.json({ ok: true });
