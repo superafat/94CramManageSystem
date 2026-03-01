@@ -6,6 +6,7 @@ on:
     paths:
       - 'apps/bot-gateway/**'
       - 'apps/bot-dashboard/**'
+      - 'packages/shared/**'
       - '.github/workflows/deploy-bot.yml'
 
 env:
@@ -38,8 +39,13 @@ jobs:
             .
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/bot-gateway --all-tags
 
-      - name: Deploy to Cloud Run
+      - name: Deploy to Cloud Run (no traffic)
+        id: deploy
         run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          REVISION="bot-gw-${SHORT_SHA}"
+          echo "REVISION_SUFFIX=${REVISION}" >> $GITHUB_OUTPUT
+
           gcloud run deploy cram94-bot-gateway \
             --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/bot-gateway:${{ github.sha }} \
             --region=${{ env.REGION }} \
@@ -49,8 +55,61 @@ jobs:
             --memory=512Mi \
             --min-instances=0 \
             --max-instances=10 \
+            --revision-suffix="${REVISION}" \
+            --no-traffic \
             --set-env-vars="NODE_ENV=production,MANAGE_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,INCLASS_URL=https://cram94-inclass-backend-1015149159553.asia-east1.run.app,STOCK_URL=https://cram94-stock-backend-1015149159553.asia-east1.run.app,GCP_PROJECT_ID=cram94-manage-system" \
             --set-secrets="TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_PARENT_BOT_TOKEN=TELEGRAM_PARENT_BOT_TOKEN:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,JWT_SECRET=JWT_SECRET:latest,INTERNAL_API_KEY=INTERNAL_API_KEY:latest"
+
+      - name: Verify revision is healthy
+        run: |
+          REVISION="cram94-bot-gateway-${{ steps.deploy.outputs.REVISION_SUFFIX }}"
+          echo "Checking revision: ${REVISION}"
+
+          # 等待 revision 就緒（最多 120 秒）
+          for i in $(seq 1 12); do
+            STATUS=$(gcloud run revisions describe "${REVISION}" \
+              --region=${{ env.REGION }} \
+              --format="value(status.conditions[0].status)" 2>/dev/null || echo "Unknown")
+            echo "Attempt ${i}: status = ${STATUS}"
+            if [ "${STATUS}" = "True" ]; then
+              echo "Revision is healthy!"
+              break
+            fi
+            if [ "${i}" = "12" ]; then
+              echo "::error::Revision ${REVISION} failed to become healthy after 120s"
+              # 刪除失敗的 revision
+              gcloud run revisions delete "${REVISION}" --region=${{ env.REGION }} --quiet 2>/dev/null || true
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Route traffic to new revision
+        run: |
+          REVISION="cram94-bot-gateway-${{ steps.deploy.outputs.REVISION_SUFFIX }}"
+          gcloud run services update-traffic cram94-bot-gateway \
+            --region=${{ env.REGION }} \
+            --to-revisions="${REVISION}=100"
+          echo "Traffic routed to ${REVISION}"
+
+      - name: Cleanup old revisions
+        if: always()
+        run: |
+          # 保留最新 3 個 revision，刪除其餘
+          REVISIONS=$(gcloud run revisions list \
+            --service=cram94-bot-gateway \
+            --region=${{ env.REGION }} \
+            --format="value(REVISION)" \
+            --sort-by="~creationTimestamp" 2>/dev/null)
+
+          COUNT=0
+          while IFS= read -r rev; do
+            COUNT=$((COUNT + 1))
+            if [ "${COUNT}" -gt 3 ]; then
+              echo "Deleting old revision: ${rev}"
+              gcloud run revisions delete "${rev}" --region=${{ env.REGION }} --quiet 2>/dev/null || true
+            fi
+          done <<< "${REVISIONS}"
 
   deploy-bot-dashboard:
     runs-on: ubuntu-latest
@@ -76,8 +135,13 @@ jobs:
             .
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/bot-dashboard --all-tags
 
-      - name: Deploy to Cloud Run
+      - name: Deploy to Cloud Run (no traffic)
+        id: deploy
         run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          REVISION="bot-dash-${SHORT_SHA}"
+          echo "REVISION_SUFFIX=${REVISION}" >> $GITHUB_OUTPUT
+
           gcloud run deploy cram94-bot-dashboard \
             --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/bot-dashboard:${{ github.sha }} \
             --region=${{ env.REGION }} \
@@ -87,4 +151,54 @@ jobs:
             --memory=512Mi \
             --min-instances=0 \
             --max-instances=5 \
+            --revision-suffix="${REVISION}" \
+            --no-traffic \
             --set-env-vars="NODE_ENV=production,BACKEND_URL=https://cram94-bot-gateway-1015149159553.asia-east1.run.app"
+
+      - name: Verify revision is healthy
+        run: |
+          REVISION="cram94-bot-dashboard-${{ steps.deploy.outputs.REVISION_SUFFIX }}"
+          echo "Checking revision: ${REVISION}"
+
+          for i in $(seq 1 12); do
+            STATUS=$(gcloud run revisions describe "${REVISION}" \
+              --region=${{ env.REGION }} \
+              --format="value(status.conditions[0].status)" 2>/dev/null || echo "Unknown")
+            echo "Attempt ${i}: status = ${STATUS}"
+            if [ "${STATUS}" = "True" ]; then
+              echo "Revision is healthy!"
+              break
+            fi
+            if [ "${i}" = "12" ]; then
+              echo "::error::Revision ${REVISION} failed to become healthy after 120s"
+              gcloud run revisions delete "${REVISION}" --region=${{ env.REGION }} --quiet 2>/dev/null || true
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Route traffic to new revision
+        run: |
+          REVISION="cram94-bot-dashboard-${{ steps.deploy.outputs.REVISION_SUFFIX }}"
+          gcloud run services update-traffic cram94-bot-dashboard \
+            --region=${{ env.REGION }} \
+            --to-revisions="${REVISION}=100"
+          echo "Traffic routed to ${REVISION}"
+
+      - name: Cleanup old revisions
+        if: always()
+        run: |
+          REVISIONS=$(gcloud run revisions list \
+            --service=cram94-bot-dashboard \
+            --region=${{ env.REGION }} \
+            --format="value(REVISION)" \
+            --sort-by="~creationTimestamp" 2>/dev/null)
+
+          COUNT=0
+          while IFS= read -r rev; do
+            COUNT=$((COUNT + 1))
+            if [ "${COUNT}" -gt 3 ]; then
+              echo "Deleting old revision: ${rev}"
+              gcloud run revisions delete "${rev}" --region=${{ env.REGION }} --quiet 2>/dev/null || true
+            fi
+          done <<< "${REVISIONS}"

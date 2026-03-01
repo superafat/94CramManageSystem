@@ -37,8 +37,13 @@ jobs:
             .
           docker push ${{ env.REGISTRY }}/94portal:${{ github.sha }}
 
-      - name: Deploy to Cloud Run
+      - name: Deploy to Cloud Run (no traffic)
+        id: deploy
         run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          REVISION="portal-${SHORT_SHA}"
+          echo "REVISION_SUFFIX=${REVISION}" >> $GITHUB_OUTPUT
+
           gcloud run deploy cram94-portal \
             --image ${{ env.REGISTRY }}/94portal:${{ github.sha }} \
             --platform managed \
@@ -49,4 +54,54 @@ jobs:
             --cpu 1 \
             --min-instances 0 \
             --max-instances 2 \
+            --revision-suffix="${REVISION}" \
+            --no-traffic \
             --set-env-vars "NODE_ENV=production,MANAGE_URL=https://cram94-manage-dashboard-1015149159553.asia-east1.run.app,INCLASS_URL=https://cram94-inclass-dashboard-1015149159553.asia-east1.run.app,STOCK_URL=https://cram94-stock-dashboard-1015149159553.asia-east1.run.app,BOT_DASHBOARD_URL=https://cram94-bot-dashboard-1015149159553.asia-east1.run.app"
+
+      - name: Verify revision is healthy
+        run: |
+          REVISION="cram94-portal-${{ steps.deploy.outputs.REVISION_SUFFIX }}"
+          echo "Checking revision: ${REVISION}"
+
+          for i in $(seq 1 12); do
+            STATUS=$(gcloud run revisions describe "${REVISION}" \
+              --region=${{ env.REGION }} \
+              --format="value(status.conditions[0].status)" 2>/dev/null || echo "Unknown")
+            echo "Attempt ${i}: status = ${STATUS}"
+            if [ "${STATUS}" = "True" ]; then
+              echo "Revision is healthy!"
+              break
+            fi
+            if [ "${i}" = "12" ]; then
+              echo "::error::Revision ${REVISION} failed to become healthy after 120s"
+              gcloud run revisions delete "${REVISION}" --region=${{ env.REGION }} --quiet 2>/dev/null || true
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Route traffic to new revision
+        run: |
+          REVISION="cram94-portal-${{ steps.deploy.outputs.REVISION_SUFFIX }}"
+          gcloud run services update-traffic cram94-portal \
+            --region=${{ env.REGION }} \
+            --to-revisions="${REVISION}=100"
+          echo "Traffic routed to ${REVISION}"
+
+      - name: Cleanup old revisions
+        if: always()
+        run: |
+          REVISIONS=$(gcloud run revisions list \
+            --service=cram94-portal \
+            --region=${{ env.REGION }} \
+            --format="value(REVISION)" \
+            --sort-by="~creationTimestamp" 2>/dev/null)
+
+          COUNT=0
+          while IFS= read -r rev; do
+            COUNT=$((COUNT + 1))
+            if [ "${COUNT}" -gt 3 ]; then
+              echo "Deleting old revision: ${rev}"
+              gcloud run revisions delete "${rev}" --region=${{ env.REGION }} --quiet 2>/dev/null || true
+            fi
+          done <<< "${REVISIONS}"

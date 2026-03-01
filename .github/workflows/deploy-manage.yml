@@ -40,9 +40,13 @@ jobs:
             .
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-backend --all-tags
 
-      - name: Deploy to Cloud Run
+      - name: Deploy to Cloud Run (no traffic)
+        id: deploy
         run: |
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          REVISION="mgmt-be-${SHORT_SHA}"
+          echo "REVISION_SUFFIX=${REVISION}" >> $GITHUB_OUTPUT
+
           gcloud run deploy cram94-manage-backend \
             --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-backend:${{ github.sha }} \
             --region=${{ env.REGION }} \
@@ -52,9 +56,59 @@ jobs:
             --memory=512Mi \
             --min-instances=0 \
             --max-instances=3 \
+            --revision-suffix="${REVISION}" \
+            --no-traffic \
             --set-env-vars="NODE_ENV=production,DEPLOY_SHA=${{ github.sha }},BACKEND_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_BASE=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app" \
             --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,INTERNAL_API_KEY=INTERNAL_API_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest" \
             --set-cloudsql-instances=cram94-manage-system:asia-east1:platform94-db
+
+      - name: Verify revision is healthy
+        run: |
+          REVISION="cram94-manage-backend-${{ steps.deploy.outputs.REVISION_SUFFIX }}"
+          echo "Checking revision: ${REVISION}"
+
+          for i in $(seq 1 12); do
+            STATUS=$(gcloud run revisions describe "${REVISION}" \
+              --region=${{ env.REGION }} \
+              --format="value(status.conditions[0].status)" 2>/dev/null || echo "Unknown")
+            echo "Attempt ${i}: status = ${STATUS}"
+            if [ "${STATUS}" = "True" ]; then
+              echo "Revision is healthy!"
+              break
+            fi
+            if [ "${i}" = "12" ]; then
+              echo "::error::Revision ${REVISION} failed to become healthy after 120s"
+              gcloud run revisions delete "${REVISION}" --region=${{ env.REGION }} --quiet 2>/dev/null || true
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Route traffic to new revision
+        run: |
+          REVISION="cram94-manage-backend-${{ steps.deploy.outputs.REVISION_SUFFIX }}"
+          gcloud run services update-traffic cram94-manage-backend \
+            --region=${{ env.REGION }} \
+            --to-revisions="${REVISION}=100"
+          echo "Traffic routed to ${REVISION}"
+
+      - name: Cleanup old revisions
+        if: always()
+        run: |
+          REVISIONS=$(gcloud run revisions list \
+            --service=cram94-manage-backend \
+            --region=${{ env.REGION }} \
+            --format="value(REVISION)" \
+            --sort-by="~creationTimestamp" 2>/dev/null)
+
+          COUNT=0
+          while IFS= read -r rev; do
+            COUNT=$((COUNT + 1))
+            if [ "${COUNT}" -gt 3 ]; then
+              echo "Deleting old revision: ${rev}"
+              gcloud run revisions delete "${rev}" --region=${{ env.REGION }} --quiet 2>/dev/null || true
+            fi
+          done <<< "${REVISIONS}"
 
   deploy-dashboard:
     runs-on: ubuntu-latest
@@ -80,8 +134,13 @@ jobs:
             .
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-dashboard --all-tags
 
-      - name: Deploy to Cloud Run
+      - name: Deploy to Cloud Run (no traffic)
+        id: deploy
         run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          REVISION="mgmt-dash-${SHORT_SHA}"
+          echo "REVISION_SUFFIX=${REVISION}" >> $GITHUB_OUTPUT
+
           gcloud run deploy cram94-manage-dashboard \
             --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/manage-dashboard:${{ github.sha }} \
             --region=${{ env.REGION }} \
@@ -91,5 +150,55 @@ jobs:
             --memory=256Mi \
             --min-instances=0 \
             --max-instances=2 \
+            --revision-suffix="${REVISION}" \
+            --no-traffic \
             --set-env-vars="NODE_ENV=production,DEPLOY_SHA=${{ github.sha }},BACKEND_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_BASE=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app" \
             --set-secrets="JWT_SECRET=JWT_SECRET:latest"
+
+      - name: Verify revision is healthy
+        run: |
+          REVISION="cram94-manage-dashboard-${{ steps.deploy.outputs.REVISION_SUFFIX }}"
+          echo "Checking revision: ${REVISION}"
+
+          for i in $(seq 1 12); do
+            STATUS=$(gcloud run revisions describe "${REVISION}" \
+              --region=${{ env.REGION }} \
+              --format="value(status.conditions[0].status)" 2>/dev/null || echo "Unknown")
+            echo "Attempt ${i}: status = ${STATUS}"
+            if [ "${STATUS}" = "True" ]; then
+              echo "Revision is healthy!"
+              break
+            fi
+            if [ "${i}" = "12" ]; then
+              echo "::error::Revision ${REVISION} failed to become healthy after 120s"
+              gcloud run revisions delete "${REVISION}" --region=${{ env.REGION }} --quiet 2>/dev/null || true
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Route traffic to new revision
+        run: |
+          REVISION="cram94-manage-dashboard-${{ steps.deploy.outputs.REVISION_SUFFIX }}"
+          gcloud run services update-traffic cram94-manage-dashboard \
+            --region=${{ env.REGION }} \
+            --to-revisions="${REVISION}=100"
+          echo "Traffic routed to ${REVISION}"
+
+      - name: Cleanup old revisions
+        if: always()
+        run: |
+          REVISIONS=$(gcloud run revisions list \
+            --service=cram94-manage-dashboard \
+            --region=${{ env.REGION }} \
+            --format="value(REVISION)" \
+            --sort-by="~creationTimestamp" 2>/dev/null)
+
+          COUNT=0
+          while IFS= read -r rev; do
+            COUNT=$((COUNT + 1))
+            if [ "${COUNT}" -gt 3 ]; then
+              echo "Deleting old revision: ${rev}"
+              gcloud run revisions delete "${rev}" --region=${{ env.REGION }} --quiet 2>/dev/null || true
+            fi
+          done <<< "${REVISIONS}"
