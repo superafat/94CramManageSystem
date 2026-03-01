@@ -1,0 +1,97 @@
+name: 'Cloud Run Safe Deploy'
+description: 'Blue-green deploy: no-traffic → health check → route traffic → cleanup'
+
+inputs:
+  service-name:
+    description: 'Cloud Run service name (e.g. cram94-bot-gateway)'
+    required: true
+  revision-prefix:
+    description: 'Short prefix for revision suffix (e.g. bot-gw)'
+    required: true
+  region:
+    description: 'GCP region'
+    required: true
+  health-check-retries:
+    description: 'Max health check attempts'
+    default: '12'
+  health-check-interval:
+    description: 'Seconds between health checks'
+    default: '10'
+  max-revisions:
+    description: 'Max revisions to keep'
+    default: '3'
+
+outputs:
+  revision-suffix:
+    description: 'Generated revision suffix'
+    value: ${{ steps.gen.outputs.REVISION_SUFFIX }}
+  revision-name:
+    description: 'Full revision name'
+    value: ${{ steps.gen.outputs.REVISION_NAME }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Generate revision suffix
+      id: gen
+      shell: bash
+      run: |
+        SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+        SUFFIX="${{ inputs.revision-prefix }}-${SHORT_SHA}"
+        echo "REVISION_SUFFIX=${SUFFIX}" >> $GITHUB_OUTPUT
+        echo "REVISION_NAME=${{ inputs.service-name }}-${SUFFIX}" >> $GITHUB_OUTPUT
+
+    - name: Verify revision is healthy
+      shell: bash
+      run: |
+        REVISION="${{ steps.gen.outputs.REVISION_NAME }}"
+        RETRIES=${{ inputs.health-check-retries }}
+        INTERVAL=${{ inputs.health-check-interval }}
+        echo "Checking revision: ${REVISION} (max ${RETRIES} attempts, ${INTERVAL}s interval)"
+
+        for i in $(seq 1 "${RETRIES}"); do
+          STATUS=$(gcloud run revisions describe "${REVISION}" \
+            --region=${{ inputs.region }} \
+            --format="value(status.conditions[0].status)" 2>/dev/null || echo "Unknown")
+          echo "Attempt ${i}/${RETRIES}: status = ${STATUS}"
+          if [ "${STATUS}" = "True" ]; then
+            echo "Revision is healthy!"
+            exit 0
+          fi
+          if [ "${i}" = "${RETRIES}" ]; then
+            echo "::error::Revision ${REVISION} failed to become healthy after $((RETRIES * INTERVAL))s"
+            gcloud run revisions delete "${REVISION}" --region=${{ inputs.region }} --quiet 2>/dev/null || true
+            exit 1
+          fi
+          sleep "${INTERVAL}"
+        done
+
+    - name: Route traffic to new revision
+      shell: bash
+      run: |
+        REVISION="${{ steps.gen.outputs.REVISION_NAME }}"
+        gcloud run services update-traffic ${{ inputs.service-name }} \
+          --region=${{ inputs.region }} \
+          --to-revisions="${REVISION}=100"
+        echo "Traffic routed to ${REVISION}"
+
+    - name: Cleanup old revisions
+      if: always()
+      shell: bash
+      run: |
+        MAX=${{ inputs.max-revisions }}
+        REVISIONS=$(gcloud run revisions list \
+          --service=${{ inputs.service-name }} \
+          --region=${{ inputs.region }} \
+          --format="value(REVISION)" \
+          --sort-by="~creationTimestamp" 2>/dev/null)
+
+        COUNT=0
+        while IFS= read -r rev; do
+          [ -z "${rev}" ] && continue
+          COUNT=$((COUNT + 1))
+          if [ "${COUNT}" -gt "${MAX}" ]; then
+            echo "Deleting old revision: ${rev}"
+            gcloud run revisions delete "${rev}" --region=${{ inputs.region }} --quiet 2>/dev/null || true
+          fi
+        done <<< "${REVISIONS}"
