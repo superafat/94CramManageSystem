@@ -171,6 +171,14 @@ telegramWebhook.post('/', async (c) => {
       return c.json({ ok: true });
     }
 
+    // Consulting intents — AI business advisor responses
+    if (intent.intent.startsWith('consult.')) {
+      const reply = intent.ai_response ?? '🤔 可以再跟我多說一點嗎？例如什麼科目、幾年級、目前狀況，我才能給更具體的建議。';
+      await sendMessage(msg.chatId, `💡 ${reply}`);
+      recordTurn('admin', msg.userId, auth.tenantId, text, reply, intent.intent);
+      return c.json({ ok: true });
+    }
+
     if (intent.intent === 'unknown') {
       const reply = intent.ai_response ?? '🤔 我沒聽懂，可以換個方式說嗎？\n輸入 /help 查看使用說明';
       await sendMessage(msg.chatId, reply);
