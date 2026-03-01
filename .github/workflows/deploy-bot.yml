@@ -50,7 +50,7 @@ jobs:
             --min-instances=0 \
             --max-instances=10 \
             --set-env-vars="NODE_ENV=production,MANAGE_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,INCLASS_URL=https://cram94-inclass-backend-1015149159553.asia-east1.run.app,STOCK_URL=https://cram94-stock-backend-1015149159553.asia-east1.run.app,GCP_PROJECT_ID=cram94-manage-system" \
-            --set-secrets="TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_PARENT_BOT_TOKEN=TELEGRAM_PARENT_BOT_TOKEN:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,JWT_SECRET=JWT_SECRET:latest"
+            --set-secrets="TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_PARENT_BOT_TOKEN=TELEGRAM_PARENT_BOT_TOKEN:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,JWT_SECRET=JWT_SECRET:latest,INTERNAL_API_KEY=INTERNAL_API_KEY:latest"
 
   deploy-bot-dashboard:
     runs-on: ubuntu-latest
