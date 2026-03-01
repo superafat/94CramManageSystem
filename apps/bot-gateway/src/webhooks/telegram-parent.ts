@@ -16,6 +16,12 @@ import type { ParentBinding, ParentChild } from '../firestore/parent-bindings';
 import { getDemoSession, handleDemoStart, handleDemoExit, handleDemoMessage } from '../demo/index.js';
 import { getMemoryContext, recordTurn } from '../memory/index.js';
 import type { MemoryContext } from '../memory/types.js';
+// Group mode imports
+import { getGroupBinding, createGroupBinding, deleteGroupBinding } from '../firestore/group-bindings';
+import { getBinding } from '../firestore/bindings';
+import { parseMention } from '../utils/mention-parser';
+import { handleGroupIntent, buildGroupContext } from '../handlers/group-intent-router';
+import { config } from '../config';
 
 // Map AI intents to parent execution intents
 const AI_INTENT_MAP: Record<string, ParentIntent> = {
@@ -32,6 +38,7 @@ const AI_INTENT_MAP: Record<string, ParentIntent> = {
   'info.fee': 'parent.payments',
   'info.policy': 'parent.info',
   'info.announcement': 'parent.info',
+  'info.enrollment': 'parent.info',
   'greeting': 'parent.help',
   'thanks': 'parent.help',
   'feedback': 'parent.unknown',
@@ -129,6 +136,13 @@ telegramParentWebhook.post('/', async (c) => {
 
   const msg = parseTelegramUpdate(update);
   if (!msg) return c.json({ ok: true });
+
+  // ── Group mode routing ──
+  if (msg.chatType === 'group' || msg.chatType === 'supergroup') {
+    return handleGroupMessage(c, msg);
+  }
+
+  // ── Private chat flow (below) ──
 
   // Rate limit
   if (!await checkRateLimit(`parent_${msg.userId}`)) {
@@ -441,6 +455,157 @@ async function handleParentBind(chatId: string, userId: string, userName: string
     `✅ 綁定成功！\n👤 學生：${invite.student_name}\n\n` +
     `現在您可以查詢孩子的資訊，例如：\n` +
     `「查出缺勤」、「查繳費」、「查課表」、「幫小明請假」`,
+    undefined,
+    'parent'
+  );
+}
+
+// ── Group Message Handler ──
+
+import type { UnifiedMessage } from '../modules/platform-adapter';
+import type { Context } from 'hono';
+
+async function handleGroupMessage(c: Context, msg: UnifiedMessage): Promise<Response> {
+  const text = msg.content.trim();
+  const botUsername = config.TELEGRAM_PARENT_BOT_USERNAME ?? '';
+
+  // Rate limit per group (silent drop, don't spam the group)
+  if (!await checkRateLimit(`group_${msg.chatId}`)) {
+    return c.json({ ok: true });
+  }
+
+  // Handle /setup command — only admins can bind groups
+  if (text.startsWith('/setup')) {
+    try {
+      await handleGroupSetup(msg.chatId, msg.userId, msg.userName, botUsername);
+    } catch (error) {
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[ParentBot:Group] setup error');
+    }
+    return c.json({ ok: true });
+  }
+
+  // Handle /unbind command — admin removes group binding
+  if (text.startsWith('/unbind') || text.startsWith('/remove')) {
+    try {
+      await handleGroupUnbind(msg.chatId, msg.userId);
+    } catch (error) {
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[ParentBot:Group] unbind error');
+    }
+    return c.json({ ok: true });
+  }
+
+  // Check group binding — unbound groups only respond to /setup
+  const groupBinding = await getGroupBinding(msg.chatId);
+  if (!groupBinding) {
+    return c.json({ ok: true }); // Silently ignore unbound groups
+  }
+
+  // Check if bot is mentioned or command is directed at it
+  const mention = parseMention(text, botUsername);
+  if (!mention.isMentioned) {
+    return c.json({ ok: true }); // Not mentioned, ignore
+  }
+
+  const cleanText = mention.cleanText;
+  if (!cleanText) {
+    return c.json({ ok: true });
+  }
+
+  // Build group context with knowledge base
+  try {
+    const groupCtx = await buildGroupContext(
+      groupBinding.tenant_name,
+      groupBinding.tenant_id,
+      botUsername
+    );
+
+    // Process via group intent router
+    const response = await handleGroupIntent(cleanText, groupCtx, groupBinding.tenant_id);
+
+    await sendMessage(msg.chatId, response.text, undefined, 'parent');
+  } catch (error) {
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[ParentBot:Group] Error processing group message');
+    // Don't send error messages in groups to avoid spam
+  }
+
+  return c.json({ ok: true });
+}
+
+async function handleGroupSetup(
+  chatId: string,
+  userId: string,
+  userName: string,
+  botUsername: string
+): Promise<void> {
+  // Only admins (千里眼 bound users) can set up groups
+  const adminBinding = await getBinding(userId);
+  if (!adminBinding) {
+    await sendMessage(
+      chatId,
+      '⚠️ 只有補習班管理員可以設定群組綁定。\n\n請先在千里眼（管理員 Bot）完成綁定，再到群組執行 /setup',
+      undefined,
+      'parent'
+    );
+    return;
+  }
+
+  // Check if already bound
+  const existing = await getGroupBinding(chatId);
+  if (existing) {
+    await sendMessage(
+      chatId,
+      `ℹ️ 此群組已綁定「${existing.tenant_name}」\n\n如需更改，請先執行 /unbind 解除綁定`,
+      undefined,
+      'parent'
+    );
+    return;
+  }
+
+  // Create group binding using admin's active tenant
+  await createGroupBinding({
+    chat_id: chatId,
+    tenant_id: adminBinding.active_tenant_id,
+    tenant_name: adminBinding.active_tenant_name,
+    group_name: '',
+    added_by: userId,
+    bot_username: botUsername,
+    active: true,
+  });
+
+  await sendMessage(
+    chatId,
+    `✅ 群組綁定成功！\n\n🏫 補習班：${adminBinding.active_tenant_name}\n👤 設定者：${userName}\n\n現在群組成員可以 @${botUsername || '順風耳'} 詢問課程、學費、師資、升學建議等公開資訊 📚\n\n⚠️ 個人資料（出缺勤、繳費）請私聊查詢`,
+    undefined,
+    'parent'
+  );
+}
+
+async function handleGroupUnbind(chatId: string, userId: string): Promise<void> {
+  // Only admins can unbind
+  const adminBinding = await getBinding(userId);
+  if (!adminBinding) {
+    await sendMessage(chatId, '⚠️ 只有管理員可以解除群組綁定', undefined, 'parent');
+    return;
+  }
+
+  const existing = await getGroupBinding(chatId);
+  if (!existing) {
+    await sendMessage(chatId, 'ℹ️ 此群組尚未綁定任何補習班', undefined, 'parent');
+    return;
+  }
+
+  // Verify the admin belongs to the same tenant
+  const hasTenant = adminBinding.bindings.some((b) => b.tenant_id === existing.tenant_id);
+  if (!hasTenant) {
+    await sendMessage(chatId, '⚠️ 您不是此群組綁定補習班的管理員', undefined, 'parent');
+    return;
+  }
+
+  await deleteGroupBinding(chatId);
+
+  await sendMessage(
+    chatId,
+    `✅ 已解除群組綁定（${existing.tenant_name}）\n\n順風耳將不再回應此群組的訊息`,
     undefined,
     'parent'
   );

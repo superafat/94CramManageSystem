@@ -1,10 +1,13 @@
 import type { TelegramUpdate } from '../utils/telegram';
 
+export type ChatType = 'private' | 'group' | 'supergroup' | 'channel';
+
 export interface UnifiedMessage {
   platform: 'telegram';
   userId: string;
   chatId: string;
   userName: string;
+  chatType: ChatType;
   messageType: 'text' | 'callback';
   content: string;
   callbackQueryId?: string;
@@ -20,6 +23,7 @@ export function parseTelegramUpdate(update: TelegramUpdate): UnifiedMessage | nu
       userId: String(cq.from.id),
       chatId: String(cq.message?.chat.id ?? cq.from.id),
       userName: cq.from.first_name,
+      chatType: (cq.message?.chat.type as ChatType) ?? 'private',
       messageType: 'callback',
       content: cq.data ?? '',
       callbackQueryId: cq.id,
@@ -36,6 +40,7 @@ export function parseTelegramUpdate(update: TelegramUpdate): UnifiedMessage | nu
       userId: String(msg.from.id),
       chatId: String(msg.chat.id),
       userName: msg.from.first_name,
+      chatType: (msg.chat.type as ChatType) ?? 'private',
       messageType: 'text',
       content: text,
       timestamp: new Date(),
