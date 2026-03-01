@@ -8,7 +8,7 @@ import { firestore } from '../firestore/client';
 import { sendMessage, type InlineKeyboardButton } from '../utils/telegram';
 
 export interface CrossBotRequest {
-  type: 'leave_request';
+  type: 'leave_request' | 'message_relay';
   from_bot: 'parent' | 'admin';
   to_bot: 'parent' | 'admin';
   tenant_id: string;
@@ -18,7 +18,7 @@ export interface CrossBotRequest {
   parent_chat_id: string;
   admin_chat_id?: string;
   data: Record<string, unknown>;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'delivered';
   created_at: Date;
   updated_at: Date;
 }
@@ -128,6 +128,30 @@ export async function notifyParentResult(
       'parent'
     );
   }
+}
+
+/**
+ * Notify admin (千里眼) about a parent message relay (transfer/feedback)
+ * Unlike leave requests, these are informational — no approve/reject needed
+ */
+export async function notifyAdminOfParentMessage(
+  adminChatId: string,
+  parentName: string,
+  originalMessage: string,
+  botResponse: string,
+  category: 'transfer' | 'feedback'
+): Promise<void> {
+  const emoji = category === 'transfer' ? '📞' : '💬';
+  const label = category === 'transfer' ? '家長要求轉達' : '家長意見回饋';
+
+  const text =
+    `${emoji} <b>${label}</b>\n\n` +
+    `👤 家長：${parentName}\n` +
+    `💬 家長說：${originalMessage}\n\n` +
+    `🤖 順風耳回覆：${botResponse}\n\n` +
+    `⏰ ${new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}`;
+
+  await sendMessage(adminChatId, text);
 }
 
 /**

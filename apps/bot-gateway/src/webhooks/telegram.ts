@@ -10,6 +10,7 @@ import { handleBind } from '../commands/bind';
 import { handleSwitch } from '../commands/switch';
 import { handleSync } from '../commands/sync';
 import { handleHelp } from '../commands/help';
+import { handleConversations } from '../commands/conversations';
 import { sendMessage } from '../utils/telegram';
 import { checkRateLimit } from '../utils/rate-limit';
 import { incrementUsage } from '../firestore/usage';
@@ -89,6 +90,15 @@ telegramWebhook.post('/', async (c) => {
       await handleHelp(msg.chatId);
     } catch (error) {
       logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Telegram] handleHelp error')
+    }
+    return c.json({ ok: true });
+  }
+  if (text === '/對話' || text === '/conversations') {
+    try {
+      await handleConversations(msg.chatId, msg.userId);
+    } catch (error) {
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Telegram] handleConversations error');
+      await sendMessage(msg.chatId, '⚠️ 查詢對話紀錄失敗，請稍後再試');
     }
     return c.json({ ok: true });
   }

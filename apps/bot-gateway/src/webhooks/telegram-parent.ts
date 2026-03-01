@@ -5,7 +5,8 @@ import { getParentInvite, markInviteUsed } from '../firestore/parent-invites';
 import { createParentBinding } from '../firestore/parent-bindings';
 import { parseParentIntent as parseParentIntentKeyword, executeParentIntent, tryKnowledgeBase, type ParentIntentResult, type ParentIntent } from '../handlers/parent-intent-router';
 import { parseParentIntent as parseParentIntentAI, type ParentContext } from '../modules/ai-engine';
-import { createCrossBotRequest, notifyAdminOfParentRequest } from '../modules/cross-bot-bridge';
+import { createCrossBotRequest, notifyAdminOfParentRequest, notifyAdminOfParentMessage } from '../modules/cross-bot-bridge';
+import { saveConversation } from '../firestore/parent-conversations';
 import { callParentApi } from '../modules/parent-api-client';
 import { sendMessage } from '../utils/telegram';
 import { checkRateLimit } from '../utils/rate-limit';
@@ -78,7 +79,7 @@ async function smartParseIntent(
   text: string,
   binding: ParentBinding,
   memoryCtx?: MemoryContext
-): Promise<{ result: ParentIntentResult; clarification?: string; aiResponse?: string }> {
+): Promise<{ result: ParentIntentResult; clarification?: string; aiResponse?: string; aiIntent?: string }> {
   // Try AI first
   try {
     const parentCtx = buildParentContext(binding);
@@ -88,6 +89,7 @@ async function smartParseIntent(
       return {
         result: { intent: 'parent.unknown', params: {} },
         clarification: ai.ai_response ?? ai.clarification_question ?? undefined,
+        aiIntent: ai.intent,
       };
     }
 
@@ -97,6 +99,7 @@ async function smartParseIntent(
         return {
           result: { intent: 'parent.unknown', params: {} },
           aiResponse: ai.ai_response,
+          aiIntent: ai.intent,
         };
       }
     }
@@ -240,12 +243,26 @@ telegramParentWebhook.post('/', async (c) => {
       logger.warn({ err: memErr instanceof Error ? memErr : new Error(String(memErr)) }, '[ParentBot] Memory context fetch failed, continuing without memory');
     }
 
-    const { result: intentResult, clarification, aiResponse } = await smartParseIntent(text, binding, memoryCtx);
+    const { result: intentResult, clarification, aiResponse, aiIntent } = await smartParseIntent(text, binding, memoryCtx);
+
+    // Helper: save conversation record for admin review
+    const logConversation = (botReply: string, intent: string) => {
+      saveConversation({
+        tenant_id: binding.tenant_id,
+        parent_user_id: msg.userId,
+        parent_name: msg.userName,
+        chat_type: 'private',
+        user_message: text,
+        bot_response: botReply,
+        intent,
+      });
+    };
 
     // AI asked for clarification
     if (clarification) {
       await sendMessage(msg.chatId, `🤔 ${clarification}`, undefined, 'parent');
       recordTurn('parent', msg.userId, binding.tenant_id, text, clarification, intentResult.intent);
+      logConversation(clarification, aiIntent ?? intentResult.intent);
       return c.json({ ok: true });
     }
 
@@ -253,12 +270,32 @@ telegramParentWebhook.post('/', async (c) => {
     if (aiResponse && intentResult.intent === 'parent.unknown' && !clarification) {
       await sendMessage(msg.chatId, aiResponse, undefined, 'parent');
       recordTurn('parent', msg.userId, binding.tenant_id, text, aiResponse, 'chat');
+      logConversation(aiResponse, aiIntent ?? 'chat');
+
+      // 🔥 轉達/意見回饋 — 真的通知千里眼
+      if (aiIntent === 'transfer' || aiIntent === 'feedback') {
+        try {
+          const adminChatId = await getAdminChatId(binding.tenant_id);
+          if (adminChatId) {
+            await notifyAdminOfParentMessage(
+              adminChatId,
+              msg.userName,
+              text,
+              aiResponse,
+              aiIntent as 'transfer' | 'feedback'
+            );
+          }
+        } catch (relayErr) {
+          logger.warn({ err: relayErr instanceof Error ? relayErr : new Error(String(relayErr)) }, '[ParentBot] Failed to relay message to admin');
+        }
+      }
       return c.json({ ok: true });
     }
 
     // Handle leave requests via cross-bot bridge
     if (intentResult.intent === 'parent.leave') {
       await handleLeaveRequest(msg.chatId, msg.userId, intentResult, binding);
+      logConversation('（請假申請已送出）', 'parent.leave');
       return c.json({ ok: true });
     }
 
@@ -267,12 +304,14 @@ telegramParentWebhook.post('/', async (c) => {
       if (aiResponse) {
         await sendMessage(msg.chatId, aiResponse, undefined, 'parent');
         recordTurn('parent', msg.userId, binding.tenant_id, text, aiResponse, intentResult.intent);
+        logConversation(aiResponse, aiIntent ?? intentResult.intent);
         return c.json({ ok: true });
       }
       const kbAnswer = await tryKnowledgeBase(text, binding.tenant_id);
       if (kbAnswer) {
         await sendMessage(msg.chatId, kbAnswer, undefined, 'parent');
         recordTurn('parent', msg.userId, binding.tenant_id, text, kbAnswer, intentResult.intent);
+        logConversation(kbAnswer, intentResult.intent);
         return c.json({ ok: true });
       }
     }
@@ -283,6 +322,7 @@ telegramParentWebhook.post('/', async (c) => {
     const reply = aiResponse ? `${aiResponse}\n\n${apiResult}` : apiResult;
     await sendMessage(msg.chatId, reply, undefined, 'parent');
     recordTurn('parent', msg.userId, binding.tenant_id, text, reply, intentResult.intent);
+    logConversation(reply, intentResult.intent);
   } catch (error) {
     logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[ParentBot] Error processing message')
     await sendMessage(
