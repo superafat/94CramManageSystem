@@ -1,5 +1,12 @@
 import type { Metadata } from 'next';
+import { Noto_Sans_TC } from 'next/font/google';
 import './globals.css';
+
+const notoSansTC = Noto_Sans_TC({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: '94Stock 補習班庫存管理系統 | 教材、講義、耗材管理 | 蜂神榜',
@@ -29,7 +36,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-TW">
-      <body>{children}</body>
+      <body className={notoSansTC.className}>{children}</body>
     </html>
   );
 }

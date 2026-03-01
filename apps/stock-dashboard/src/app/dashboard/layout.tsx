@@ -1,45 +1,134 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import AuthGuard from '@/components/AuthGuard';
 import { getCurrentUser, removeToken } from '@/lib/auth';
 
+interface NavItem {
+  href: string;
+  icon: string;
+  label: string;
+  separator?: undefined;
+}
+
+interface NavSeparator {
+  separator: string;
+  href?: undefined;
+  icon?: undefined;
+  label?: undefined;
+}
+
+type NavEntry = NavItem | NavSeparator;
+
+const navItems: NavEntry[] = [
+  { href: '/dashboard', icon: '📊', label: '總覽' },
+  // 庫存管理
+  { separator: '庫存管理' },
+  { href: '/dashboard/items', icon: '📦', label: '品項管理' },
+  { href: '/dashboard/inventory', icon: '🏪', label: '庫存總覽' },
+  { href: '/dashboard/stock-in', icon: '📥', label: '入庫作業' },
+  { href: '/dashboard/stock-out', icon: '📤', label: '出庫作業' },
+  { href: '/dashboard/transfer', icon: '🔄', label: '調撥作業' },
+  { href: '/dashboard/inventory-counts', icon: '📋', label: '盤點管理' },
+  { href: '/dashboard/barcodes', icon: '🏷️', label: '條碼管理' },
+  // 採購管理
+  { separator: '採購管理' },
+  { href: '/dashboard/suppliers', icon: '🏭', label: '供應商管理' },
+  { href: '/dashboard/purchase-orders', icon: '📝', label: '進貨單管理' },
+  // 分析與設定
+  { separator: '分析與設定' },
+  { href: '/dashboard/reports', icon: '📈', label: '庫存報表' },
+  { href: '/dashboard/ai', icon: '🤖', label: 'AI 智能' },
+  { href: '/dashboard/notifications', icon: '🔔', label: '通知設定' },
+  { href: '/dashboard/integrations', icon: '🔗', label: '系統整合' },
+];
+
+const roleLabels: Record<string, string> = {
+  admin: '館長',
+  staff: '行政',
+  warehouse: '倉管',
+};
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const user = getCurrentUser();
+  const pathname = usePathname();
+  const [user, setUser] = useState<ReturnType<typeof getCurrentUser>>(null);
+
+  useEffect(() => {
+    setUser(getCurrentUser());
+  }, []);
 
   return (
     <AuthGuard>
-      <div className="flex h-screen bg-gray-50">
-        <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-          <div className="h-16 flex items-center px-6 border-b border-gray-200">
-            <h1 className="text-xl font-bold text-gray-800">94Stock</h1>
+      <div className="flex h-screen bg-[#F5F0EB]">
+        {/* Sidebar */}
+        <aside className="w-64 bg-[#FDFBF8] border-r border-[#D8D1C6] flex flex-col">
+          {/* Logo */}
+          <div className="p-5 border-b border-[#D8D1C6]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#8FA895] flex items-center justify-center text-white text-xl">
+                🐝
+              </div>
+              <div className="flex-1 min-w-0">
+                <h1 className="font-bold text-[#4B5C53] text-sm">94Stock</h1>
+                <p className="text-xs text-[#8B8B8B]">庫存管理系統</p>
+              </div>
+            </div>
+            {user && (
+              <div className="mt-3 px-3 py-2 bg-[#8FA895]/10 rounded-lg">
+                <p className="text-xs text-[#8B8B8B]">
+                  {user.name || user.email || '使用者'}
+                  <span className="ml-1 font-medium text-[#8FA895]">
+                    {roleLabels[user.role || ''] || user.role || ''}
+                  </span>
+                </p>
+              </div>
+            )}
           </div>
-          <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
-            <Link href="/dashboard" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">Dashboard</Link>
-            <Link href="/dashboard/items" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">品項管理</Link>
-            <Link href="/dashboard/inventory" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">庫存總覽</Link>
-            <Link href="/dashboard/stock-in" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">入庫作業</Link>
-            <Link href="/dashboard/stock-out" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">出庫作業</Link>
-            <Link href="/dashboard/transfer" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">調撥作業</Link>
-            <Link href="/dashboard/classes" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">班級管理</Link>
-            <Link href="/dashboard/suppliers" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">供應商管理</Link>
-            <Link href="/dashboard/purchase-orders" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">進貨單管理</Link>
-            <Link href="/dashboard/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">庫存報表</Link>
-            <Link href="/dashboard/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">通知設定</Link>
-            <Link href="/dashboard/ai" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">AI 智能</Link>
-            <Link href="/dashboard/integrations" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">系統整合</Link>
-            <Link href="/dashboard/students" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">學生管理</Link>
-            <Link href="/dashboard/inventory-counts" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">盤點管理</Link>
-            <Link href="/dashboard/barcodes" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md">條碼管理</Link>
+
+          {/* Navigation */}
+          <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+            {navItems.map((item, index) => {
+              if ('separator' in item && item.separator) {
+                return (
+                  <div key={`sep-${index}`} className="pt-4 pb-1">
+                    <div className="border-t border-[#D8D1C6]" />
+                    <p className="text-xs text-[#8B8B8B] font-medium px-3 pt-3">
+                      {item.separator}
+                    </p>
+                  </div>
+                );
+              }
+              const navItem = item as NavItem;
+              const isActive =
+                pathname === navItem.href ||
+                (navItem.href !== '/dashboard' && pathname?.startsWith(navItem.href));
+
+              return (
+                <Link
+                  key={navItem.href}
+                  href={navItem.href}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
+                    isActive
+                      ? 'bg-[#8FA895]/15 text-[#4B5C53] font-medium'
+                      : 'text-[#6B746E] hover:bg-[#F5F0EB] hover:text-[#4B5C53]'
+                  }`}
+                >
+                  <span className="text-base">{navItem.icon}</span>
+                  <span>{navItem.label}</span>
+                </Link>
+              );
+            })}
           </nav>
-          <div className="p-4 border-t border-gray-200 space-y-2">
+
+          {/* Footer */}
+          <div className="p-3 border-t border-[#D8D1C6] space-y-2">
             <a
               href="https://94cram.app"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center w-full px-4 py-2 text-sm text-gray-600 bg-gray-100 border border-gray-200 rounded-md hover:bg-gray-200 transition-colors"
-              title="切換至其他系統"
+              className="flex items-center justify-center gap-2 w-full px-3 py-2 text-sm text-[#6B746E] bg-[#F5F0EB] border border-[#D8D1C6] rounded-xl hover:bg-[#E6DDD1] transition-colors"
             >
               🔀 系統切換
             </a>
@@ -48,16 +137,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 removeToken();
                 window.location.href = '/login';
               }}
-              className="w-full px-4 py-2 text-sm text-white bg-[#8FA895] rounded-md hover:bg-[#7a9380]"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-white bg-[#8FA895] rounded-xl hover:bg-[#7A9380] transition-colors"
             >
-              登出
+              🚪 登出
             </button>
           </div>
-        </div>
+        </aside>
+
+        {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
-            <div className="font-medium text-gray-600">補習班庫存系統</div>
-            <div className="text-sm text-gray-500">{user?.name || user?.email || '未登入'} {user?.role ? `(${user.role})` : ''}</div>
+          <header className="h-14 bg-[#FDFBF8] border-b border-[#D8D1C6] flex items-center justify-between px-6">
+            <div className="font-medium text-[#4B5C53]">🐝 蜂神榜庫存管理</div>
+            <div className="text-sm text-[#8B8B8B]">
+              {user?.name || user?.email || '未登入'}
+              {user?.role ? ` (${roleLabels[user.role] || user.role})` : ''}
+            </div>
           </header>
           <main className="flex-1 overflow-auto p-6">{children}</main>
         </div>

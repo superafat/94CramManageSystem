@@ -30,15 +30,15 @@ const STUDENTS = [
 
 // ===== Courses/Classes =====
 const COURSES = [
-  { id: 'c1', name: '國中數學 A 班', grade: '國中', room: '201', capacity: 15, teacher_id: 't1', teacher_name: '王老師', fee_monthly: 3500, schedule: '週二 18:00-20:00, 週五 18:00-20:00' },
-  { id: 'c2', name: '國中英文菁英班', grade: '國中', room: '202', capacity: 12, teacher_id: 't2', teacher_name: '李老師', fee_monthly: 4000, schedule: '週三 18:00-20:00, 週六 10:00-12:00' },
-  { id: 'c3', name: '國小先修班', grade: '國小', room: '101', capacity: 10, teacher_id: 't1', teacher_name: '王老師', fee_monthly: 2800, schedule: '週四 16:00-18:00' },
+  { id: 'c1', name: '國中數學 A 班', subject: '數學', grade: '國中', room: '201', capacity: 15, teacher_id: 't1', teacher_name: '王老師', fee_monthly: 3500, duration_minutes: 120, schedule: '週二 18:00-20:00, 週五 18:00-20:00' },
+  { id: 'c2', name: '國中英文菁英班', subject: '英文', grade: '國中', room: '202', capacity: 12, teacher_id: 't2', teacher_name: '李老師', fee_monthly: 4000, duration_minutes: 120, schedule: '週三 18:00-20:00, 週六 10:00-12:00' },
+  { id: 'c3', name: '國小先修班', subject: '數學', grade: '國小', room: '101', capacity: 10, teacher_id: 't1', teacher_name: '王老師', fee_monthly: 2800, duration_minutes: 120, schedule: '週四 16:00-18:00' },
 ]
 
 // ===== Teachers =====
 const TEACHERS = [
-  { id: 't1', name: '王老師', email: 'wang@demo.com', phone: '0912-345-678', subject: '數學', hourly_rate: 800, status: 'active' },
-  { id: 't2', name: '李老師', email: 'lee@demo.com', phone: '0923-456-789', subject: '英文', hourly_rate: 900, status: 'active' },
+  { id: 't1', name: '王老師', title: '資深講師', email: 'wang@demo.com', phone: '0912-345-678', subject: '數學', hourly_rate: 800, rate_per_class: '800', status: 'active' },
+  { id: 't2', name: '李老師', title: '首席講師', email: 'lee@demo.com', phone: '0923-456-789', subject: '英文', hourly_rate: 900, rate_per_class: '900', status: 'active' },
 ]
 
 // ===== Schedules =====
@@ -48,14 +48,17 @@ function getWeekSchedules(startDate: string, endDate: string) {
   for (let d = new Date(start); d <= new Date(endDate); d.setDate(d.getDate() + 1)) {
     const dow = d.getDay()
     const dateStr = d.toISOString().split('T')[0]
+    const isPast = d < new Date()
     if (dow === 2 || dow === 5) { // 週二、週五
-      schedules.push({ id: `sch-${dateStr}-c1`, course_id: 'c1', course_name: '國中數學 A 班', teacher_name: '王老師', room: '201', date: dateStr, start_time: '18:00', end_time: '20:00' })
+      schedules.push({ id: `sch-${dateStr}-c1`, course_id: 'c1', course_name: '國中數學 A 班', subject: '數學', teacher_id: 't1', teacher_name: '王老師', teacher_title: '資深講師', room: '201', scheduled_date: dateStr, start_time: '18:00:00', end_time: '20:00:00', status: isPast ? 'completed' : 'scheduled', rate_per_class: '800' })
     }
     if (dow === 3 || dow === 6) { // 週三、週六
-      schedules.push({ id: `sch-${dateStr}-c2`, course_id: 'c2', course_name: '國中英文菁英班', teacher_name: '李老師', room: '202', date: dateStr, start_time: dow === 3 ? '18:00' : '10:00', end_time: dow === 3 ? '20:00' : '12:00' })
+      const st = dow === 3 ? '18:00:00' : '10:00:00'
+      const et = dow === 3 ? '20:00:00' : '12:00:00'
+      schedules.push({ id: `sch-${dateStr}-c2`, course_id: 'c2', course_name: '國中英文菁英班', subject: '英文', teacher_id: 't2', teacher_name: '李老師', teacher_title: '首席講師', room: '202', scheduled_date: dateStr, start_time: st, end_time: et, status: isPast ? 'completed' : 'scheduled', rate_per_class: '900' })
     }
     if (dow === 4) { // 週四
-      schedules.push({ id: `sch-${dateStr}-c3`, course_id: 'c3', course_name: '國小先修班', teacher_name: '王老師', room: '101', date: dateStr, start_time: '16:00', end_time: '18:00' })
+      schedules.push({ id: `sch-${dateStr}-c3`, course_id: 'c3', course_name: '國小先修班', subject: '數學', teacher_id: 't1', teacher_name: '王老師', teacher_title: '資深講師', room: '101', scheduled_date: dateStr, start_time: '16:00:00', end_time: '18:00:00', status: isPast ? 'completed' : 'scheduled', rate_per_class: '800' })
     }
   }
   return schedules
@@ -98,6 +101,20 @@ const ALERTS = [
   { id: 'al3', action: 'update', table_name: 'grades', change_summary: '新增數學段考成績 6 筆', user_name: 'Demo 館長', created_at: new Date(Date.now() - 7200000).toISOString() },
   { id: 'al4', action: 'create', table_name: 'students', change_summary: '新增學生：李宜庭', user_name: 'Demo 館長', created_at: new Date(Date.now() - 86400000).toISOString() },
   { id: 'al5', action: 'payment', table_name: 'billing', change_summary: '收到繳費：陳小利 NT$3,500', user_name: '系統', created_at: new Date(Date.now() - 172800000).toISOString() },
+]
+
+// ===== Billing Records (家長繳費紀錄) =====
+const BILLING_RECORDS = [
+  { id: 'bill-1', student_name: '陳小利', course_name: '國中數學 A 班', amount: 3500, status: 'paid', period_month: '2026-03', created_at: '2026-03-01T09:00:00Z' },
+  { id: 'bill-2', student_name: '陳小利', course_name: '國中數學 A 班', amount: 3500, status: 'paid', period_month: '2026-02', created_at: '2026-02-01T09:00:00Z' },
+  { id: 'bill-3', student_name: '王大明', course_name: '國中數學 A 班', amount: 3500, status: 'paid', period_month: '2026-03', created_at: '2026-03-02T10:30:00Z' },
+  { id: 'bill-4', student_name: '林美琪', course_name: '國中英文菁英班', amount: 11200, status: 'paid', period_month: '2026-01', created_at: '2026-01-05T14:00:00Z' },
+  { id: 'bill-5', student_name: '張志豪', course_name: '國中英文菁英班', amount: 4000, status: 'pending', period_month: '2026-03', created_at: '2026-03-01T00:00:00Z' },
+  { id: 'bill-6', student_name: '李宜庭', course_name: '國小先修班', amount: 2800, status: 'paid', period_month: '2026-03', created_at: '2026-03-10T11:00:00Z' },
+  { id: 'bill-7', student_name: '黃柏翰', course_name: '國中數學 A 班', amount: 3500, status: 'paid', period_month: '2026-03', created_at: '2026-03-05T08:45:00Z' },
+  { id: 'bill-8', student_name: '劉思涵', course_name: '國小先修班', amount: 2800, status: 'pending', period_month: '2026-03', created_at: '2026-03-01T00:00:00Z' },
+  { id: 'bill-9', student_name: '吳承恩', course_name: '國中英文菁英班', amount: 4000, status: 'unpaid', period_month: '2026-02', created_at: '2026-02-01T00:00:00Z' },
+  { id: 'bill-10', student_name: '吳承恩', course_name: '國中英文菁英班', amount: 4000, status: 'unpaid', period_month: '2026-03', created_at: '2026-03-01T00:00:00Z' },
 ]
 
 // ===== Route handler =====
@@ -157,9 +174,26 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     // Trials
     if (path === '/api/admin/trials') return { status: 200, body: { trials: [] } }
 
-    // Salary
+    // Salary — 薪資計算
     if (path.startsWith('/api/admin/salary') || path.startsWith('/api/w8/salary')) {
-      return { status: 200, body: { records: [], summary: { totalHours: 0, totalAmount: 0 } } }
+      const now = new Date()
+      const startDate = searchParams.get('startDate') || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+      const endDate = searchParams.get('endDate') || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-28`
+      // 王老師：數學 A 班 (週二五) + 國小先修班 (週四) ≈ 12 堂/月；李老師：英文菁英班 (週三六) ≈ 8 堂/月
+      return { status: 200, body: { data: {
+        period: { start: startDate, end: endDate },
+        teachers: [
+          { teacher_id: 't1', teacher_name: '王老師', title: '資深講師', rate_per_class: '800', total_classes: 12, total_amount: '9600' },
+          { teacher_id: 't2', teacher_name: '李老師', title: '首席講師', rate_per_class: '900', total_classes: 8, total_amount: '7200' },
+        ],
+        grand_total_classes: 20,
+        grand_total_amount: 16800,
+      } } }
+    }
+
+    // Billing — 家長繳費查詢
+    if (path === '/api/admin/billing/payment-records' || path.startsWith('/api/admin/billing')) {
+      return { status: 200, body: { data: { records: BILLING_RECORDS } } }
     }
 
     // Reports
