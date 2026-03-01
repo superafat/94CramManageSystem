@@ -124,9 +124,23 @@ function getAttendanceReport(month?: string) {
     total: 18,
     rate: Math.round(((15 - i + (i % 3)) / 18) * 100),
   }))
+  // Generate daily stats for the month
+  const dailyStats: Record<string, { arrived: number; late: number; absent: number; total: number; rate: number }> = {}
+  const [year, mon] = m.split('-').map(Number)
+  const daysInMonth = new Date(year, mon, 0).getDate()
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = new Date(year, mon - 1, d).getDay()
+    if (dow === 0 || dow === 6) continue // skip weekends (Sun/Sat simplification — only weekday classes)
+    if (dow === 1) continue // no class on Monday
+    const dateStr = `${m}-${String(d).padStart(2, '0')}`
+    const arrived = 5 + (d % 2)
+    const late = d % 3 === 0 ? 1 : 0
+    const absent = 8 - arrived - late
+    dailyStats[dateStr] = { arrived, late, absent, total: 8, rate: Math.round(((arrived + late) / 8) * 100) }
+  }
   return {
     month: m,
-    dailyStats: {},
+    dailyStats,
     studentStats,
     summary: { totalDays: 18, totalAttendances: 120, averageRate: 87, totalStudents: 8 },
   }
@@ -142,7 +156,11 @@ export const DEMO_TENANT = DEMO_TENANT_ID
 export function getDemoResponse(method: string, path: string, searchParams: URLSearchParams): { status: number; body: unknown } | null {
   // GET endpoints
   if (method === 'GET') {
-    if (path === '/api/auth/me') return { status: 200, body: { id: 'demo-admin', name: 'Demo 管理員', email: 'demo@94cram.com', role: 'admin', tenantId: DEMO_TENANT_ID, branchId: 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d' } }
+    // AuthContext expects { user: {...}, school: {...} }
+    if (path === '/api/auth/me') return { status: 200, body: {
+      user: { id: 'demo-admin', email: 'demo@94cram.com', name: 'Demo 管理員', role: 'admin', isDemo: true },
+      school: { id: 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d', name: '蜂神榜示範校' },
+    } }
     if (path === '/api/students') return { status: 200, body: { students: STUDENTS } }
     if (path === '/api/classes') return { status: 200, body: { classes: CLASSES } }
     if (path === '/api/attendance/today') return { status: 200, body: getTodayAttendance() }

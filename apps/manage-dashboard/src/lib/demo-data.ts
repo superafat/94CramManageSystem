@@ -199,17 +199,34 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
 
     // Attendance APIs
     if (path === '/api/admin/attendance') {
+      const studentId = searchParams.get('studentId')
       const from = searchParams.get('from') || new Date().toISOString().split('T')[0]
       const to = searchParams.get('to') || from
+      // Student detail page expects { records: AttendanceRecord[] }
+      if (studentId) {
+        const data = getAttendance(from, to)
+        const filtered = data.attendance.filter(a => a.student_id === studentId)
+        return { status: 200, body: { records: filtered } }
+      }
       const data = getAttendance(from, to)
       return { status: 200, body: { success: true, data } }
     }
 
-    // Grades APIs
-    if (path === '/api/admin/grades') return { status: 200, body: { grades: GRADES } }
+    // Grades APIs — student detail expects camelCase: maxScore, date, examType
+    if (path === '/api/admin/grades') {
+      const studentId = searchParams.get('studentId')
+      const gradesWithCamel = GRADES.map(g => ({
+        ...g,
+        maxScore: g.max_score,
+        date: g.exam_date,
+        examType: g.exam_name,
+      }))
+      const filtered = studentId ? gradesWithCamel.filter(g => g.student_id === studentId) : gradesWithCamel
+      return { status: 200, body: { grades: filtered } }
+    }
 
-    // Alerts
-    if (path === '/api/admin/alerts') return { status: 200, body: { alerts: ALERTS } }
+    // Alerts — dashboard checks data.success then reads data.data.alerts
+    if (path === '/api/admin/alerts') return { status: 200, body: { success: true, data: { alerts: ALERTS } } }
 
     // Course/Class APIs (w8 prefix = manage backend routes)
     if (path === '/api/w8/courses') return { status: 200, body: { success: true, data: { courses: COURSES } } }
@@ -271,7 +288,27 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
       return { status: 200, body: { success: true, data: { records: BILLING_RECORDS } } }
     }
 
-    // Reports
+    // Churn risk — reports page fetches /api/admin/churn/:branchId
+    if (path.startsWith('/api/admin/churn')) {
+      return { status: 200, body: { data: { students: [
+        { id: 's8', name: '吳承恩', risk_score: 85, risk_factors: ['出席率 65%', '2 筆未繳費'] },
+        { id: 's4', name: '張志豪', risk_score: 55, risk_factors: ['出席率 80%', '成績下滑'] },
+      ] } } }
+    }
+
+    // Reports — trend endpoint returns monthly data for charts
+    if (path === '/api/admin/reports/trend') {
+      return { status: 200, body: { data: { months: [
+        { month: '2025-10', activeStudents: 6, attendanceRate: 90, avgScore: 78 },
+        { month: '2025-11', activeStudents: 6, attendanceRate: 88, avgScore: 80 },
+        { month: '2025-12', activeStudents: 7, attendanceRate: 85, avgScore: 77 },
+        { month: '2026-01', activeStudents: 7, attendanceRate: 87, avgScore: 82 },
+        { month: '2026-02', activeStudents: 8, attendanceRate: 86, avgScore: 79 },
+        { month: '2026-03', activeStudents: 8, attendanceRate: 88, avgScore: 81 },
+      ] } } }
+    }
+
+    // Reports — generic fallback
     if (path.startsWith('/api/admin/reports') || path.startsWith('/api/w8/reports')) {
       return { status: 200, body: { data: {} } }
     }

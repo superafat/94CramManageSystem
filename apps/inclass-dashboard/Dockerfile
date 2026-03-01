@@ -15,7 +15,6 @@ COPY apps/inclass-dashboard/ apps/inclass-dashboard/
 
 WORKDIR /app/apps/inclass-dashboard
 RUN rm -f .env.local .env.production
-ENV NEXT_PUBLIC_API_BASE=
 RUN pnpm build
 
 FROM node:20-alpine AS runner
