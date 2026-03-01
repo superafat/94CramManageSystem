@@ -21,14 +21,11 @@ const DEMO_ACCOUNTS: Record<string, { id: string; name: string; role: Role; tena
   boss2:     { id: 'demo-stock-boss2',     name: 'Demo 館長2',  role: 'admin',     tenantId: DEMO_TENANT_2, branchId: BRANCH_2 },
 }
 
+// Demo 模式使用 fallback secret — demo token 僅用於攔截 mock 資料，不涉及真實後端驗證
+const DEMO_FALLBACK_SECRET = 'demo-94stock-secret-not-for-production'
+
 export async function POST(request: NextRequest) {
-  const jwtSecret = process.env.JWT_SECRET
-  if (!jwtSecret) {
-    return NextResponse.json(
-      { success: false, error: { code: 'SERVER_ERROR', message: 'JWT_SECRET not configured' } },
-      { status: 500 }
-    )
-  }
+  const jwtSecret = process.env.JWT_SECRET || DEMO_FALLBACK_SECRET
 
   try {
     const body = await request.json().catch(() => ({}))
