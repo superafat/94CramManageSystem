@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import StatCard from './components/StatCard'
-import ToolButton from './components/ToolButton'
 import FormField from './components/FormField'
 import CheckInModal from './components/CheckInModal'
 import PaymentSection from './components/PaymentSection'
@@ -411,17 +410,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Bottom Fixed Toolbar */}
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'var(--surface)', borderTop: '2px solid var(--border)', padding: '12px', display: 'flex', justifyContent: 'space-around', boxShadow: 'var(--shadow-lg)', zIndex: 100 }}>
-        <ToolButton emoji="📸" label="刷臉" onClick={() => setShowFaceCheckin(true)} />
-        <ToolButton emoji="📋" label="名單" onClick={() => setShowAddStudent(true)} />
-        <ToolButton emoji="📊" label="儀表板" onClick={() => router.push('/dashboard')} />
-        <ToolButton emoji="📝" label="成績" onClick={() => router.push('/grades')} />
-        <ToolButton emoji="📈" label="報表" onClick={() => router.push('/reports')} />
-        <ToolButton emoji="💰" label="繳費" onClick={() => router.push('/billing')} />
-        <ToolButton emoji="📚" label="說明" onClick={() => router.push('/guide')} />
-        {(user?.role === 'admin') && <ToolButton emoji="⚙️" label="管理" onClick={() => router.push('/admin')} />}
-      </div>
+      {/* BottomNav is provided by layout.tsx via AppLayout */}
 
       {/* Add Student Modal */}
       {showAddStudent && (

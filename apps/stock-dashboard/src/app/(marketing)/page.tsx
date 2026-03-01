@@ -1,63 +1,55 @@
 import Link from 'next/link';
-import {
-  BarChart3,
-  Bot,
-  Building2,
-  Boxes,
-  Link2,
-  School,
-  Send,
-  Warehouse,
-  ScanBarcode,
-  ClipboardCheck,
-  TrendingUp,
-  ShieldCheck,
-} from 'lucide-react';
 
 const features = [
   {
-    icon: Boxes,
+    emoji: '📦',
     title: '品項管理',
     description: '講義、教材、耗材分類管理，支援條碼掃描快速查詢',
+    accent: '#E8734A',
   },
   {
-    icon: Warehouse,
+    emoji: '🏬',
     title: '多倉庫支援',
     description: '總部與分校庫存一目瞭然，調撥作業一鍵完成',
+    accent: '#5B8DEF',
   },
   {
-    icon: BarChart3,
+    emoji: '📊',
     title: '智能報表',
     description: '庫存周轉率、消耗分析、低庫存預警通知',
+    accent: '#8B5CF6',
   },
   {
-    icon: Bot,
+    emoji: '🤖',
     title: 'AI 備貨預測',
     description: '根據歷史數據智慧推薦補貨量，降低缺貨風險',
+    accent: '#10B981',
   },
   {
-    icon: Send,
+    emoji: '🔔',
     title: 'Telegram 即時通知',
     description: '低庫存警告、採購單狀態變更自動推播',
+    accent: '#F59E0B',
   },
   {
-    icon: Link2,
+    emoji: '🔗',
     title: '系統整合',
     description: '與 94Manage、94inClass 無縫串接，資料同步',
+    accent: '#EC4899',
   },
 ];
 
 const advantages = [
-  { icon: ScanBarcode, title: '條碼管理', desc: '掃碼進出貨，效率提升 3 倍' },
-  { icon: ClipboardCheck, title: '盤點管理', desc: '系統 vs 實際自動比對差異' },
-  { icon: TrendingUp, title: '採購流程', desc: '草稿→審核→核准→收貨' },
-  { icon: ShieldCheck, title: '審計追蹤', desc: '每筆異動完整記錄可追溯' },
+  { emoji: '🏷️', title: '條碼管理', desc: '掃碼進出貨，效率提升 3 倍', color: '#E8734A' },
+  { emoji: '📋', title: '盤點管理', desc: '系統 vs 實際自動比對差異', color: '#5B8DEF' },
+  { emoji: '📈', title: '採購流程', desc: '草稿→審核→核准→收貨', color: '#10B981' },
+  { emoji: '🛡️', title: '審計追蹤', desc: '每筆異動完整記錄可追溯', color: '#F59E0B' },
 ];
 
 const audiences = [
-  { icon: School, label: '補習班 / 才藝教室', desc: '管理講義、教材發放' },
-  { icon: Building2, label: '教育機構總部', desc: '統一管控多校區庫存' },
-  { icon: Warehouse, label: '連鎖培訓中心', desc: '跨校區調撥與補貨' },
+  { emoji: '🏫', label: '補習班 / 才藝教室', desc: '管理講義、教材發放', color: '#E8734A' },
+  { emoji: '🏢', label: '教育機構總部', desc: '統一管控多校區庫存', color: '#5B8DEF' },
+  { emoji: '🏭', label: '連鎖培訓中心', desc: '跨校區調撥與補貨', color: '#8B5CF6' },
 ];
 
 const pricingPlans = [
@@ -131,13 +123,17 @@ export default function MarketingHomePage() {
           <h2 className="text-3xl font-bold text-[#4B5C53]">六大核心功能</h2>
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {features.map(({ icon: Icon, title, description }) => (
+          {features.map(({ emoji, title, description, accent }) => (
             <div
               key={title}
-              className="group rounded-2xl border border-[#D8D1C6] bg-[#FDFBF8] p-6 shadow-sm transition-all hover:shadow-md hover:border-[#8FA895]/50 hover:-translate-y-1"
+              className="group rounded-2xl border border-[#D8D1C6] bg-[#FDFBF8] p-6 shadow-sm transition-all hover:shadow-lg hover:-translate-y-1 overflow-hidden relative"
             >
-              <div className="w-12 h-12 rounded-xl bg-[#8FA895]/10 flex items-center justify-center mb-4 group-hover:bg-[#8FA895]/20 transition-colors">
-                <Icon className="h-6 w-6 text-[#7D9383]" />
+              <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: accent }} />
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 text-3xl transition-transform group-hover:scale-110"
+                style={{ background: `${accent}15` }}
+              >
+                {emoji}
               </div>
               <h3 className="text-xl font-semibold text-[#4B5C53]">{title}</h3>
               <p className="mt-2 text-[#6B746E] leading-relaxed">{description}</p>
@@ -147,14 +143,17 @@ export default function MarketingHomePage() {
       </section>
 
       {/* Advantages */}
-      <section className="bg-[#4B5C53] px-6 py-16">
+      <section className="bg-gradient-to-br from-[#4B5C53] to-[#3A4A42] px-6 py-16">
         <div className="mx-auto max-w-6xl">
           <h2 className="text-center text-3xl font-bold text-white mb-10">進階管理能力</h2>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {advantages.map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="text-center p-6 rounded-2xl bg-white/10 backdrop-blur">
-                <div className="w-14 h-14 mx-auto rounded-xl bg-white/20 flex items-center justify-center mb-4">
-                  <Icon className="h-7 w-7 text-white" />
+            {advantages.map(({ emoji, title, desc, color }) => (
+              <div key={title} className="text-center p-6 rounded-2xl bg-white/10 backdrop-blur transition-all hover:bg-white/15 hover:-translate-y-1">
+                <div
+                  className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4 text-3xl"
+                  style={{ background: `${color}30` }}
+                >
+                  {emoji}
                 </div>
                 <h3 className="text-lg font-semibold text-white">{title}</h3>
                 <p className="mt-2 text-sm text-white/70">{desc}</p>
@@ -172,13 +171,16 @@ export default function MarketingHomePage() {
             <h2 className="text-3xl font-bold text-[#4B5C53]">適用對象</h2>
           </div>
           <div className="grid gap-8 md:grid-cols-3">
-            {audiences.map(({ icon: Icon, label, desc }) => (
+            {audiences.map(({ emoji, label, desc, color }) => (
               <div
                 key={label}
-                className="rounded-2xl border border-[#D8D1C6] bg-[#FDFBF8] p-8 text-center transition-all hover:shadow-md"
+                className="rounded-2xl border border-[#D8D1C6] bg-[#FDFBF8] p-8 text-center transition-all hover:shadow-md hover:-translate-y-1"
               >
-                <div className="w-16 h-16 mx-auto rounded-2xl bg-[#8FA895]/10 flex items-center justify-center mb-4">
-                  <Icon className="h-8 w-8 text-[#7D9383]" />
+                <div
+                  className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4 text-4xl"
+                  style={{ background: `${color}15` }}
+                >
+                  {emoji}
                 </div>
                 <p className="text-lg font-semibold text-[#4B5C53]">{label}</p>
                 <p className="mt-2 text-sm text-[#6B746E]">{desc}</p>
@@ -212,11 +214,14 @@ export default function MarketingHomePage() {
               <h3 className="text-2xl font-bold text-[#4B5C53]">{plan.name}</h3>
               <p className="mt-4 text-3xl font-bold text-[#8FA895]">{plan.price}</p>
               <ul className="mt-6 space-y-3">
-                {plan.items.map((item) => (
-                  <li key={item} className="flex items-center gap-2 text-[#6B746E]">
-                    <span className="text-[#8FA895]">✓</span> {item}
-                  </li>
-                ))}
+                {plan.items.map((item, i) => {
+                  const colors = ['#E8734A', '#5B8DEF', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899']
+                  return (
+                    <li key={item} className="flex items-center gap-2 text-[#6B746E]">
+                      <span style={{ color: colors[i % colors.length] }}>✓</span> {item}
+                    </li>
+                  )
+                })}
               </ul>
               <Link
                 href={plan.featured ? '/demo' : '/register'}
