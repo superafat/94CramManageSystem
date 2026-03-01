@@ -147,14 +147,24 @@ telegramWebhook.post('/', async (c) => {
     });
 
     if (intent.need_clarification) {
-      await sendMessage(msg.chatId, `🤔 ${intent.clarification_question}`);
-      recordTurn('admin', msg.userId, auth.tenantId, text, intent.clarification_question ?? '沒聽懂', intent.intent);
+      const reply = intent.ai_response ?? intent.clarification_question ?? '沒聽懂，可以再說一次嗎？';
+      await sendMessage(msg.chatId, `🤔 ${reply}`);
+      recordTurn('admin', msg.userId, auth.tenantId, text, reply, intent.intent);
+      return c.json({ ok: true });
+    }
+
+    // Conversational intents — respond with AI-generated natural language
+    if (intent.intent.startsWith('chat.')) {
+      const reply = intent.ai_response ?? '👋 你好！有什麼行政事務需要幫忙嗎？';
+      await sendMessage(msg.chatId, reply);
+      recordTurn('admin', msg.userId, auth.tenantId, text, reply, intent.intent);
       return c.json({ ok: true });
     }
 
     if (intent.intent === 'unknown') {
-      await sendMessage(msg.chatId, '🤔 我沒聽懂，可以換個方式說嗎？\n輸入 /help 查看使用說明');
-      recordTurn('admin', msg.userId, auth.tenantId, text, '沒聽懂', intent.intent);
+      const reply = intent.ai_response ?? '🤔 我沒聽懂，可以換個方式說嗎？\n輸入 /help 查看使用說明';
+      await sendMessage(msg.chatId, reply);
+      recordTurn('admin', msg.userId, auth.tenantId, text, reply, intent.intent);
       return c.json({ ok: true });
     }
 
@@ -180,9 +190,11 @@ telegramWebhook.post('/', async (c) => {
       incrementUsage(auth.tenantId, 'api_calls').catch((err: unknown) => {
         logger.error({ err: err instanceof Error ? err : new Error(String(err)) }, '[Webhook] Failed to increment api_calls usage')
       });
-      await sendMessage(msg.chatId, formatResponse(result));
-      // Record conversation turn (fire-and-forget)
-      recordTurn('admin', msg.userId, auth.tenantId, text, formatResponse(result), intent.intent);
+      const formatted = formatResponse(result);
+      // 用 ai_response 當自然語言前綴，讓回覆更像人
+      const reply = intent.ai_response ? `${intent.ai_response}\n\n${formatted}` : formatted;
+      await sendMessage(msg.chatId, reply);
+      recordTurn('admin', msg.userId, auth.tenantId, text, reply, intent.intent);
       return c.json({ ok: true });
     }
 

@@ -71,17 +71,27 @@ async function smartParseIntent(
   text: string,
   binding: ParentBinding,
   memoryCtx?: MemoryContext
-): Promise<{ result: ParentIntentResult; clarification?: string }> {
+): Promise<{ result: ParentIntentResult; clarification?: string; aiResponse?: string }> {
   // Try AI first
   try {
     const parentCtx = buildParentContext(binding);
     const ai = await parseParentIntentAI(text, parentCtx, memoryCtx ?? null);
 
-    if (ai.need_clarification && ai.clarification_question) {
+    if (ai.need_clarification) {
       return {
         result: { intent: 'parent.unknown', params: {} },
-        clarification: ai.clarification_question,
+        clarification: ai.ai_response ?? ai.clarification_question ?? undefined,
       };
+    }
+
+    // Conversational intents — use AI response directly
+    if (ai.intent === 'greeting' || ai.intent === 'thanks' || ai.intent === 'feedback' || ai.intent === 'transfer') {
+      if (ai.ai_response) {
+        return {
+          result: { intent: 'parent.unknown', params: {} },
+          aiResponse: ai.ai_response,
+        };
+      }
     }
 
     const intent = AI_INTENT_MAP[ai.intent] ?? 'parent.unknown';
@@ -96,6 +106,7 @@ async function smartParseIntent(
           reason: ai.params.reason as string | undefined,
         },
       },
+      aiResponse: ai.ai_response ?? undefined,
     };
   } catch (err) {
     logger.warn({ err: err instanceof Error ? err : new Error(String(err)) }, '[ParentBot] AI parsing failed, falling back to keywords');
@@ -210,12 +221,19 @@ telegramParentWebhook.post('/', async (c) => {
     // Fetch memory context
     const memoryCtx = await getMemoryContext('parent', msg.userId, binding.tenant_id);
 
-    const { result: intentResult, clarification } = await smartParseIntent(text, binding, memoryCtx);
+    const { result: intentResult, clarification, aiResponse } = await smartParseIntent(text, binding, memoryCtx);
 
     // AI asked for clarification
     if (clarification) {
       await sendMessage(msg.chatId, `🤔 ${clarification}`, undefined, 'parent');
       recordTurn('parent', msg.userId, binding.tenant_id, text, clarification, intentResult.intent);
+      return c.json({ ok: true });
+    }
+
+    // AI 直接回覆的對話（greeting, thanks, feedback, transfer）
+    if (aiResponse && intentResult.intent === 'parent.unknown' && !clarification) {
+      await sendMessage(msg.chatId, aiResponse, undefined, 'parent');
+      recordTurn('parent', msg.userId, binding.tenant_id, text, aiResponse, 'chat');
       return c.json({ ok: true });
     }
 
@@ -225,8 +243,13 @@ telegramParentWebhook.post('/', async (c) => {
       return c.json({ ok: true });
     }
 
-    // Handle unknown intents — try knowledge base first
+    // Handle unknown intents — try AI response, then knowledge base
     if (intentResult.intent === 'parent.unknown') {
+      if (aiResponse) {
+        await sendMessage(msg.chatId, aiResponse, undefined, 'parent');
+        recordTurn('parent', msg.userId, binding.tenant_id, text, aiResponse, intentResult.intent);
+        return c.json({ ok: true });
+      }
       const kbAnswer = await tryKnowledgeBase(text, binding.tenant_id);
       if (kbAnswer) {
         await sendMessage(msg.chatId, kbAnswer, undefined, 'parent');
@@ -236,9 +259,11 @@ telegramParentWebhook.post('/', async (c) => {
     }
 
     // Execute intent via real API
-    const response = await executeParentIntent(intentResult, binding);
-    await sendMessage(msg.chatId, response, undefined, 'parent');
-    recordTurn('parent', msg.userId, binding.tenant_id, text, response, intentResult.intent);
+    const apiResult = await executeParentIntent(intentResult, binding);
+    // 用 aiResponse 當自然語言前綴，讓回覆更像人
+    const reply = aiResponse ? `${aiResponse}\n\n${apiResult}` : apiResult;
+    await sendMessage(msg.chatId, reply, undefined, 'parent');
+    recordTurn('parent', msg.userId, binding.tenant_id, text, reply, intentResult.intent);
   } catch (error) {
     logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[ParentBot] Error processing message')
     await sendMessage(msg.chatId, '⚠️ 系統發生錯誤，請稍後再試', undefined, 'parent');

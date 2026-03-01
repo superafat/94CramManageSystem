@@ -67,6 +67,7 @@ export async function handleCallback(msg: UnifiedMessage): Promise<void> {
       params: pending.params,
       need_clarification: false,
       clarification_question: null,
+      ai_response: null,
     };
 
     const apiResponse = await executeIntent(intentResult, auth);

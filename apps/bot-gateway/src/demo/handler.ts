@@ -145,14 +145,17 @@ async function handleAdminDemoMessage(
     return;
   }
 
+  // Conversational intents — respond with AI-generated natural language
+  if (intent.intent.startsWith('chat.')) {
+    const reply = intent.ai_response ?? '👋 你好！這是 Demo 模式，試試看輸入「陳小利今天請假」之類的指令吧！';
+    await sendMessage(chatId, reply, undefined, 'admin');
+    return;
+  }
+
   // Unknown intent
   if (intent.intent === 'unknown') {
-    await sendMessage(
-      chatId,
-      '🤔 我沒聽懂，可以換個方式說嗎？\n\n例如：「陳小利今天請假」「查數學題本庫存」「陳小利繳了4500元」',
-      undefined,
-      'admin'
-    );
+    const reply = intent.ai_response ?? '🤔 我沒聽懂，可以換個方式說嗎？\n\n例如：「陳小利今天請假」「查數學題本庫存」「陳小利繳了4500元」';
+    await sendMessage(chatId, reply, undefined, 'admin');
     return;
   }
 
@@ -224,9 +227,17 @@ async function handleParentDemoMessage(
 
   try {
     const ai = await parseParentIntent(text, DEMO_PARENT_CONTEXT);
-    if (ai.need_clarification && ai.clarification_question) {
-      await sendMessage(chatId, `🤔 ${ai.clarification_question}`, undefined, 'parent');
+    if (ai.need_clarification) {
+      const reply = ai.ai_response ?? ai.clarification_question ?? '我沒聽清楚，可以再說一次嗎？';
+      await sendMessage(chatId, `🤔 ${reply}`, undefined, 'parent');
       return;
+    }
+    // Conversational intents — use AI response directly
+    if (ai.intent === 'greeting' || ai.intent === 'thanks' || ai.intent === 'unknown') {
+      if (ai.ai_response) {
+        await sendMessage(chatId, ai.ai_response, undefined, 'parent');
+        return;
+      }
     }
     parentIntentKey = AI_TO_PARENT_INTENT[ai.intent] ?? 'parent.unknown';
     params = ai.params;
