@@ -1,5 +1,5 @@
 // 94inClass Schema - 點名系統專屬表
-import { pgTable, uuid, varchar, timestamp, boolean, integer, text, decimal, index, jsonb } from '../connection';
+import { pgTable, uuid, varchar, timestamp, boolean, integer, text, decimal, index, jsonb, uniqueIndex } from '../connection';
 import { manageStudents, manageCourses, manageTeachers } from './manage';
 import { tenants } from './common';
 
@@ -127,4 +127,5 @@ export const inclassFaceEnrollments = pgTable('inclass_face_enrollments', {
   tenantIdx: index('inclass_face_enrollments_tenant_id_idx').on(table.tenantId),
   studentIdx: index('inclass_face_enrollments_student_id_idx').on(table.studentId),
   tenantStudentIdx: index('inclass_face_enrollments_tenant_student_idx').on(table.tenantId, table.studentId),
+  tenantStudentUnique: uniqueIndex('inclass_face_enrollments_tenant_student_unique_idx').on(table.tenantId, table.studentId),
 }));
