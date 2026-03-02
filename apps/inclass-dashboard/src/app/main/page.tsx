@@ -80,6 +80,9 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [showAddStudent, setShowAddStudent] = useState(false)
   const [showFaceCheckin, setShowFaceCheckin] = useState(false)
+  const [faceMatches, setFaceMatches] = useState<{studentId: string; studentName: string; confidence: number}[]>([])
+  const [showFaceResults, setShowFaceResults] = useState(false)
+  const [faceLoading, setFaceLoading] = useState(false)
   const [newStudent, setNewStudent] = useState({ name: '', grade: '', nfcId: '' })
   const [nfcInput, setNfcInput] = useState('')
   const [message, setMessage] = useState('')
@@ -248,9 +251,56 @@ export default function Home() {
     }
   }
 
-  const capturePhoto = async (_base64: string): Promise<void> => {
-    showMessage('📸 拍照成功！（辨識功能開發中）')
-    // TODO: 整合 蜂神榜視覺辨識系統
+  const capturePhoto = async (base64Image: string) => {
+    setFaceLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const res = await fetch('/api/face/recognize', {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify({ image: base64Image, autoCheckin: false }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        showMessage(`❌ ${data.error || '辨識失敗'}`)
+        return
+      }
+
+      setFaceMatches(data.matches || [])
+      setShowFaceCheckin(false)
+      setShowFaceResults(true)
+
+      if ((data.matches || []).length === 0) {
+        showMessage(`⚠️ ${data.message || '未辨識到學生'}`)
+      }
+    } catch {
+      showMessage('❌ 辨識失敗，請重試')
+    } finally {
+      setFaceLoading(false)
+    }
+  }
+
+  const confirmFaceCheckin = async (studentIds: string[]) => {
+    try {
+      let successCount = 0
+      for (const studentId of studentIds) {
+        try {
+          await api.checkin({ studentId, method: 'face', status: 'arrived' })
+          successCount++
+        } catch { /* skip already checked in */ }
+      }
+      showMessage(`✅ 成功為 ${successCount} 位學生完成點名！`)
+      setShowFaceResults(false)
+      setFaceMatches([])
+      fetchAttendance()
+    } catch {
+      showMessage('❌ 打卡失敗')
+    }
   }
 
   const showMessage = (msg: string) => {
@@ -452,6 +502,53 @@ export default function Home() {
           onCapture={capturePhoto}
           onStreamReady={() => {}}
         />
+      )}
+
+      {/* Face Recognition Results Modal */}
+      {showFaceResults && (
+        <div
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(74,74,74,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}
+          onClick={() => setShowFaceResults(false)}
+        >
+          <div
+            style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: '24px', maxWidth: '400px', width: '100%', boxShadow: 'var(--shadow-lg)', border: '2px solid var(--border)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ fontSize: '20px', color: 'var(--primary)', fontWeight: 'bold', marginBottom: '16px' }}>
+              🎯 辨識結果
+            </h3>
+
+            {faceMatches.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                😕 未辨識到任何學生<br/>
+                <small>請確認學生已建立人臉資料</small>
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: '16px', maxHeight: '300px', overflowY: 'auto' }}>
+                  {faceMatches.map(m => (
+                    <div key={m.studentId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderBottom: '1px solid var(--border)', fontSize: '14px' }}>
+                      <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{m.studentName}</span>
+                      <span style={{
+                        padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold',
+                        background: m.confidence >= 80 ? 'var(--success)' : 'var(--warning)',
+                        color: 'white'
+                      }}>
+                        {m.confidence}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => confirmFaceCheckin(faceMatches.map(m => m.studentId))}
+                  style={{ width: '100%', padding: '14px', borderRadius: 'var(--radius-md)', background: 'var(--accent)', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}
+                >
+                  ✅ 確認為 {faceMatches.length} 位學生點名
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Toast Message */}
