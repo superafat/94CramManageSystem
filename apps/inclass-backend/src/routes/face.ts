@@ -98,13 +98,15 @@ faceRouter.post('/recognize', zValidator('json', recognizeSchema), async (c) => 
     const matchedStudentIds = new Set<string>()
 
     for (const faceEmb of faceEmbeddings) {
-      const remaining = candidates.filter(cand => !matchedStudentIds.has(cand.studentId))
+      const remaining = candidates.filter(candidate => !matchedStudentIds.has(candidate.studentId))
       const match = findBestMatch(faceEmb, remaining)
       if (match && !matchedStudentIds.has(match.studentId)) {
         matchedStudentIds.add(match.studentId)
+        const studentName = studentMap[match.studentId]
+        if (!studentName) logger.warn(`[Face] Student ${match.studentId} not found in studentMap for tenant ${tenantId}`)
         matched.push({
           studentId: match.studentId,
-          studentName: studentMap[match.studentId] ?? 'Unknown',
+          studentName: studentName ?? 'Unknown',
           confidence: match.confidence,
           distance: match.distance,
         })
@@ -126,7 +128,7 @@ faceRouter.post('/recognize', zValidator('json', recognizeSchema), async (c) => 
               eq(manageEnrollments.studentId, m.studentId),
               eq(manageEnrollments.status, 'active')
             )
-          )
+          ).limit(1)
           resolvedCourseId = enrollment?.courseId ?? undefined
         }
         if (!resolvedCourseId) continue
