@@ -164,8 +164,16 @@ export function Sidebar() {
             目前身份：<span className="font-medium text-primary">{roleLabels[userRole]}</span>
           </p>
         </div>
-        
-        <button 
+
+        <a
+          href="https://94cram.app"
+          className="w-full flex items-center gap-3 px-4 py-2 text-text-muted hover:text-text transition-colors rounded-xl hover:bg-surface-hover"
+        >
+          <span>🏠</span>
+          <span className="text-sm">返回首頁</span>
+        </a>
+
+        <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-4 py-2 text-text-muted hover:text-text transition-colors rounded-xl hover:bg-surface-hover"
         >

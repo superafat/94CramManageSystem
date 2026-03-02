@@ -105,6 +105,13 @@ export function MobileHeader() {
                   <p className="font-medium text-text">{user.name}</p>
                   <p className="text-xs text-text-muted">{roleLabels[user.role] || user.role}</p>
                 </div>
+                <a
+                  href="https://94cram.app"
+                  className="w-full px-4 py-3 text-left text-sm text-text hover:bg-surface flex items-center gap-2"
+                >
+                  <span>🏠</span>
+                  返回首頁
+                </a>
                 <button
                   onClick={handleLogout}
                   className="w-full px-4 py-3 text-left text-sm text-[#B5706E] hover:bg-red-50 flex items-center gap-2"

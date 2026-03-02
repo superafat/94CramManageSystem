@@ -130,6 +130,13 @@ export function MobileNav() {
                 <span className="text-xs text-text-muted">{item.label}</span>
               </Link>
             ))}
+            <a
+              href="https://94cram.app"
+              className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-surface-hover"
+            >
+              <span className="text-2xl">🏠</span>
+              <span className="text-xs text-text-muted">首頁</span>
+            </a>
             <button
               onClick={async () => {
                 try {

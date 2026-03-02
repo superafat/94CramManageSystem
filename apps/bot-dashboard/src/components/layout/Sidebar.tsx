@@ -54,8 +54,15 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Logout */}
-      <div className="px-3 py-4 border-t border-[#d8d3de]">
+      {/* Footer */}
+      <div className="px-3 py-4 border-t border-[#d8d3de] space-y-1">
+        <a
+          href="https://94cram.app"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[#5d5468] hover:bg-[#F5F0F7] hover:text-[#4b4355] transition w-full"
+        >
+          <span className="text-lg">🏠</span>
+          返回首頁
+        </a>
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[#7b7387] hover:bg-red-50 hover:text-red-500 transition w-full"

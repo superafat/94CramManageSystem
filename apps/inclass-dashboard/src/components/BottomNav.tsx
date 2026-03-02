@@ -78,6 +78,24 @@ export default function BottomNav() {
           </button>
         )
       })}
+      <a
+        href="https://94cram.app"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '8px',
+          gap: '4px',
+          opacity: 0.7,
+          transition: 'all 0.2s ease',
+          textDecoration: 'none',
+        }}
+      >
+        <div style={{ fontSize: '28px' }}>🏠</div>
+        <div style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 'bold' }}>
+          首頁
+        </div>
+      </a>
     </div>
   )
 }
