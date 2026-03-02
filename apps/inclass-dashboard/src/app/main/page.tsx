@@ -248,7 +248,7 @@ export default function Home() {
     }
   }
 
-  const capturePhoto = () => {
+  const capturePhoto = async (_base64: string): Promise<void> => {
     showMessage('📸 拍照成功！（辨識功能開發中）')
     // TODO: 整合 蜂神榜視覺辨識系統
   }

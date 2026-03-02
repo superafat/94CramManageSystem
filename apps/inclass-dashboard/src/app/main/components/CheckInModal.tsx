@@ -1,38 +1,54 @@
 'use client'
 
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 
 interface CheckInModalProps {
   onClose: () => void
-  onCapture: () => void
+  onCapture: (base64: string) => Promise<void>
   onStreamReady: (stream: MediaStream) => void
 }
 
 export default function CheckInModal({ onClose, onCapture, onStreamReady }: CheckInModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [capturing, setCapturing] = useState(false)
+  const [cameraError, setCameraError] = useState('')
 
   useEffect(() => {
     let mediaStream: MediaStream | null = null
     navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: 'user' } })
+      .getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } })
       .then((stream) => {
         mediaStream = stream
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-        }
+        if (videoRef.current) videoRef.current.srcObject = stream
         onStreamReady(stream)
       })
       .catch(() => {
-        // parent handles error message
+        setCameraError('無法開啟相機，請確認瀏覽器相機權限')
       })
 
     return () => {
-      if (mediaStream) {
-        mediaStream.getTracks().forEach((track) => track.stop())
-      }
+      if (mediaStream) mediaStream.getTracks().forEach(t => t.stop())
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const handleCapture = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current) return
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    canvas.getContext('2d')?.drawImage(video, 0, 0)
+    const base64 = canvas.toDataURL('image/jpeg', 0.85)
+
+    setCapturing(true)
+    try {
+      await onCapture(base64)
+    } finally {
+      setCapturing(false)
+    }
+  }, [onCapture])
 
   return (
     <div
@@ -41,30 +57,53 @@ export default function CheckInModal({ onClose, onCapture, onStreamReady }: Chec
     >
       <div
         style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: '24px', maxWidth: '500px', width: '100%', boxShadow: 'var(--shadow-lg)', border: '2px solid var(--border)', position: 'relative' }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         <button
           onClick={onClose}
           style={{ position: 'absolute', top: '12px', right: '12px', background: 'var(--error)', border: 'none', width: '32px', height: '32px', borderRadius: '50%', color: 'white', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold' }}
-        >
-          ×
-        </button>
-        <h3 style={{ fontSize: '20px', color: 'var(--primary)', fontWeight: 'bold', marginBottom: '16px' }}>📸 刷臉點名</h3>
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          style={{ width: '100%', borderRadius: 'var(--radius-md)', background: '#000', marginBottom: '12px' }}
-        />
+        >×</button>
+
+        <h3 style={{ fontSize: '20px', color: 'var(--primary)', fontWeight: 'bold', marginBottom: '16px' }}>
+          📸 刷臉點名
+        </h3>
+
+        {cameraError ? (
+          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--error)', fontSize: '14px' }}>
+            ⚠️ {cameraError}
+          </div>
+        ) : (
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{ width: '100%', borderRadius: 'var(--radius-md)', background: '#000', marginBottom: '12px' }}
+          />
+        )}
+
+        <canvas ref={canvasRef} style={{ display: 'none' }} />
+
         <button
-          disabled
-          onClick={onCapture}
-          style={{ width: '100%', padding: '14px', borderRadius: 'var(--radius-md)', background: '#B0B8B4', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'not-allowed', opacity: 0.7 }}
+          onClick={handleCapture}
+          disabled={capturing || !!cameraError}
+          style={{
+            width: '100%',
+            padding: '14px',
+            borderRadius: 'var(--radius-md)',
+            background: capturing || cameraError ? '#B0B8B4' : 'var(--accent)',
+            color: 'white',
+            border: 'none',
+            fontWeight: 'bold',
+            fontSize: '16px',
+            cursor: capturing || cameraError ? 'not-allowed' : 'pointer',
+          }}
         >
-          📸 拍照辨識（功能開發中）
+          {capturing ? '⏳ 辨識中...' : '📸 拍照辨識全班'}
         </button>
-        <div style={{ marginTop: '8px', textAlign: 'center', fontSize: '12px', color: 'var(--text-secondary)', background: '#FFF8E7', border: '1px solid #F0D080', borderRadius: 'var(--radius-sm)', padding: '6px 10px' }}>
-          ⚠️ AI 臉部辨識功能尚在開發中，敬請期待
+
+        <div style={{ marginTop: '8px', textAlign: 'center', fontSize: '12px', color: 'var(--text-secondary)' }}>
+          對準全班同學後按下拍照，系統自動辨識並點名
         </div>
       </div>
     </div>
