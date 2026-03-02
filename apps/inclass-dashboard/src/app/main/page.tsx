@@ -292,7 +292,9 @@ export default function Home() {
         try {
           await api.checkin({ studentId, method: 'face', status: 'arrived' })
           successCount++
-        } catch { /* skip already checked in */ }
+        } catch (e) {
+          console.error(`[FaceCheckin] Failed to checkin student ${studentId}:`, e)
+        }
       }
       showMessage(`✅ 成功為 ${successCount} 位學生完成點名！`)
       setShowFaceResults(false)
@@ -541,9 +543,10 @@ export default function Home() {
                 </div>
                 <button
                   onClick={() => confirmFaceCheckin(faceMatches.map(m => m.studentId))}
-                  style={{ width: '100%', padding: '14px', borderRadius: 'var(--radius-md)', background: 'var(--accent)', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}
+                  disabled={faceLoading}
+                  style={{ width: '100%', padding: '14px', borderRadius: 'var(--radius-md)', background: faceLoading ? '#B0B8B4' : 'var(--accent)', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: faceLoading ? 'not-allowed' : 'pointer', opacity: faceLoading ? 0.6 : 1 }}
                 >
-                  ✅ 確認為 {faceMatches.length} 位學生點名
+                  {faceLoading ? '⏳ 處理中...' : `✅ 確認為 ${faceMatches.length} 位學生點名`}
                 </button>
               </>
             )}
