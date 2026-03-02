@@ -116,11 +116,15 @@ export default function Home() {
       const headers: HeadersInit = {}
       if (token) headers['Authorization'] = `Bearer ${token}`
       const res = await fetch('/api/face/enrolled-students', { credentials: 'include', headers })
-      if (res.ok) {
-        const data = await res.json()
-        setEnrolledStudentIds(data.enrolledStudentIds || [])
+      if (!res.ok) {
+        console.warn(`[Face] fetchEnrolledStudents failed: ${res.status}`)
+        return
       }
-    } catch { /* non-critical */ }
+      const data = await res.json()
+      setEnrolledStudentIds(data.enrolledStudentIds || [])
+    } catch (err) {
+      console.error('[Face] fetchEnrolledStudents error:', err)
+    }
   }
 
   const fetchAlerts = async () => {
