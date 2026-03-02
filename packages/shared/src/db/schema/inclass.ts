@@ -1,5 +1,5 @@
 // 94inClass Schema - 點名系統專屬表
-import { pgTable, uuid, varchar, timestamp, boolean, integer, text, decimal, index } from '../connection';
+import { pgTable, uuid, varchar, timestamp, boolean, integer, text, decimal, index, jsonb } from '../connection';
 import { manageStudents, manageCourses, manageTeachers } from './manage';
 import { tenants } from './common';
 
@@ -113,4 +113,18 @@ export const inclassNfcCards = pgTable('inclass_nfc_cards', {
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
   tenantIdx: index('inclass_nfc_cards_tenant_id_idx').on(table.tenantId),
+}));
+
+// 人臉建檔（刷臉點名用）
+export const inclassFaceEnrollments = pgTable('inclass_face_enrollments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  studentId: uuid('student_id').references(() => manageStudents.id).notNull(),
+  embedding: jsonb('embedding').notNull(), // number[] - 128 維向量
+  enrolledAt: timestamp('enrolled_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  tenantIdx: index('inclass_face_enrollments_tenant_id_idx').on(table.tenantId),
+  studentIdx: index('inclass_face_enrollments_student_id_idx').on(table.studentId),
+  tenantStudentIdx: index('inclass_face_enrollments_tenant_student_idx').on(table.tenantId, table.studentId),
 }));
