@@ -39,6 +39,8 @@ import internalRoutes from './routes/internal.js'
 import webhookRoutes from './routes/webhooks.js'
 import botRoutes from './routes/bot/index.js'
 import parentExtRoutes from './routes/parent-ext.js'
+import faceRoutes from './routes/face.js'
+import { loadModels } from './services/faceRecognition.js'
 type Variables = {
   schoolId: string
   userId: string
@@ -80,8 +82,8 @@ app.use('/*', cors({
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id'],
 }))
-// Body size limit: 1MB default
-app.use('/api/*', bodyLimit({ maxSize: 1024 * 1024 }))
+// Body size limit: 5MB for image upload support
+app.use('/api/*', bodyLimit({ maxSize: 5 * 1024 * 1024 }))
 // Request Logger
 app.use('*', honoLogger())
 // Rate limiter for auth routes (skip OPTIONS & demo)
@@ -183,6 +185,8 @@ app.route('/api/parent-ext', parentExtRoutes)
 app.route('/api/webhooks', webhookRoutes)
 // Internal API (own auth via INTERNAL_API_TOKEN, NOT JWT)
 app.route('/internal', internalRoutes)
+// Face recognition routes (image-based, requires increased body limit)
+app.route('/api/face', faceRoutes)
 // ===== Global Error Handler =====
 app.onError((err, c) => {
   logger.error({ err }, `[Global Error Handler] ${c.req.path}`)
@@ -211,6 +215,8 @@ export default app
 const port = parseInt(process.env.PORT || '3102')
 logger.info(`🐝 BeeClass Backend starting on port ${port}...`)
 const serve = async () => {
+  // Preload face recognition models at startup (avoids cold-start delay)
+  await loadModels().catch(err => logger.warn({ err }, 'Face model preload failed (non-fatal)'))
   const { serve } = await import('@hono/node-server')
   const server = serve({ port, fetch: app.fetch })
   logger.info(`✅ BeeClass Backend running at http://localhost:${port}`)
