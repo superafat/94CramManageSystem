@@ -98,11 +98,30 @@ export default function Home() {
   const [paymentNotes, setPaymentNotes] = useState('')
   const [submittingPayment, setSubmittingPayment] = useState(false)
 
+  // 人臉建檔
+  const [enrolledStudentIds, setEnrolledStudentIds] = useState<string[]>([])
+  const [showEnrollModal, setShowEnrollModal] = useState(false)
+  const [enrollingStudentId, setEnrollingStudentId] = useState<string | null>(null)
+  const [enrollingStudentName, setEnrollingStudentName] = useState('')
+
   // 警示通知
   const [alerts, setAlerts] = useState<AlertNotification[]>([])
   const [showAlerts, setShowAlerts] = useState(false)
 
   const API_BASE = ''
+
+  const fetchEnrolledStudents = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch('/api/face/enrolled-students', { credentials: 'include', headers })
+      if (res.ok) {
+        const data = await res.json()
+        setEnrolledStudentIds(data.enrolledStudentIds || [])
+      }
+    } catch { /* non-critical */ }
+  }
 
   const fetchAlerts = async () => {
     try {
@@ -120,6 +139,7 @@ export default function Home() {
   useEffect(() => {
     fetchData()
     fetchAlerts()
+    fetchEnrolledStudents()
   }, [])
 
   const fetchData = async () => {
@@ -310,6 +330,37 @@ export default function Home() {
     setTimeout(() => setMessage(''), 3000)
   }
 
+  const handleEnrollFace = (studentId: string, studentName: string) => {
+    setEnrollingStudentId(studentId)
+    setEnrollingStudentName(studentName)
+    setShowEnrollModal(true)
+  }
+
+  const submitEnrollment = async (base64Image: string) => {
+    if (!enrollingStudentId) return
+    try {
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch('/api/face/enroll', {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify({ studentId: enrollingStudentId, image: base64Image }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        showMessage(`✅ ${data.studentName} 人臉建檔成功！`)
+        setEnrolledStudentIds(prev => [...new Set([...prev, enrollingStudentId!])])
+        setShowEnrollModal(false)
+      } else {
+        showMessage(`❌ ${data.error || '建檔失敗'}`)
+      }
+    } catch {
+      showMessage('❌ 建檔失敗，請重試')
+    }
+  }
+
   const attendanceRate = stats.total > 0 ? Math.round(((stats.arrived + stats.late) / stats.total) * 100) : 0
 
   return (
@@ -420,7 +471,19 @@ export default function Home() {
                   <div style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{s.name}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{s.grade} {s.nfcId && `· ${s.nfcId}`}</div>
                 </div>
-                <button onClick={() => deleteStudent(s.id)} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer' }}>🗑️</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <button
+                    onClick={() => handleEnrollFace(s.id, s.name)}
+                    style={{
+                      fontSize: '11px', padding: '3px 8px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                      background: enrolledStudentIds.includes(s.id) ? 'var(--success)' : 'var(--warning)',
+                      color: 'white', fontWeight: 'bold', flexShrink: 0,
+                    }}
+                  >
+                    {enrolledStudentIds.includes(s.id) ? '✅建檔' : '📷建檔'}
+                  </button>
+                  <button onClick={() => deleteStudent(s.id)} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer' }}>🗑️</button>
+                </div>
               </div>
             ))}
             {students.length === 0 && (
@@ -502,6 +565,15 @@ export default function Home() {
         <CheckInModal
           onClose={() => setShowFaceCheckin(false)}
           onCapture={capturePhoto}
+          onStreamReady={() => {}}
+        />
+      )}
+
+      {/* Face Enrollment Modal */}
+      {showEnrollModal && enrollingStudentId && (
+        <CheckInModal
+          onClose={() => setShowEnrollModal(false)}
+          onCapture={submitEnrollment}
           onStreamReady={() => {}}
         />
       )}
