@@ -77,10 +77,10 @@ app.use('*', cors({
     gcpOrigin('cram94-stock-dashboard'),
     gcpOrigin('cram94-stock-backend'),
     gcpOrigin('cram94-portal'),
-    // Custom domains (94cram.app)
-    'https://manage.94cram.app',
-    'https://inclass.94cram.app',
-    'https://stock.94cram.app',
+    // Custom domains (94cram.com)
+    'https://manage.94cram.com',
+    'https://inclass.94cram.com',
+    'https://stock.94cram.com',
     // Custom domains (94cram.com)
     'https://manage.94cram.com',
     'https://inclass.94cram.com',

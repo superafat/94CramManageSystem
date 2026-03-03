@@ -63,11 +63,11 @@ app.use('*', secureHeaders())
 // CORS - MUST be first (before rate limiter, before auth)
 app.use('/*', cors({
   origin: [
-    'https://inclass.94cram.app',
+    'https://inclass.94cram.com',
     gcpOrigin('cram94-inclass-dashboard'),
-    'https://manage.94cram.app',
+    'https://manage.94cram.com',
     gcpOrigin('cram94-manage-dashboard'),
-    'https://stock.94cram.app',
+    'https://stock.94cram.com',
     gcpOrigin('cram94-stock-dashboard'),
     gcpOrigin('cram94-portal'),
     'https://inclass.94cram.com',

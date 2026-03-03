@@ -19,11 +19,11 @@ app.use('/*', secureHeaders());
 // CORS whitelist
 app.use('/*', cors({
   origin: [
-    'https://stock.94cram.app',
+    'https://stock.94cram.com',
     gcpOrigin('cram94-stock-dashboard'),
-    'https://manage.94cram.app',
+    'https://manage.94cram.com',
     gcpOrigin('cram94-manage-dashboard'),
-    'https://inclass.94cram.app',
+    'https://inclass.94cram.com',
     gcpOrigin('cram94-inclass-dashboard'),
     gcpOrigin('cram94-portal'),
     // Custom domains (94cram.com)

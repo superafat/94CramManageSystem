@@ -554,7 +554,7 @@ authRoutes.post('/seed', async (c) => {
     const userId = generateId()
     await db.execute(sql`
       INSERT INTO users (id, tenant_id, username, full_name, email, role, password_hash, is_active, created_at)
-      VALUES (${userId}, ${tenantId}, 'admin', '系統管理員', 'admin@94cram.app', 'superadmin', ${passwordHash}, true, NOW())
+      VALUES (${userId}, ${tenantId}, 'admin', '系統管理員', 'admin@94cram.com', 'superadmin', ${passwordHash}, true, NOW())
     `)
 
     return success(c, { message: 'Admin user created', userId, tenantId })

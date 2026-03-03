@@ -31,7 +31,7 @@
 - **Billing Account**: `010ED6-0628BE-09B2D4`
 - **Artifact Registry**: `cram94`（asia-east1）
 - **Cloud Run**: `cram94-*` 前綴（⚠️ 不能數字開頭）
-- **Domain**: `94cram.app`
+- **Domain**: `94cram.com`
 - **SA**: `deploy94@cram94-manage-system.iam.gserviceaccount.com`
 - **SA Key**: `~/gcp-sa-key.json`
 - **GitHub**: `superafat/94CramManageSystem`（public monorepo）

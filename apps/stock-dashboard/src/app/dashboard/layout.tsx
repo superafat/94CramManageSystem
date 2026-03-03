@@ -125,7 +125,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Footer */}
           <div className="p-3 border-t border-[#D8D1C6] space-y-2">
             <a
-              href="https://94cram.app"
+              href="https://94cram.com"
               className="flex items-center justify-center gap-2 w-full px-3 py-2 text-sm text-[#6B746E] bg-[#F5F0EB] border border-[#D8D1C6] rounded-xl hover:bg-[#E6DDD1] transition-colors"
             >
               🏠 返回首頁

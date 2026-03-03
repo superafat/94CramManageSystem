@@ -79,7 +79,7 @@ export default function BottomNav() {
         )
       })}
       <a
-        href="https://94cram.app"
+        href="https://94cram.com"
         style={{
           display: 'flex',
           flexDirection: 'column',

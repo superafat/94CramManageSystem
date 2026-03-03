@@ -18,7 +18,7 @@
 | **統一入口** | `apps/portal` — 圖標選擇器 |
 | **SSO** | 共用 JWT_SECRET + users 表 |
 | **Billing** | `010ED6-0628BE-09B2D4` |
-| **域名** | `94cram.app` |
+| **域名** | `94cram.com` |
 | **月預算** | NT$300（~$10 USD） |
 | **94LineBot** | 不遷入，未來獨立為 `94CramLineBot` |
 
@@ -145,7 +145,7 @@ JWT Payload:
   "iat": ..., "exp": ...
 }
 
-Cookie domain: .94cram.app → 三個子系統自動帶入
+Cookie domain: .94cram.com → 三個子系統自動帶入
 ```
 
 ### 3.3 跨服務內部 API
@@ -232,7 +232,7 @@ packages/shared/src/utils/internal-api.ts 提供 helper：
 - [ ] 系統圖標選擇器 + 登入頁
 - [ ] 根據帳號權限顯示授權系統
 - [ ] 部署到 Cloud Run
-- [ ] 域名設定 `94cram.app`
+- [ ] 域名設定 `94cram.com`
 
 ### Phase 6：收尾 ⏱️ 1 天
 - [ ] 舊 repo archive（94Manage / 94inClass / 94Stock）
@@ -263,7 +263,7 @@ packages/shared/src/utils/internal-api.ts 提供 helper：
 | Cloud SQL db-f1-micro（24h） | ~$7-9 |
 | Cloud Run × 7 services | ~$0（免費層） |
 | Artifact Registry | ~$0 |
-| 域名 94cram.app | ~$1/月 |
+| 域名 94cram.com | ~$1/月 |
 | **總計** | **~$8-10/月** |
 
 ---

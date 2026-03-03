@@ -946,8 +946,8 @@ add_rect(slide, Inches(1), Inches(3.5), Inches(3), Inches(0.04), COLORS['accent'
 
 # 聯絡資訊
 contact_info = [
-    ('🌐', '94cram.app'),
-    ('📧', 'contact@94cram.app'),
+    ('🌐', '94cram.com'),
+    ('📧', 'contact@94cram.com'),
     ('📱', 'LINE 官方帳號 @94cram'),
     ('💬', 'Telegram @bot94cram'),
 ]

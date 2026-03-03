@@ -266,11 +266,11 @@ export default function HomePage() {
           <p className="text-lg font-semibold text-white mb-2">🤖 蜂神榜 補習班 Ai 助手系統</p>
           <p className="mb-5 text-[#a89bb5] text-xs">千里眼 · 順風耳 · 蜂神榜 Ai 教育管理平台</p>
           <div className="flex flex-wrap justify-center gap-6 mb-5 text-[#a89bb5] text-xs">
-            <a href="https://94cram.app" className="hover:text-white transition">蜂神榜平台</a>
+            <a href="https://94cram.com" className="hover:text-white transition">蜂神榜平台</a>
             <a href="https://t.me/cram94_bot" className="hover:text-white transition">千里眼 Telegram</a>
             <a href="https://t.me/Cram94_VIP_bot" className="hover:text-white transition">順風耳 Telegram</a>
           </div>
-          <p className="text-[#6b6275] text-xs">&copy; 2026 94cram.app · 蜂神榜 Ai 教育科技 · All rights reserved.</p>
+          <p className="text-[#6b6275] text-xs">&copy; 2026 94cram.com · 蜂神榜 Ai 教育科技 · All rights reserved.</p>
         </div>
       </footer>
 

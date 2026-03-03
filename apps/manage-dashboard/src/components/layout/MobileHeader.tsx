@@ -106,7 +106,7 @@ export function MobileHeader() {
                   <p className="text-xs text-text-muted">{roleLabels[user.role] || user.role}</p>
                 </div>
                 <a
-                  href="https://94cram.app"
+                  href="https://94cram.com"
                   className="w-full px-4 py-3 text-left text-sm text-text hover:bg-surface flex items-center gap-2"
                 >
                   <span>🏠</span>
