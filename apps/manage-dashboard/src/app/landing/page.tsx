@@ -284,7 +284,7 @@ export default function LandingPage() {
         <p className="text-sm opacity-80">
           <a href="/guide" className="text-white underline">使用說明</a>
           <span className="mx-3">·</span>
-          <a href="mailto:superafat0922@gmail.com" className="text-white underline">聯絡我們</a>
+          <a href="mailto:superafatus@gmail.com" className="text-white underline">聯絡我們</a>
         </p>
       </footer>
     </div>

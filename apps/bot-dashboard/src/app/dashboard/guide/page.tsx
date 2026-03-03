@@ -254,10 +254,10 @@ export default function GuidePage() {
               <div>
                 <div className="text-[#7b7387]">Email 聯絡</div>
                 <a
-                  href="mailto:superafat0922@gmail.com"
+                  href="mailto:superafatus@gmail.com"
                   className="font-medium text-[#A89BB5] hover:text-[#4b4355] transition"
                 >
-                  superafat0922@gmail.com
+                  superafatus@gmail.com
                 </a>
               </div>
             </div>

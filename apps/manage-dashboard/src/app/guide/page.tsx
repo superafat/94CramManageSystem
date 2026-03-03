@@ -327,7 +327,7 @@ export default function GuidePage() {
             技術支援
           </p>
           <ul className="ml-5 text-text-muted text-sm leading-relaxed">
-            <li className="mb-2">📧 Email: <a href="mailto:superafat0922@gmail.com" className="text-primary hover:underline">superafat0922@gmail.com</a></li>
+            <li className="mb-2">📧 Email: <a href="mailto:superafatus@gmail.com" className="text-primary hover:underline">superafatus@gmail.com</a></li>
             <li className="mb-2">💬 LINE 官方帳號: @94imstudy</li>
             <li className="mb-2">📖 GitHub: <a href="https://github.com/superafat/94imStudy/issues" target="_blank" rel="noopener" className="text-primary hover:underline">提交 Issue</a></li>
             <li>📚 完整文件: <a href="https://github.com/superafat/94imStudy" target="_blank" rel="noopener" className="text-primary hover:underline">GitHub README</a></li>

@@ -162,8 +162,8 @@ export default function GuidePage() {
           <ul className="ml-5 text-[#6B746E] text-sm leading-loose">
             <li className="mb-2">
               📧 Email:{' '}
-              <a href="mailto:superafat0922@gmail.com" className="text-[#4B5C53] hover:underline">
-                superafat0922@gmail.com
+              <a href="mailto:superafatus@gmail.com" className="text-[#4B5C53] hover:underline">
+                superafatus@gmail.com
               </a>
             </li>
             <li>💬 LINE 官方帳號: @94imstudy</li>
