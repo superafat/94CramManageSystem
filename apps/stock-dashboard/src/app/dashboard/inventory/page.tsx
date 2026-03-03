@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Package, AlertTriangle, Search, Warehouse, ShoppingCart } from 'lucide-react';
 import api from '@/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
+import { DemoBanner } from '@/components/DemoBanner';
 
 interface InventoryItem {
   id: string;
@@ -72,12 +73,14 @@ export default function InventoryPage() {
     }
   };
 
-  const filteredInventory = inventory.filter(item =>
+  const filteredInventory = useMemo(() => inventory.filter(item =>
     item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ), [inventory, searchTerm]);
 
-  const lowStockItems = filteredInventory.filter(item => item.quantity <= item.safetyStock);
+  const lowStockItems = useMemo(() => filteredInventory.filter(item => item.quantity <= item.safetyStock), [filteredInventory]);
+
+  const warehouseCount = useMemo(() => new Set(inventory.map(i => i.warehouseName)).size, [inventory]);
 
   // 建議採購數量 = safetyStock * 2 - quantity（至少 1）
   const suggestedQty = (item: InventoryItem) => Math.max(1, item.safetyStock * 2 - item.quantity);
@@ -90,13 +93,22 @@ export default function InventoryPage() {
     }
     setCreatingPO(true);
     try {
-      const warehouseId = lowStockItems[0].warehouseId;
-      const payload = {
-        warehouseId,
-        notes: `系統自動建議：低庫存一鍵採購（${lowStockItems.length} 項品項）`,
-      };
-      await api.post('/purchase-orders', payload);
-      toast.success(`已建立採購單（${lowStockItems.length} 項低庫存品項）`);
+      // 依倉庫分組，每個倉庫建立一張採購單
+      const byWarehouse = new Map<string, InventoryItem[]>();
+      for (const item of lowStockItems) {
+        const existing = byWarehouse.get(item.warehouseId) || [];
+        existing.push(item);
+        byWarehouse.set(item.warehouseId, existing);
+      }
+      await Promise.all(
+        Array.from(byWarehouse.entries()).map(([warehouseId, items]) =>
+          api.post('/purchase-orders', {
+            warehouseId,
+            notes: `系統自動建議：低庫存一鍵採購（${items.length} 項品項）`,
+          })
+        )
+      );
+      toast.success(`已建立 ${byWarehouse.size} 張採購單（共 ${lowStockItems.length} 項低庫存品項）`);
     } catch (err) {
       console.error('Failed to create purchase order:', err);
       toast.error('建立採購單失敗，請至進貨單頁面手動建立');
@@ -113,11 +125,7 @@ export default function InventoryPage() {
     <div className="space-y-6 relative h-full flex flex-col">
       <Toaster position="top-right" />
 
-      {isDemo && (
-        <div className="bg-blue-50 border border-blue-200 rounded px-4 py-2 text-blue-700 text-sm">
-          目前為 Demo 模式，資料不會真實寫入
-        </div>
-      )}
+      {isDemo && <DemoBanner />}
 
       {/* Header */}
       <div className="flex justify-between items-center">
@@ -166,7 +174,7 @@ export default function InventoryPage() {
             </div>
             <div>
               <p className="text-sm text-gray-500">倉庫數量</p>
-              <p className="text-2xl font-bold text-gray-900">{new Set(inventory.map(i => i.warehouseName)).size}</p>
+              <p className="text-2xl font-bold text-gray-900">{warehouseCount}</p>
             </div>
           </div>
         </div>

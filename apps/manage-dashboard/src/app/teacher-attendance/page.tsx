@@ -153,14 +153,16 @@ export default function TeacherAttendancePage() {
     setSaving(true)
     try {
       if (!isDemo) {
-        for (const [teacherId, status] of Object.entries(changes)) {
-          await fetch(`${API_BASE}/api/admin/teacher-attendance`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ teacherId, date: selectedDate, status, notes: '' }),
-          })
-        }
+        await Promise.all(
+          Object.entries(changes).map(([teacherId, status]) =>
+            fetch(`${API_BASE}/api/admin/teacher-attendance`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ teacherId, date: selectedDate, status, notes: '' }),
+            })
+          )
+        )
         setChanges({})
         setEditMode(false)
         await loadData()
@@ -209,11 +211,10 @@ export default function TeacherAttendancePage() {
           reason: leaveForm.reason,
         }),
       })
-      if (!res.ok && res.status !== 404) {
+      if (!res.ok) {
         throw new Error('請假申請失敗')
       }
       setLeaveSuccess(`已為 ${leaveForm.teacherName} 登記${LEAVE_TYPE_LABELS[leaveForm.leaveType]}`)
-      // 同步本地 records
       setRecords(prev =>
         prev.map(r =>
           r.teacher_id === leaveForm.teacherId
@@ -221,17 +222,21 @@ export default function TeacherAttendancePage() {
             : r
         )
       )
-      if (!isDemo) await loadData()
+      await loadData()
     } catch {
-      // Demo 模式下 404 視為成功
-      setLeaveSuccess(`已為 ${leaveForm.teacherName} 登記${LEAVE_TYPE_LABELS[leaveForm.leaveType]}`)
-      setRecords(prev =>
-        prev.map(r =>
-          r.teacher_id === leaveForm.teacherId
-            ? { ...r, status: 'leave', leave_type: leaveForm.leaveType, leave_reason: leaveForm.reason }
-            : r
+      if (isDemo) {
+        // Demo 模式：API 不存在時直接更新本地
+        setLeaveSuccess(`已為 ${leaveForm.teacherName} 登記${LEAVE_TYPE_LABELS[leaveForm.leaveType]}`)
+        setRecords(prev =>
+          prev.map(r =>
+            r.teacher_id === leaveForm.teacherId
+              ? { ...r, status: 'leave', leave_type: leaveForm.leaveType, leave_reason: leaveForm.reason }
+              : r
+          )
         )
-      )
+      } else {
+        setError('請假申請失敗')
+      }
     } finally {
       setLeaveSubmitting(false)
     }

@@ -149,9 +149,7 @@ export default function SchedulesPage() {
       router.push('/login')
       return
     }
-    fetchTeachers()
-    fetchCourses()
-    fetchStudents()
+    Promise.all([fetchTeachers(), fetchCourses(), fetchStudents()])
   }, [router])
 
   useEffect(() => {
@@ -252,7 +250,7 @@ export default function SchedulesPage() {
         }
         if (dates.length === 0) return
 
-        await Promise.all(
+        const results = await Promise.all(
           dates.map(date =>
             fetch(`${API_BASE}/api/w8/schedules`, {
               method: 'POST',
@@ -262,10 +260,15 @@ export default function SchedulesPage() {
             })
           )
         )
+        const failedCount = results.filter(r => !r.ok).length
         setShowAddModal(false)
         setAddForm(DEFAULT_FORM)
         fetchSchedules()
-        showToast(`已建立 ${dates.length} 堂週課`)
+        if (failedCount > 0) {
+          showToast(`已建立 ${dates.length - failedCount} 堂週課（${failedCount} 堂失敗）`)
+        } else {
+          showToast(`已建立 ${dates.length} 堂週課`)
+        }
       }
     } catch (err) {
       console.error('Failed to add schedule:', err)

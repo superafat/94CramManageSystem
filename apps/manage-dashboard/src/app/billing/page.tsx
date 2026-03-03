@@ -181,10 +181,12 @@ function loadPriceMemory(): PriceMemory {
   } catch { return {} }
 }
 
-function savePriceMemory(courseId: string, studentId: string, amount: number, paymentType: string) {
+function savePriceMemoryBatch(records: Array<{ courseId: string; studentId: string; amount: number; paymentType: string }>) {
   const mem = loadPriceMemory()
-  if (!mem[courseId]) mem[courseId] = {}
-  mem[courseId][studentId] = { amount, paymentType, updatedAt: new Date().toISOString() }
+  for (const r of records) {
+    if (!mem[r.courseId]) mem[r.courseId] = {}
+    mem[r.courseId][r.studentId] = { amount: r.amount, paymentType: r.paymentType, updatedAt: new Date().toISOString() }
+  }
   localStorage.setItem(PRICE_MEMORY_KEY, JSON.stringify(mem))
 }
 
@@ -571,7 +573,7 @@ function DaycareTab() {
       })
       const json = await res.json()
       if (json.success) {
-        records.forEach(r => savePriceMemory(r.courseId, r.studentId, r.amount, r.paymentType))
+        savePriceMemoryBatch(records)
         showMsg(`✅ 成功建立 ${json.data.created} 筆繳費記錄`)
         fetchData()
       }
@@ -730,7 +732,7 @@ function DaycareTab() {
                         className="w-24 px-2 py-1 border border-border rounded text-right text-sm"
                         placeholder="金額"
                       />
-                      {(() => { const lp = getLastPrice(selectedClassId, s.id); return lp && !s.payment_id ? <span className="text-xs text-text-muted">上次: ${lp.amount.toLocaleString()}</span> : null })()}
+                      {!s.payment_id && (() => { const lp = getLastPrice(selectedClassId, s.id); return lp ? <span className="text-xs text-text-muted">上次: NT${lp.amount.toLocaleString()}</span> : null })()}
                     </div>
                   </div>
                 )}
@@ -860,7 +862,7 @@ function GroupTab() {
       })
       const data = await res.json()
       if (data.success) {
-        records.forEach(r => savePriceMemory(r.courseId, r.studentId, r.amount, r.paymentType))
+        savePriceMemoryBatch(records)
         showMsg(`✅ 成功建立 ${data.data.created} 筆繳費記錄`)
         fetchBilling()
       }
@@ -1084,7 +1086,7 @@ function GroupTab() {
                         className="w-24 px-2 py-1 border border-border rounded text-right text-sm"
                         placeholder="金額"
                       />
-                      {(() => { const lp = getLastPrice(selectedCourseId, student.id); return lp && !student.payment_id ? <span className="text-xs text-text-muted">上次: ${lp.amount.toLocaleString()}</span> : null })()}
+                      {!student.payment_id && (() => { const lp = getLastPrice(selectedCourseId, student.id); return lp ? <span className="text-xs text-text-muted">上次: NT${lp.amount.toLocaleString()}</span> : null })()}
                     </div>
                   </div>
                 )}

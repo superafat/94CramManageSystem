@@ -948,7 +948,7 @@ export default function HeadquartersPage() {
     setFranchise((prev) =>
       prev.map((r) =>
         r.id === id
-          ? { ...r, urgeCount: newCount, paymentStatus: newCount >= 3 ? 'overdue' as PaymentStatus : r.paymentStatus }
+          ? { ...r, urgeCount: newCount, paymentStatus: newCount >= 3 ? 'pending' as PaymentStatus : r.paymentStatus }
           : r
       )
     )

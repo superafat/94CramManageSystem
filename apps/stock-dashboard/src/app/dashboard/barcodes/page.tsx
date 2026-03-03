@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
+import { DemoBanner } from '@/components/DemoBanner';
 
 type Item = { id: string; name: string };
 type Row = { barcode: { id: string; itemId: string; barcode: string; barcodeType: string; isPrimary: boolean }; itemName: string };
@@ -178,11 +179,7 @@ export default function BarcodesPage() {
         </button>
       </div>
 
-      {isDemo && (
-        <div className="bg-blue-50 border border-blue-200 rounded px-4 py-2 text-blue-700 text-sm">
-          目前為 Demo 模式，資料不會真實寫入
-        </div>
-      )}
+      {isDemo && <DemoBanner />}
 
       {/* 盤點 Modal */}
       {scanning && (
@@ -265,15 +262,15 @@ export default function BarcodesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {scanRecords.map((rec, idx) => (
-                          <tr key={idx} className="border-t">
+                        {scanRecords.map((rec) => (
+                          <tr key={rec.barcode} className="border-t">
                             <td className="px-3 py-2 font-mono text-xs text-gray-500">{rec.barcode}</td>
                             <td className="px-3 py-2 text-gray-900">{rec.itemName}</td>
                             <td className="px-3 py-2 text-right font-bold text-gray-900">{rec.actualQty}</td>
                             <td className="px-3 py-2">
                               <button
                                 className="text-red-500 text-xs hover:text-red-700"
-                                onClick={() => setScanRecords(prev => prev.filter((_, i) => i !== idx))}
+                                onClick={() => setScanRecords(prev => prev.filter(r => r.barcode !== rec.barcode))}
                               >
                                 移除
                               </button>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { getCurrentUser } from '@/lib/auth';
 import toast, { Toaster } from 'react-hot-toast';
+import { DemoBanner } from '@/components/DemoBanner';
 
 type PurchaseOrderListItem = {
   order: {
@@ -144,11 +145,7 @@ export default function PurchaseOrdersPage() {
         <h2 className="text-2xl font-bold text-gray-900">進貨單管理</h2>
       </div>
 
-      {isDemo && (
-        <div className="bg-blue-50 border border-blue-200 rounded px-4 py-2 text-blue-700 text-sm">
-          目前為 Demo 模式，資料不會真實寫入
-        </div>
-      )}
+      {isDemo && <DemoBanner />}
 
       {/* 新增表單 */}
       <div className="bg-white border rounded-lg p-4 grid md:grid-cols-3 gap-2">
@@ -190,7 +187,7 @@ export default function PurchaseOrdersPage() {
             ) : orders.map((row) => (
               <tr key={row.order.id} className="border-t hover:bg-gray-50">
                 <td className="p-2">
-                  {row.order.id.startsWith('demo-') ? (
+                  {isDemo ? (
                     <span className="text-gray-500 font-mono text-xs">{row.order.id.slice(0, 12)}</span>
                   ) : (
                     <Link href={`/dashboard/purchase-orders/${row.order.id}`} className="text-[#6f8d75] hover:underline font-mono text-xs">
