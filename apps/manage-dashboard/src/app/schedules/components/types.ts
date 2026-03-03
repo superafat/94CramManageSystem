@@ -19,6 +19,7 @@ export interface Schedule {
   student_ids?: string[]
   student_names?: string[]
   fee_per_class?: string
+  instruction_mode?: 'teacher' | 'self_study'
   // 繳費狀態（可由後端填入，或用 Demo 假資料）
   unpaidCount?: number
   unpaidStudents?: string[]
@@ -53,6 +54,11 @@ export interface AddForm {
   roomId: string
   studentIds: string[]
   feePerClass: string
+  instructionMode: 'teacher' | 'self_study'
+  recurrenceMode: 'single' | 'weekly'
+  weekDays: number[]
+  recurrenceStart: string
+  recurrenceEnd: string
 }
 
 export interface ConflictWarning {

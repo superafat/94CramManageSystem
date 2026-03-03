@@ -83,14 +83,51 @@ export default function TeacherCourseSelector({
         </select>
       </div>
 
+      {/* 個指：教學模式 */}
+      {isIndividual && (
+        <div>
+          <label className="block text-sm text-text-muted mb-2">教學模式</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => onFormChange({ ...addForm, instructionMode: 'teacher' })}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${
+                addForm.instructionMode === 'teacher'
+                  ? 'bg-[#6f8d75] text-white border-transparent'
+                  : 'bg-surface border-border text-text-muted hover:border-[#8FA895]'
+              }`}
+            >
+              老師教學
+            </button>
+            <button
+              type="button"
+              onClick={() => onFormChange({ ...addForm, instructionMode: 'self_study', teacherId: '' })}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${
+                addForm.instructionMode === 'self_study'
+                  ? 'bg-[#C8A882] text-white border-transparent'
+                  : 'bg-surface border-border text-text-muted hover:border-[#C8A882]'
+              }`}
+            >
+              自修/非老師
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 講師 */}
       <div>
-        <label className="block text-sm text-text-muted mb-1">講師 *</label>
+        <label className="block text-sm text-text-muted mb-1">
+          講師
+          {isIndividual && addForm.instructionMode === 'self_study'
+            ? <span className="ml-1 text-xs text-text-muted">（自修模式可不填）</span>
+            : <span className="ml-1 text-[#B5706E]">*</span>
+          }
+        </label>
         <select
           value={addForm.teacherId}
           onChange={(e) => onFormChange({ ...addForm, teacherId: e.target.value })}
           className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
-          required
+          required={!(isIndividual && addForm.instructionMode === 'self_study')}
         >
           <option value="">選擇講師</option>
           {teachers.map(t => (

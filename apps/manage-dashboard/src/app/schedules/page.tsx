@@ -21,6 +21,11 @@ const DEFAULT_FORM: AddForm = {
   roomId: '',
   studentIds: [],
   feePerClass: '',
+  instructionMode: 'teacher',
+  recurrenceMode: 'single',
+  weekDays: [],
+  recurrenceStart: '',
+  recurrenceEnd: '',
 }
 
 const getWeekDates = (offset: number = 0) => {
@@ -197,35 +202,70 @@ export default function SchedulesPage() {
 
   const handleAddSchedule = async (e: React.FormEvent) => {
     e.preventDefault()
-    try {
-      const payload = {
-        courseId: addForm.courseId,
-        teacherId: addForm.teacherId,
-        scheduledDate: addForm.scheduledDate,
-        startTime: addForm.startTime,
-        endTime: addForm.endTime,
-        courseType: addForm.courseType,
-        ...(addForm.roomId.trim() ? { roomId: addForm.roomId.trim() } : {}),
-        ...(addForm.courseType === 'individual' && addForm.studentIds.length > 0
-          ? { studentIds: addForm.studentIds }
-          : {}),
-        ...(addForm.courseType === 'individual' && addForm.feePerClass
-          ? { feePerClass: addForm.feePerClass }
-          : {}),
-      }
 
-      const res = await fetch(`${API_BASE}/api/w8/schedules`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      })
-      if (res.ok) {
+    const buildPayload = (scheduledDate: string) => ({
+      courseId: addForm.courseId,
+      teacherId: addForm.teacherId || undefined,
+      scheduledDate,
+      startTime: addForm.startTime,
+      endTime: addForm.endTime,
+      courseType: addForm.courseType,
+      ...(addForm.roomId.trim() ? { roomId: addForm.roomId.trim() } : {}),
+      ...(addForm.courseType === 'individual' && addForm.studentIds.length > 0
+        ? { studentIds: addForm.studentIds }
+        : {}),
+      ...(addForm.courseType === 'individual' && addForm.feePerClass
+        ? { feePerClass: addForm.feePerClass }
+        : {}),
+      ...(addForm.courseType === 'individual'
+        ? { instructionMode: addForm.instructionMode }
+        : {}),
+    })
+
+    try {
+      if (addForm.recurrenceMode === 'single') {
+        const payload = buildPayload(addForm.scheduledDate)
+        const res = await fetch(`${API_BASE}/api/w8/schedules`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        })
+        if (res.ok) {
+          setShowAddModal(false)
+          setAddForm(DEFAULT_FORM)
+          fetchSchedules()
+        } else {
+          console.error('Add schedule failed:', res.status)
+        }
+      } else {
+        // 計算 recurrenceStart ~ recurrenceEnd 之間符合 weekDays 的所有日期
+        if (!addForm.recurrenceStart || !addForm.recurrenceEnd || addForm.weekDays.length === 0) return
+        const dates: string[] = []
+        const cursor = new Date(addForm.recurrenceStart + 'T00:00:00')
+        const end = new Date(addForm.recurrenceEnd + 'T00:00:00')
+        while (cursor <= end) {
+          if (addForm.weekDays.includes(cursor.getDay())) {
+            dates.push(cursor.toISOString().split('T')[0])
+          }
+          cursor.setDate(cursor.getDate() + 1)
+        }
+        if (dates.length === 0) return
+
+        await Promise.all(
+          dates.map(date =>
+            fetch(`${API_BASE}/api/w8/schedules`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify(buildPayload(date)),
+            })
+          )
+        )
         setShowAddModal(false)
         setAddForm(DEFAULT_FORM)
         fetchSchedules()
-      } else {
-        console.error('Add schedule failed:', res.status)
+        showToast(`已建立 ${dates.length} 堂週課`)
       }
     } catch (err) {
       console.error('Failed to add schedule:', err)

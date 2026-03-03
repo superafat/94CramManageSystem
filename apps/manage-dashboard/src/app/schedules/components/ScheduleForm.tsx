@@ -2,6 +2,8 @@
 
 import { Schedule, AddForm, ConflictWarning } from './types'
 
+const WEEK_DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
+
 const formatTime = (time: string) => time.slice(0, 5)
 
 const getStatusColor = (status: string) => {
@@ -143,16 +145,99 @@ export default function ScheduleForm({
             />
           </div>
 
+          {/* 排課模式切換 */}
           <div>
-            <label className="block text-sm text-text-muted mb-1">日期 *</label>
-            <input
-              type="date"
-              value={addForm.scheduledDate}
-              onChange={(e) => onFormChange({ ...addForm, scheduledDate: e.target.value })}
-              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
-              required
-            />
+            <label className="block text-sm text-text-muted mb-2">排課模式</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => onFormChange({ ...addForm, recurrenceMode: 'single' })}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${
+                  addForm.recurrenceMode === 'single'
+                    ? 'bg-[#6f8d75] text-white border-transparent'
+                    : 'bg-surface border-border text-text-muted hover:border-[#8FA895]'
+                }`}
+              >
+                單堂
+              </button>
+              <button
+                type="button"
+                onClick={() => onFormChange({ ...addForm, recurrenceMode: 'weekly' })}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${
+                  addForm.recurrenceMode === 'weekly'
+                    ? 'bg-[#6f8d75] text-white border-transparent'
+                    : 'bg-surface border-border text-text-muted hover:border-[#8FA895]'
+                }`}
+              >
+                每週重複
+              </button>
+            </div>
           </div>
+
+          {addForm.recurrenceMode === 'single' ? (
+            <div>
+              <label className="block text-sm text-text-muted mb-1">日期 *</label>
+              <input
+                type="date"
+                value={addForm.scheduledDate}
+                onChange={(e) => onFormChange({ ...addForm, scheduledDate: e.target.value })}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                required
+              />
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm text-text-muted mb-2">週課天數 *</label>
+                <div className="flex gap-1.5">
+                  {WEEK_DAY_LABELS.map((label, idx) => {
+                    const selected = addForm.weekDays.includes(idx)
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          const next = selected
+                            ? addForm.weekDays.filter(d => d !== idx)
+                            : [...addForm.weekDays, idx]
+                          onFormChange({ ...addForm, weekDays: next })
+                        }}
+                        className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${
+                          selected
+                            ? 'bg-[#6f8d75] text-white border-transparent'
+                            : 'bg-surface border-border text-text-muted hover:border-[#8FA895]'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-text-muted mb-1">開始日期 *</label>
+                  <input
+                    type="date"
+                    value={addForm.recurrenceStart}
+                    onChange={(e) => onFormChange({ ...addForm, recurrenceStart: e.target.value })}
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                    required={addForm.recurrenceMode === 'weekly'}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-text-muted mb-1">結束日期 *</label>
+                  <input
+                    type="date"
+                    value={addForm.recurrenceEnd}
+                    onChange={(e) => onFormChange({ ...addForm, recurrenceEnd: e.target.value })}
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                    required={addForm.recurrenceMode === 'weekly'}
+                  />
+                </div>
+              </div>
+            </>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm text-text-muted mb-1">開始時間 *</label>

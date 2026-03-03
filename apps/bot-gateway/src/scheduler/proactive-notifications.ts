@@ -237,6 +237,21 @@ function buildWeakSubjectNote(
   );
 }
 
+// ─── 分校主管逾期通知 ─────────────────────────────────────────────────────────
+
+/**
+ * 通知分校主管逾期帳款摘要
+ * TODO: 實際發送 — 查詢該 tenant 的 manager user，透過 LINE/Telegram 發送
+ */
+async function notifyBranchManagerOverdue(tenantId: string, unpaidCount: number, maxOverdueDays: number): Promise<void> {
+  const message = `【帳款提醒】貴校有 ${unpaidCount} 筆待繳帳款，最長逾期 ${Math.floor(maxOverdueDays)} 天，請儘速處理。`;
+  logger.info(
+    { tenantId, unpaidCount, maxOverdueDays },
+    '[Branch Manager Notification] 逾期帳款通知'
+  );
+  console.log(`[Branch Manager Notification] tenant=${tenantId}: ${message}`);
+}
+
 // ─── 任務一：每日繳費提醒（通知分校行政人員） ────────────────────────────────
 
 /**
@@ -310,6 +325,10 @@ export async function scheduleDailyBillingReminder(): Promise<void> {
         `📅 統計時間：${new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}`;
 
       dispatchTextNotification(admin.admin_chat_id, message, 'admin');
+
+      // 通知分校主管逾期帳款摘要
+      const maxOverdueDays = Math.max(...tenantStudents.map((s) => s.overdue_days));
+      await notifyBranchManagerOverdue(tenantId, tenantStudents.length, maxOverdueDays);
     }
 
     logger.info(

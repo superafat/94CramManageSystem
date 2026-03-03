@@ -160,6 +160,39 @@ function getOverdueDays(periodMonth: string | undefined): number {
   return Math.max(0, diff)
 }
 
+// ─── 價格記憶 ─────────────────────────────────────────────────────────────────
+
+const PRICE_MEMORY_KEY = '94cram_billing_price_memory'
+
+interface PriceMemory {
+  [courseId: string]: {
+    [studentId: string]: {
+      amount: number
+      paymentType: string
+      updatedAt: string
+    }
+  }
+}
+
+function loadPriceMemory(): PriceMemory {
+  try {
+    const raw = localStorage.getItem(PRICE_MEMORY_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch { return {} }
+}
+
+function savePriceMemory(courseId: string, studentId: string, amount: number, paymentType: string) {
+  const mem = loadPriceMemory()
+  if (!mem[courseId]) mem[courseId] = {}
+  mem[courseId][studentId] = { amount, paymentType, updatedAt: new Date().toISOString() }
+  localStorage.setItem(PRICE_MEMORY_KEY, JSON.stringify(mem))
+}
+
+function getLastPrice(courseId: string, studentId: string): { amount: number; paymentType: string } | null {
+  const mem = loadPriceMemory()
+  return mem[courseId]?.[studentId] || null
+}
+
 // ─── Overdue Badge ────────────────────────────────────────────────────────────
 
 function OverdueBadge({ level, days }: { level: OverdueLevel; days?: number }) {
@@ -503,7 +536,8 @@ function DaycareTab() {
         const newAmt: Record<string, number> = {}
         students.forEach(s => {
           newSel[s.id] = !s.payment_id
-          newAmt[s.id] = s.paid_amount || fee
+          const remembered = getLastPrice(selectedClassId, s.id)
+          newAmt[s.id] = s.paid_amount || (remembered?.amount ?? fee)
         })
         setSelected(newSel)
         setAmounts(newAmt)
@@ -536,7 +570,11 @@ function DaycareTab() {
         body: JSON.stringify({ records }),
       })
       const json = await res.json()
-      if (json.success) { showMsg(`✅ 成功建立 ${json.data.created} 筆繳費記錄`); fetchData() }
+      if (json.success) {
+        records.forEach(r => savePriceMemory(r.courseId, r.studentId, r.amount, r.paymentType))
+        showMsg(`✅ 成功建立 ${json.data.created} 筆繳費記錄`)
+        fetchData()
+      }
       else showMsg('❌ 建立失敗：' + (json.error?.message || '未知錯誤'))
     } catch (e) { console.error(e); showMsg('❌ 建立失敗') }
     setSubmitting(false)
@@ -684,13 +722,16 @@ function DaycareTab() {
                     {(overdueLevel === 'critical' || overdueLevel === 'overdue') && (
                       <ReminderButton studentId={s.id} studentName={s.full_name} />
                     )}
-                    <input
-                      type="number"
-                      value={amounts[s.id] || 0}
-                      onChange={e => setAmounts({ ...amounts, [s.id]: Number(e.target.value) })}
-                      className="w-24 px-2 py-1 border border-border rounded text-right text-sm"
-                      placeholder="金額"
-                    />
+                    <div className="flex flex-col items-end gap-0.5">
+                      <input
+                        type="number"
+                        value={amounts[s.id] || 0}
+                        onChange={e => setAmounts({ ...amounts, [s.id]: Number(e.target.value) })}
+                        className="w-24 px-2 py-1 border border-border rounded text-right text-sm"
+                        placeholder="金額"
+                      />
+                      {(() => { const lp = getLastPrice(selectedClassId, s.id); return lp && !s.payment_id ? <span className="text-xs text-text-muted">上次: ${lp.amount.toLocaleString()}</span> : null })()}
+                    </div>
                   </div>
                 )}
               </div>
@@ -764,7 +805,8 @@ function GroupTab() {
         const defaultFee = getDefaultFee(data.data.course)
         data.data.students.forEach((s: StudentBilling) => {
           newSel[s.id] = !s.payment_id
-          newAmt[s.id] = s.paid_amount || defaultFee
+          const remembered = getLastPrice(selectedCourseId, s.id)
+          newAmt[s.id] = s.paid_amount || (remembered?.amount ?? defaultFee)
         })
         setSelected(newSel)
         setAmounts(newAmt)
@@ -817,7 +859,11 @@ function GroupTab() {
         body: JSON.stringify({ records }),
       })
       const data = await res.json()
-      if (data.success) { showMsg(`✅ 成功建立 ${data.data.created} 筆繳費記錄`); fetchBilling() }
+      if (data.success) {
+        records.forEach(r => savePriceMemory(r.courseId, r.studentId, r.amount, r.paymentType))
+        showMsg(`✅ 成功建立 ${data.data.created} 筆繳費記錄`)
+        fetchBilling()
+      }
       else showMsg('❌ 建立失敗：' + (data.error?.message || '未知錯誤'))
     } catch (e) { console.error(e); showMsg('❌ 建立失敗') }
     setSubmitting(false)
@@ -1030,13 +1076,16 @@ function GroupTab() {
                     {(overdueLevel === 'critical' || overdueLevel === 'overdue') && (
                       <ReminderButton studentId={student.id} studentName={student.full_name} />
                     )}
-                    <input
-                      type="number"
-                      value={amounts[student.id] || 0}
-                      onChange={e => setAmounts({ ...amounts, [student.id]: Number(e.target.value) })}
-                      className="w-24 px-2 py-1 border border-border rounded text-right text-sm"
-                      placeholder="金額"
-                    />
+                    <div className="flex flex-col items-end gap-0.5">
+                      <input
+                        type="number"
+                        value={amounts[student.id] || 0}
+                        onChange={e => setAmounts({ ...amounts, [student.id]: Number(e.target.value) })}
+                        className="w-24 px-2 py-1 border border-border rounded text-right text-sm"
+                        placeholder="金額"
+                      />
+                      {(() => { const lp = getLastPrice(selectedCourseId, student.id); return lp && !student.payment_id ? <span className="text-xs text-text-muted">上次: ${lp.amount.toLocaleString()}</span> : null })()}
+                    </div>
                   </div>
                 )}
               </div>
