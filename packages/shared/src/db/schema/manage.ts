@@ -9,12 +9,15 @@ export const manageCourses = pgTable('manage_courses', {
   name: varchar('name', { length: 255 }).notNull(),
   subject: varchar('subject', { length: 100 }),
   grade: varchar('grade', { length: 20 }), // 國一, 高一...
+  courseType: varchar('course_type', { length: 20 }).default('group'), // group=團班, individual=個指, daycare=安親
   price: decimal('price', { precision: 10, scale: 2 }),
   feeMonthly: decimal('fee_monthly', { precision: 10, scale: 2 }),
   feeQuarterly: decimal('fee_quarterly', { precision: 10, scale: 2 }),
   feeSemester: decimal('fee_semester', { precision: 10, scale: 2 }),
   feeYearly: decimal('fee_yearly', { precision: 10, scale: 2 }),
+  feePerSession: decimal('fee_per_session', { precision: 10, scale: 2 }), // 個指單堂費用
   hours: integer('hours'), // 總時數
+  maxStudents: integer('max_students'), // 個指通常 1-3 人
   deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
@@ -177,6 +180,51 @@ export const manageExpenses = pgTable('manage_expenses', {
 }, (table) => ({
   tenantIdx: index('manage_expenses_tenant_idx').on(table.tenantId),
   categoryIdx: index('manage_expenses_category_idx').on(table.tenantId, table.category),
+}));
+
+// 師資出缺勤
+export const manageTeacherAttendance = pgTable('manage_teacher_attendance', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  teacherId: uuid('teacher_id').references(() => manageTeachers.id).notNull(),
+  date: date('date').notNull(),
+  status: varchar('status', { length: 20 }).default('present').notNull(), // present, absent, late, leave, substitute
+  checkInTime: varchar('check_in_time', { length: 10 }), // HH:MM
+  checkOutTime: varchar('check_out_time', { length: 10 }),
+  leaveType: varchar('leave_type', { length: 20 }), // sick, personal, annual, other
+  leaveReason: text('leave_reason'),
+  substituteTeacherId: uuid('substitute_teacher_id').references(() => manageTeachers.id),
+  approved: boolean('approved').default(false),
+  approvedBy: uuid('approved_by').references(() => users.id),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  tenantIdx: index('manage_teacher_att_tenant_idx').on(table.tenantId),
+  teacherIdx: index('manage_teacher_att_teacher_idx').on(table.teacherId),
+  dateIdx: index('manage_teacher_att_date_idx').on(table.tenantId, table.date),
+}));
+
+// 電子聯絡簿訊息（進度/作業/小叮嚀/照片/家長反饋）
+export const manageContactMessages = pgTable('manage_contact_messages', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  courseId: uuid('course_id').references(() => manageCourses.id),
+  studentId: uuid('student_id').references(() => manageStudents.id),
+  teacherId: uuid('teacher_id').references(() => manageTeachers.id),
+  parentUserId: uuid('parent_user_id').references(() => users.id), // 家長回覆用
+  type: varchar('type', { length: 20 }).notNull(), // progress, homework, tip, photo, feedback
+  title: varchar('title', { length: 200 }).notNull(),
+  content: text('content').notNull(),
+  attachments: jsonb('attachments').default([]), // [{url, name, type}]
+  isFromParent: boolean('is_from_parent').default(false),
+  readByParent: boolean('read_by_parent').default(false),
+  readAt: timestamp('read_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  tenantIdx: index('manage_contact_msg_tenant_idx').on(table.tenantId),
+  studentIdx: index('manage_contact_msg_student_idx').on(table.studentId),
+  courseIdx: index('manage_contact_msg_course_idx').on(table.courseId),
+  typeIdx: index('manage_contact_msg_type_idx').on(table.tenantId, table.type),
 }));
 
 // AI 對話記錄

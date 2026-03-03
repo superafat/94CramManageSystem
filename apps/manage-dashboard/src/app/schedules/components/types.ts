@@ -1,3 +1,5 @@
+export type CourseType = 'group' | 'individual' | 'daycare'
+
 export interface Schedule {
   id: string
   course_id: string
@@ -11,6 +13,12 @@ export interface Schedule {
   end_time: string
   status: string
   rate_per_class: string
+  course_type?: CourseType
+  room_id?: string
+  room_name?: string
+  student_ids?: string[]
+  student_names?: string[]
+  fee_per_class?: string
 }
 
 export interface Teacher {
@@ -27,10 +35,24 @@ export interface Course {
   duration_minutes: number
 }
 
+export interface Student {
+  id: string
+  name: string
+}
+
 export interface AddForm {
   courseId: string
   teacherId: string
   scheduledDate: string
   startTime: string
   endTime: string
+  courseType: CourseType
+  roomId: string
+  studentIds: string[]
+  feePerClass: string
+}
+
+export interface ConflictWarning {
+  type: 'room' | 'teacher'
+  message: string
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { Schedule, AddForm } from './types'
+import { Schedule, AddForm, ConflictWarning } from './types'
 
 const formatTime = (time: string) => time.slice(0, 5)
 
@@ -12,6 +12,12 @@ const getStatusColor = (status: string) => {
     case 'rescheduled': return 'bg-yellow-100 text-yellow-700'
     default: return 'bg-gray-100 text-gray-700'
   }
+}
+
+const COURSE_TYPE_LABEL: Record<string, string> = {
+  group: '團班',
+  individual: '個指',
+  daycare: '安親',
 }
 
 interface ScheduleDetailModalProps {
@@ -26,6 +32,12 @@ export function ScheduleDetailModal({ schedule, onClose, onCancel }: ScheduleDet
       <div className="bg-surface rounded-2xl w-full max-w-md p-6">
         <h2 className="text-lg font-semibold text-text mb-4">{schedule.course_name}</h2>
         <div className="space-y-3">
+          {schedule.course_type && (
+            <div className="flex justify-between">
+              <span className="text-text-muted">課程類型</span>
+              <span className="text-text">{COURSE_TYPE_LABEL[schedule.course_type] ?? schedule.course_type}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-text-muted">講師</span>
             <span className="text-text">{schedule.teacher_name} {schedule.teacher_title}</span>
@@ -44,6 +56,24 @@ export function ScheduleDetailModal({ schedule, onClose, onCancel }: ScheduleDet
             <span className="text-text-muted">科目</span>
             <span className="text-text">{schedule.subject}</span>
           </div>
+          {schedule.room_name && (
+            <div className="flex justify-between">
+              <span className="text-text-muted">教室</span>
+              <span className="text-text">{schedule.room_name}</span>
+            </div>
+          )}
+          {schedule.course_type === 'individual' && schedule.student_names && schedule.student_names.length > 0 && (
+            <div className="flex justify-between">
+              <span className="text-text-muted">學生</span>
+              <span className="text-text text-right">{schedule.student_names.join('、')}</span>
+            </div>
+          )}
+          {schedule.course_type === 'individual' && schedule.fee_per_class && (
+            <div className="flex justify-between">
+              <span className="text-text-muted">單堂費用</span>
+              <span className="text-primary font-medium">${Number(schedule.fee_per_class).toLocaleString()}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-text-muted">堂薪</span>
             <span className="text-primary font-medium">${Number(schedule.rate_per_class).toLocaleString()}</span>
@@ -81,17 +111,38 @@ interface ScheduleFormProps {
   onFormChange: (form: AddForm) => void
   onSubmit: (e: React.FormEvent) => void
   onClose: () => void
+  conflicts: ConflictWarning[]
   children?: React.ReactNode
 }
 
-export default function ScheduleForm({ addForm, onFormChange, onSubmit, onClose, children }: ScheduleFormProps) {
+export default function ScheduleForm({
+  addForm,
+  onFormChange,
+  onSubmit,
+  onClose,
+  conflicts,
+  children,
+}: ScheduleFormProps) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-surface rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-semibold text-text mb-4">新增排課</h2>
         <form onSubmit={onSubmit} className="space-y-4">
-          {/* Teacher/Course selectors rendered by TeacherCourseSelector via children */}
+          {/* Teacher/Course selectors + course type + students rendered via children */}
           {children}
+
+          {/* 教室 */}
+          <div>
+            <label className="block text-sm text-text-muted mb-1">教室</label>
+            <input
+              type="text"
+              value={addForm.roomId}
+              onChange={(e) => onFormChange({ ...addForm, roomId: e.target.value })}
+              placeholder="教室名稱（選填）"
+              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+            />
+          </div>
+
           <div>
             <label className="block text-sm text-text-muted mb-1">日期 *</label>
             <input
@@ -124,6 +175,20 @@ export default function ScheduleForm({ addForm, onFormChange, onSubmit, onClose,
               />
             </div>
           </div>
+
+          {/* 衝突警告 */}
+          {conflicts.length > 0 && (
+            <div className="rounded-xl border border-yellow-300 bg-yellow-50 p-3 space-y-1.5">
+              <p className="text-sm font-medium text-yellow-800">⚠ 排課衝突警告</p>
+              {conflicts.map((c, i) => (
+                <p key={i} className="text-xs text-yellow-700">
+                  {c.type === 'room' ? '🏫' : '👨‍🏫'} {c.message}
+                </p>
+              ))}
+              <p className="text-xs text-yellow-600 mt-1">仍可繼續新增，請確認後送出。</p>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2">
             <button
               type="button"
@@ -134,9 +199,9 @@ export default function ScheduleForm({ addForm, onFormChange, onSubmit, onClose,
             </button>
             <button
               type="submit"
-              className="flex-1 py-2 bg-primary text-white rounded-lg font-medium"
+              className={`flex-1 py-2 rounded-lg font-medium text-white ${conflicts.length > 0 ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-primary'}`}
             >
-              新增排課
+              {conflicts.length > 0 ? '仍要新增' : '新增排課'}
             </button>
           </div>
         </form>

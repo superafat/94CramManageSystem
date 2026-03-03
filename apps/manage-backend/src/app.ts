@@ -10,6 +10,7 @@ import { adminRoutes } from './routes/admin'
 import usersRoutes from './routes/users'
 import { demoRoutes } from './routes/demo'
 import { w8Routes } from './routes/w8'
+import { teacherAttendanceRoutes } from './routes/teacher-attendance'
 import notificationRoutes from './routes/notifications'
 import lineRoutes from './routes/line'
 import { errorTestRoutes } from './routes/error-test'
@@ -174,6 +175,9 @@ app.route('/admin', demoRoutes)
 
 // W8: 講師排課 + 薪資系統 (JWT + RBAC protected)
 app.route('/api/w8', w8Routes)
+
+// Teacher Attendance: 師資出缺勤管理 (JWT + RBAC protected)
+app.route('/api/teacher-attendance', teacherAttendanceRoutes)
 
 // Notification system routes
 app.route('/api', notificationRoutes)

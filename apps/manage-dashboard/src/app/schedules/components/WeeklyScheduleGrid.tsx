@@ -1,6 +1,6 @@
 'use client'
 
-import { Schedule } from './types'
+import { Schedule, CourseType } from './types'
 
 interface WeeklyScheduleGridProps {
   weekDates: Date[]
@@ -25,13 +25,38 @@ const getStatusColor = (status: string) => {
   }
 }
 
-const getSubjectColor = (subject: string) => {
+// 課程類型對應左邊框顏色：團班=藍、個指=橘、安親=綠
+const getCourseTypeBorderColor = (courseType?: CourseType, subject?: string) => {
+  if (courseType === 'group') return 'border-l-[#9DAEBB]'      // 莫蘭迪藍
+  if (courseType === 'individual') return 'border-l-[#C8A882]' // 莫蘭迪橘
+  if (courseType === 'daycare') return 'border-l-[#A8B5A2]'    // 莫蘭迪綠
+  // 向後相容：以 subject 判斷
   switch (subject) {
-    case '數學': return 'border-l-blue-500'
-    case '英文': return 'border-l-green-500'
-    case '體育': return 'border-l-orange-500'
-    default: return 'border-l-gray-500'
+    case '數學': return 'border-l-[#9DAEBB]'
+    case '英文': return 'border-l-[#A8B5A2]'
+    case '體育': return 'border-l-[#C8A882]'
+    default: return 'border-l-gray-400'
   }
+}
+
+// 課程類型對應卡片背景色
+const getCourseTypeBg = (courseType?: CourseType) => {
+  if (courseType === 'group') return 'bg-[#EDF1F5]'      // 淡藍
+  if (courseType === 'individual') return 'bg-[#F7F0E8]' // 淡橘
+  if (courseType === 'daycare') return 'bg-[#EDF2EC]'    // 淡綠
+  return 'bg-background'
+}
+
+const COURSE_TYPE_LABEL: Record<string, string> = {
+  group: '團班',
+  individual: '個指',
+  daycare: '安親',
+}
+
+const COURSE_TYPE_BADGE: Record<string, string> = {
+  group: 'bg-[#9DAEBB]/20 text-[#5A7A8F]',
+  individual: 'bg-[#C8A882]/20 text-[#8F6A3A]',
+  daycare: 'bg-[#A8B5A2]/20 text-[#4A6B44]',
 }
 
 export default function WeeklyScheduleGrid({
@@ -42,7 +67,9 @@ export default function WeeklyScheduleGrid({
 }: WeeklyScheduleGridProps) {
   const getSchedulesForDate = (date: Date) => {
     const dateStr = formatDate(date)
-    return schedules.filter(s => s.scheduled_date === dateStr)
+    return schedules
+      .filter(s => s.scheduled_date === dateStr)
+      .sort((a, b) => a.start_time.localeCompare(b.start_time))
   }
 
   if (loading) {
@@ -75,6 +102,9 @@ export default function WeeklyScheduleGrid({
                     今天
                   </span>
                 )}
+                {daySchedules.length > 0 && (
+                  <span className="ml-auto text-xs text-text-muted">{daySchedules.length} 堂</span>
+                )}
               </div>
             </div>
 
@@ -88,22 +118,40 @@ export default function WeeklyScheduleGrid({
                     <div
                       key={schedule.id}
                       onClick={() => onSelectSchedule(schedule)}
-                      className={`p-3 bg-background rounded-lg border-l-4 ${getSubjectColor(schedule.subject)} cursor-pointer hover:shadow-md transition-shadow`}
+                      className={`p-3 rounded-lg border-l-4 ${getCourseTypeBorderColor(schedule.course_type, schedule.subject)} ${getCourseTypeBg(schedule.course_type)} cursor-pointer hover:shadow-md transition-shadow`}
                     >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium text-text">{schedule.course_name}</p>
-                          <p className="text-sm text-text-muted">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="font-medium text-text">{schedule.course_name}</p>
+                            {schedule.course_type && (
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${COURSE_TYPE_BADGE[schedule.course_type] ?? ''}`}>
+                                {COURSE_TYPE_LABEL[schedule.course_type]}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-text-muted mt-0.5">
                             {schedule.teacher_name} {schedule.teacher_title}
                           </p>
+                          {schedule.course_type === 'individual' && schedule.student_names && schedule.student_names.length > 0 && (
+                            <p className="text-xs text-text-muted mt-0.5">
+                              學生：{schedule.student_names.join('、')}
+                            </p>
+                          )}
+                          {schedule.room_name && (
+                            <p className="text-xs text-text-muted">教室：{schedule.room_name}</p>
+                          )}
                         </div>
-                        <div className="text-right">
+                        <div className="text-right shrink-0">
                           <p className="text-sm font-medium text-text">
                             {formatTime(schedule.start_time)}-{formatTime(schedule.end_time)}
                           </p>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(schedule.status)}`}>
-                            {schedule.status === 'scheduled' ? '已排' : schedule.status}
+                            {schedule.status === 'scheduled' ? '已排' : schedule.status === 'completed' ? '已完成' : schedule.status === 'cancelled' ? '已取消' : schedule.status}
                           </span>
+                          {schedule.course_type === 'individual' && schedule.fee_per_class && (
+                            <p className="text-xs text-text-muted mt-0.5">${Number(schedule.fee_per_class).toLocaleString()}/堂</p>
+                          )}
                         </div>
                       </div>
                     </div>
