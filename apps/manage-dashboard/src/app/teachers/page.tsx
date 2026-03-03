@@ -9,9 +9,40 @@ interface Teacher {
   name: string
   title: string
   phone: string
+  email: string
   rate_per_class: string
   status: string
-  email?: string
+  // 個人資料
+  id_number?: string
+  birthday?: string
+  address?: string
+  emergency_contact?: string
+  emergency_phone?: string
+  // 匯款資訊
+  bank_name?: string
+  bank_branch?: string
+  bank_account?: string
+  bank_account_name?: string
+  // 教授能力
+  subjects?: string[]
+  grade_levels?: string[]
+}
+
+const SUBJECT_OPTIONS = [
+  '國文', '英文', '數學', '理化', '物理', '化學',
+  '生物', '地科', '歷史', '地理', '公民', '自然',
+  '社會', '作文', '閱讀', '程式設計',
+]
+
+const GRADE_LEVEL_OPTIONS = ['國小', '國中', '高中']
+
+const EMPTY_FORM = {
+  name: '', title: '教師', phone: '', email: '', rate_per_class: '',
+  id_number: '', birthday: '', address: '',
+  emergency_contact: '', emergency_phone: '',
+  bank_name: '', bank_branch: '', bank_account: '', bank_account_name: '',
+  subjects: [] as string[],
+  grade_levels: [] as string[],
 }
 
 const API_BASE = ''
@@ -29,7 +60,7 @@ export default function TeachersPage() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null)
-  const [form, setForm] = useState({ name: '', title: '教師', phone: '', rate_per_class: '' })
+  const [form, setForm] = useState(EMPTY_FORM)
 
   const getHeaders = () => {
     return {
@@ -58,25 +89,40 @@ export default function TeachersPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const url = editingTeacher 
+      const url = editingTeacher
         ? `${API_BASE}/api/w8/teachers/${editingTeacher.id}`
         : `${API_BASE}/api/w8/teachers`
-      
+
       const res = await fetch(url, {
         method: editingTeacher ? 'PUT' : 'POST',
         headers: getHeaders(),
         credentials: 'include',
         body: JSON.stringify({
-          ...form,
+          name: form.name,
+          title: form.title,
+          phone: form.phone || undefined,
+          email: form.email || undefined,
+          ratePerClass: form.rate_per_class,
+          idNumber: form.id_number || undefined,
+          birthday: form.birthday || undefined,
+          address: form.address || undefined,
+          emergencyContact: form.emergency_contact || undefined,
+          emergencyPhone: form.emergency_phone || undefined,
+          bankName: form.bank_name || undefined,
+          bankBranch: form.bank_branch || undefined,
+          bankAccount: form.bank_account || undefined,
+          bankAccountName: form.bank_account_name || undefined,
+          subjects: form.subjects.length > 0 ? form.subjects : undefined,
+          gradeLevels: form.grade_levels.length > 0 ? form.grade_levels : undefined,
           tenant_id: getTenantId(),
           branch_id: getBranchId(),
         })
       })
-      
+
       if (res.ok) {
         setShowModal(false)
         setEditingTeacher(null)
-        setForm({ name: '', title: '教師', phone: '', rate_per_class: '' })
+        setForm({ ...EMPTY_FORM, subjects: [], grade_levels: [] })
         fetchTeachers()
       }
     } catch (err) {
@@ -90,15 +136,45 @@ export default function TeachersPage() {
       name: teacher.name,
       title: teacher.title,
       phone: teacher.phone || '',
+      email: teacher.email || '',
       rate_per_class: teacher.rate_per_class,
+      id_number: teacher.id_number || '',
+      birthday: teacher.birthday || '',
+      address: teacher.address || '',
+      emergency_contact: teacher.emergency_contact || '',
+      emergency_phone: teacher.emergency_phone || '',
+      bank_name: teacher.bank_name || '',
+      bank_branch: teacher.bank_branch || '',
+      bank_account: teacher.bank_account || '',
+      bank_account_name: teacher.bank_account_name || '',
+      subjects: teacher.subjects || [],
+      grade_levels: teacher.grade_levels || [],
     })
     setShowModal(true)
   }
 
   const openAdd = () => {
     setEditingTeacher(null)
-    setForm({ name: '', title: '教師', phone: '', rate_per_class: '' })
+    setForm({ ...EMPTY_FORM, subjects: [], grade_levels: [] })
     setShowModal(true)
+  }
+
+  const toggleSubject = (subject: string) => {
+    setForm({
+      ...form,
+      subjects: form.subjects.includes(subject)
+        ? form.subjects.filter((s) => s !== subject)
+        : [...form.subjects, subject],
+    })
+  }
+
+  const toggleGradeLevel = (level: string) => {
+    setForm({
+      ...form,
+      grade_levels: form.grade_levels.includes(level)
+        ? form.grade_levels.filter((l) => l !== level)
+        : [...form.grade_levels, level],
+    })
   }
 
   if (loading) {
@@ -149,6 +225,20 @@ export default function TeachersPage() {
                   {teacher.phone && (
                     <p className="text-sm text-text-muted mt-1">{teacher.phone}</p>
                   )}
+                  {(teacher.grade_levels && teacher.grade_levels.length > 0 || teacher.subjects && teacher.subjects.length > 0) && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {teacher.grade_levels?.map((level) => (
+                        <span key={level} className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
+                          {level}
+                        </span>
+                      ))}
+                      {teacher.subjects?.map((subject) => (
+                        <span key={subject} className="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded">
+                          {subject}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-semibold text-primary">
@@ -165,52 +255,207 @@ export default function TeachersPage() {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-surface rounded-2xl w-full max-w-md p-6">
+          <div className="bg-surface rounded-2xl w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto">
             <h2 className="text-lg font-semibold text-text mb-4">
               {editingTeacher ? '編輯講師' : '新增講師'}
             </h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm text-text-muted mb-1">姓名</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-text-muted mb-1">稱謂</label>
-                <select
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
-                >
-                  <option value="教師">教師</option>
-                  <option value="講師">講師</option>
-                  <option value="教練">教練</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm text-text-muted mb-1">電話</label>
-                <input
-                  type="tel"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-text-muted mb-1">堂薪</label>
-                <input
-                  type="number"
-                  value={form.rate_per_class}
-                  onChange={(e) => setForm({ ...form, rate_per_class: e.target.value })}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
-                  required
-                />
-              </div>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* 基本資料 */}
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-semibold text-primary mb-2">基本資料</legend>
+                <div>
+                  <label className="block text-sm text-text-muted mb-1">姓名 *</label>
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1">稱謂</label>
+                    <select
+                      value={form.title}
+                      onChange={(e) => setForm({ ...form, title: e.target.value })}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                    >
+                      <option value="教師">教師</option>
+                      <option value="講師">講師</option>
+                      <option value="教練">教練</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1">堂薪 *</label>
+                    <input
+                      type="number"
+                      value={form.rate_per_class}
+                      onChange={(e) => setForm({ ...form, rate_per_class: e.target.value })}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1">電話</label>
+                    <input
+                      type="tel"
+                      value={form.phone}
+                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                    />
+                  </div>
+                </div>
+              </fieldset>
+
+              {/* 個人資料 */}
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-semibold text-primary mb-2">個人資料</legend>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1">身分證字號</label>
+                    <input
+                      type="text"
+                      value={form.id_number}
+                      onChange={(e) => setForm({ ...form, id_number: e.target.value })}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                      maxLength={10}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1">生日</label>
+                    <input
+                      type="date"
+                      value={form.birthday}
+                      onChange={(e) => setForm({ ...form, birthday: e.target.value })}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-text-muted mb-1">地址</label>
+                  <input
+                    type="text"
+                    value={form.address}
+                    onChange={(e) => setForm({ ...form, address: e.target.value })}
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1">緊急聯絡人</label>
+                    <input
+                      type="text"
+                      value={form.emergency_contact}
+                      onChange={(e) => setForm({ ...form, emergency_contact: e.target.value })}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1">緊急聯絡電話</label>
+                    <input
+                      type="tel"
+                      value={form.emergency_phone}
+                      onChange={(e) => setForm({ ...form, emergency_phone: e.target.value })}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                    />
+                  </div>
+                </div>
+              </fieldset>
+
+              {/* 匯款資訊 */}
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-semibold text-primary mb-2">匯款資訊</legend>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1">銀行名稱</label>
+                    <input
+                      type="text"
+                      value={form.bank_name}
+                      onChange={(e) => setForm({ ...form, bank_name: e.target.value })}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1">分行名稱</label>
+                    <input
+                      type="text"
+                      value={form.bank_branch}
+                      onChange={(e) => setForm({ ...form, bank_branch: e.target.value })}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1">帳號</label>
+                    <input
+                      type="text"
+                      value={form.bank_account}
+                      onChange={(e) => setForm({ ...form, bank_account: e.target.value })}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1">戶名</label>
+                    <input
+                      type="text"
+                      value={form.bank_account_name}
+                      onChange={(e) => setForm({ ...form, bank_account_name: e.target.value })}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                    />
+                  </div>
+                </div>
+              </fieldset>
+
+              {/* 教授科目 */}
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-semibold text-primary mb-2">教授科目</legend>
+                <div className="grid grid-cols-4 gap-2">
+                  {SUBJECT_OPTIONS.map((subject) => (
+                    <label key={subject} className="flex items-center gap-1.5 text-sm text-text cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.subjects.includes(subject)}
+                        onChange={() => toggleSubject(subject)}
+                        className="rounded border-border text-primary"
+                      />
+                      {subject}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              {/* 教授年級 */}
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-semibold text-primary mb-2">教授年級</legend>
+                <div className="flex gap-6">
+                  {GRADE_LEVEL_OPTIONS.map((level) => (
+                    <label key={level} className="flex items-center gap-1.5 text-sm text-text cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.grade_levels.includes(level)}
+                        onChange={() => toggleGradeLevel(level)}
+                        className="rounded border-border text-primary"
+                      />
+                      {level}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              {/* 按鈕 */}
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"

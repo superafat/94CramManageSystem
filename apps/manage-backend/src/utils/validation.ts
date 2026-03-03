@@ -107,6 +107,18 @@ export const updateStudentSchema = createStudentSchema.partial().extend({
 
 export const teacherStatusSchema = z.enum(['active', 'inactive', 'resigned'])
 
+// 科目與年級固定選項
+export const SUBJECT_OPTIONS = [
+  '國文', '英文', '數學', '理化', '物理', '化學',
+  '生物', '地科', '歷史', '地理', '公民', '自然',
+  '社會', '作文', '閱讀', '程式設計',
+] as const
+
+export const GRADE_LEVEL_OPTIONS = ['國小', '國中', '高中'] as const
+
+export const subjectSchema = z.enum(SUBJECT_OPTIONS)
+export const gradeLevelSchema = z.enum(GRADE_LEVEL_OPTIONS)
+
 export const createTeacherSchema = z.object({
   userId: uuidSchema.optional().nullable(),
   tenantId: uuidSchema,
@@ -114,15 +126,45 @@ export const createTeacherSchema = z.object({
   name: nonEmptyString.max(50),
   title: z.string().max(20).default('教師'),
   phone: phoneSchema,
+  email: emailSchema,
   ratePerClass: z.coerce.number().positive('Rate must be positive'),
+  // 個人資料
+  idNumber: z.string().max(10).optional(),
+  birthday: dateStringSchema.optional(),
+  address: z.string().max(200).optional(),
+  emergencyContact: z.string().max(50).optional(),
+  emergencyPhone: phoneSchema,
+  // 匯款資訊
+  bankName: z.string().max(50).optional(),
+  bankBranch: z.string().max(50).optional(),
+  bankAccount: z.string().max(20).optional(),
+  bankAccountName: z.string().max(50).optional(),
+  // 教授能力
+  subjects: z.array(subjectSchema).optional(),
+  gradeLevels: z.array(gradeLevelSchema).optional(),
 })
 
 export const updateTeacherSchema = z.object({
   name: z.string().max(50).optional(),
   title: z.string().max(20).optional(),
   phone: phoneSchema,
+  email: emailSchema,
   ratePerClass: z.coerce.number().positive().optional(),
   status: teacherStatusSchema.optional(),
+  // 個人資料
+  idNumber: z.string().max(10).optional().nullable(),
+  birthday: dateStringSchema.optional().nullable(),
+  address: z.string().max(200).optional().nullable(),
+  emergencyContact: z.string().max(50).optional().nullable(),
+  emergencyPhone: phoneSchema.nullable(),
+  // 匯款資訊
+  bankName: z.string().max(50).optional().nullable(),
+  bankBranch: z.string().max(50).optional().nullable(),
+  bankAccount: z.string().max(20).optional().nullable(),
+  bankAccountName: z.string().max(50).optional().nullable(),
+  // 教授能力
+  subjects: z.array(subjectSchema).optional().nullable(),
+  gradeLevels: z.array(gradeLevelSchema).optional().nullable(),
 })
 
 // ===== Course Schemas =====

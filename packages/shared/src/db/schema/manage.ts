@@ -1,5 +1,5 @@
 // 94Manage Schema - 學員管理專屬表
-import { pgTable, uuid, varchar, text, timestamp, boolean, integer, decimal, jsonb, uniqueIndex, index } from '../connection';
+import { pgTable, uuid, varchar, text, timestamp, boolean, integer, decimal, jsonb, uniqueIndex, index, date } from '../connection';
 import { tenants, users, branches } from './common';
 
 // 課程
@@ -67,6 +67,21 @@ export const manageTeachers = pgTable('manage_teachers', {
   email: varchar('email', { length: 255 }),
   expertise: text('expertise'), // 專長科目
   hourlyRate: decimal('hourly_rate', { precision: 10, scale: 2 }),
+  // --- 個人資料 ---
+  idNumber: varchar('id_number', { length: 10 }),
+  birthday: date('birthday'),
+  address: text('address'),
+  emergencyContact: varchar('emergency_contact', { length: 50 }),
+  emergencyPhone: varchar('emergency_phone', { length: 20 }),
+  // --- 匯款資訊 ---
+  bankName: varchar('bank_name', { length: 50 }),
+  bankBranch: varchar('bank_branch', { length: 50 }),
+  bankAccount: varchar('bank_account', { length: 20 }),
+  bankAccountName: varchar('bank_account_name', { length: 50 }),
+  // --- 教授能力 ---
+  subjects: text('subjects').array(),
+  gradeLevels: text('grade_levels').array(),
+  // ---
   deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({

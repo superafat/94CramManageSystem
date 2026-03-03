@@ -120,14 +120,28 @@ w8Routes.post('/teachers', requireRole(Role.ADMIN, Role.MANAGER), zValidator('js
   try {
     const body = c.req.valid('json')
     const user = c.get('user')
-    
+
     const result = await db.execute(sql`
-      INSERT INTO teachers (user_id, tenant_id, branch_id, name, title, phone, rate_per_class)
-      VALUES (${body.userId || null}, ${user?.tenant_id ?? body.tenantId}, ${body.branchId}, 
-              ${sanitizeString(body.name)}, ${sanitizeString(body.title)}, ${body.phone || null}, ${body.ratePerClass})
+      INSERT INTO teachers (
+        user_id, tenant_id, branch_id, name, title, phone, email, rate_per_class,
+        id_number, birthday, address, emergency_contact, emergency_phone,
+        bank_name, bank_branch, bank_account, bank_account_name,
+        subjects, grade_levels
+      )
+      VALUES (
+        ${body.userId || null}, ${user?.tenant_id ?? body.tenantId}, ${body.branchId},
+        ${sanitizeString(body.name)}, ${sanitizeString(body.title)}, ${body.phone || null}, ${body.email || null}, ${body.ratePerClass},
+        ${body.idNumber || null}, ${body.birthday ? sql`${body.birthday}::date` : null},
+        ${body.address ? sanitizeString(body.address) : null},
+        ${body.emergencyContact ? sanitizeString(body.emergencyContact) : null}, ${body.emergencyPhone || null},
+        ${body.bankName ? sanitizeString(body.bankName) : null}, ${body.bankBranch ? sanitizeString(body.bankBranch) : null},
+        ${body.bankAccount || null}, ${body.bankAccountName ? sanitizeString(body.bankAccountName) : null},
+        ${body.subjects ? sql`${body.subjects}::text[]` : null},
+        ${body.gradeLevels ? sql`${body.gradeLevels}::text[]` : null}
+      )
       RETURNING *
     `)
-    
+
     return success(c, { teacher: first(result) }, 201)
   } catch (error) {
     logger.error({ err: error }, 'Error creating teacher:')
@@ -138,31 +152,43 @@ w8Routes.post('/teachers', requireRole(Role.ADMIN, Role.MANAGER), zValidator('js
   }
 })
 
-w8Routes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER), 
+w8Routes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER),
   zValidator('param', z.object({ id: uuidSchema })),
-  zValidator('json', updateTeacherSchema), 
+  zValidator('json', updateTeacherSchema),
   async (c) => {
     try {
       const { id } = c.req.valid('param')
       const body = c.req.valid('json')
-      
+
       const result = await db.execute(sql`
         UPDATE teachers
         SET name = COALESCE(${body.name != null ? sanitizeString(body.name) : null}, name),
             title = COALESCE(${body.title != null ? sanitizeString(body.title) : null}, title),
             phone = COALESCE(${body.phone ?? null}, phone),
+            email = COALESCE(${body.email ?? null}, email),
             rate_per_class = COALESCE(${body.ratePerClass ?? null}, rate_per_class),
             status = COALESCE(${body.status ?? null}, status),
+            id_number = COALESCE(${body.idNumber ?? null}, id_number),
+            birthday = COALESCE(${body.birthday != null ? sql`${body.birthday}::date` : null}, birthday),
+            address = COALESCE(${body.address != null ? sanitizeString(body.address) : null}, address),
+            emergency_contact = COALESCE(${body.emergencyContact != null ? sanitizeString(body.emergencyContact) : null}, emergency_contact),
+            emergency_phone = COALESCE(${body.emergencyPhone ?? null}, emergency_phone),
+            bank_name = COALESCE(${body.bankName != null ? sanitizeString(body.bankName) : null}, bank_name),
+            bank_branch = COALESCE(${body.bankBranch != null ? sanitizeString(body.bankBranch) : null}, bank_branch),
+            bank_account = COALESCE(${body.bankAccount ?? null}, bank_account),
+            bank_account_name = COALESCE(${body.bankAccountName != null ? sanitizeString(body.bankAccountName) : null}, bank_account_name),
+            subjects = COALESCE(${body.subjects ? sql`${body.subjects}::text[]` : null}, subjects),
+            grade_levels = COALESCE(${body.gradeLevels ? sql`${body.gradeLevels}::text[]` : null}, grade_levels),
             updated_at = NOW()
         WHERE id = ${id}
         RETURNING *
       `)
-      
+
       const teacher = first(result)
       if (!teacher) {
         return notFound(c, 'Teacher')
       }
-      
+
       return success(c, { teacher })
     } catch (error) {
       logger.error({ err: error }, 'Error updating teacher:')
