@@ -43,6 +43,7 @@ const navItems: NavEntry[] = [
   { href: '/dashboard/ai', icon: '🤖', label: 'AI 智能' },
   { href: '/dashboard/notifications', icon: '🔔', label: '通知設定' },
   { href: '/dashboard/integrations', icon: '🔗', label: '系統整合' },
+  { href: '/dashboard/guide', icon: '📚', label: '使用說明' },
 ];
 
 const roleLabels: Record<string, string> = {

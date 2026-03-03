@@ -9,6 +9,7 @@ const navItems = [
   { icon: '👨‍👩‍👧', label: '順風耳管理', href: '/dashboard/parent-bot' },
   { icon: '📊', label: '用量統計', href: '/dashboard/usage' },
   { icon: '⚙️', label: '設定', href: '/dashboard/settings' },
+  { icon: '📚', label: '使用說明', href: '/dashboard/guide' },
 ]
 
 export function Sidebar() {
