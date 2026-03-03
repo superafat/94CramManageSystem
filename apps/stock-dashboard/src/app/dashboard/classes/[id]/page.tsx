@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 
 type ClassInfo = {
   id: string;
@@ -182,6 +182,7 @@ export default function ClassDetailPage() {
 
   return (
     <div className="space-y-4">
+      <Toaster position="top-right" />
       <button className="text-sm text-gray-600" onClick={() => router.push('/dashboard/classes')}>← 返回班級列表</button>
       <h2 className="text-2xl font-bold text-gray-900">{classInfo.name} 教材配發</h2>
       <div className="bg-white border rounded-lg p-4 text-sm text-gray-700">

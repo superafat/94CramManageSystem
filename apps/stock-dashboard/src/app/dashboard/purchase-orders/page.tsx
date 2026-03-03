@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { getCurrentUser } from '@/lib/auth';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 
 type PurchaseOrderListItem = {
   order: {
@@ -53,13 +53,19 @@ export default function PurchaseOrdersPage() {
   }, []);
 
   const createOrder = async () => {
-    if (!form.warehouseId) return;
+    if (!form.warehouseId) {
+      toast.error('請選擇倉庫');
+      return;
+    }
     try {
-      await api.post('/purchase-orders', {
+      const payload: Record<string, string | undefined> = {
         warehouseId: form.warehouseId,
-        supplierId: form.supplierId || null,
-        notes: form.notes,
-      });
+      };
+      if (form.supplierId) payload.supplierId = form.supplierId;
+      if (form.notes.trim()) payload.notes = form.notes;
+
+      await api.post('/purchase-orders', payload);
+      toast.success('進貨單已新增');
       setForm({ supplierId: '', warehouseId: '', notes: '' });
       await load();
     } catch (err) {
@@ -80,6 +86,7 @@ export default function PurchaseOrdersPage() {
 
   return (
     <div className="space-y-4">
+      <Toaster position="top-right" />
       <h2 className="text-2xl font-bold text-gray-900">進貨單管理</h2>
 
       <div className="bg-white border rounded-lg p-4 grid md:grid-cols-3 gap-2">

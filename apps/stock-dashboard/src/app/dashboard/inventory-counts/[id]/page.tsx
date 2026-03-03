@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import api from '@/lib/api';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import BarcodeScanner from '@/components/BarcodeScanner';
 
 type CountItem = {
@@ -62,6 +62,7 @@ export default function InventoryCountDetailPage() {
 
   return (
     <div className="space-y-4">
+      <Toaster position="top-right" />
       <h2 className="text-2xl font-bold">盤點執行</h2>
       <div className="bg-white border rounded p-4 space-y-3">
         <BarcodeScanner onDetected={handleBarcode} />

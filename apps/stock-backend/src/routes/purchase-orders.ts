@@ -11,10 +11,10 @@ const uuidParamSchema = z.object({ id: z.string().uuid() });
 
 const purchaseOrderCreateSchema = z.object({
   warehouseId: z.string().uuid(),
-  supplierId: z.string().uuid().optional(),
-  orderDate: z.string().optional(),
-  notes: z.string().optional(),
-  totalAmount: z.number().optional(),
+  supplierId: z.preprocess((v) => (v === '' || v === null ? undefined : v), z.string().uuid().optional()),
+  orderDate: z.preprocess((v) => (v === '' || v === null ? undefined : v), z.string().optional()),
+  notes: z.preprocess((v) => (v === '' || v === null ? undefined : v), z.string().optional()),
+  totalAmount: z.preprocess((v) => (v === '' || v === null ? undefined : v), z.number().optional()),
 });
 
 const purchaseItemCreateSchema = z.object({

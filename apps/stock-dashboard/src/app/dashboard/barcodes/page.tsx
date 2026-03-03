@@ -48,19 +48,25 @@ export default function BarcodesPage() {
     <div className="space-y-4">
       <Toaster position="top-right" />
       <h2 className="text-2xl font-bold text-gray-900">條碼管理</h2>
-      <div className="bg-white border rounded p-4 grid md:grid-cols-4 gap-2">
-        <select className="border rounded px-2 py-2" value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value })}>
-          <option value="">選擇品項</option>
-          {items.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
-        <input className="border rounded px-2 py-2" placeholder="條碼" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} />
-        <select className="border rounded px-2 py-2" value={form.barcodeType} onChange={(e) => setForm({ ...form, barcodeType: e.target.value })}>
-          <option value="code128">Code128</option>
-          <option value="ean13">EAN13</option>
-          <option value="qr">QR</option>
-        </select>
-        <button className="px-3 py-2 rounded bg-[#8FA895] text-white" onClick={submit}>新增條碼</button>
-      </div>
+      {items.length === 0 ? (
+        <div className="bg-white border rounded p-4 text-center text-gray-500">
+          尚無品項資料，請先至<a href="/dashboard/items" className="text-[#6f8d75] underline mx-1">品項管理</a>新增品項後再設定條碼
+        </div>
+      ) : (
+        <div className="bg-white border rounded p-4 grid md:grid-cols-4 gap-2">
+          <select className="border rounded px-2 py-2" value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value })}>
+            <option value="">選擇品項</option>
+            {items.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+          <input className="border rounded px-2 py-2" placeholder="條碼" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} />
+          <select className="border rounded px-2 py-2" value={form.barcodeType} onChange={(e) => setForm({ ...form, barcodeType: e.target.value })}>
+            <option value="code128">Code128</option>
+            <option value="ean13">EAN13</option>
+            <option value="qr">QR</option>
+          </select>
+          <button className="px-3 py-2 rounded bg-[#8FA895] text-white" onClick={submit}>新增條碼</button>
+        </div>
+      )}
 
       <div className="bg-white rounded border overflow-hidden">
         <table className="min-w-full text-sm">

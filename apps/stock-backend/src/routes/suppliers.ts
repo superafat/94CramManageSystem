@@ -10,11 +10,11 @@ const app = new Hono();
 const uuidParamSchema = z.object({ id: z.string().uuid() });
 const supplierCreateSchema = z.object({
   name: z.string().trim().min(1),
-  contactName: z.string().trim().min(1).optional(),
-  phone: z.string().trim().min(1).optional(),
-  email: z.string().email().optional(),
-  address: z.string().trim().min(1).optional(),
-  notes: z.string().trim().min(1).optional(),
+  contactName: z.preprocess((v) => (v === '' ? undefined : v), z.string().trim().min(1).optional()),
+  phone: z.preprocess((v) => (v === '' ? undefined : v), z.string().trim().min(1).optional()),
+  email: z.preprocess((v) => (v === '' ? undefined : v), z.string().email().optional()),
+  address: z.preprocess((v) => (v === '' ? undefined : v), z.string().trim().min(1).optional()),
+  notes: z.preprocess((v) => (v === '' ? undefined : v), z.string().trim().min(1).optional()),
 }).strict();
 const supplierUpdateSchema = supplierCreateSchema.partial().refine(
   (data) => Object.keys(data).length > 0,

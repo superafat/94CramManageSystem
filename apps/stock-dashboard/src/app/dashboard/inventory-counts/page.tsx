@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 
 type CountTask = {
   id: string;
@@ -67,6 +67,7 @@ export default function InventoryCountsPage() {
 
   return (
     <div className="space-y-4">
+      <Toaster position="top-right" />
       <h2 className="text-2xl font-bold">盤點管理</h2>
       <div className="bg-white border rounded p-4 grid md:grid-cols-3 gap-2">
         <select className="border rounded px-2 py-2" value={form.warehouseId} onChange={(e) => setForm({ ...form, warehouseId: e.target.value })}>

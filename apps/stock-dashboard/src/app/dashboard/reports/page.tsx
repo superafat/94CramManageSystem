@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import * as XLSX from 'xlsx';
 import api from '@/lib/api';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 
 type SummaryData = {
   totalItems: number;
@@ -117,6 +117,7 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-4">
+      <Toaster position="top-right" />
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">報表分析</h2>
         <button className="bg-[#8FA895] text-white rounded px-3 py-2" onClick={exportExcel}>匯出 Excel</button>

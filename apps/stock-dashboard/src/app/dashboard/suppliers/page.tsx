@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 
 type Supplier = {
   id: string;
@@ -36,12 +36,25 @@ export default function SuppliersPage() {
   }, []);
 
   const submit = async () => {
-    if (!form.name.trim()) return;
+    if (!form.name.trim()) {
+      toast.error('請輸入供應商名稱');
+      return;
+    }
     try {
+      // Filter out empty strings to avoid backend validation issues
+      const payload: Record<string, string | undefined> = { name: form.name };
+      if (form.contactName.trim()) payload.contactName = form.contactName;
+      if (form.phone.trim()) payload.phone = form.phone;
+      if (form.email.trim()) payload.email = form.email;
+      if (form.address.trim()) payload.address = form.address;
+      if (form.notes.trim()) payload.notes = form.notes;
+
       if (editingId) {
-        await api.put(`/suppliers/${editingId}`, form);
+        await api.put(`/suppliers/${editingId}`, payload);
+        toast.success('供應商已更新');
       } else {
-        await api.post('/suppliers', form);
+        await api.post('/suppliers', payload);
+        toast.success('供應商已新增');
       }
       setEditingId(null);
       setForm(defaultForm);
@@ -76,6 +89,7 @@ export default function SuppliersPage() {
 
   return (
     <div className="space-y-4">
+      <Toaster position="top-right" />
       <h2 className="text-2xl font-bold text-gray-900">供應商管理</h2>
       <div className="bg-white border rounded-lg p-4 grid md:grid-cols-3 gap-2">
         <input className="border rounded px-2 py-2" placeholder="供應商名稱" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />

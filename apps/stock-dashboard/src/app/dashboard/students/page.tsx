@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 
 type StudentRow = {
   student: {
@@ -27,6 +27,7 @@ export default function StudentsPage() {
 
   return (
     <div className="space-y-4">
+      <Toaster position="top-right" />
       <h2 className="text-2xl font-bold">學生管理</h2>
       <div className="bg-white rounded border overflow-hidden">
         <table className="min-w-full text-sm">
