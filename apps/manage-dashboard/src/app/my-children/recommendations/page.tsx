@@ -364,7 +364,7 @@ export default function RecommendationsPage() {
                         <div className="flex items-center gap-1.5 text-text-muted">
                           <span>💰</span>
                           <span className="font-medium text-text">
-                            NT${course.monthly_fee.toLocaleString()}/月
+                            NT${(course.monthly_fee ?? 0).toLocaleString()}/月
                           </span>
                         </div>
                         <div className="col-span-2 flex items-center gap-1.5 text-text-muted">

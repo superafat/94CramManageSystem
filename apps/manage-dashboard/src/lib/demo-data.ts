@@ -475,28 +475,31 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
         {
           student_id: 's4',
           student_name: '張志豪',
-          weak_subjects: [{ subject: '數學', avg_score: 64 }],
+          grade: '國中一年級',
+          weak_subjects: [{ subject: '數學', average_score: 64, threshold: 70 }],
           recommended_courses: [
-            { course_id: 'c1', course_name: '國中數學 A 班', subject: '數學', reason: '數學平均 64 分，建議加強', priority: 'low' },
+            { id: 'c1', name: '國中數學 A 班', teacher: '王老師', schedule: '每週二、四 18:00–20:00', monthly_fee: 3200, subject: '數學', description: '數學平均 64 分，建議加強', priority: 'low' },
           ],
         },
         {
           student_id: 's8',
           student_name: '吳承恩',
+          grade: '國中二年級',
           weak_subjects: [
-            { subject: '數學', avg_score: 58 },
+            { subject: '數學', average_score: 58, threshold: 70 },
           ],
           recommended_courses: [
-            { course_id: 'c1', course_name: '國中數學 A 班', subject: '數學', reason: '數學平均 58 分，建議加強', priority: 'high' },
-            { course_id: 'c2', course_name: '國中英文菁英班', subject: '英文', reason: '英文成績偏弱，建議加強', priority: 'medium' },
+            { id: 'c1', name: '國中數學 A 班', teacher: '王老師', schedule: '每週二、四 18:00–20:00', monthly_fee: 3200, subject: '數學', description: '數學平均 58 分，建議加強', priority: 'high' },
+            { id: 'c2', name: '國中英文菁英班', teacher: '林老師', schedule: '每週六 10:00–12:00', monthly_fee: 2800, subject: '英文', description: '英文成績偏弱，建議加強', priority: 'medium' },
           ],
         },
         {
           student_id: 's2',
           student_name: '王大明',
-          weak_subjects: [{ subject: '英文', avg_score: 68 }],
+          grade: '國中一年級',
+          weak_subjects: [{ subject: '英文', average_score: 68, threshold: 70 }],
           recommended_courses: [
-            { course_id: 'c2', course_name: '國中英文菁英班', subject: '英文', reason: '英文平均 68 分，建議加強', priority: 'low' },
+            { id: 'c2', name: '國中英文菁英班', teacher: '林老師', schedule: '每週六 10:00–12:00', monthly_fee: 2800, subject: '英文', description: '英文平均 68 分，建議加強', priority: 'low' },
           ],
         },
       ]
