@@ -10,10 +10,10 @@ export default function DashboardPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
-          { label: '本月 AI Calls', value: '42', icon: '🤖', color: '#A89BB5' },
-          { label: '千里眼用戶', value: '8', icon: '🏫', color: '#7B8FA1' },
-          { label: '順風耳家長', value: '23', icon: '👨‍👩‍👧', color: '#C4A9A1' },
-          { label: '今日訊息', value: '15', icon: '💬', color: '#A8B5A2' },
+          { label: '本月 AI Calls', icon: '🤖', color: '#A89BB5' },
+          { label: '千里眼用戶', icon: '🏫', color: '#7B8FA1' },
+          { label: '順風耳家長', icon: '👨‍👩‍👧', color: '#C4A9A1' },
+          { label: '今日訊息', icon: '💬', color: '#A8B5A2' },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -21,12 +21,12 @@ export default function DashboardPage() {
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-2xl">{stat.icon}</span>
-              <span className="text-xs text-[#7b7387] font-medium">placeholder</span>
             </div>
             <div className="text-2xl font-bold" style={{ color: stat.color }}>
-              {stat.value}
+              —
             </div>
             <div className="text-xs text-[#7b7387] mt-1">{stat.label}</div>
+            <div className="text-xs text-[#b0a8bc] mt-0.5">待接入 API</div>
           </div>
         ))}
       </div>
@@ -40,20 +40,18 @@ export default function DashboardPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-[#7b7387]">Bot 狀態</span>
-              <span className="text-[#A8B5A2] font-medium flex items-center gap-1">
-                <span className="w-2 h-2 bg-[#A8B5A2] rounded-full inline-block" />
-                運行中
-              </span>
+              <span className="text-[#b0a8bc] font-medium">—</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-[#7b7387]">已綁定帳號</span>
-              <span className="text-[#4b4355] font-medium">3 個</span>
+              <span className="text-[#b0a8bc] font-medium">—</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-[#7b7387]">本週操作</span>
-              <span className="text-[#4b4355] font-medium">28 次</span>
+              <span className="text-[#b0a8bc] font-medium">—</span>
             </div>
           </div>
+          <p className="text-xs text-[#b0a8bc] mt-3">待接入 API</p>
         </div>
 
         <div className="bg-white rounded-xl border border-[#d8d3de] p-5 shadow-sm">
@@ -63,20 +61,18 @@ export default function DashboardPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-[#7b7387]">Bot 狀態</span>
-              <span className="text-[#A8B5A2] font-medium flex items-center gap-1">
-                <span className="w-2 h-2 bg-[#A8B5A2] rounded-full inline-block" />
-                運行中
-              </span>
+              <span className="text-[#b0a8bc] font-medium">—</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-[#7b7387]">已綁定家長</span>
-              <span className="text-[#4b4355] font-medium">23 位</span>
+              <span className="text-[#b0a8bc] font-medium">—</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-[#7b7387]">今日推播</span>
-              <span className="text-[#4b4355] font-medium">7 則</span>
+              <span className="text-[#b0a8bc] font-medium">—</span>
             </div>
           </div>
+          <p className="text-xs text-[#b0a8bc] mt-3">待接入 API</p>
         </div>
       </div>
     </div>

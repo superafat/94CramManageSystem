@@ -25,6 +25,9 @@
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
+  "_securityNotes": {
+    "xlsx": "0.18.5 has known prototype pollution and ReDoS vulnerabilities (CVE). No newer version is available on npm — SheetJS moved to a paid registry after 0.18.5. Mitigate by never parsing untrusted user-supplied xlsx files."
+  },
   "devDependencies": {
     "@types/node": "^25.2.3",
     "@types/react": "^19.0.6",

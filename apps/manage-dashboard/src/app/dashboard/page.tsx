@@ -107,18 +107,8 @@ export default function DashboardPage() {
     setTesting(false)
   }
 
-  // 意圖分佈：目前無真實統計數據，顯示為待統計狀態
-  const totalConversations = stats?.conversations ?? 0
-  const intentDistribution = totalConversations > 0
-    ? [
-        { intent: '📅 排課查詢', count: null as number | null, pct: null as number | null },
-        { intent: '💰 費用帳務', count: null, pct: null },
-        { intent: '❓ 一般問答', count: null, pct: null },
-        { intent: '🎓 招生諮詢', count: null, pct: null },
-        { intent: '📝 作業成績', count: null, pct: null },
-        { intent: '📢 客訴建議', count: null, pct: null },
-      ]
-    : []
+  // 意圖分佈：目前無真實統計數據，統計功能開發中
+  const INTENT_LABELS = ['📅 排課查詢', '💰 費用帳務', '❓ 一般問答', '🎓 招生諮詢', '📝 作業成績', '📢 客訴建議']
 
   // 未授權時不顯示內容
   if (!authorized) {
@@ -222,23 +212,20 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Intent Distribution */}
         <div className="lg:col-span-2 bg-surface rounded-2xl border border-border p-6">
-          <h2 className="text-lg font-semibold text-text mb-4">意圖分佈</h2>
-          <div className="space-y-4">
-            {intentDistribution.length === 0 ? (
-              <p className="text-sm text-text-muted text-center py-4">尚無對話數據，待系統累積統計資料</p>
-            ) : (
-              intentDistribution.map((item) => (
-                <div key={item.intent}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-text">{item.intent}</span>
-                    <span className="text-text-muted">{item.count != null ? `${item.count} (${item.pct}%)` : '待統計'}</span>
-                  </div>
-                  <div className="h-2 bg-border rounded-full overflow-hidden">
-                    <div className="h-full bg-primary/30 rounded-full" style={{ width: item.pct != null ? `${item.pct}%` : '0%' }} />
-                  </div>
+          <h2 className="text-lg font-semibold text-text mb-1">意圖分佈</h2>
+          <p className="text-xs text-text-muted mb-4">統計功能開發中</p>
+          <div className="space-y-3">
+            {INTENT_LABELS.map((label) => (
+              <div key={label}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-text">{label}</span>
+                  <span className="text-text-muted">待統計</span>
                 </div>
-              ))
-            )}
+                <div className="h-2 bg-border rounded-full overflow-hidden">
+                  <div className="h-full bg-primary/10 rounded-full w-0" />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

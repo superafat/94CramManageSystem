@@ -16,16 +16,11 @@ import { config } from '../config'
 import { db } from '../db'
 import { sql } from 'drizzle-orm'
 import { getUserPermissions, Role } from '../middleware/rbac'
-import { createHash } from 'crypto'
+import { createHash, randomUUID, randomInt } from 'crypto'
 import { rateLimit } from '../middleware/rateLimit'
 
-// Simple UUID v4 generator
 function generateId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0
-    const v = c === 'x' ? r : (r & 0x3 | 0x8)
-    return v.toString(16)
-  })
+  return randomUUID()
 }
 import { loginSchema, telegramLoginSchema, trialSignupSchema } from '../utils/validation'
 import {

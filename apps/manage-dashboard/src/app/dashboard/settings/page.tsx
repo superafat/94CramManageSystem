@@ -196,7 +196,10 @@ export default function SettingsPage() {
 
           {/* Intent Routing */}
           <div className="bg-surface rounded-2xl border border-border p-6">
-            <h2 className="text-lg font-semibold text-text mb-4">意圖路由表</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-text">意圖路由表</h2>
+              <span className="text-xs text-text-muted bg-border/50 px-2 py-1 rounded-lg">僅供檢視（編輯功能開發中）</span>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>

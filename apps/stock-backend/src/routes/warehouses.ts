@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import { authMiddleware } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { z } from 'zod';
+import { logger } from '../utils/logger';
 
 const app = new Hono();
 const uuidParamSchema = z.object({ id: z.string().uuid() });
@@ -23,133 +24,158 @@ app.use('*', authMiddleware, tenantMiddleware);
 
 // GET all warehouses
 app.get('/', async (c) => {
-  const tenantId = getTenantId(c);
+  try {
+    const tenantId = getTenantId(c);
 
-  const warehouses = await db.select()
-    .from(stockWarehouses)
-    .where(eq(stockWarehouses.tenantId, tenantId));
+    const warehouses = await db.select()
+      .from(stockWarehouses)
+      .where(eq(stockWarehouses.tenantId, tenantId));
 
-  return c.json(warehouses);
+    return c.json(warehouses);
+  } catch (err) {
+    logger.error({ err }, 'Route error');
+    return c.json({ error: 'Internal server error' }, 500);
+  }
 });
 
 // GET single warehouse
 app.get('/:id', async (c) => {
-  const tenantId = getTenantId(c);
-  const parsedParams = uuidParamSchema.safeParse({ id: c.req.param('id') });
-  if (!parsedParams.success) {
-    return c.json({ error: 'Invalid warehouse id' }, 400);
+  try {
+    const tenantId = getTenantId(c);
+    const parsedParams = uuidParamSchema.safeParse({ id: c.req.param('id') });
+    if (!parsedParams.success) {
+      return c.json({ error: 'Invalid warehouse id' }, 400);
+    }
+    const { id } = parsedParams.data;
+
+    const [warehouse] = await db.select()
+      .from(stockWarehouses)
+      .where(and(
+        eq(stockWarehouses.id, id),
+        eq(stockWarehouses.tenantId, tenantId),
+      ));
+
+    if (!warehouse) {
+      return c.json({ error: 'Warehouse not found' }, 404);
+    }
+
+    return c.json(warehouse);
+  } catch (err) {
+    logger.error({ err }, 'Route error');
+    return c.json({ error: 'Internal server error' }, 500);
   }
-  const { id } = parsedParams.data;
-
-  const [warehouse] = await db.select()
-    .from(stockWarehouses)
-    .where(and(
-      eq(stockWarehouses.id, id),
-      eq(stockWarehouses.tenantId, tenantId),
-    ));
-
-  if (!warehouse) {
-    return c.json({ error: 'Warehouse not found' }, 404);
-  }
-
-  return c.json(warehouse);
 });
 
 // POST create warehouse
 app.post('/', async (c) => {
-  const tenantId = getTenantId(c);
-  let requestBody: unknown;
   try {
-    requestBody = await c.req.json();
-  } catch {
-    return c.json({ error: 'Invalid JSON body' }, 400);
-  }
-  const parsedBody = warehouseCreateSchema.safeParse(requestBody);
-  if (!parsedBody.success) {
-    return c.json({ error: 'Invalid input' }, 400);
-  }
-  const body = parsedBody.data;
+    const tenantId = getTenantId(c);
+    let requestBody: unknown;
+    try {
+      requestBody = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+    const parsedBody = warehouseCreateSchema.safeParse(requestBody);
+    if (!parsedBody.success) {
+      return c.json({ error: 'Invalid input' }, 400);
+    }
+    const body = parsedBody.data;
 
-  const [warehouse] = await db.insert(stockWarehouses)
-    .values({
-      tenantId,
-      name: body.name,
-      code: body.code,
-      address: body.address,
-      isHeadquarters: body.isHeadquarters || false,
-    })
-    .returning();
+    const [warehouse] = await db.insert(stockWarehouses)
+      .values({
+        tenantId,
+        name: body.name,
+        code: body.code,
+        address: body.address,
+        isHeadquarters: body.isHeadquarters || false,
+      })
+      .returning();
 
-  return c.json(warehouse, 201);
+    return c.json(warehouse, 201);
+  } catch (err) {
+    logger.error({ err }, 'Route error');
+    return c.json({ error: 'Internal server error' }, 500);
+  }
 });
 
 // PUT update warehouse
 app.put('/:id', async (c) => {
-  const tenantId = getTenantId(c);
-  const parsedParams = uuidParamSchema.safeParse({ id: c.req.param('id') });
-  if (!parsedParams.success) {
-    return c.json({ error: 'Invalid warehouse id' }, 400);
-  }
-  let requestBody: unknown;
   try {
-    requestBody = await c.req.json();
-  } catch {
-    return c.json({ error: 'Invalid JSON body' }, 400);
+    const tenantId = getTenantId(c);
+    const parsedParams = uuidParamSchema.safeParse({ id: c.req.param('id') });
+    if (!parsedParams.success) {
+      return c.json({ error: 'Invalid warehouse id' }, 400);
+    }
+    let requestBody: unknown;
+    try {
+      requestBody = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+    const parsedBody = warehouseUpdateSchema.safeParse(requestBody);
+    if (!parsedBody.success) {
+      return c.json({ error: 'Invalid input' }, 400);
+    }
+    const { id } = parsedParams.data;
+    const body = parsedBody.data;
+    const updateData: {
+      name?: string;
+      code?: string;
+      address?: string;
+      isHeadquarters?: boolean;
+    } = {};
+
+    if ('name' in body) updateData.name = body.name;
+    if ('code' in body) updateData.code = body.code;
+    if ('address' in body) updateData.address = body.address;
+    if ('isHeadquarters' in body) updateData.isHeadquarters = body.isHeadquarters;
+
+    const [warehouse] = await db.update(stockWarehouses)
+      .set(updateData)
+      .where(and(
+        eq(stockWarehouses.id, id),
+        eq(stockWarehouses.tenantId, tenantId),
+      ))
+      .returning();
+
+    if (!warehouse) {
+      return c.json({ error: 'Warehouse not found' }, 404);
+    }
+
+    return c.json(warehouse);
+  } catch (err) {
+    logger.error({ err }, 'Route error');
+    return c.json({ error: 'Internal server error' }, 500);
   }
-  const parsedBody = warehouseUpdateSchema.safeParse(requestBody);
-  if (!parsedBody.success) {
-    return c.json({ error: 'Invalid input' }, 400);
-  }
-  const { id } = parsedParams.data;
-  const body = parsedBody.data;
-  const updateData: {
-    name?: string;
-    code?: string;
-    address?: string;
-    isHeadquarters?: boolean;
-  } = {};
-
-  if ('name' in body) updateData.name = body.name;
-  if ('code' in body) updateData.code = body.code;
-  if ('address' in body) updateData.address = body.address;
-  if ('isHeadquarters' in body) updateData.isHeadquarters = body.isHeadquarters;
-
-  const [warehouse] = await db.update(stockWarehouses)
-    .set(updateData)
-    .where(and(
-      eq(stockWarehouses.id, id),
-      eq(stockWarehouses.tenantId, tenantId),
-    ))
-    .returning();
-
-  if (!warehouse) {
-    return c.json({ error: 'Warehouse not found' }, 404);
-  }
-
-  return c.json(warehouse);
 });
 
 // DELETE warehouse
 app.delete('/:id', async (c) => {
-  const tenantId = getTenantId(c);
-  const parsedParams = uuidParamSchema.safeParse({ id: c.req.param('id') });
-  if (!parsedParams.success) {
-    return c.json({ error: 'Invalid warehouse id' }, 400);
+  try {
+    const tenantId = getTenantId(c);
+    const parsedParams = uuidParamSchema.safeParse({ id: c.req.param('id') });
+    if (!parsedParams.success) {
+      return c.json({ error: 'Invalid warehouse id' }, 400);
+    }
+    const { id } = parsedParams.data;
+
+    const [deleted] = await db.delete(stockWarehouses)
+      .where(and(
+        eq(stockWarehouses.id, id),
+        eq(stockWarehouses.tenantId, tenantId),
+      ))
+      .returning();
+
+    if (!deleted) {
+      return c.json({ error: 'Warehouse not found' }, 404);
+    }
+
+    return c.json({ message: 'Warehouse deleted' });
+  } catch (err) {
+    logger.error({ err }, 'Route error');
+    return c.json({ error: 'Internal server error' }, 500);
   }
-  const { id } = parsedParams.data;
-
-  const [deleted] = await db.delete(stockWarehouses)
-    .where(and(
-      eq(stockWarehouses.id, id),
-      eq(stockWarehouses.tenantId, tenantId),
-    ))
-    .returning();
-
-  if (!deleted) {
-    return c.json({ error: 'Warehouse not found' }, 404);
-  }
-
-  return c.json({ message: 'Warehouse deleted' });
 });
 
 export default app;

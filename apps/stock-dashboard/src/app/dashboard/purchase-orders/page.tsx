@@ -68,7 +68,7 @@ export default function PurchaseOrdersPage() {
       setSuppliers(DEMO_SUPPLIERS);
       setWarehouses(DEMO_WAREHOUSES);
       setIsDemo(true);
-      toast('已進入 Demo 模式（API 連線失敗）', { icon: 'ℹ️' });
+      toast.error('API 連線失敗，已切換至 Demo 模式（顯示示範資料）');
     }
   };
 

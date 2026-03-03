@@ -45,7 +45,7 @@ jobs:
             --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/inclass-backend:${{ github.sha }} \
             --region=${{ env.REGION }} \
             --platform=managed \
-            --allow-unauthenticated \
+            --no-allow-unauthenticated \
             --port=3102 \
             --memory=256Mi \
             --min-instances=0 \

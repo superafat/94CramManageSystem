@@ -1,4 +1,5 @@
 import type { ErrorHandler } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import { AppError } from './errors.js';
 
 /**
@@ -24,6 +25,44 @@ export function createErrorHandler(
   return (error: Error, c) => {
     // Generate request ID for tracking
     const requestId = c.req.header('x-request-id') || crypto.randomUUID();
+
+    // Handle Hono HTTPException (thrown by RBAC, auth, etc.)
+    if (error instanceof HTTPException) {
+      const status = error.status;
+      const response: ErrorResponse = {
+        success: false,
+        error: {
+          message: error.message,
+          code: `HTTP_${status}`,
+          statusCode: status,
+        },
+      };
+
+      if (isDevelopment) {
+        response.error.stack = error.stack;
+      }
+
+      const logData = {
+        requestId,
+        type: 'HTTPException',
+        statusCode: status,
+        message: error.message,
+        path: c.req.path,
+        method: c.req.method,
+        timestamp: new Date().toISOString(),
+      };
+
+      if (logger) {
+        logger(error, logData);
+      } else if (status >= 500) {
+        console.error('[Error]', JSON.stringify(logData));
+      } else if (isDevelopment) {
+        console.warn('[Warning]', JSON.stringify(logData));
+      }
+
+      c.header('x-request-id', requestId);
+      return c.json(response, status as any);
+    }
 
     // Handle AppError instances
     if (error instanceof AppError) {

@@ -133,17 +133,17 @@ export default function HomePage() {
         <div className="mx-auto max-w-3xl text-center">
           <h2 className="text-2xl font-bold text-[#4b5c53] mb-8">🤔 不知道從哪個開始？</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-            <a href={process.env.MANAGE_URL || '#'} className="bg-white rounded-xl p-5 border border-[#d8d1c6] hover:shadow-md transition text-left">
+            <a href={process.env.MANAGE_URL || gcpOrigin('cram94-manage-dashboard')} className="bg-white rounded-xl p-5 border border-[#d8d1c6] hover:shadow-md transition text-left">
               <p className="font-bold text-[#4b5c53] mb-2">📋 需要管理學員 / 收費 / 薪資</p>
               <p className="text-[#6b7c73] text-xs mb-3">補習班日常行政全自動化</p>
               <span className="text-[#A8B5A2] font-semibold text-xs">→ 前往 94Manage</span>
             </a>
-            <a href={process.env.INCLASS_URL || '#'} className="bg-white rounded-xl p-5 border border-[#d8d1c6] hover:shadow-md transition text-left">
+            <a href={process.env.INCLASS_URL || gcpOrigin('cram94-inclass-dashboard')} className="bg-white rounded-xl p-5 border border-[#d8d1c6] hover:shadow-md transition text-left">
               <p className="font-bold text-[#4b5c53] mb-2">✋ 需要快速點名 / 通知家長</p>
               <p className="text-[#6b7c73] text-xs mb-3">NFC + AI 臉辨，1 秒搞定</p>
               <span className="text-[#C4A9A1] font-semibold text-xs">→ 前往 94inClass</span>
             </a>
-            <a href={process.env.STOCK_URL || '#'} className="bg-white rounded-xl p-5 border border-[#d8d1c6] hover:shadow-md transition text-left">
+            <a href={process.env.STOCK_URL || gcpOrigin('cram94-stock-dashboard')} className="bg-white rounded-xl p-5 border border-[#d8d1c6] hover:shadow-md transition text-left">
               <p className="font-bold text-[#4b5c53] mb-2">📦 需要管理講義 / 教材庫存</p>
               <p className="text-[#6b7c73] text-xs mb-3">多校區統一管理，AI 預測備貨</p>
               <span className="text-[#9CADB7] font-semibold text-xs">→ 前往 94Stock</span>
@@ -179,9 +179,9 @@ export default function HomePage() {
           <p className="text-lg font-semibold text-white mb-2">🐝 蜂神榜 Ai 教育管理平台</p>
           <p className="mb-5 text-[#a8b9b2] text-xs">94Manage · 94inClass · 94Stock · 94Bot</p>
           <div className="flex flex-wrap justify-center gap-6 mb-5 text-[#a8b9b2] text-xs">
-            <a href={process.env.MANAGE_URL || '#'} className="hover:text-white transition">94Manage 學員管理</a>
-            <a href={process.env.INCLASS_URL || '#'} className="hover:text-white transition">94inClass 點名系統</a>
-            <a href={process.env.STOCK_URL || '#'} className="hover:text-white transition">94Stock 庫存管理</a>
+            <a href={process.env.MANAGE_URL || gcpOrigin('cram94-manage-dashboard')} className="hover:text-white transition">94Manage 學員管理</a>
+            <a href={process.env.INCLASS_URL || gcpOrigin('cram94-inclass-dashboard')} className="hover:text-white transition">94inClass 點名系統</a>
+            <a href={process.env.STOCK_URL || gcpOrigin('cram94-stock-dashboard')} className="hover:text-white transition">94Stock 庫存管理</a>
             <a href={process.env.BOT_DASHBOARD_URL || 'https://t.me/cram94bot'} className="hover:text-white transition">94Bot 補習班助手</a>
           </div>
           <p className="text-[#6b7c73] text-xs">© 2026 94cram.com · 蜂神榜 Ai 教育科技 · All rights reserved.</p>

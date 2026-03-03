@@ -45,7 +45,7 @@ jobs:
             --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY }}/stock-backend:${{ github.sha }} \
             --region=${{ env.REGION }} \
             --platform=managed \
-            --allow-unauthenticated \
+            --no-allow-unauthenticated \
             --port=3101 \
             --memory=256Mi \
             --min-instances=0 \
@@ -100,7 +100,8 @@ jobs:
             --max-instances=2 \
             --revision-suffix="stk-dash-$(echo ${{ github.sha }} | cut -c1-7)" \
             --no-traffic \
-            --set-env-vars="NODE_ENV=production,BACKEND_URL=https://cram94-stock-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_BASE=https://cram94-stock-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_URL=https://cram94-stock-backend-1015149159553.asia-east1.run.app"
+            --set-env-vars="NODE_ENV=production,BACKEND_URL=https://cram94-stock-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_BASE=https://cram94-stock-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_URL=https://cram94-stock-backend-1015149159553.asia-east1.run.app" \
+            --set-secrets="JWT_SECRET=JWT_SECRET:latest"
 
       - name: Safe deploy (verify + route + cleanup)
         uses: ./.github/actions/cloud-run-safe-deploy

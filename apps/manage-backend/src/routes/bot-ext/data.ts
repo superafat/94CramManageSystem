@@ -3,6 +3,7 @@ import { db } from '../../db'
 import { manageStudents, manageCourses } from '@94cram/shared/db'
 import { eq } from 'drizzle-orm'
 import { Firestore } from '@google-cloud/firestore'
+import { randomInt } from 'crypto'
 import { logger } from '../../utils/logger'
 
 type BotExtVariables = { tenantId: string; botRequest: boolean; botBody: Record<string, unknown> }
@@ -46,7 +47,7 @@ app.post('/bindcode', async (c) => {
     const { tenant_id, tenant_name } = c.get('botBody') as any
     const tenantId = c.get('tenantId') as string
 
-    const code = String(Math.floor(100000 + Math.random() * 900000))
+    const code = String(randomInt(100000, 1000000))
 
     const firestore = new Firestore()
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000)

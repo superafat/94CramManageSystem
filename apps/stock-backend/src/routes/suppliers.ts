@@ -5,6 +5,7 @@ import { stockSuppliers } from '@94cram/shared/db';
 import { authMiddleware } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { z } from 'zod';
+import { logger } from '../utils/logger';
 
 const app = new Hono();
 const uuidParamSchema = z.object({ id: z.string().uuid() });
@@ -23,77 +24,97 @@ const supplierUpdateSchema = supplierCreateSchema.partial().refine(
 app.use('*', authMiddleware, tenantMiddleware);
 
 app.get('/', async (c) => {
-  const tenantId = getTenantId(c);
-  const suppliers = await db.select().from(stockSuppliers).where(eq(stockSuppliers.tenantId, tenantId));
-  return c.json(suppliers);
+  try {
+    const tenantId = getTenantId(c);
+    const suppliers = await db.select().from(stockSuppliers).where(eq(stockSuppliers.tenantId, tenantId));
+    return c.json(suppliers);
+  } catch (err) {
+    logger.error({ err }, 'Route error');
+    return c.json({ error: 'Internal server error' }, 500);
+  }
 });
 
 app.post('/', async (c) => {
-  const tenantId = getTenantId(c);
-  let requestBody: unknown;
   try {
-    requestBody = await c.req.json();
-  } catch {
-    return c.json({ error: 'Invalid JSON body' }, 400);
+    const tenantId = getTenantId(c);
+    let requestBody: unknown;
+    try {
+      requestBody = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+    const parsedBody = supplierCreateSchema.safeParse(requestBody);
+    if (!parsedBody.success) {
+      return c.json({ error: 'Invalid input' }, 400);
+    }
+    const body = parsedBody.data;
+    const [created] = await db.insert(stockSuppliers).values({
+      tenantId,
+      name: body.name,
+      contactName: body.contactName,
+      phone: body.phone,
+      email: body.email,
+      address: body.address,
+      notes: body.notes,
+    }).returning();
+    return c.json(created, 201);
+  } catch (err) {
+    logger.error({ err }, 'Route error');
+    return c.json({ error: 'Internal server error' }, 500);
   }
-  const parsedBody = supplierCreateSchema.safeParse(requestBody);
-  if (!parsedBody.success) {
-    return c.json({ error: 'Invalid input' }, 400);
-  }
-  const body = parsedBody.data;
-  const [created] = await db.insert(stockSuppliers).values({
-    tenantId,
-    name: body.name,
-    contactName: body.contactName,
-    phone: body.phone,
-    email: body.email,
-    address: body.address,
-    notes: body.notes,
-  }).returning();
-  return c.json(created, 201);
 });
 
 app.put('/:id', async (c) => {
-  const tenantId = getTenantId(c);
-  const parsedParams = uuidParamSchema.safeParse({ id: c.req.param('id') });
-  if (!parsedParams.success) {
-    return c.json({ error: 'Invalid supplier id' }, 400);
-  }
-  let requestBody: unknown;
   try {
-    requestBody = await c.req.json();
-  } catch {
-    return c.json({ error: 'Invalid JSON body' }, 400);
-  }
-  const parsedBody = supplierUpdateSchema.safeParse(requestBody);
-  if (!parsedBody.success) {
-    return c.json({ error: 'Invalid input' }, 400);
-  }
-  const { id } = parsedParams.data;
-  const body = parsedBody.data;
-  const [updated] = await db.update(stockSuppliers).set({
-    name: body.name,
-    contactName: body.contactName,
-    phone: body.phone,
-    email: body.email,
-    address: body.address,
-    notes: body.notes,
-  }).where(and(eq(stockSuppliers.id, id), eq(stockSuppliers.tenantId, tenantId))).returning();
+    const tenantId = getTenantId(c);
+    const parsedParams = uuidParamSchema.safeParse({ id: c.req.param('id') });
+    if (!parsedParams.success) {
+      return c.json({ error: 'Invalid supplier id' }, 400);
+    }
+    let requestBody: unknown;
+    try {
+      requestBody = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+    const parsedBody = supplierUpdateSchema.safeParse(requestBody);
+    if (!parsedBody.success) {
+      return c.json({ error: 'Invalid input' }, 400);
+    }
+    const { id } = parsedParams.data;
+    const body = parsedBody.data;
+    const [updated] = await db.update(stockSuppliers).set({
+      name: body.name,
+      contactName: body.contactName,
+      phone: body.phone,
+      email: body.email,
+      address: body.address,
+      notes: body.notes,
+    }).where(and(eq(stockSuppliers.id, id), eq(stockSuppliers.tenantId, tenantId))).returning();
 
-  if (!updated) return c.json({ error: 'Supplier not found' }, 404);
-  return c.json(updated);
+    if (!updated) return c.json({ error: 'Supplier not found' }, 404);
+    return c.json(updated);
+  } catch (err) {
+    logger.error({ err }, 'Route error');
+    return c.json({ error: 'Internal server error' }, 500);
+  }
 });
 
 app.delete('/:id', async (c) => {
-  const tenantId = getTenantId(c);
-  const parsedParams = uuidParamSchema.safeParse({ id: c.req.param('id') });
-  if (!parsedParams.success) {
-    return c.json({ error: 'Invalid supplier id' }, 400);
+  try {
+    const tenantId = getTenantId(c);
+    const parsedParams = uuidParamSchema.safeParse({ id: c.req.param('id') });
+    if (!parsedParams.success) {
+      return c.json({ error: 'Invalid supplier id' }, 400);
+    }
+    const { id } = parsedParams.data;
+    const [deleted] = await db.delete(stockSuppliers).where(and(eq(stockSuppliers.id, id), eq(stockSuppliers.tenantId, tenantId))).returning();
+    if (!deleted) return c.json({ error: 'Supplier not found' }, 404);
+    return c.json({ message: 'Supplier deleted' });
+  } catch (err) {
+    logger.error({ err }, 'Route error');
+    return c.json({ error: 'Internal server error' }, 500);
   }
-  const { id } = parsedParams.data;
-  const [deleted] = await db.delete(stockSuppliers).where(and(eq(stockSuppliers.id, id), eq(stockSuppliers.tenantId, tenantId))).returning();
-  if (!deleted) return c.json({ error: 'Supplier not found' }, 404);
-  return c.json({ message: 'Supplier deleted' });
 });
 
 export default app;
