@@ -20,6 +20,7 @@ const getBottomNavItems = (role: Role): NavItem[] => {
       { href: '/my-children', icon: '👶', label: '孩子', roles: ['parent'] },
       { href: '/my-children/grades', icon: '📊', label: '成績', roles: ['parent'] },
       { href: '/my-children/billing', icon: '💰', label: '繳費', roles: ['parent'] },
+      { href: '/my-children/notifications', icon: '📬', label: '聯絡簿', roles: ['parent'] },
     ]
   }
   if (role === 'student') {
@@ -132,7 +133,7 @@ export function MobileNav() {
               </Link>
             ))}
             <a
-              href="https://94cram.app"
+              href="https://94cram.com"
               className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-surface-hover"
             >
               <span className="text-2xl">🏠</span>

@@ -24,6 +24,21 @@ interface ChurnStudent {
   risk_factors: string[]
 }
 
+interface RecommendedCourse {
+  course_id: string
+  course_name: string
+  subject: string
+  reason: string
+  priority: 'high' | 'medium' | 'low'
+}
+
+interface CourseRecommendation {
+  student_id: string
+  student_name: string
+  weak_subjects: { subject: string; avg_score: number }[]
+  recommended_courses: RecommendedCourse[]
+}
+
 interface AttendanceRecord {
   present: boolean
   date?: string
@@ -50,6 +65,7 @@ interface TrendMonth {
 export default function ReportsPage() {
   const [data, setData] = useState<ReportData | null>(null)
   const [churnStudents, setChurnStudents] = useState<ChurnStudent[]>([])
+  const [recommendations, setRecommendations] = useState<CourseRecommendation[]>([])
   const [rawGrades, setRawGrades] = useState<GradeRecord[]>([])
   const [trendMonths, setTrendMonths] = useState<TrendMonth[]>([])
   const [loading, setLoading] = useState(true)
@@ -116,6 +132,16 @@ export default function ReportsPage() {
       
       setRawGrades(grades)
       setChurnStudents(churnData.students?.slice(0, 5) || [])
+
+      // 取得 AI 課程推薦
+      const recsRes = await fetch(`${API_BASE}/api/w8/recommendations`, {
+        credentials: 'include',
+      })
+      if (recsRes.ok) {
+        const recsJson = await recsRes.json()
+        const recsData = recsJson.data ?? recsJson
+        setRecommendations(recsData.recommendations ?? [])
+      }
 
       // 取得歷史趨勢資料
       const trendRes = await fetch(`${API_BASE}/api/admin/reports/trend?months=6`, {
@@ -336,7 +362,7 @@ export default function ReportsPage() {
                   </div>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  student.risk_score >= 70 ? 'bg-[#B5706E]/10 text-[#B5706E]' 
+                  student.risk_score >= 70 ? 'bg-[#B5706E]/10 text-[#B5706E]'
                     : student.risk_score >= 50 ? 'bg-[#C4956A]/10 text-[#C4956A]'
                     : 'bg-[#7B9E89]/10 text-[#7B9E89]'
                 }`}>
@@ -348,6 +374,66 @@ export default function ReportsPage() {
         ) : (
           <div className="text-center py-8 text-text-muted">
             🎉 目前沒有高風險學生
+          </div>
+        )}
+      </div>
+
+      {/* AI 課程推薦 */}
+      <div className="bg-white rounded-2xl shadow-sm border border-border p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-text">🤖 AI 課程推薦</h3>
+          <span className="text-2xl font-bold text-[#6366f1]">{recommendations.length} 位</span>
+        </div>
+
+        {recommendations.length > 0 ? (
+          <div className="space-y-4">
+            {recommendations.map((rec) => (
+              <div key={rec.student_id} className="border border-border rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="font-medium text-text text-base">{rec.student_name}</div>
+                  <div className="flex gap-2">
+                    {rec.weak_subjects.map((ws) => (
+                      <span key={ws.subject} className="text-xs px-2 py-1 rounded-full bg-[#C4956A]/10 text-[#C4956A]">
+                        {ws.subject} {ws.avg_score}分
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {rec.recommended_courses.map((course) => (
+                    <div key={course.course_id} className="flex items-center justify-between p-3 bg-surface rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className={`inline-block w-2 h-2 rounded-full ${
+                          course.priority === 'high' ? 'bg-[#B5706E]'
+                            : course.priority === 'medium' ? 'bg-[#C4956A]'
+                            : 'bg-[#6366f1]'
+                        }`} />
+                        <div>
+                          <div className="text-sm font-medium text-text">{course.course_name}</div>
+                          <div className="text-xs text-text-muted">{course.reason}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          course.priority === 'high' ? 'bg-[#B5706E]/10 text-[#B5706E]'
+                            : course.priority === 'medium' ? 'bg-[#C4956A]/10 text-[#C4956A]'
+                            : 'bg-[#6366f1]/10 text-[#6366f1]'
+                        }`}>
+                          {course.priority === 'high' ? '高優先' : course.priority === 'medium' ? '中優先' : '低優先'}
+                        </span>
+                        <button className="text-xs px-3 py-1 rounded-lg bg-[#7B9E89]/10 text-[#7B9E89] hover:bg-[#7B9E89]/20 transition-colors">
+                          聯繫家長
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-text-muted">
+            ✨ 所有學生成績良好，暫無課程推薦
           </div>
         )}
       </div>

@@ -174,6 +174,100 @@ const COURSE_STUDENTS: Record<string, { id: string; full_name: string; grade_lev
   ],
 }
 
+// ===== Notifications (電子聯絡簿) =====
+const NOTIFICATIONS = [
+  {
+    id: 'notif-1',
+    type: 'grade_notification',
+    title: '新成績公布：數學第一次段考',
+    message: '陳小利 數學第一次段考成績已公布，得分 88 / 100（等第：B）',
+    student_name: '陳小利',
+    created_at: '2026-02-20T16:00:00Z',
+    read: false,
+  },
+  {
+    id: 'notif-2',
+    type: 'grade_notification',
+    title: '新成績公布：英文第一次段考',
+    message: '陳小利 英文第一次段考成績已公布，得分 92 / 100（等第：A）',
+    student_name: '陳小利',
+    created_at: '2026-02-21T09:00:00Z',
+    read: true,
+  },
+  {
+    id: 'notif-3',
+    type: 'attendance_alert',
+    title: '出勤提醒：今日已到校',
+    message: '陳小利 今日 15:52 NFC 刷卡到校，出勤狀態：出席',
+    student_name: '陳小利',
+    created_at: new Date(Date.now() - 3600000).toISOString(),
+    read: false,
+  },
+  {
+    id: 'notif-4',
+    type: 'billing_reminder',
+    title: '繳費通知：3月份學費已繳清',
+    message: '陳小利 國中數學 A 班 3月份學費 NT$3,500 已於 3/1 完成繳費，謝謝！',
+    student_name: '陳小利',
+    created_at: '2026-03-01T09:00:00Z',
+    read: true,
+  },
+  {
+    id: 'notif-5',
+    type: 'billing_reminder',
+    title: '繳費通知：3月份學費已繳清',
+    message: '陳小利 國中英文菁英班 3月份學費 NT$4,000 已於 3/1 完成繳費，謝謝！',
+    student_name: '陳小利',
+    created_at: '2026-03-01T09:05:00Z',
+    read: true,
+  },
+  {
+    id: 'notif-6',
+    type: 'schedule_change',
+    title: '課表異動：國中英文菁英班本週六停課',
+    message: '國中英文菁英班（李老師）本週六（3/8）停課一次，補課日期另行通知，造成不便敬請見諒。',
+    student_name: '陳小利',
+    created_at: '2026-03-05T10:00:00Z',
+    read: false,
+  },
+  {
+    id: 'notif-7',
+    type: 'grade_notification',
+    title: '新成績公布：數學隨堂測驗',
+    message: '陳小利 數學隨堂測驗成績已公布，得分 95 / 100，表現優異！',
+    student_name: '陳小利',
+    created_at: '2026-03-02T17:30:00Z',
+    read: false,
+  },
+  {
+    id: 'notif-8',
+    type: 'attendance_alert',
+    title: '出勤提醒：今日缺席',
+    message: '陳小利 今日國中數學 A 班課程缺席，如有特殊原因請與班導師聯繫。',
+    student_name: '陳小利',
+    created_at: '2026-02-27T20:00:00Z',
+    read: true,
+  },
+  {
+    id: 'notif-9',
+    type: 'schedule_change',
+    title: '課表異動：國中數學 A 班改期',
+    message: '國中數學 A 班（王老師）下週二（3/11）課程改期至 3/13（週四）18:00-20:00，教室不變。',
+    student_name: '陳小利',
+    created_at: '2026-03-07T14:00:00Z',
+    read: false,
+  },
+  {
+    id: 'notif-10',
+    type: 'billing_reminder',
+    title: '繳費提醒：國中英文菁英班學費調漲通知',
+    message: '自 3 月起，國中英文菁英班月費調整為 NT$4,000（原 NT$3,800），如有疑問請洽行政老師。',
+    student_name: '陳小利',
+    created_at: '2026-02-15T14:20:00Z',
+    read: true,
+  },
+]
+
 // ===== Route handler =====
 
 export const DEMO_TENANTS = [DEMO_TENANT_1, DEMO_TENANT_2]
@@ -310,6 +404,42 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
       return { status: 200, body: { success: true, data: { records: BILLING_RECORDS } } }
     }
 
+    // AI 課程推薦
+    if (path === '/api/w8/recommendations') {
+      const studentId = searchParams.get('studentId')
+      const allRecs = [
+        {
+          student_id: 's4',
+          student_name: '張志豪',
+          weak_subjects: [{ subject: '數學', avg_score: 64 }],
+          recommended_courses: [
+            { course_id: 'c1', course_name: '國中數學 A 班', subject: '數學', reason: '數學平均 64 分，建議加強', priority: 'low' },
+          ],
+        },
+        {
+          student_id: 's8',
+          student_name: '吳承恩',
+          weak_subjects: [
+            { subject: '數學', avg_score: 58 },
+          ],
+          recommended_courses: [
+            { course_id: 'c1', course_name: '國中數學 A 班', subject: '數學', reason: '數學平均 58 分，建議加強', priority: 'high' },
+            { course_id: 'c2', course_name: '國中英文菁英班', subject: '英文', reason: '英文成績偏弱，建議加強', priority: 'medium' },
+          ],
+        },
+        {
+          student_id: 's2',
+          student_name: '王大明',
+          weak_subjects: [{ subject: '英文', avg_score: 68 }],
+          recommended_courses: [
+            { course_id: 'c2', course_name: '國中英文菁英班', subject: '英文', reason: '英文平均 68 分，建議加強', priority: 'low' },
+          ],
+        },
+      ]
+      const filtered = studentId ? allRecs.filter(r => r.student_id === studentId) : allRecs
+      return { status: 200, body: { success: true, data: { recommendations: filtered } } }
+    }
+
     // Churn risk — reports page fetches /api/admin/churn/:branchId
     if (path.startsWith('/api/admin/churn')) {
       return { status: 200, body: { data: { students: [
@@ -350,6 +480,18 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     // Knowledge
     if (path.startsWith('/api/admin/knowledge')) {
       return { status: 200, body: { chunks: [], count: 0 } }
+    }
+
+    // Notifications — 電子聯絡簿
+    if (path === '/api/w8/notifications') {
+      const limitParam = parseInt(searchParams.get('limit') || '20')
+      const studentId = searchParams.get('studentId')
+      const type = searchParams.get('type')
+      let filtered = NOTIFICATIONS
+      if (studentId) filtered = filtered.filter(n => n.student_name === studentId)
+      if (type && type !== 'all') filtered = filtered.filter(n => n.type === type)
+      filtered = filtered.slice(0, limitParam)
+      return { status: 200, body: { notifications: filtered, unread: filtered.filter(n => !n.read).length } }
     }
 
     // Conversations — AI 對話紀錄

@@ -214,7 +214,7 @@ export async function executeParentIntent(
       return handleAttendance(studentId!, childLabel, binding.tenant_id);
 
     case 'parent.grades':
-      return handleStudentInfo(studentId!, childLabel, binding.tenant_id);
+      return handleGrades(studentId!, childLabel, binding.tenant_id);
 
     case 'parent.payments':
       return handlePayments(studentId!, childLabel, binding.tenant_id);
@@ -267,43 +267,82 @@ async function handleAttendance(studentId: string, childLabel: string, tenantId:
   if (recordsRes.success && recordsRes.data) {
     const records = (recordsRes.data as Record<string, unknown>).records as Array<Record<string, unknown>> | undefined;
     if (records && records.length > 0) {
-      text += `\n📜 最近紀錄：\n`;
-      const recent = records.slice(0, 5);
+      text += `\n📜 最近出勤：\n`;
+      const recent = records.slice(0, 6);
       for (const r of recent) {
-        const date = r.date ? new Date(r.date as string).toLocaleDateString('zh-TW') : '未知';
-        const statusEmoji = r.status === 'present' ? '✅' : r.status === 'absent' ? '—' : r.status === 'late' ? '⏰' : '📝';
+        const date = r.date
+          ? new Date(r.date as string).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })
+          : '未知';
+        const isAbsent = r.status === 'absent';
+        const statusEmoji = r.status === 'present' ? '✅' : isAbsent ? '❌' : r.status === 'late' ? '⏰' : '📝';
+        const statusLabel = r.status === 'present' ? '到課' : isAbsent ? '缺席' : r.status === 'late' ? '遲到' : '請假';
         const note = r.note ? `（${r.note}）` : '';
-        text += `${statusEmoji} ${date} ${note}\n`;
+        const absentMark = isAbsent ? ' ⚠️' : '';
+        text += `${statusEmoji} ${date} ${statusLabel}${note}${absentMark}\n`;
       }
     }
   }
 
   if (summaryRes.success && summaryRes.data) {
     const rate = (summaryRes.data as Record<string, unknown>).attendance_rate as number;
-    if (rate >= 90) {
-      text += `\n出勤狀況很穩定！`;
-    } else if (rate >= 70) {
-      text += `\n如果有什麼狀況，可以跟老師聊聊`;
+    if (typeof rate === 'number') {
+      if (rate >= 90) {
+        text += `\n✨ 出勤率 ${rate}%，表現很棒！`;
+      } else if (rate >= 70) {
+        text += `\n📊 出勤率 ${rate}%，如果有特殊狀況歡迎跟老師說`;
+      } else {
+        text += `\n⚠️ 出勤率 ${rate}%，請多留意上課狀況`;
+      }
     }
   }
 
   return text;
 }
 
-async function handleStudentInfo(studentId: string, childLabel: string, tenantId: string): Promise<string> {
-  const res = await callParentApi('manage', `/student/${studentId}`, tenantId);
+async function handleGrades(studentId: string, childLabel: string, tenantId: string): Promise<string> {
+  const res = await callParentApi('manage', `/grades/${studentId}`, tenantId);
 
   if (!res.success) {
-    logger.warn('[ParentRouter] StudentInfo API failed, using basic info');
-    return `👤 ${childLabel}的基本資料\n\n📛 姓名：${childLabel}\n📋 狀態：在學中`;
+    logger.warn('[ParentRouter] Grades API failed, using mock data');
+    return (
+      `📊 ${childLabel}的成績記錄\n\n` +
+      `目前無法取得成績資料，請稍後再試或直接聯繫補習班`
+    );
   }
 
   const d = res.data as Record<string, unknown>;
-  let text = `👤 ${childLabel}的基本資料\n\n`;
-  text += `📛 姓名：${d.name ?? childLabel}\n`;
-  if (d.grade) text += `📚 年級：${d.grade}\n`;
-  if (d.school) text += `🏫 學校：${d.school}\n`;
-  if (d.status) text += `📋 狀態：${d.status === 'active' ? '在學中' : d.status}\n`;
+  const grades = d.grades as Array<Record<string, unknown>> | undefined;
+
+  if (!grades || grades.length === 0) {
+    return `📊 ${childLabel}的成績記錄\n\n目前沒有成績資料`;
+  }
+
+  const examTypeMap: Record<string, string> = {
+    quiz: '小考',
+    midterm: '期中考',
+    final: '期末考',
+    homework: '作業',
+    project: '專題',
+  };
+
+  let text = `📊 ${childLabel}的成績記錄\n\n`;
+
+  const recent = grades.slice(0, 8);
+  for (const g of recent) {
+    const subject = (g.course_name ?? g.subject ?? '未知科目') as string;
+    const score = g.score != null ? Number(g.score) : null;
+    const examType = examTypeMap[g.exam_type as string] ?? (g.exam_type as string) ?? '';
+    const examName = (g.exam_name ?? examType) as string;
+    const date = g.exam_date
+      ? new Date(g.exam_date as string).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })
+      : '';
+
+    const scoreStr = score != null ? `${score} 分` : '未登錄';
+    const scoreEmoji = score == null ? '' : score >= 90 ? ' 🌟' : score >= 70 ? '' : ' ⚠️';
+    const datePart = date ? ` ｜ ${date}` : '';
+
+    text += `▪ ${subject}【${examName}】${datePart}\n  ${scoreStr}${scoreEmoji}\n`;
+  }
 
   return text;
 }
@@ -343,9 +382,12 @@ async function handlePayments(studentId: string, childLabel: string, tenantId: s
       const recent = payments.slice(0, 5);
       for (const p of recent) {
         const amount = Number(p.amount ?? 0);
-        const date = p.date ? new Date(p.date as string).toLocaleDateString('zh-TW') : '未知';
-        const statusEmoji = p.status === 'paid' ? '✅' : p.status === 'overdue' ? '⚠️' : '⏳';
-        text += `${statusEmoji} ${date} NT$${amount.toLocaleString()}\n`;
+        const period = (p.period ?? p.month ?? '') as string;
+        const date = p.date ? new Date(p.date as string).toLocaleDateString('zh-TW', { year: 'numeric', month: 'numeric' }) : '';
+        const displayPeriod = period || date || '未知期間';
+        const statusEmoji = p.status === 'paid' ? '✅' : p.status === 'overdue' ? '❌' : '⏳';
+        const statusLabel = p.status === 'paid' ? '已繳' : p.status === 'overdue' ? '逾期' : '待繳';
+        text += `${statusEmoji} ${displayPeriod}　NT$${amount.toLocaleString()}　${statusLabel}\n`;
       }
     }
   }

@@ -47,6 +47,7 @@ const navItems: NavItem[] = [
   { href: '/my-children', icon: '👶', label: '孩子資料', roles: ['parent'] },
   { href: '/my-children/grades', icon: '📊', label: '成績查詢', roles: ['parent'] },
   { href: '/my-children/billing', icon: '💰', label: '繳費查詢', roles: ['parent'] },
+  { href: '/my-children/notifications', icon: '📬', label: '聯絡簿', roles: ['parent'] },
   
   // 學生專區
   { type: 'separator', separator: '我的學習', roles: ['student'] },
@@ -167,7 +168,7 @@ export function Sidebar() {
         </div>
 
         <a
-          href="https://94cram.app"
+          href="https://94cram.com"
           className="w-full flex items-center gap-3 px-4 py-2 text-text-muted hover:text-text transition-colors rounded-xl hover:bg-surface-hover"
         >
           <span>🏠</span>
