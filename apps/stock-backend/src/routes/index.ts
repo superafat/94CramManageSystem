@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import ai from './ai';
 import auth from './auth';
+import batches from './batches';
 import barcodes from './barcodes';
 import categories from './categories';
 import classes from './classes';
@@ -18,6 +19,7 @@ const app = new Hono();
 
 app.route('/auth', auth);
 app.route('/ai', ai);
+app.route('/batches', batches);
 app.route('/categories', categories);
 app.route('/classes', classes);
 app.route('/items', items);

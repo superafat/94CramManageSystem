@@ -482,6 +482,214 @@ function formatHelpMessage(): string {
   );
 }
 
+// ─── Flex Message 整合 ───────────────────────────────────────────────────────
+
+import {
+  scheduleCard,
+  billingCard,
+  recommendationCard,
+  attendanceCard,
+  flexToPlainText,
+  type LineFlexMessage,
+  type ScheduleItem,
+  type BillingItem,
+  type AttendanceStatus,
+} from '../templates/line-flex-messages';
+
+export type { LineFlexMessage };
+
+export interface ParentIntentFlexResult {
+  /** 純文字回覆（永遠存在，可作為 Telegram/fallback 使用） */
+  text: string;
+  /** LINE Flex Message 物件（僅在有結構化資料時存在） */
+  flex?: LineFlexMessage;
+}
+
+/**
+ * 根據意圖執行 API，同時回傳純文字 + LINE Flex Message。
+ * 現有的 `executeParentIntent` 純文字版本不受影響。
+ */
+export async function executeParentIntentFlex(
+  intentResult: ParentIntentResult,
+  binding: ParentBinding
+): Promise<ParentIntentFlexResult> {
+  // 先取得純文字結果
+  const text = await executeParentIntent(intentResult, binding);
+
+  const { intent, params } = intentResult;
+  const studentId = params.student_id;
+  const childLabel = params.child_name ?? '您的孩子';
+  const tenantId = binding.tenant_id;
+
+  switch (intent) {
+    case 'parent.schedule': {
+      if (!studentId) return { text };
+      const flex = await buildScheduleFlex(studentId, childLabel, tenantId);
+      return flex ? { text, flex } : { text };
+    }
+
+    case 'parent.payments': {
+      if (!studentId) return { text };
+      const flex = await buildBillingFlex(studentId, childLabel, tenantId);
+      return flex ? { text, flex } : { text };
+    }
+
+    default:
+      return { text };
+  }
+}
+
+/**
+ * 偵測訊息中的 Flex Message 觸發關鍵字，直接回傳卡片（不需先解析完整意圖）。
+ * 適合在 webhook 入口處做快速攔截。
+ *
+ * @returns Flex Message 物件，或 null（代表不觸發）
+ */
+export async function detectAndBuildFlexCard(
+  text: string,
+  intentResult: ParentIntentResult,
+  binding: ParentBinding
+): Promise<LineFlexMessage | null> {
+  const normalized = text.trim().toLowerCase();
+  const { intent, params } = intentResult;
+  const studentId = params.student_id;
+  const childLabel = params.child_name ?? '您的孩子';
+  const tenantId = binding.tenant_id;
+
+  // 課表觸發
+  if (
+    intent === 'parent.schedule' ||
+    ['課表', '上課', '課程', '排課'].some((kw) => normalized.includes(kw))
+  ) {
+    if (!studentId) return null;
+    return buildScheduleFlex(studentId, childLabel, tenantId);
+  }
+
+  // 學費觸發
+  if (
+    intent === 'parent.payments' ||
+    ['繳費', '費用', '學費', '帳單', '欠費'].some((kw) => normalized.includes(kw))
+  ) {
+    if (!studentId) return null;
+    return buildBillingFlex(studentId, childLabel, tenantId);
+  }
+
+  // 推薦觸發
+  if (['推薦', '建議課程', '推薦課程', '弱科'].some((kw) => normalized.includes(kw))) {
+    return buildRecommendationFlex(childLabel, tenantId);
+  }
+
+  return null;
+}
+
+// ─── Flex 資料建構輔助 ────────────────────────────────────────────────────────
+
+const DAY_NAME_MAP: Record<number, string> = {
+  0: '週日', 1: '週一', 2: '週二', 3: '週三',
+  4: '週四', 5: '週五', 6: '週六',
+};
+
+async function buildScheduleFlex(
+  studentId: string,
+  childLabel: string,
+  tenantId: string
+): Promise<LineFlexMessage | null> {
+  try {
+    const res = await callParentApi('inclass', `/schedule/${studentId}`, tenantId);
+    if (!res.success || !res.data) return null;
+
+    const d = res.data as Record<string, unknown>;
+    const raw = d.schedules as Array<Record<string, unknown>> | undefined;
+    if (!raw || raw.length === 0) return null;
+
+    const schedules: ScheduleItem[] = raw.map((s) => ({
+      courseName: (s.course_name as string | undefined) ?? '未知課程',
+      startTime:  (s.start_time as string | undefined) ?? '',
+      endTime:    (s.end_time as string | undefined) ?? '',
+      dayOfWeek:  DAY_NAME_MAP[s.day_of_week as number] ?? `週${s.day_of_week}`,
+      room:       s.room as string | undefined,
+    }));
+
+    return scheduleCard({ childName: childLabel, schedules });
+  } catch (err) {
+    logger.warn({ err: err instanceof Error ? err : new Error(String(err)) }, '[FlexCard] buildScheduleFlex failed');
+    return null;
+  }
+}
+
+async function buildBillingFlex(
+  studentId: string,
+  childLabel: string,
+  tenantId: string
+): Promise<LineFlexMessage | null> {
+  try {
+    const [statusRes, historyRes] = await Promise.all([
+      callParentApi('manage', `/payments/${studentId}/status`, tenantId),
+      callParentApi('manage', `/payments/${studentId}`, tenantId),
+    ]);
+
+    if (!statusRes.success && !historyRes.success) return null;
+
+    const statusData = (statusRes.data ?? {}) as Record<string, unknown>;
+    const historyData = (historyRes.data ?? {}) as Record<string, unknown>;
+
+    const totalUnpaid = typeof statusData.overdue_amount === 'number'
+      ? statusData.overdue_amount
+      : 0;
+
+    const payments = (historyData.payments as Array<Record<string, unknown>> | undefined) ?? [];
+
+    const totalPaid = payments
+      .filter((p) => p.status === 'paid')
+      .reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
+
+    const unpaidItems: BillingItem[] = payments
+      .filter((p) => p.status !== 'paid')
+      .map((p) => ({
+        period: (p.period ?? p.month ?? '未知期間') as string,
+        amount: Number(p.amount ?? 0),
+        status: (p.status as BillingItem['status']) ?? 'pending',
+      }));
+
+    return billingCard({ childName: childLabel, totalUnpaid, totalPaid, unpaidItems });
+  } catch (err) {
+    logger.warn({ err: err instanceof Error ? err : new Error(String(err)) }, '[FlexCard] buildBillingFlex failed');
+    return null;
+  }
+}
+
+async function buildRecommendationFlex(
+  childLabel: string,
+  _tenantId: string
+): Promise<LineFlexMessage | null> {
+  // 目前後端尚未提供課程推薦 API，回傳示範卡片
+  return recommendationCard({
+    courseName: '數學強化班',
+    teacherName: '林老師',
+    fee: 3500,
+    feeUnit: '元/月',
+    weakSubjectNote: `根據 ${childLabel} 最近的學習紀錄，數學為相對弱科，建議加強代數與幾何單元。`,
+  });
+}
+
+// ─── 出勤通知卡片（主動推播用） ───────────────────────────────────────────────
+
+/**
+ * 建立出勤通知 Flex Message（由系統在學生簽到時呼叫，主動推播給家長）
+ */
+export function buildAttendanceNotificationFlex(params: {
+  studentName: string;
+  status: AttendanceStatus;
+  checkInTime: string;
+  date: string;
+  courseName?: string;
+  note?: string;
+}): LineFlexMessage {
+  return attendanceCard(params);
+}
+
+export { flexToPlainText };
+
 /**
  * Try to answer from knowledge base when intent is unknown
  */

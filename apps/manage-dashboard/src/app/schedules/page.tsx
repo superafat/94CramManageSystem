@@ -7,6 +7,7 @@ import { Schedule, Teacher, Course, Student, AddForm, ConflictWarning } from './
 import WeeklyScheduleGrid from './components/WeeklyScheduleGrid'
 import ScheduleForm, { ScheduleDetailModal } from './components/ScheduleForm'
 import TeacherCourseSelector from './components/TeacherCourseSelector'
+import RenewalModal from './components/RenewalModal'
 
 const API_BASE = ''
 
@@ -59,9 +60,20 @@ export default function SchedulesPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [addForm, setAddForm] = useState<AddForm>(DEFAULT_FORM)
 
+  // Renewal state
+  const [renewalSchedule, setRenewalSchedule] = useState<Schedule | null>(null)
+
+  // Toast state
+  const [toast, setToast] = useState<string | null>(null)
+
   const weekDates = getWeekDates(weekOffset)
   const startDate = formatDate(weekDates[0])
   const endDate = formatDate(weekDates[6])
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 4000)
+  }
 
   // 衝突偵測：每次表單欄位變動時重新計算
   const conflicts = useMemo<ConflictWarning[]>(() => {
@@ -236,6 +248,11 @@ export default function SchedulesPage() {
     }
   }
 
+  const handleRenewalSuccess = () => {
+    fetchSchedules()
+    showToast('續班成功！已通知家長查看課表')
+  }
+
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Header */}
@@ -299,6 +316,7 @@ export default function SchedulesPage() {
           loading={loading}
           weekOffset={weekOffset}
           onSelectSchedule={setSelectedSchedule}
+          onRenewSchedule={setRenewalSchedule}
         />
       </div>
 
@@ -328,6 +346,24 @@ export default function SchedulesPage() {
           onClose={() => setSelectedSchedule(null)}
           onCancel={handleCancelSchedule}
         />
+      )}
+
+      {/* Renewal Modal */}
+      {renewalSchedule && (
+        <RenewalModal
+          schedule={renewalSchedule}
+          teachers={teachers}
+          students={students}
+          onClose={() => setRenewalSchedule(null)}
+          onSuccess={handleRenewalSuccess}
+        />
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 bg-[#4A6B44] text-white text-sm rounded-2xl shadow-lg animate-fade-in whitespace-nowrap">
+          {toast}
+        </div>
       )}
     </div>
   )

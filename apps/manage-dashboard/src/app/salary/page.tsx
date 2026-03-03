@@ -55,8 +55,81 @@ interface AttendanceStats {
   sick_leave_days: number
   personal_leave_days: number
   absent_days: number
+  late_count: number
   total_leave_days: number
 }
+
+// ───────────── Auto-Deduction Types ─────────────
+
+type AutoDeductionKind = 'late' | 'absent' | 'personal_leave'
+
+interface AutoDeduction {
+  id: string
+  kind: AutoDeductionKind
+  label: string
+  count: number
+  unitAmount: number
+  totalAmount: number
+  cancelled: boolean
+  overrideAmount: number | null  // null = use computed totalAmount
+}
+
+interface AutoDeductionOverride {
+  cancelled: boolean
+  overrideAmount: number | null
+}
+
+// ───────────── 勞健保級距常數 (2026年) ─────────────
+
+interface InsuranceTier {
+  level: number
+  wage: number       // 投保薪資（元）
+  label: string
+}
+
+// 勞保 2026 年級距（費率 12%，個人 20%，雇主 70%，政府 10%）
+const LABOR_TIERS: InsuranceTier[] = [
+  { level: 1,  wage: 27470, label: '第1級 27,470元' },
+  { level: 2,  wage: 28800, label: '第2級 28,800元' },
+  { level: 3,  wage: 30300, label: '第3級 30,300元' },
+  { level: 4,  wage: 31800, label: '第4級 31,800元' },
+  { level: 5,  wage: 33300, label: '第5級 33,300元' },
+  { level: 6,  wage: 34800, label: '第6級 34,800元' },
+  { level: 7,  wage: 36300, label: '第7級 36,300元' },
+  { level: 8,  wage: 38200, label: '第8級 38,200元' },
+  { level: 9,  wage: 40100, label: '第9級 40,100元' },
+  { level: 10, wage: 42000, label: '第10級 42,000元' },
+  { level: 11, wage: 44000, label: '第11級 44,000元' },
+  { level: 12, wage: 45800, label: '第12級 45,800元' },
+]
+
+// 健保 2026 年級距（費率 5.17%，個人 30%，雇主 60%，政府 10%）
+const HEALTH_TIERS: InsuranceTier[] = [
+  { level: 1,  wage: 27470, label: '第1級 27,470元' },
+  { level: 2,  wage: 28800, label: '第2級 28,800元' },
+  { level: 3,  wage: 30300, label: '第3級 30,300元' },
+  { level: 4,  wage: 31800, label: '第4級 31,800元' },
+  { level: 5,  wage: 33300, label: '第5級 33,300元' },
+  { level: 6,  wage: 34800, label: '第6級 34,800元' },
+  { level: 7,  wage: 36300, label: '第7級 36,300元' },
+  { level: 8,  wage: 38200, label: '第8級 38,200元' },
+  { level: 9,  wage: 40100, label: '第9級 40,100元' },
+  { level: 10, wage: 42000, label: '第10級 42,000元' },
+  { level: 11, wage: 44000, label: '第11級 44,000元' },
+  { level: 12, wage: 45800, label: '第12級 45,800元' },
+]
+
+// 勞保計算（費率 12%，個人負擔 20%，雇主負擔 70%）
+const calcLabor = (wage: number) => ({
+  personal: Math.round(wage * 0.12 * 0.20),
+  employer: Math.round(wage * 0.12 * 0.70),
+})
+
+// 健保計算（費率 5.17%，個人負擔 30%，雇主負擔 60%）
+const calcHealth = (wage: number) => ({
+  personal: Math.round(wage * 0.0517 * 0.30),
+  employer: Math.round(wage * 0.0517 * 0.60),
+})
 
 // ───────────── Constants ─────────────
 
@@ -67,6 +140,8 @@ const SALARY_TYPE_LABELS: Record<string, string> = {
   hourly: '時薪制',
   per_class: '堂薪制',
 }
+
+const LATE_DEDUCTION_PER_OCCURRENCE = 200  // 每次遲到扣 200 元
 
 const getMonthRange = (offset: number = 0) => {
   const date = new Date()
@@ -110,17 +185,103 @@ const groupByWeek = (schedules: ScheduleItem[]) => {
   return weeks
 }
 
+// ───────────── Auto-Deduction Logic ─────────────
+
+function computeAutoDeductions(
+  teacher: TeacherSalary,
+  attendance: AttendanceStats | null,
+  overrides: Record<string, AutoDeductionOverride>
+): AutoDeduction[] {
+  if (!attendance) return []
+
+  const baseSalary = Number(teacher.base_salary) || 0
+  // Daily rate — used for absent and personal_leave; fallback for non-monthly types
+  const dailyRate = teacher.salary_type === 'monthly' && baseSalary > 0
+    ? Math.round(baseSalary / 30)
+    : 0
+
+  const results: AutoDeduction[] = []
+
+  // 遲到
+  const lateCount = attendance.late_count ?? 0
+  if (lateCount > 0) {
+    const unitAmt = teacher.salary_type === 'monthly' && baseSalary > 0
+      ? Math.max(LATE_DEDUCTION_PER_OCCURRENCE, Math.round(dailyRate * 0.2))
+      : LATE_DEDUCTION_PER_OCCURRENCE
+    const id = 'auto_late'
+    const ov = overrides[id]
+    results.push({
+      id,
+      kind: 'late',
+      label: `遲到 ×${lateCount}`,
+      count: lateCount,
+      unitAmount: unitAmt,
+      totalAmount: unitAmt * lateCount,
+      cancelled: ov?.cancelled ?? false,
+      overrideAmount: ov?.overrideAmount ?? null,
+    })
+  }
+
+  // 曠職 — 月薪才算日薪扣法；非月薪顯示但金額為 0
+  const absentCount = attendance.absent_days ?? 0
+  if (absentCount > 0) {
+    const id = 'auto_absent'
+    const ov = overrides[id]
+    results.push({
+      id,
+      kind: 'absent',
+      label: `曠職 ×${absentCount}`,
+      count: absentCount,
+      unitAmount: dailyRate,
+      totalAmount: dailyRate * absentCount,
+      cancelled: ov?.cancelled ?? false,
+      overrideAmount: ov?.overrideAmount ?? null,
+    })
+  }
+
+  // 事假 — 月薪才算日薪/2；非月薪顯示但金額為 0
+  const personalCount = attendance.personal_leave_days ?? 0
+  if (personalCount > 0) {
+    const unitAmt = Math.round(dailyRate / 2)
+    const id = 'auto_personal_leave'
+    const ov = overrides[id]
+    results.push({
+      id,
+      kind: 'personal_leave',
+      label: `事假 ×${personalCount}`,
+      count: personalCount,
+      unitAmount: unitAmt,
+      totalAmount: unitAmt * personalCount,
+      cancelled: ov?.cancelled ?? false,
+      overrideAmount: ov?.overrideAmount ?? null,
+    })
+  }
+
+  return results
+}
+
+function getEffectiveDeductionAmount(d: AutoDeduction): number {
+  if (d.cancelled) return 0
+  return d.overrideAmount !== null ? d.overrideAmount : d.totalAmount
+}
+
+function autoDeductionSummaryLabel(d: AutoDeduction): string {
+  const eff = getEffectiveDeductionAmount(d)
+  return `${d.label} → -$${eff.toLocaleString()}`
+}
+
 // ───────────── Salary Slip Modal ─────────────
 
 interface SlipProps {
   teacher: TeacherSalary
   schedules: ScheduleItem[]
   attendance: AttendanceStats | null
+  autoDeductions: AutoDeduction[]
   period: string
   onClose: () => void
 }
 
-function SalarySlipModal({ teacher, schedules, attendance, period, onClose }: SlipProps) {
+function SalarySlipModal({ teacher, schedules, attendance, autoDeductions, period, onClose }: SlipProps) {
   const printRef = useRef<HTMLDivElement>(null)
 
   const handlePrint = () => {
@@ -143,13 +304,8 @@ function SalarySlipModal({ teacher, schedules, attendance, period, onClose }: Sl
     win.print()
   }
 
-  const leaveDeduction = (() => {
-    if (teacher.salary_type !== 'monthly' || !attendance) return 0
-    const dailyRate = Number(teacher.base_salary) / 30
-    return Math.round(attendance.personal_leave_days * dailyRate)
-  })()
-
-  const netAmount = teacher.total_amount - leaveDeduction
+  const autoDeductTotal = autoDeductions.reduce((acc, d) => acc + getEffectiveDeductionAmount(d), 0)
+  const netAmount = teacher.total_amount - autoDeductTotal
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
@@ -161,7 +317,7 @@ function SalarySlipModal({ teacher, schedules, attendance, period, onClose }: Sl
               onClick={handlePrint}
               className="px-3 py-1.5 bg-indigo-500 text-white rounded-lg text-sm"
             >
-              🖨️ 列印
+              列印
             </button>
             <button onClick={onClose} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-600">
               關閉
@@ -245,7 +401,7 @@ function SalarySlipModal({ teacher, schedules, attendance, period, onClose }: Sl
                 </tr>
               ))}
 
-              {/* Deductions */}
+              {/* Manual deductions */}
               {teacher.adjustments?.filter(a => a.type === 'deduction').map((a, i) => (
                 <tr key={i} className="text-red-700">
                   <td className="px-3 py-2">- {a.name}</td>
@@ -253,14 +409,39 @@ function SalarySlipModal({ teacher, schedules, attendance, period, onClose }: Sl
                 </tr>
               ))}
 
-              {/* Leave deduction */}
-              {leaveDeduction > 0 && (
-                <tr className="text-red-700">
-                  <td className="px-3 py-2">
-                    - 事假扣薪（{attendance?.personal_leave_days} 天）
-                  </td>
-                  <td className="px-3 py-2 text-right">-${leaveDeduction.toLocaleString()}</td>
-                </tr>
+              {/* Auto deductions section */}
+              {autoDeductions.length > 0 && (
+                <>
+                  <tr>
+                    <td colSpan={2} className="px-3 py-1.5 bg-red-50 text-xs font-semibold text-red-700 border-t border-red-100">
+                      自動扣款明細
+                    </td>
+                  </tr>
+                  {autoDeductions.map((d) => {
+                    const eff = getEffectiveDeductionAmount(d)
+                    return (
+                      <tr key={d.id} className={d.cancelled ? 'text-gray-400' : 'text-red-700'}>
+                        <td className="px-3 py-2">
+                          <span className="inline-flex items-center gap-1">
+                            <span className="text-xs bg-red-100 text-red-600 px-1 rounded">自動</span>
+                            {d.cancelled
+                              ? <span className="line-through">{d.label}</span>
+                              : d.label}
+                          </span>
+                          {d.cancelled && <span className="ml-1 text-xs text-gray-400">（已取消）</span>}
+                          {d.overrideAmount !== null && !d.cancelled && (
+                            <span className="ml-1 text-xs text-amber-600">（已調整）</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {d.cancelled
+                            ? <span className="line-through text-gray-400">-${d.totalAmount.toLocaleString()}</span>
+                            : `-$${eff.toLocaleString()}`}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </>
               )}
 
               {/* Total */}
@@ -273,15 +454,102 @@ function SalarySlipModal({ teacher, schedules, attendance, period, onClose }: Sl
             </tbody>
           </table>
 
-          {/* Attendance */}
+          {/* Attendance summary */}
           {attendance && (
             <div className="text-xs text-gray-500 border border-gray-100 rounded-lg p-3 space-y-1">
               <p className="font-medium text-gray-700 mb-1">出缺勤紀錄</p>
               <p>病假：{attendance.sick_leave_days} 天（不扣薪）</p>
-              <p>事假：{attendance.personal_leave_days} 天{leaveDeduction > 0 ? `（扣 $${leaveDeduction.toLocaleString()}）` : ''}</p>
+              <p>事假：{attendance.personal_leave_days} 天</p>
               <p>曠職：{attendance.absent_days} 天</p>
+              <p>遲到：{attendance.late_count ?? 0} 次</p>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ───────────── Auto-Deduction Adjust Modal ─────────────
+
+interface AdjustAutoDeductProps {
+  deduction: AutoDeduction
+  onSave: (override: AutoDeductionOverride) => void
+  onClose: () => void
+}
+
+function AdjustAutoDeductModal({ deduction, onSave, onClose }: AdjustAutoDeductProps) {
+  const [cancelled, setCancelled] = useState(deduction.cancelled)
+  const [customAmount, setCustomAmount] = useState<string>(
+    deduction.overrideAmount !== null
+      ? String(deduction.overrideAmount)
+      : String(deduction.totalAmount)
+  )
+
+  const handleSave = () => {
+    if (cancelled) {
+      onSave({ cancelled: true, overrideAmount: null })
+      return
+    }
+    const parsed = parseInt(customAmount, 10)
+    const amt = isNaN(parsed) ? deduction.totalAmount : Math.max(0, parsed)
+    onSave({
+      cancelled: false,
+      overrideAmount: amt !== deduction.totalAmount ? amt : null,
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-xl">
+        <h3 className="text-base font-semibold text-gray-800 mb-1">調整自動扣薪</h3>
+        <p className="text-xs text-gray-500 mb-4">
+          {deduction.label}（原始金額：${deduction.totalAmount.toLocaleString()}）
+        </p>
+
+        <div className="space-y-3">
+          {/* Cancel toggle */}
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={cancelled}
+              onChange={e => setCancelled(e.target.checked)}
+              className="w-4 h-4 accent-red-500"
+            />
+            <span className="text-sm text-gray-700">取消此筆自動扣薪</span>
+          </label>
+
+          {/* Amount override */}
+          {!cancelled && (
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">調整金額（元）</label>
+              <input
+                type="number"
+                min="0"
+                value={customAmount}
+                onChange={e => setCustomAmount(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                原始計算：{deduction.count} × ${deduction.unitAmount.toLocaleString()} = ${deduction.totalAmount.toLocaleString()}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 mt-5">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+          >
+            取消
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex-1 py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600"
+          >
+            儲存
+          </button>
         </div>
       </div>
     </div>
@@ -400,8 +668,18 @@ export default function SalaryPage() {
   // Attendance
   const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceStats>>({})
 
+  // Auto-deduction overrides — keyed by `${teacherId}::${deductionId}`
+  const [autoDeductOverrides, setAutoDeductOverrides] = useState<Record<string, AutoDeductionOverride>>({})
+
+  // Auto-deduction adjust modal
+  const [adjustingDeduct, setAdjustingDeduct] = useState<{ teacher: TeacherSalary; deduction: AutoDeduction } | null>(null)
+
   // Salary slip modal
   const [slipTeacher, setSlipTeacher] = useState<TeacherSalary | null>(null)
+
+  // 勞健保級距選擇（預設第1級）
+  const [laborTierIndex, setLaborTierIndex] = useState(0)
+  const [healthTierIndex, setHealthTierIndex] = useState(0)
 
   const monthRange = getMonthRange(monthOffset)
 
@@ -415,6 +693,7 @@ export default function SalaryPage() {
     setExpandedTeacher(null)
     setTeacherSchedules({})
     setAttendanceMap({})
+    setAutoDeductOverrides({})
     try {
       const res = await fetch(
         `${API_BASE}/api/w8/salary/calculate?startDate=${monthRange.start}&endDate=${monthRange.end}`,
@@ -518,13 +797,28 @@ export default function SalaryPage() {
     return `堂薪 $${Number(t.rate_per_class || 0).toLocaleString()} × ${t.total_classes} 堂`
   }
 
-  // Leave deduction for monthly teachers
-  const getLeaveDeduction = (teacher: TeacherSalary): number => {
-    if (teacher.salary_type !== 'monthly') return 0
-    const stats = attendanceMap[teacher.teacher_id]
-    if (!stats) return 0
-    const dailyRate = Number(teacher.base_salary) / 30
-    return Math.round(stats.personal_leave_days * dailyRate)
+  // Get per-teacher auto deductions with overrides applied
+  const getAutoDeductions = (teacher: TeacherSalary): AutoDeduction[] => {
+    const attendance = attendanceMap[teacher.teacher_id] ?? null
+    const overridePrefix = `${teacher.teacher_id}::`
+    const relevantOverrides: Record<string, AutoDeductionOverride> = {}
+    for (const [k, v] of Object.entries(autoDeductOverrides)) {
+      if (k.startsWith(overridePrefix)) {
+        relevantOverrides[k.replace(overridePrefix, '')] = v
+      }
+    }
+    return computeAutoDeductions(teacher, attendance, relevantOverrides)
+  }
+
+  // Total effective auto deduction for a teacher
+  const getAutoDeductTotal = (teacher: TeacherSalary): number => {
+    return getAutoDeductions(teacher).reduce((acc, d) => acc + getEffectiveDeductionAmount(d), 0)
+  }
+
+  const handleSaveAutoDeductOverride = (teacher: TeacherSalary, deduction: AutoDeduction, override: AutoDeductionOverride) => {
+    const key = `${teacher.teacher_id}::${deduction.id}`
+    setAutoDeductOverrides(prev => ({ ...prev, [key]: override }))
+    setAdjustingDeduct(null)
   }
 
   return (
@@ -556,6 +850,55 @@ export default function SalaryPage() {
           <button onClick={() => setMonthOffset(m => m + 1)} className="p-2 text-text-muted hover:text-text">
             下月 →
           </button>
+        </div>
+
+        {/* 勞健保級距選擇 */}
+        <div className="mt-3 border border-border rounded-xl bg-background p-3 space-y-2">
+          <p className="text-xs font-semibold text-text-muted">勞健保投保級距設定（2026年）</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs text-text-muted mb-1">勞保級距</label>
+              <select
+                value={laborTierIndex}
+                onChange={e => setLaborTierIndex(Number(e.target.value))}
+                className="w-full text-xs px-2 py-1.5 border border-border rounded-lg bg-surface text-text"
+              >
+                {LABOR_TIERS.map((t, i) => (
+                  <option key={t.level} value={i}>{t.label}</option>
+                ))}
+              </select>
+              {(() => {
+                const { personal, employer } = calcLabor(LABOR_TIERS[laborTierIndex].wage)
+                return (
+                  <p className="text-[10px] text-text-muted mt-1">
+                    個人 <span className="text-[#9DAEBB] font-medium">${personal.toLocaleString()}</span>
+                    ／雇主 <span className="text-[#C8A882] font-medium">${employer.toLocaleString()}</span>
+                  </p>
+                )
+              })()}
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted mb-1">健保級距</label>
+              <select
+                value={healthTierIndex}
+                onChange={e => setHealthTierIndex(Number(e.target.value))}
+                className="w-full text-xs px-2 py-1.5 border border-border rounded-lg bg-surface text-text"
+              >
+                {HEALTH_TIERS.map((t, i) => (
+                  <option key={t.level} value={i}>{t.label}</option>
+                ))}
+              </select>
+              {(() => {
+                const { personal, employer } = calcHealth(HEALTH_TIERS[healthTierIndex].wage)
+                return (
+                  <p className="text-[10px] text-text-muted mt-1">
+                    個人 <span className="text-[#9DAEBB] font-medium">${personal.toLocaleString()}</span>
+                    ／雇主 <span className="text-[#C8A882] font-medium">${employer.toLocaleString()}</span>
+                  </p>
+                )
+              })()}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -593,8 +936,12 @@ export default function SalaryPage() {
                 const isExpanded = expandedTeacher === teacher.teacher_id
                 const schedules = teacherSchedules[teacher.teacher_id] ?? []
                 const attendance = attendanceMap[teacher.teacher_id] ?? null
-                const leaveDeduction = getLeaveDeduction(teacher)
-                const hasLeave = attendance && (attendance.sick_leave_days > 0 || attendance.personal_leave_days > 0 || attendance.absent_days > 0)
+                const autoDeductions = getAutoDeductions(teacher)
+                const autoDeductTotal = autoDeductions.reduce((acc, d) => acc + getEffectiveDeductionAmount(d), 0)
+                const hasAttendanceData = attendance !== null
+                const hasAutoDeductions = autoDeductions.length > 0
+                const netAmount = teacher.total_amount - autoDeductTotal
+                const hasSickLeave = attendance && attendance.sick_leave_days > 0
 
                 return (
                   <div key={teacher.teacher_id} className="bg-surface rounded-xl border border-border overflow-hidden">
@@ -617,40 +964,43 @@ export default function SalaryPage() {
                           </div>
                           <p className="text-sm text-text-muted mt-1">{getSalaryBreakdown(teacher)}</p>
 
-                          {/* Attendance badges */}
-                          {hasLeave && (
+                          {/* 勞健保個人負擔 */}
+                          {(() => {
+                            const laborPersonal = calcLabor(LABOR_TIERS[laborTierIndex].wage).personal
+                            const healthPersonal = calcHealth(HEALTH_TIERS[healthTierIndex].wage).personal
+                            return (
+                              <div className="flex gap-2 mt-1.5 flex-wrap">
+                                <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-[#EDF1F5] text-[#5A7A8F]">
+                                  勞保自付 ${laborPersonal.toLocaleString()}
+                                </span>
+                                <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-[#EDF2EC] text-[#4A6B44]">
+                                  健保自付 ${healthPersonal.toLocaleString()}
+                                </span>
+                              </div>
+                            )
+                          })()}
+
+                          {/* Attendance badges — sick leave only (auto-deduct items handled below) */}
+                          {hasSickLeave && (
                             <div className="flex gap-2 mt-2 flex-wrap">
-                              {attendance.sick_leave_days > 0 && (
-                                <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs rounded-full">
-                                  病假 {attendance.sick_leave_days} 天
-                                </span>
-                              )}
-                              {attendance.personal_leave_days > 0 && (
-                                <span className="px-2 py-0.5 bg-orange-50 text-orange-600 text-xs rounded-full">
-                                  事假 {attendance.personal_leave_days} 天
-                                  {leaveDeduction > 0 && ` (-$${leaveDeduction.toLocaleString()})`}
-                                </span>
-                              )}
-                              {attendance.absent_days > 0 && (
-                                <span className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full">
-                                  曠職 {attendance.absent_days} 天
-                                </span>
-                              )}
+                              <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs rounded-full">
+                                病假 {attendance!.sick_leave_days} 天（不扣薪）
+                              </span>
                             </div>
                           )}
                         </div>
 
                         <div className="text-right ml-3">
                           <p className="text-xl font-bold text-primary">
-                            ${Number(teacher.total_amount - leaveDeduction).toLocaleString()}
+                            ${netAmount.toLocaleString()}
                           </p>
-                          {leaveDeduction > 0 && (
-                            <p className="text-xs text-red-500">含事假扣薪</p>
+                          {autoDeductTotal > 0 && (
+                            <p className="text-xs text-red-500">含自動扣款</p>
                           )}
                         </div>
                       </div>
 
-                      {/* Adjustments */}
+                      {/* Manual adjustments */}
                       {(teacher.bonus_total > 0 || teacher.deduction_total > 0) && (
                         <div className="mt-2 space-y-1">
                           {teacher.adjustments?.map((adj, i) => (
@@ -662,12 +1012,71 @@ export default function SalaryPage() {
                         </div>
                       )}
 
-                      {/* Leave deduction line item */}
-                      {leaveDeduction > 0 && (
-                        <div className="mt-1 flex justify-between text-xs px-2 py-1 rounded bg-red-50 text-red-700">
-                          <span>- 事假扣薪（{attendance?.personal_leave_days} 天）</span>
-                          <span>-${leaveDeduction.toLocaleString()}</span>
+                      {/* Auto-deduction items */}
+                      {hasAutoDeductions && (
+                        <div className="mt-2 space-y-1">
+                          {autoDeductions.map((d) => {
+                            const eff = getEffectiveDeductionAmount(d)
+                            return (
+                              <div
+                                key={d.id}
+                                className={`flex items-center justify-between text-xs px-2 py-1.5 rounded border ${
+                                  d.cancelled
+                                    ? 'bg-gray-50 border-gray-200 text-gray-400'
+                                    : 'bg-red-50 border-red-100 text-red-700'
+                                }`}
+                              >
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className={`shrink-0 px-1 py-0.5 rounded text-xs font-medium ${
+                                    d.cancelled ? 'bg-gray-200 text-gray-500' : 'bg-red-100 text-red-600'
+                                  }`}>
+                                    自動
+                                  </span>
+                                  <span className={d.cancelled ? 'line-through text-gray-400' : ''}>
+                                    {autoDeductionSummaryLabel(d)}
+                                  </span>
+                                  {d.cancelled && (
+                                    <span className="text-gray-400 shrink-0">（已取消）</span>
+                                  )}
+                                  {d.overrideAmount !== null && !d.cancelled && (
+                                    <span className="text-amber-600 shrink-0">（已調整）</span>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    if (!hasAttendanceData) {
+                                      fetchAttendance(teacher.teacher_id)
+                                    }
+                                    setAdjustingDeduct({ teacher, deduction: d })
+                                  }}
+                                  className={`shrink-0 ml-2 px-1.5 py-0.5 rounded text-xs border transition-colors ${
+                                    d.cancelled
+                                      ? 'border-gray-300 text-gray-500 hover:border-gray-400'
+                                      : 'border-red-200 text-red-500 hover:border-red-400 hover:text-red-700'
+                                  }`}
+                                >
+                                  調整
+                                </button>
+                              </div>
+                            )
+                          })}
                         </div>
+                      )}
+
+                      {/* No attendance data yet — prompt to expand */}
+                      {!hasAttendanceData && (
+                        <button
+                          onClick={() => {
+                            fetchAttendance(teacher.teacher_id)
+                            if (!isExpanded) {
+                              setExpandedTeacher(teacher.teacher_id)
+                              fetchTeacherSchedules(teacher.teacher_id)
+                            }
+                          }}
+                          className="mt-2 w-full text-xs text-text-muted border border-dashed border-border rounded-lg py-1.5 hover:text-primary hover:border-primary transition-colors"
+                        >
+                          載入出缺勤資料以計算自動扣薪
+                        </button>
                       )}
 
                       {/* Progress Bar */}
@@ -698,9 +1107,10 @@ export default function SalaryPage() {
                         {/* Salary slip */}
                         <button
                           onClick={() => {
-                            // Ensure we have schedules before showing slip
                             if (!teacherSchedules[teacher.teacher_id]) {
                               fetchTeacherSchedules(teacher.teacher_id)
+                            }
+                            if (!attendanceMap[teacher.teacher_id]) {
                               fetchAttendance(teacher.teacher_id)
                             }
                             setSlipTeacher(teacher)
@@ -757,6 +1167,41 @@ export default function SalaryPage() {
                 )
               })}
             </div>
+
+            {/* 雇主勞健保負擔總計 */}
+            {data.teachers.length > 0 && (() => {
+              const teacherCount = data.teachers.length
+              const laborEmployer = calcLabor(LABOR_TIERS[laborTierIndex].wage).employer
+              const healthEmployer = calcHealth(HEALTH_TIERS[healthTierIndex].wage).employer
+              const totalLaborEmployer = laborEmployer * teacherCount
+              const totalHealthEmployer = healthEmployer * teacherCount
+              const totalInsuranceCost = totalLaborEmployer + totalHealthEmployer
+              return (
+                <div className="bg-surface rounded-xl border border-border p-4 mt-2">
+                  <p className="text-sm font-semibold text-text mb-3">雇主勞健保負擔總計</p>
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="bg-[#EDF1F5] rounded-lg p-3">
+                      <p className="text-[10px] text-[#5A7A8F] mb-1">勞保雇主負擔</p>
+                      <p className="text-sm font-bold text-[#5A7A8F]">${totalLaborEmployer.toLocaleString()}</p>
+                      <p className="text-[10px] text-[#9DAEBB] mt-0.5">${laborEmployer.toLocaleString()} × {teacherCount}人</p>
+                    </div>
+                    <div className="bg-[#EDF2EC] rounded-lg p-3">
+                      <p className="text-[10px] text-[#4A6B44] mb-1">健保雇主負擔</p>
+                      <p className="text-sm font-bold text-[#4A6B44]">${totalHealthEmployer.toLocaleString()}</p>
+                      <p className="text-[10px] text-[#A8B5A2] mt-0.5">${healthEmployer.toLocaleString()} × {teacherCount}人</p>
+                    </div>
+                    <div className="bg-[#F7F0E8] rounded-lg p-3">
+                      <p className="text-[10px] text-[#8F6A3A] mb-1">合計支出</p>
+                      <p className="text-sm font-bold text-[#8F6A3A]">${totalInsuranceCost.toLocaleString()}</p>
+                      <p className="text-[10px] text-[#C8A882] mt-0.5">勞保＋健保</p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-text-muted mt-2 text-right">
+                    * 依選定投保級距計算，不含政府補助部分
+                  </p>
+                </div>
+              )
+            })()}
 
             {data.teachers.length === 0 && (
               <div className="text-center py-12 text-text-muted">本月無排課記錄</div>
@@ -838,12 +1283,22 @@ export default function SalaryPage() {
         </div>
       )}
 
+      {/* Auto-Deduction Adjust Modal */}
+      {adjustingDeduct && (
+        <AdjustAutoDeductModal
+          deduction={adjustingDeduct.deduction}
+          onSave={(override) => handleSaveAutoDeductOverride(adjustingDeduct.teacher, adjustingDeduct.deduction, override)}
+          onClose={() => setAdjustingDeduct(null)}
+        />
+      )}
+
       {/* Salary Slip Modal */}
       {slipTeacher && (
         <SalarySlipModal
           teacher={slipTeacher}
           schedules={teacherSchedules[slipTeacher.teacher_id] ?? []}
           attendance={attendanceMap[slipTeacher.teacher_id] ?? null}
+          autoDeductions={getAutoDeductions(slipTeacher)}
           period={monthRange.label}
           onClose={() => setSlipTeacher(null)}
         />

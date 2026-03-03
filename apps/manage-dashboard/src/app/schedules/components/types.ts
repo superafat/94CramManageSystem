@@ -19,6 +19,9 @@ export interface Schedule {
   student_ids?: string[]
   student_names?: string[]
   fee_per_class?: string
+  // 繳費狀態（可由後端填入，或用 Demo 假資料）
+  unpaidCount?: number
+  unpaidStudents?: string[]
 }
 
 export interface Teacher {
@@ -55,4 +58,32 @@ export interface AddForm {
 export interface ConflictWarning {
   type: 'room' | 'teacher'
   message: string
+}
+
+export interface RenewalForm {
+  courseName: string
+  teacherId: string
+  startTime: string
+  endTime: string
+  courseType: CourseType
+  studentIds: string[]
+  feePerClass: string
+  startMonth: string   // YYYY-MM
+  endMonth: string     // YYYY-MM
+  roomId: string
+}
+
+export type PaymentStatus = 'paid' | 'pending' | 'unpaid'
+
+export interface StudentBillingInfo {
+  studentId: string
+  studentName: string
+  status: PaymentStatus
+}
+
+export interface CourseBillingData {
+  courseId: string
+  total: number
+  paid: number
+  students: StudentBillingInfo[]
 }

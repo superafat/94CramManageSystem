@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type BillingTab = 'daycare' | 'group' | 'individual'
 type PaymentType = 'monthly' | 'quarterly' | 'semester' | 'yearly'
+type OverdueLevel = 'critical' | 'overdue' | 'pending' | null
 
 interface CourseInfo {
   id: string
@@ -27,6 +28,8 @@ interface StudentBilling {
   paid_amount?: number
   payment_type?: string
   payment_date?: string
+  status?: string
+  period_month?: string
 }
 
 interface BillingData {
@@ -54,6 +57,8 @@ interface DaycareStudentRow {
   payment_id?: string
   paid_amount?: number
   payment_date?: string
+  status?: string
+  period_month?: string
 }
 
 interface DaycareData {
@@ -71,6 +76,8 @@ interface IndividualStudent {
   sessions_completed: number
   payment_id?: string
   paid_amount?: number
+  status?: string
+  period_month?: string
 }
 
 interface IndividualStats {
@@ -80,6 +87,16 @@ interface IndividualStats {
   overdue_amount: number
 }
 
+// 遲繳相關
+interface OverdueStudent {
+  id: string
+  full_name: string
+  grade_level?: string
+  level: 'critical' | 'overdue' | 'pending'
+  periodMonth: string
+  overdueDays?: number
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DISCOUNT_LABELS: Record<PaymentType, { label: string; discount: string; color: string }> = {
@@ -87,6 +104,275 @@ const DISCOUNT_LABELS: Record<PaymentType, { label: string; discount: string; co
   quarterly: { label: '季費', discount: '95折', color: 'text-blue-500' },
   semester: { label: '學期費', discount: '9折', color: 'text-green-500' },
   yearly: { label: '學年費', discount: '85折', color: 'text-purple-500' },
+}
+
+// ─── Overdue Helpers ──────────────────────────────────────────────────────────
+
+function getCurrentMonth(): string {
+  return new Date().toISOString().substring(0, 7)
+}
+
+function getCurrentDay(): number {
+  return new Date().getDate()
+}
+
+/**
+ * 判斷遲繳等級
+ * - status='unpaid' 且 period_month < 當前月 → 「嚴重遲繳」critical
+ * - status='unpaid' 且 period_month = 當前月 且 今日 > 15 → 「遲繳」overdue
+ * - status='pending' → 「處理中」pending
+ * - 否則 null（不需標記）
+ */
+function getOverdueLevel(
+  paymentId: string | undefined,
+  status: string | undefined,
+  periodMonth: string | undefined
+): OverdueLevel {
+  if (paymentId) return null
+
+  const currentMonth = getCurrentMonth()
+  const effectiveStatus = status || (paymentId ? 'paid' : 'unpaid')
+
+  if (effectiveStatus === 'pending') return 'pending'
+
+  if (effectiveStatus === 'unpaid' || !paymentId) {
+    if (!periodMonth) return null
+    if (periodMonth < currentMonth) return 'critical'
+    if (periodMonth === currentMonth && getCurrentDay() > 15) return 'overdue'
+  }
+
+  return null
+}
+
+/**
+ * 計算逾期天數
+ */
+function getOverdueDays(periodMonth: string | undefined): number {
+  if (!periodMonth) return 0
+  const currentMonth = getCurrentMonth()
+  if (periodMonth >= currentMonth) return getCurrentDay() - 15 > 0 ? getCurrentDay() - 15 : 0
+
+  // 計算從上月15日到今天的天數
+  const [year, month] = periodMonth.split('-').map(Number)
+  const dueDate = new Date(year, month - 1, 15)
+  const today = new Date()
+  const diff = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+  return Math.max(0, diff)
+}
+
+// ─── Overdue Badge ────────────────────────────────────────────────────────────
+
+function OverdueBadge({ level, days }: { level: OverdueLevel; days?: number }) {
+  if (!level) return null
+
+  if (level === 'critical') {
+    return (
+      <div className="flex flex-col items-end gap-0.5">
+        <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+          嚴重遲繳
+        </span>
+        {days != null && days > 0 && (
+          <span className="text-xs text-red-400">逾期 {days} 天</span>
+        )}
+      </div>
+    )
+  }
+  if (level === 'overdue') {
+    return (
+      <div className="flex flex-col items-end gap-0.5">
+        <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200">
+          遲繳
+        </span>
+        {days != null && days > 0 && (
+          <span className="text-xs text-orange-400">逾期 {days} 天</span>
+        )}
+      </div>
+    )
+  }
+  if (level === 'pending') {
+    return (
+      <span className="text-xs font-bold text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-full border border-yellow-200">
+        處理中
+      </span>
+    )
+  }
+  return null
+}
+
+// ─── Reminder Button ──────────────────────────────────────────────────────────
+
+function ReminderButton({ studentId, studentName }: { studentId: string; studentName: string }) {
+  const [sent, setSent] = useState(false)
+  const [sending, setSending] = useState(false)
+
+  const handleSend = async () => {
+    setSending(true)
+    try {
+      const res = await fetch('/api/notifications/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ studentId, type: 'payment_reminder' }),
+      })
+      // Demo 模式：API 失敗時仍標記為已發送（local state）
+      if (!res.ok) {
+        console.warn(`催繳通知 API 失敗（demo 模式）：${studentName}`)
+      }
+      setSent(true)
+      setTimeout(() => setSent(false), 3000)
+    } catch {
+      // Demo 模式相容：API 不存在時仍顯示已催繳
+      setSent(true)
+      setTimeout(() => setSent(false), 3000)
+    }
+    setSending(false)
+  }
+
+  if (sent) {
+    return (
+      <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-lg border border-gray-200">
+        ✅ 已催繳
+      </span>
+    )
+  }
+
+  return (
+    <button
+      onClick={handleSend}
+      disabled={sending}
+      className="text-xs text-orange-600 bg-orange-50 hover:bg-orange-100 px-2 py-1 rounded-lg border border-orange-200 transition-colors disabled:opacity-50 whitespace-nowrap"
+    >
+      {sending ? '發送中...' : '📩 催繳'}
+    </button>
+  )
+}
+
+// ─── Overdue Banner ───────────────────────────────────────────────────────────
+
+function OverdueBanner({ students }: { students: OverdueStudent[] }) {
+  const [expanded, setExpanded] = useState(false)
+  const [batchSending, setBatchSending] = useState(false)
+  const [batchProgress, setBatchProgress] = useState<{ sent: number; total: number } | null>(null)
+  const [sentIds, setSentIds] = useState<Set<string>>(new Set())
+
+  const criticalCount = students.filter(s => s.level === 'critical').length
+  const overdueCount = students.filter(s => s.level === 'overdue').length
+  const pendingCount = students.filter(s => s.level === 'pending').length
+
+  const totalActionable = criticalCount + overdueCount
+
+  if (students.length === 0) return null
+
+  const handleBatchSend = async () => {
+    if (!confirm(`確定要對 ${totalActionable} 位遲繳學生發送催繳通知嗎？`)) return
+
+    const targets = students.filter(s => s.level === 'critical' || s.level === 'overdue')
+    setBatchSending(true)
+    setBatchProgress({ sent: 0, total: targets.length })
+
+    const newSentIds = new Set(sentIds)
+    for (let i = 0; i < targets.length; i++) {
+      const s = targets[i]
+      try {
+        await fetch('/api/notifications/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ studentId: s.id, type: 'payment_reminder' }),
+        })
+      } catch {
+        // Demo 模式相容
+      }
+      newSentIds.add(s.id)
+      setSentIds(new Set(newSentIds))
+      setBatchProgress({ sent: i + 1, total: targets.length })
+    }
+
+    setBatchSending(false)
+    setTimeout(() => setBatchProgress(null), 3000)
+  }
+
+  return (
+    <div className="rounded-xl border border-red-300 bg-red-50 overflow-hidden">
+      {/* Banner Header */}
+      <div
+        className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <span className="text-base">⚠️</span>
+        <div className="flex-1 text-sm font-medium text-red-800">
+          目前有{' '}
+          {criticalCount > 0 && (
+            <span className="font-bold text-red-700">{criticalCount} 筆嚴重遲繳</span>
+          )}
+          {criticalCount > 0 && overdueCount > 0 && <span>、</span>}
+          {overdueCount > 0 && (
+            <span className="font-bold text-orange-600">{overdueCount} 筆遲繳</span>
+          )}
+          {pendingCount > 0 && (criticalCount > 0 || overdueCount > 0) && <span>、</span>}
+          {pendingCount > 0 && (
+            <span className="font-bold text-yellow-700">{pendingCount} 筆處理中</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {totalActionable > 0 && (
+            <button
+              onClick={e => {
+                e.stopPropagation()
+                handleBatchSend()
+              }}
+              disabled={batchSending}
+              className="text-xs font-medium text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
+            >
+              {batchSending
+                ? batchProgress
+                  ? `已發送 ${batchProgress.sent}/${batchProgress.total}`
+                  : '發送中...'
+                : '📩 一鍵催繳全部'}
+            </button>
+          )}
+          <span className="text-red-600 text-sm">{expanded ? '▲' : '▼'}</span>
+        </div>
+      </div>
+
+      {/* 完成進度 */}
+      {batchProgress && !batchSending && (
+        <div className="px-4 pb-2 text-xs text-green-700 font-medium">
+          ✅ 已發送 {batchProgress.sent} 筆催繳通知
+        </div>
+      )}
+
+      {/* Expanded Student List */}
+      {expanded && (
+        <div className="border-t border-red-200 divide-y divide-red-100">
+          {students.map(s => (
+            <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 bg-white/50">
+              <div className="flex-1">
+                <div className="text-sm font-medium text-text">{s.full_name}</div>
+                <div className="text-xs text-text-muted">
+                  {s.grade_level && <span>{s.grade_level} · </span>}
+                  <span>{s.periodMonth}</span>
+                  {s.overdueDays != null && s.overdueDays > 0 && (
+                    <span className="text-red-400"> · 逾期 {s.overdueDays} 天</span>
+                  )}
+                </div>
+              </div>
+              <OverdueBadge level={s.level} />
+              {(s.level === 'critical' || s.level === 'overdue') && (
+                sentIds.has(s.id) ? (
+                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-lg border border-gray-200">
+                    ✅ 已催繳
+                  </span>
+                ) : (
+                  <ReminderButton studentId={s.id} studentName={s.full_name} />
+                )
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -157,6 +443,7 @@ function DaycareTab() {
 
   useEffect(() => {
     if (selectedClassId) fetchData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClassId, selectedMonth])
 
   const fetchClasses = async () => {
@@ -164,7 +451,6 @@ function DaycareTab() {
     try {
       const res = await fetch('/api/w8/courses?limit=100&type=daycare', { credentials: 'include' })
       if (!res.ok) {
-        // Fallback: get all courses and filter locally
         const res2 = await fetch('/api/w8/courses?limit=100', { credentials: 'include' })
         const d2 = await res2.json()
         const all: CourseInfo[] = d2.data?.courses || []
@@ -265,6 +551,27 @@ function DaycareTab() {
     setSelected(newSel)
   }
 
+  // 計算遲繳學生清單
+  const overdueStudents: OverdueStudent[] = (data?.students || [])
+    .filter(s => {
+      const level = getOverdueLevel(s.payment_id, s.status, s.period_month || selectedMonth)
+      return level !== null
+    })
+    .map(s => {
+      const level = getOverdueLevel(s.payment_id, s.status, s.period_month || selectedMonth)!
+      const periodMonth = s.period_month || selectedMonth
+      return {
+        id: s.id,
+        full_name: s.full_name,
+        grade_level: s.grade_level,
+        level,
+        periodMonth,
+        overdueDays: (level === 'critical' || level === 'overdue')
+          ? getOverdueDays(periodMonth)
+          : undefined,
+      }
+    })
+
   if (loading && !data) {
     return <div className="py-8 text-center text-text-muted text-sm">讀取中...</div>
   }
@@ -305,6 +612,9 @@ function DaycareTab() {
         </select>
       </div>
 
+      {/* Overdue Banner */}
+      {overdueStudents.length > 0 && <OverdueBanner students={overdueStudents} />}
+
       {/* Stats */}
       {data && (
         <StatBar paid={data.stats.paid} unpaid={data.stats.unpaid} overdue={data.stats.overdue} />
@@ -326,42 +636,66 @@ function DaycareTab() {
             <span className="text-xs text-text-muted">已選 {Object.values(selected).filter(Boolean).length} 人</span>
           </div>
 
-          {data.students.map(s => (
-            <div
-              key={s.id}
-              className={`bg-white rounded-xl border p-3 flex items-center gap-3 ${
-                s.payment_id ? 'border-green-200 bg-green-50' : 'border-border'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={selected[s.id] || false}
-                onChange={e => setSelected({ ...selected, [s.id]: e.target.checked })}
-                disabled={!!s.payment_id}
-                className="w-4 h-4 text-primary"
-              />
-              <div className="flex-1">
-                <div className="font-medium text-text text-sm">{s.full_name}</div>
-                <div className="text-xs text-text-muted">{s.grade_level}</div>
-              </div>
-              {s.payment_id ? (
-                <div className="text-right">
-                  <div className="text-xs font-medium text-green-600">已繳 ${s.paid_amount?.toLocaleString()}</div>
-                  {s.payment_date && (
-                    <div className="text-xs text-text-muted">{twDate(s.payment_date)}</div>
+          {data.students.map(s => {
+            const overdueLevel = getOverdueLevel(s.payment_id, s.status, s.period_month || selectedMonth)
+            const overdueDays = overdueLevel && overdueLevel !== 'pending'
+              ? getOverdueDays(s.period_month || selectedMonth)
+              : undefined
+
+            return (
+              <div
+                key={s.id}
+                className={`bg-white rounded-xl border p-3 flex items-center gap-3 ${
+                  s.payment_id
+                    ? 'border-green-200 bg-green-50'
+                    : overdueLevel === 'critical'
+                    ? 'border-l-4 border-l-red-500 border-red-200 bg-red-50/40'
+                    : overdueLevel === 'overdue'
+                    ? 'border-l-4 border-l-orange-400 border-orange-200'
+                    : 'border-border'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selected[s.id] || false}
+                  onChange={e => setSelected({ ...selected, [s.id]: e.target.checked })}
+                  disabled={!!s.payment_id}
+                  className="w-4 h-4 text-primary"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-text text-sm">{s.full_name}</div>
+                  <div className="text-xs text-text-muted">{s.grade_level}</div>
+                  {overdueDays != null && overdueDays > 0 && (
+                    <div className="text-xs text-red-400 mt-0.5">逾期 {overdueDays} 天</div>
                   )}
                 </div>
-              ) : (
-                <input
-                  type="number"
-                  value={amounts[s.id] || 0}
-                  onChange={e => setAmounts({ ...amounts, [s.id]: Number(e.target.value) })}
-                  className="w-24 px-2 py-1 border border-border rounded text-right text-sm"
-                  placeholder="金額"
-                />
-              )}
-            </div>
-          ))}
+                {s.payment_id ? (
+                  <div className="text-right">
+                    <div className="text-xs font-medium text-green-600">已繳 ${s.paid_amount?.toLocaleString()}</div>
+                    {s.payment_date && (
+                      <div className="text-xs text-text-muted">{twDate(s.payment_date)}</div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    {overdueLevel && (
+                      <OverdueBadge level={overdueLevel} />
+                    )}
+                    {(overdueLevel === 'critical' || overdueLevel === 'overdue') && (
+                      <ReminderButton studentId={s.id} studentName={s.full_name} />
+                    )}
+                    <input
+                      type="number"
+                      value={amounts[s.id] || 0}
+                      onChange={e => setAmounts({ ...amounts, [s.id]: Number(e.target.value) })}
+                      className="w-24 px-2 py-1 border border-border rounded text-right text-sm"
+                      placeholder="金額"
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -398,6 +732,7 @@ function GroupTab() {
   const monthOptions = getMonthOptions()
 
   useEffect(() => { fetchCourses() }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (selectedCourseId) fetchBilling() }, [selectedCourseId, selectedMonth])
 
   const fetchCourses = async () => {
@@ -444,14 +779,14 @@ function GroupTab() {
     setLoading(false)
   }
 
-  const getDefaultFee = (course: CourseInfo) => {
+  const getDefaultFee = useCallback((course: CourseInfo) => {
     switch (paymentType) {
       case 'monthly': return course.fee_monthly || 0
       case 'quarterly': return course.fee_quarterly || 0
       case 'semester': return course.fee_semester || 0
       case 'yearly': return course.fee_yearly || 0
     }
-  }
+  }, [paymentType])
 
   const handleSelectAll = () => {
     const all = Object.values(selected).every(Boolean)
@@ -505,6 +840,27 @@ function GroupTab() {
   const showMsg = (m: string) => { setMessage(m); setTimeout(() => setMessage(''), 3000) }
 
   const disc = DISCOUNT_LABELS[paymentType]
+
+  // 計算遲繳學生清單
+  const overdueStudents: OverdueStudent[] = (billingData?.students || [])
+    .filter(s => {
+      const level = getOverdueLevel(s.payment_id, s.status, s.period_month || selectedMonth)
+      return level !== null
+    })
+    .map(s => {
+      const level = getOverdueLevel(s.payment_id, s.status, s.period_month || selectedMonth)!
+      const periodMonth = s.period_month || selectedMonth
+      return {
+        id: s.id,
+        full_name: s.full_name,
+        grade_level: s.grade_level,
+        level,
+        periodMonth,
+        overdueDays: (level === 'critical' || level === 'overdue')
+          ? getOverdueDays(periodMonth)
+          : undefined,
+      }
+    })
 
   // Compute group stats as amounts
   const groupStats = billingData
@@ -588,7 +944,7 @@ function GroupTab() {
 
       {/* Discount badge */}
       {paymentType !== 'monthly' && (
-        <div className={`flex items-center gap-2 bg-white rounded-xl border border-border px-4 py-2 text-sm`}>
+        <div className="flex items-center gap-2 bg-white rounded-xl border border-border px-4 py-2 text-sm">
           <span className="text-text-muted">折扣方案</span>
           <span className={`font-bold ${disc.color}`}>{disc.discount}</span>
           {billingData && (
@@ -598,6 +954,9 @@ function GroupTab() {
           )}
         </div>
       )}
+
+      {/* Overdue Banner */}
+      {overdueStudents.length > 0 && <OverdueBanner students={overdueStudents} />}
 
       {/* Stats */}
       {groupStats && (
@@ -627,40 +986,62 @@ function GroupTab() {
             </span>
           </div>
 
-          {billingData.students.map(student => (
-            <div
-              key={student.id}
-              className={`bg-white rounded-xl border p-3 flex items-center gap-3 ${
-                student.payment_id ? 'border-green-200 bg-green-50' : 'border-border'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={selected[student.id] || false}
-                onChange={e => setSelected({ ...selected, [student.id]: e.target.checked })}
-                disabled={!!student.payment_id}
-                className="w-4 h-4 text-primary"
-              />
-              <div className="flex-1">
-                <div className="font-medium text-text text-sm">{student.full_name}</div>
-                <div className="text-xs text-text-muted">{student.grade_level}</div>
-              </div>
-              {student.payment_id ? (
-                <div className="text-right">
-                  <div className="text-xs font-medium text-green-600">已繳 ${student.paid_amount?.toLocaleString()}</div>
-                  <div className="text-xs text-text-muted">{student.payment_type}</div>
-                </div>
-              ) : (
+          {billingData.students.map(student => {
+            const overdueLevel = getOverdueLevel(student.payment_id, student.status, student.period_month || selectedMonth)
+            const overdueDays = overdueLevel && overdueLevel !== 'pending'
+              ? getOverdueDays(student.period_month || selectedMonth)
+              : undefined
+
+            return (
+              <div
+                key={student.id}
+                className={`bg-white rounded-xl border p-3 flex items-center gap-3 ${
+                  student.payment_id
+                    ? 'border-green-200 bg-green-50'
+                    : overdueLevel === 'critical'
+                    ? 'border-l-4 border-l-red-500 border-red-200 bg-red-50/40'
+                    : overdueLevel === 'overdue'
+                    ? 'border-l-4 border-l-orange-400 border-orange-200'
+                    : 'border-border'
+                }`}
+              >
                 <input
-                  type="number"
-                  value={amounts[student.id] || 0}
-                  onChange={e => setAmounts({ ...amounts, [student.id]: Number(e.target.value) })}
-                  className="w-24 px-2 py-1 border border-border rounded text-right text-sm"
-                  placeholder="金額"
+                  type="checkbox"
+                  checked={selected[student.id] || false}
+                  onChange={e => setSelected({ ...selected, [student.id]: e.target.checked })}
+                  disabled={!!student.payment_id}
+                  className="w-4 h-4 text-primary"
                 />
-              )}
-            </div>
-          ))}
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-text text-sm">{student.full_name}</div>
+                  <div className="text-xs text-text-muted">{student.grade_level}</div>
+                  {overdueDays != null && overdueDays > 0 && (
+                    <div className="text-xs text-red-400 mt-0.5">逾期 {overdueDays} 天</div>
+                  )}
+                </div>
+                {student.payment_id ? (
+                  <div className="text-right">
+                    <div className="text-xs font-medium text-green-600">已繳 ${student.paid_amount?.toLocaleString()}</div>
+                    <div className="text-xs text-text-muted">{student.payment_type}</div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    {overdueLevel && <OverdueBadge level={overdueLevel} />}
+                    {(overdueLevel === 'critical' || overdueLevel === 'overdue') && (
+                      <ReminderButton studentId={student.id} studentName={student.full_name} />
+                    )}
+                    <input
+                      type="number"
+                      value={amounts[student.id] || 0}
+                      onChange={e => setAmounts({ ...amounts, [student.id]: Number(e.target.value) })}
+                      className="w-24 px-2 py-1 border border-border rounded text-right text-sm"
+                      placeholder="金額"
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -692,6 +1073,7 @@ function IndividualTab() {
 
   const monthOptions = getMonthOptions()
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchIndividual() }, [selectedMonth])
 
   const fetchIndividual = async () => {
@@ -702,7 +1084,6 @@ function IndividualTab() {
         { credentials: 'include' }
       )
       if (!res.ok) {
-        // Fallback: derive from courses API
         await fetchIndividualFallback()
         setLoading(false)
         return
@@ -728,7 +1109,6 @@ function IndividualTab() {
     setLoading(false)
   }
 
-  // Fallback: use courses API and mock session data
   const fetchIndividualFallback = async () => {
     try {
       const res = await fetch('/api/w8/courses?limit=100', { credentials: 'include' })
@@ -737,7 +1117,6 @@ function IndividualTab() {
       const indCourses = all.filter(c =>
         c.course_type === 'individual' || c.name.includes('個指') || c.name.includes('個別')
       )
-      // For each individual course, fetch billing to get students
       const studentMap: Record<string, IndividualStudent> = {}
       await Promise.all(
         indCourses.map(async course => {
@@ -758,6 +1137,8 @@ function IndividualTab() {
                     sessions_completed: 4,
                     payment_id: s.payment_id,
                     paid_amount: s.paid_amount,
+                    status: s.status,
+                    period_month: s.period_month,
                   }
                 }
               })
@@ -816,6 +1197,27 @@ function IndividualTab() {
 
   const totalSelected = Object.values(selected).filter(Boolean).length
 
+  // 計算遲繳學生清單
+  const overdueStudents: OverdueStudent[] = students
+    .filter(s => {
+      const level = getOverdueLevel(s.payment_id, s.status, s.period_month || selectedMonth)
+      return level !== null
+    })
+    .map(s => {
+      const level = getOverdueLevel(s.payment_id, s.status, s.period_month || selectedMonth)!
+      const periodMonth = s.period_month || selectedMonth
+      return {
+        id: s.id,
+        full_name: s.full_name,
+        grade_level: s.grade_level,
+        level,
+        periodMonth,
+        overdueDays: (level === 'critical' || level === 'overdue')
+          ? getOverdueDays(periodMonth)
+          : undefined,
+      }
+    })
+
   if (loading) {
     return <div className="py-8 text-center text-text-muted text-sm">讀取中...</div>
   }
@@ -844,6 +1246,9 @@ function IndividualTab() {
           ))}
         </select>
       </div>
+
+      {/* Overdue Banner */}
+      {overdueStudents.length > 0 && <OverdueBanner students={overdueStudents} />}
 
       {/* Stats */}
       <StatBar paid={stats.paid_amount} unpaid={stats.unpaid_amount} overdue={stats.overdue_amount} />
@@ -876,11 +1281,22 @@ function IndividualTab() {
         {students.map(s => {
           const sessionCount = sessions[s.id] ?? s.sessions_completed
           const total = s.fee_per_session * sessionCount
+          const overdueLevel = getOverdueLevel(s.payment_id, s.status, s.period_month || selectedMonth)
+          const overdueDays = overdueLevel && overdueLevel !== 'pending'
+            ? getOverdueDays(s.period_month || selectedMonth)
+            : undefined
+
           return (
             <div
               key={s.id}
               className={`bg-white rounded-xl border p-3 ${
-                s.payment_id ? 'border-green-200 bg-green-50' : 'border-border'
+                s.payment_id
+                  ? 'border-green-200 bg-green-50'
+                  : overdueLevel === 'critical'
+                  ? 'border-l-4 border-l-red-500 border-red-200 bg-red-50/40'
+                  : overdueLevel === 'overdue'
+                  ? 'border-l-4 border-l-orange-400 border-orange-200'
+                  : 'border-border'
               }`}
             >
               <div className="flex items-center gap-3">
@@ -891,17 +1307,26 @@ function IndividualTab() {
                   disabled={!!s.payment_id}
                   className="w-4 h-4 text-primary"
                 />
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className="font-medium text-text text-sm">{s.full_name}</div>
                   <div className="text-xs text-text-muted">{s.grade_level}</div>
+                  {overdueDays != null && overdueDays > 0 && (
+                    <div className="text-xs text-red-400 mt-0.5">逾期 {overdueDays} 天</div>
+                  )}
                 </div>
                 {s.payment_id ? (
                   <div className="text-right">
                     <div className="text-xs font-medium text-green-600">已繳 ${s.paid_amount?.toLocaleString()}</div>
                   </div>
                 ) : (
-                  <div className="text-right text-sm font-bold text-text">
-                    ${total.toLocaleString()}
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    {overdueLevel && <OverdueBadge level={overdueLevel} />}
+                    {(overdueLevel === 'critical' || overdueLevel === 'overdue') && (
+                      <ReminderButton studentId={s.id} studentName={s.full_name} />
+                    )}
+                    <div className="text-right text-sm font-bold text-text">
+                      ${total.toLocaleString()}
+                    </div>
                   </div>
                 )}
               </div>

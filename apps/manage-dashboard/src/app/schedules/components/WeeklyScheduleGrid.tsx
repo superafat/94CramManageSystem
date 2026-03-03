@@ -1,6 +1,7 @@
 'use client'
 
-import { Schedule, CourseType } from './types'
+import { useEffect, useState } from 'react'
+import { Schedule, CourseType, CourseBillingData } from './types'
 
 interface WeeklyScheduleGridProps {
   weekDates: Date[]
@@ -8,6 +9,7 @@ interface WeeklyScheduleGridProps {
   loading: boolean
   weekOffset: number
   onSelectSchedule: (schedule: Schedule) => void
+  onRenewSchedule: (schedule: Schedule) => void
 }
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
@@ -59,11 +61,126 @@ const COURSE_TYPE_BADGE: Record<string, string> = {
   daycare: 'bg-[#A8B5A2]/20 text-[#4A6B44]',
 }
 
+// ---- Billing helpers ----
+
+const BILLING_FALLBACK: Record<string, CourseBillingData> = {}
+
+async function fetchBillingData(courseId: string): Promise<CourseBillingData | null> {
+  try {
+    const res = await fetch(`/api/admin/billing/course/${courseId}`, {
+      credentials: 'include',
+    })
+    if (!res.ok) {
+      if (res.status === 404 || res.status === 401) return null
+      return null
+    }
+    const body = await res.json() as { data?: CourseBillingData } | CourseBillingData
+    const data = (body as { data?: CourseBillingData }).data ?? (body as CourseBillingData)
+    return data
+  } catch {
+    return null
+  }
+}
+
+// 依 courseId 穩定產生 Demo 假資料（0~3 未繳人數）
+const DEMO_STUDENT_NAMES = ['小明', '小華', '小美', '小強', '小玲', '小傑', '小雯', '小凱']
+function getDemoUnpaid(courseId: string): { unpaidCount: number; unpaidStudents: string[] } {
+  // 用 courseId 最後兩個字元的 charCode 做穩定的偽隨機
+  const seed = (courseId.charCodeAt(courseId.length - 1) ?? 0) + (courseId.charCodeAt(courseId.length - 2) ?? 0)
+  const count = seed % 4  // 0~3
+  const students = DEMO_STUDENT_NAMES.slice(seed % DEMO_STUDENT_NAMES.length).concat(DEMO_STUDENT_NAMES).slice(0, count)
+  return { unpaidCount: count, unpaidStudents: students }
+}
+
+interface BillingBadgeProps {
+  courseId: string
+  /** 排課本身攜帶的未繳人數（優先於 API 資料） */
+  unpaidCount?: number
+  /** 排課本身攜帶的未繳學生名單 */
+  unpaidStudents?: string[]
+}
+
+function BillingBadge({ courseId, unpaidCount: propUnpaidCount, unpaidStudents: propUnpaidStudents }: BillingBadgeProps) {
+  const [billing, setBilling] = useState<CourseBillingData | null>(
+    BILLING_FALLBACK[courseId] ?? null
+  )
+
+  useEffect(() => {
+    if (BILLING_FALLBACK[courseId]) {
+      setBilling(BILLING_FALLBACK[courseId])
+      return
+    }
+    fetchBillingData(courseId).then(data => {
+      if (data) {
+        BILLING_FALLBACK[courseId] = data
+        setBilling(data)
+      }
+    })
+  }, [courseId])
+
+  // 若排課本身有 unpaidCount 欄位，優先使用；否則從 API billing 資料推算；最後 fallback 到 demo 假資料
+  let unpaidCount: number
+  let unpaidStudents: string[]
+  let total: number
+
+  if (propUnpaidCount !== undefined) {
+    unpaidCount = propUnpaidCount
+    unpaidStudents = propUnpaidStudents ?? []
+    total = unpaidStudents.length > 0 ? unpaidStudents.length + (billing?.paid ?? 0) : unpaidCount + (billing?.paid ?? 1)
+  } else if (billing && billing.total > 0) {
+    unpaidCount = billing.total - billing.paid
+    unpaidStudents = billing.students.filter(s => s.status !== 'paid').map(s => s.studentName)
+    total = billing.total
+  } else {
+    // Demo 假資料
+    const demo = getDemoUnpaid(courseId)
+    unpaidCount = demo.unpaidCount
+    unpaidStudents = demo.unpaidStudents
+    total = unpaidCount + Math.max(1, unpaidCount)  // 假設至少有同等數量已繳
+  }
+
+  if (total === 0) return null
+
+  const allPaid = unpaidCount === 0
+  const nonePaid = billing ? billing.paid === 0 && billing.total > 0 : false
+  const partial = !allPaid && !nonePaid
+
+  // 全數已繳：不顯示 badge（正常狀態）
+  if (allPaid) return null
+
+  let colorClass: string
+  let label: string
+  if (nonePaid) {
+    colorClass = 'bg-red-100 text-red-700 border border-red-200'
+    label = `${unpaidCount}人未繳`
+  } else if (partial && unpaidCount >= 3) {
+    colorClass = 'bg-red-100 text-red-700 border border-red-200'
+    label = `${unpaidCount}人未繳`
+  } else {
+    colorClass = 'bg-orange-100 text-orange-700 border border-orange-200'
+    label = `${unpaidCount}人未繳`
+  }
+
+  const tooltipText = unpaidStudents.length > 0
+    ? `未繳學生：${unpaidStudents.join('、')}`
+    : `${unpaidCount} 位學生尚未繳費`
+
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium cursor-help ${colorClass}`}
+      title={tooltipText}
+    >
+      ● {label}
+    </span>
+  )
+}
+
 export default function WeeklyScheduleGrid({
   weekDates,
   schedules,
   loading,
   onSelectSchedule,
+  onRenewSchedule,
 }: WeeklyScheduleGridProps) {
   const getSchedulesForDate = (date: Date) => {
     const dateStr = formatDate(date)
@@ -117,10 +234,23 @@ export default function WeeklyScheduleGrid({
                   {daySchedules.map((schedule) => (
                     <div
                       key={schedule.id}
+                      className={`p-3 rounded-lg border-l-4 ${getCourseTypeBorderColor(schedule.course_type, schedule.subject)} ${getCourseTypeBg(schedule.course_type)} cursor-pointer hover:shadow-md transition-shadow relative`}
                       onClick={() => onSelectSchedule(schedule)}
-                      className={`p-3 rounded-lg border-l-4 ${getCourseTypeBorderColor(schedule.course_type, schedule.subject)} ${getCourseTypeBg(schedule.course_type)} cursor-pointer hover:shadow-md transition-shadow`}
                     >
-                      <div className="flex items-start justify-between gap-2">
+                      {/* 續班按鈕 — 右上角，不觸發卡片點擊 */}
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation()
+                          onRenewSchedule(schedule)
+                        }}
+                        className="absolute top-2 right-2 text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium leading-snug z-10"
+                        title="續班（複製此課程）"
+                      >
+                        🔄 續班
+                      </button>
+
+                      <div className="flex items-start justify-between gap-2 pr-14">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <p className="font-medium text-text">{schedule.course_name}</p>
@@ -129,6 +259,12 @@ export default function WeeklyScheduleGrid({
                                 {COURSE_TYPE_LABEL[schedule.course_type]}
                               </span>
                             )}
+                            {/* 繳費狀態 badge */}
+                            <BillingBadge
+                              courseId={schedule.course_id}
+                              unpaidCount={schedule.unpaidCount}
+                              unpaidStudents={schedule.unpaidStudents}
+                            />
                           </div>
                           <p className="text-sm text-text-muted mt-0.5">
                             {schedule.teacher_name} {schedule.teacher_title}

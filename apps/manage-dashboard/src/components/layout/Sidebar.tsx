@@ -24,6 +24,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/knowledge', icon: '📚', label: '知識庫', roles: ['superadmin', 'admin'] },
   { href: '/dashboard/conversations', icon: '💬', label: '對話紀錄', roles: ['superadmin', 'admin', 'staff'] },
   { href: '/dashboard/trials', icon: '🎯', label: '試用審核', roles: ['superadmin'] }, // 只有系統管理員可見
+  { href: '/headquarters', icon: '🏢', label: '總部管理', roles: ['superadmin'] },
   { href: '/dashboard/audit', icon: '📋', label: '異動日誌', roles: ['superadmin', 'admin'] },
   { href: '/dashboard/settings', icon: '⚙️', label: '系統設定', roles: ['superadmin'] }, // 只有系統管理員可見
   
@@ -53,6 +54,7 @@ const navItems: NavItem[] = [
   { href: '/my-children/grades', icon: '📊', label: '成績查詢', roles: ['parent'] },
   { href: '/my-children/billing', icon: '💰', label: '繳費查詢', roles: ['parent'] },
   { href: '/my-children/notifications', icon: '📬', label: '聯絡簿', roles: ['parent'] },
+  { href: '/my-children/recommendations', icon: '🎯', label: '推薦課程', roles: ['parent'] },
   
   // 學生專區
   { type: 'separator', separator: '我的學習', roles: ['student'] },

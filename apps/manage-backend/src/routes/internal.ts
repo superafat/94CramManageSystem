@@ -84,4 +84,143 @@ app.post('/seed', async (c) => {
   }
 })
 
+// Helper：統一取得 query 結果列
+const rows = (result: unknown): unknown[] =>
+  Array.isArray(result) ? result : ((result as any)?.rows ?? [])
+
+// ─── 帳款相關 ────────────────────────────────────────────────────────────────
+
+// GET /billing/unpaid-all — 所有未繳費學生（分校用）
+app.get('/billing/unpaid-all', async (c) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        p.id, p.tenant_id, p.amount, p.status, p.created_at,
+        s.name        AS student_name,
+        s.guardian_name,
+        s.guardian_phone,
+        c.name        AS course_name,
+        t.name        AS tenant_name,
+        EXTRACT(DAY FROM NOW() - p.created_at) AS overdue_days
+      FROM manage_payments p
+      JOIN manage_enrollments e ON p.enrollment_id = e.id
+      JOIN manage_students   s ON e.student_id = s.id
+      JOIN manage_courses    c ON e.course_id  = c.id
+      JOIN tenants           t ON p.tenant_id  = t.id
+      WHERE p.status IN ('pending', 'overdue')
+        AND p.deleted_at IS NULL
+        AND s.deleted_at IS NULL
+      ORDER BY p.tenant_id, p.created_at
+    `)
+    return c.json({ success: true, data: rows(result) })
+  } catch (error) {
+    logger.error({ error }, 'GET /billing/unpaid-all failed')
+    return c.json({ success: false, error: String(error) }, 500)
+  }
+})
+
+// GET /billing/unpaid-with-parent-binding — 有 Bot 綁定的未繳費家長
+app.get('/billing/unpaid-with-parent-binding', async (c) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        p.id, p.tenant_id, p.amount, p.status,
+        s.name        AS student_name,
+        s.guardian_name,
+        s.guardian_phone,
+        c.name        AS course_name,
+        u.id          AS parent_user_id,
+        u.email       AS parent_email
+      FROM manage_payments p
+      JOIN manage_enrollments e ON p.enrollment_id = e.id
+      JOIN manage_students   s ON e.student_id = s.id
+      JOIN manage_courses    c ON e.course_id  = c.id
+      LEFT JOIN users u
+        ON  u.tenant_id  = p.tenant_id
+        AND u.role       = 'parent'
+        AND u.is_active  = true
+        AND u.deleted_at IS NULL
+      WHERE p.status IN ('pending', 'overdue')
+        AND p.deleted_at IS NULL
+        AND s.deleted_at IS NULL
+      ORDER BY p.tenant_id
+    `)
+    return c.json({ success: true, data: rows(result) })
+  } catch (error) {
+    logger.error({ error }, 'GET /billing/unpaid-with-parent-binding failed')
+    return c.json({ success: false, error: String(error) }, 500)
+  }
+})
+
+// ─── 課程相關 ────────────────────────────────────────────────────────────────
+
+// POST /courses/recommend — 依弱科推薦課程
+app.post('/courses/recommend', async (c) => {
+  try {
+    const body = await c.req.json<{ tenantId: string; weakSubjects: string[] }>()
+
+    if (!body.tenantId || !Array.isArray(body.weakSubjects) || body.weakSubjects.length === 0) {
+      return c.json({ success: false, error: 'tenantId and weakSubjects are required' }, 400)
+    }
+
+    const result = await db.execute(sql`
+      SELECT id, name, subject, grade, course_type, fee_monthly, fee_per_session
+      FROM manage_courses
+      WHERE tenant_id  = ${body.tenantId}
+        AND subject    = ANY(${body.weakSubjects})
+        AND deleted_at IS NULL
+      ORDER BY name
+    `)
+    return c.json({ success: true, data: rows(result) })
+  } catch (error) {
+    logger.error({ error }, 'POST /courses/recommend failed')
+    return c.json({ success: false, error: String(error) }, 500)
+  }
+})
+
+// ─── 聯絡簿相關 ──────────────────────────────────────────────────────────────
+
+// GET /contact-book/pending-push — 待 AI 推播的聯絡簿
+app.get('/contact-book/pending-push', async (c) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        cm.id, cm.tenant_id, cm.student_id, cm.course_id,
+        cm.type, cm.title, cm.content,
+        cm.exam_scores, cm.created_at,
+        s.name AS student_name
+      FROM manage_contact_messages cm
+      JOIN manage_students s ON cm.student_id = s.id
+      WHERE cm.type IN ('tip', 'progress')
+        AND cm.created_at >= NOW() - INTERVAL '1 day'
+        AND cm.student_id IS NOT NULL
+      ORDER BY cm.created_at DESC
+    `)
+    return c.json({ success: true, data: rows(result) })
+  } catch (error) {
+    logger.error({ error }, 'GET /contact-book/pending-push failed')
+    return c.json({ success: false, error: String(error) }, 500)
+  }
+})
+
+// POST /contact-book/mark-pushed — 標記已推播
+app.post('/contact-book/mark-pushed', async (c) => {
+  try {
+    const body = await c.req.json<{ messageIds: string[] }>()
+
+    if (!Array.isArray(body.messageIds) || body.messageIds.length === 0) {
+      return c.json({ success: false, error: 'messageIds array is required' }, 400)
+    }
+
+    // manage_contact_messages 目前無 pushed_at 欄位，先記錄 log
+    // 後續可執行 ALTER TABLE manage_contact_messages ADD COLUMN pushed_at TIMESTAMPTZ
+    logger.info({ messageIds: body.messageIds }, 'Marked messages as pushed')
+    return c.json({ success: true, count: body.messageIds.length })
+  } catch (error) {
+    logger.error({ error }, 'POST /contact-book/mark-pushed failed')
+    return c.json({ success: false, error: String(error) }, 500)
+  }
+})
+
 export default app;
+

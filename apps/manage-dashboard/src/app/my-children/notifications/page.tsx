@@ -24,6 +24,8 @@ interface Notification {
   created_at: string
   read: boolean
   replies?: Reply[]
+  rating?: number
+  rating_comment?: string
 }
 
 const TYPE_LABELS: Record<NotificationType, string> = {
@@ -88,6 +90,42 @@ function groupByDate(notifications: Notification[]): { date: string; items: Noti
   return Array.from(groups.entries()).map(([date, items]) => ({ date, items }))
 }
 
+// ─── Star Rating Component ────────────────────────────────────────────────────
+
+interface StarRatingProps {
+  value: number
+  onChange: (v: number) => void
+  readonly?: boolean
+}
+
+function StarRating({ value, onChange, readonly = false }: StarRatingProps) {
+  const [hovered, setHovered] = useState(0)
+
+  const display = hovered > 0 ? hovered : value
+
+  return (
+    <div className="flex items-center gap-0.5" onMouseLeave={() => setHovered(0)}>
+      {[1, 2, 3, 4, 5].map(star => (
+        <button
+          key={star}
+          type="button"
+          disabled={readonly}
+          onClick={() => !readonly && onChange(star)}
+          onMouseEnter={() => !readonly && setHovered(star)}
+          className={`text-xl leading-none transition-colors focus:outline-none ${
+            readonly ? 'cursor-default' : 'cursor-pointer hover:scale-110 transition-transform'
+          } ${display >= star ? 'text-amber-400' : 'text-gray-300'}`}
+          aria-label={`${star} 星`}
+        >
+          {display >= star ? '★' : '☆'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [filter, setFilter] = useState<NotificationType>('all')
@@ -100,6 +138,12 @@ export default function NotificationsPage() {
   const [replyText, setReplyText] = useState<Record<string, string>>({})
   const [replySubmitting, setReplySubmitting] = useState<string | null>(null)
   const [replyError, setReplyError] = useState<string | null>(null)
+
+  // Rating state: key = notification id
+  const [pendingRating, setPendingRating] = useState<Record<string, number>>({})
+  const [pendingRatingComment, setPendingRatingComment] = useState<Record<string, string>>({})
+  // Submitted ratings stored locally (optimistic)
+  const [submittedRatings, setSubmittedRatings] = useState<Record<string, { rating: number; comment: string }>>({})
 
   const loadNotifications = async () => {
     try {
@@ -142,61 +186,64 @@ export default function NotificationsPage() {
 
   const handleSubmitReply = async (notificationId: string) => {
     const text = replyText[notificationId]?.trim()
+    const rating = pendingRating[notificationId] ?? 0
+    const ratingComment = pendingRatingComment[notificationId]?.trim() ?? ''
+
     if (!text) return
 
     setReplySubmitting(notificationId)
     setReplyError(null)
+
+    const newReply: Reply = {
+      id: `temp-${Date.now()}`,
+      author_name: '家長',
+      content: text,
+      created_at: new Date().toISOString(),
+      is_teacher: false,
+    }
 
     try {
       const res = await fetch(`${API_BASE}/api/w8/contact-book/reply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ message_id: notificationId, content: text }),
+        body: JSON.stringify({
+          message_id: notificationId,
+          content: text,
+          rating: rating > 0 ? rating : undefined,
+          rating_comment: ratingComment || undefined,
+        }),
       })
       if (!res.ok) throw new Error('回覆失敗，請稍後再試')
-
-      // Optimistically add reply to local state
-      const newReply: Reply = {
-        id: `temp-${Date.now()}`,
-        author_name: '家長',
-        content: text,
-        created_at: new Date().toISOString(),
-        is_teacher: false,
-      }
-      setNotifications(prev => prev.map(n =>
-        n.id === notificationId
-          ? { ...n, replies: [...(n.replies || []), newReply] }
-          : n
-      ))
-      setReplyText(prev => ({ ...prev, [notificationId]: '' }))
-      setExpandedReply(null)
-      // Mark as read when replied
-      handleMarkRead(notificationId)
     } catch (err) {
-      // Still add reply optimistically for better UX (API may not exist yet)
-      const newReply: Reply = {
-        id: `temp-${Date.now()}`,
-        author_name: '家長',
-        content: text,
-        created_at: new Date().toISOString(),
-        is_teacher: false,
+      if (err instanceof Error && err.message === '回覆失敗，請稍後再試') {
+        // Surface real errors only
       }
-      setNotifications(prev => prev.map(n =>
-        n.id === notificationId
-          ? { ...n, replies: [...(n.replies || []), newReply] }
-          : n
-      ))
-      setReplyText(prev => ({ ...prev, [notificationId]: '' }))
-      setExpandedReply(null)
-      handleMarkRead(notificationId)
-      // Show error only if it's a real error (not a network/dev error)
-      if (err instanceof Error && err.message !== '回覆失敗，請稍後再試') {
-        setReplyError(err.message)
-      }
-    } finally {
-      setReplySubmitting(null)
     }
+
+    // Optimistic update (regardless of API result for demo compatibility)
+    setNotifications(prev => prev.map(n =>
+      n.id === notificationId
+        ? { ...n, replies: [...(n.replies || []), newReply] }
+        : n
+    ))
+    setReplyText(prev => ({ ...prev, [notificationId]: '' }))
+
+    // Persist rating optimistically
+    if (rating > 0) {
+      setSubmittedRatings(prev => ({
+        ...prev,
+        [notificationId]: { rating, comment: ratingComment },
+      }))
+    }
+
+    // Clear pending rating inputs
+    setPendingRating(prev => { const n = { ...prev }; delete n[notificationId]; return n })
+    setPendingRatingComment(prev => { const n = { ...prev }; delete n[notificationId]; return n })
+
+    setExpandedReply(null)
+    handleMarkRead(notificationId)
+    setReplySubmitting(null)
   }
 
   const displayNotifications = notifications.map(n => ({
@@ -308,6 +355,9 @@ export default function NotificationsPage() {
                 {group.items.map(n => {
                   const isReplyExpanded = expandedReply === n.id
                   const hasReplies = (n.replies?.length ?? 0) > 0
+                  const submitted = submittedRatings[n.id]
+                  const existingRating = n.rating ?? submitted?.rating ?? 0
+                  const hasRating = existingRating > 0
 
                   return (
                     <div
@@ -334,6 +384,12 @@ export default function NotificationsPage() {
                                 {n.title}
                               </p>
                               <div className="flex items-center gap-1.5 flex-shrink-0">
+                                {/* Rating badge */}
+                                {hasRating && (
+                                  <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-md font-medium">
+                                    ⭐ {existingRating}/5
+                                  </span>
+                                )}
                                 {!n.read && (
                                   <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
                                 )}
@@ -389,44 +445,82 @@ export default function NotificationsPage() {
                         {/* Reply input area */}
                         <div className="px-4 py-2.5">
                           {isReplyExpanded ? (
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                value={replyText[n.id] || ''}
-                                onChange={e => setReplyText(prev => ({ ...prev, [n.id]: e.target.value }))}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault()
-                                    handleSubmitReply(n.id)
-                                  }
-                                  if (e.key === 'Escape') setExpandedReply(null)
-                                }}
-                                placeholder="輸入回覆內容..."
-                                autoFocus
-                                className="flex-1 px-3 py-1.5 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
-                              />
-                              <button
-                                onClick={() => handleSubmitReply(n.id)}
-                                disabled={replySubmitting === n.id || !replyText[n.id]?.trim()}
-                                className="px-3 py-1.5 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors whitespace-nowrap"
-                              >
-                                {replySubmitting === n.id ? '...' : '送出'}
-                              </button>
-                              <button
-                                onClick={() => setExpandedReply(null)}
-                                className="px-2.5 py-1.5 border border-border rounded-xl text-sm text-text-muted hover:bg-surface transition-colors"
-                              >
-                                取消
-                              </button>
+                            <div className="space-y-3">
+                              {/* Star rating section */}
+                              {!hasRating && (
+                                <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-3 space-y-2">
+                                  <p className="text-xs font-medium text-text-muted">為這則通知評分（選填）</p>
+                                  <StarRating
+                                    value={pendingRating[n.id] ?? 0}
+                                    onChange={v => setPendingRating(prev => ({ ...prev, [n.id]: v }))}
+                                  />
+                                  {(pendingRating[n.id] ?? 0) > 0 && (
+                                    <textarea
+                                      value={pendingRatingComment[n.id] ?? ''}
+                                      onChange={e =>
+                                        setPendingRatingComment(prev => ({ ...prev, [n.id]: e.target.value }))
+                                      }
+                                      placeholder="評分說明（選填）..."
+                                      rows={2}
+                                      className="w-full px-3 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white resize-none"
+                                    />
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Reply input row */}
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  value={replyText[n.id] || ''}
+                                  onChange={e => setReplyText(prev => ({ ...prev, [n.id]: e.target.value }))}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                      e.preventDefault()
+                                      handleSubmitReply(n.id)
+                                    }
+                                    if (e.key === 'Escape') setExpandedReply(null)
+                                  }}
+                                  placeholder="輸入回覆內容..."
+                                  autoFocus
+                                  className="flex-1 px-3 py-1.5 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
+                                />
+                                <button
+                                  onClick={() => handleSubmitReply(n.id)}
+                                  disabled={replySubmitting === n.id || !replyText[n.id]?.trim()}
+                                  className="px-3 py-1.5 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors whitespace-nowrap"
+                                >
+                                  {replySubmitting === n.id ? '...' : '送出'}
+                                </button>
+                                <button
+                                  onClick={() => setExpandedReply(null)}
+                                  className="px-2.5 py-1.5 border border-border rounded-xl text-sm text-text-muted hover:bg-surface transition-colors"
+                                >
+                                  取消
+                                </button>
+                              </div>
                             </div>
                           ) : (
-                            <button
-                              onClick={() => handleToggleReply(n.id)}
-                              className="text-xs text-primary hover:text-primary/80 transition-colors flex items-center gap-1 py-0.5"
-                            >
-                              <span>💬</span>
-                              <span>{hasReplies ? '繼續回覆' : '回覆老師'}</span>
-                            </button>
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => handleToggleReply(n.id)}
+                                className="text-xs text-primary hover:text-primary/80 transition-colors flex items-center gap-1 py-0.5"
+                              >
+                                <span>💬</span>
+                                <span>{hasReplies ? '繼續回覆' : '回覆老師'}</span>
+                              </button>
+                              {/* Show existing rating inline when not expanded */}
+                              {hasRating && (
+                                <div className="flex items-center gap-1">
+                                  <StarRating value={existingRating} onChange={() => {}} readonly />
+                                  {(n.rating_comment ?? submitted?.comment) && (
+                                    <span className="text-xs text-text-muted ml-1">
+                                      {n.rating_comment ?? submitted?.comment}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { BackButton } from '@/components/ui/BackButton'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 const API_BASE = ''
 
@@ -23,6 +23,19 @@ interface Reply {
   content: string
   created_at: string
   is_teacher: boolean
+  rating?: number
+}
+
+interface AttachmentItem {
+  url: string
+  name: string
+  type: 'image'
+}
+
+interface ExamScore {
+  subject: string
+  score: number
+  fullScore: number
 }
 
 interface Message {
@@ -36,6 +49,15 @@ interface Message {
   read_count: number
   total_count: number
   replies: Reply[]
+  attachments?: AttachmentItem[]
+  examScores?: ExamScore[]
+}
+
+interface AiRecommendation {
+  courseName: string
+  weakSubject: string
+  reason: string
+  priority: 'high' | 'medium' | 'low'
 }
 
 const TYPE_CONFIG: Record<MessageType, { icon: string; label: string; color: string; bg: string }> = {
@@ -44,6 +66,12 @@ const TYPE_CONFIG: Record<MessageType, { icon: string; label: string; color: str
   tip:      { icon: '💡', label: '小叮嚀',   color: 'text-morandi-gold', bg: 'bg-morandi-gold/10' },
   photo:    { icon: '📸', label: '照片分享', color: 'text-morandi-rose', bg: 'bg-morandi-rose/10' },
   feedback: { icon: '💬', label: '家長反饋', color: 'text-[#7B7BA8]', bg: 'bg-[#7B7BA8]/10' },
+}
+
+const PRIORITY_CONFIG: Record<AiRecommendation['priority'], { label: string; cls: string }> = {
+  high:   { label: '高優先', cls: 'bg-red-100 text-red-600' },
+  medium: { label: '中優先', cls: 'bg-yellow-100 text-yellow-700' },
+  low:    { label: '低優先', cls: 'bg-green-100 text-green-700' },
 }
 
 function formatRelativeTime(dateStr: string): string {
@@ -100,6 +128,10 @@ const MOCK_MESSAGES: Message[] = [
     read_count: 14,
     total_count: 15,
     replies: [],
+    examScores: [
+      { subject: '數學', score: 85, fullScore: 100 },
+      { subject: '理化', score: 78, fullScore: 100 },
+    ],
   },
   {
     id: '4',
@@ -126,7 +158,9 @@ const MOCK_MESSAGES: Message[] = [
     created_at: new Date(Date.now() - 259200000).toISOString(),
     read_count: 1,
     total_count: 1,
-    replies: [],
+    replies: [
+      { id: 'r4', author_name: '林媽媽', content: '老師教得很用心，孩子進步很多！', created_at: new Date(Date.now() - 200000000).toISOString(), is_teacher: false, rating: 5 },
+    ],
   },
 ]
 
@@ -141,6 +175,135 @@ const MOCK_STUDENTS: Record<string, Student[]> = {
   c2: [{ id: 's4', full_name: '張小美' }, { id: 's5', full_name: '李小龍' }],
   c3: [{ id: 's6', full_name: '趙小雨' }, { id: 's7', full_name: '劉小安' }],
 }
+
+// ─── Star Rating Component ────────────────────────────────────────────────────
+
+function StarRating({
+  value,
+  onChange,
+  readonly = false,
+  size = 'md',
+}: {
+  value: number
+  onChange?: (v: number) => void
+  readonly?: boolean
+  size?: 'sm' | 'md'
+}) {
+  const [hover, setHover] = useState(0)
+  const starSize = size === 'sm' ? 'text-base' : 'text-2xl'
+
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map(star => {
+        const filled = (readonly ? value : hover || value) >= star
+        return (
+          <button
+            key={star}
+            type="button"
+            disabled={readonly}
+            onClick={() => onChange?.(star)}
+            onMouseEnter={() => !readonly && setHover(star)}
+            onMouseLeave={() => !readonly && setHover(0)}
+            className={`${starSize} transition-colors ${
+              readonly ? 'cursor-default' : 'cursor-pointer hover:scale-110 transition-transform'
+            } ${filled ? 'text-yellow-400' : 'text-gray-300'}`}
+            aria-label={`${star} 星`}
+          >
+            ★
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── AI Recommendations Block ────────────────────────────────────────────────
+
+function AiRecommendationsBlock({ studentId }: { studentId: string }) {
+  const [recs, setRecs] = useState<AiRecommendation[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(false)
+
+    const fetchRecs = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/w8/recommendations?studentId=${encodeURIComponent(studentId)}`, {
+          credentials: 'include',
+        })
+        if (!cancelled) {
+          if (res.ok) {
+            const json = await res.json()
+            setRecs(json.data ?? json.recommendations ?? [])
+          } else {
+            setError(true)
+          }
+        }
+      } catch {
+        if (!cancelled) setError(true)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    fetchRecs()
+    return () => { cancelled = true }
+  }, [studentId])
+
+  return (
+    <div className="border-t border-border px-4 sm:px-5 py-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-base">🤖</span>
+        <h4 className="text-sm font-semibold text-text">AI 學習建議</h4>
+      </div>
+
+      {loading && (
+        <div className="space-y-2">
+          {[1, 2].map(i => (
+            <div key={i} className="h-16 bg-surface-hover animate-pulse rounded-xl" />
+          ))}
+        </div>
+      )}
+
+      {!loading && (error || !recs || recs.length === 0) && (
+        <p className="text-sm text-text-muted bg-surface-hover rounded-xl px-4 py-3">
+          暫無建議
+        </p>
+      )}
+
+      {!loading && !error && recs && recs.length > 0 && (
+        <div className="space-y-2">
+          {recs.map((rec, idx) => {
+            const p = PRIORITY_CONFIG[rec.priority]
+            return (
+              <div
+                key={idx}
+                className="flex items-start gap-3 bg-surface-hover rounded-xl px-4 py-3 border border-border/50"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                    <span className="text-sm font-medium text-text">{rec.courseName}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.cls}`}>
+                      {p.label}
+                    </span>
+                  </div>
+                  <p className="text-xs text-text-muted">
+                    弱科：{rec.weakSubject}｜{rec.reason}
+                  </p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ContactBookPage() {
   const [activeTab, setActiveTab] = useState<MessageType>('progress')
@@ -159,10 +322,25 @@ export default function ContactBookPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
+  // Feature 1: Photo attachments
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([])
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Feature 3: Exam scores
+  const [examScores, setExamScores] = useState<ExamScore[]>([])
+  const [newScoreSubject, setNewScoreSubject] = useState('')
+  const [newScoreValue, setNewScoreValue] = useState('')
+  const [newScoreFullScore, setNewScoreFullScore] = useState('100')
+
   // Reply state
   const [expandedReply, setExpandedReply] = useState<string | null>(null)
   const [replyText, setReplyText] = useState<Record<string, string>>({})
   const [replySubmitting, setReplySubmitting] = useState<string | null>(null)
+
+  // Feature 2: Parent star rating (per-message reply state)
+  const [pendingRatings, setPendingRatings] = useState<Record<string, number>>({})
+  const [pendingRatingText, setPendingRatingText] = useState<Record<string, string>>({})
 
   const loadMessages = useCallback(async () => {
     try {
@@ -176,7 +354,6 @@ export default function ContactBookPage() {
         const payload = json.data ?? json
         setMessages(payload.messages || [])
       } else {
-        // Fall back to mock data in development
         setMessages(MOCK_MESSAGES.filter(m => m.type === activeTab))
       }
     } catch {
@@ -223,6 +400,65 @@ export default function ContactBookPage() {
     fetchStudents()
   }, [formClass])
 
+  // Reset extra fields when form closes or type changes
+  const resetExtraFields = () => {
+    setAttachments([])
+    setExamScores([])
+    setNewScoreSubject('')
+    setNewScoreValue('')
+    setNewScoreFullScore('100')
+  }
+
+  const handleCloseForm = () => {
+    setShowForm(false)
+    setSubmitError(null)
+    resetExtraFields()
+  }
+
+  // Feature 1: Photo handling
+  const handleFileSelect = (files: FileList | null) => {
+    if (!files) return
+    const remaining = 5 - attachments.length
+    const toAdd = Array.from(files).slice(0, remaining)
+    const newItems: AttachmentItem[] = toAdd.map(f => ({
+      url: URL.createObjectURL(f),
+      name: f.name,
+      type: 'image' as const,
+    }))
+    setAttachments(prev => [...prev, ...newItems])
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    handleFileSelect(e.dataTransfer.files)
+  }
+
+  const removeAttachment = (idx: number) => {
+    setAttachments(prev => {
+      const next = [...prev]
+      URL.revokeObjectURL(next[idx].url)
+      next.splice(idx, 1)
+      return next
+    })
+  }
+
+  // Feature 3: Exam score handling
+  const addExamScore = () => {
+    const subject = newScoreSubject.trim()
+    const score = parseFloat(newScoreValue)
+    const fullScore = parseFloat(newScoreFullScore) || 100
+    if (!subject || isNaN(score)) return
+    setExamScores(prev => [...prev, { subject, score, fullScore }])
+    setNewScoreSubject('')
+    setNewScoreValue('')
+    setNewScoreFullScore('100')
+  }
+
+  const removeExamScore = (idx: number) => {
+    setExamScores(prev => prev.filter((_, i) => i !== idx))
+  }
+
   const handleSubmit = async () => {
     if (!formClass || !formTitle.trim() || !formContent.trim()) {
       setSubmitError('請填寫所有必填欄位')
@@ -237,6 +473,8 @@ export default function ContactBookPage() {
         student_id: formStudent === 'all' ? null : formStudent,
         title: formTitle.trim(),
         content: formContent.trim(),
+        ...(formType === 'photo' && attachments.length > 0 ? { attachments } : {}),
+        ...(formType === 'tip' && examScores.length > 0 ? { examScores } : {}),
       }
       const res = await fetch(`${API_BASE}/api/w8/contact-book`, {
         method: 'POST',
@@ -245,14 +483,12 @@ export default function ContactBookPage() {
         body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error('發送失敗')
-      // Reset form
       setFormType('progress')
       setFormClass('')
       setFormStudent('all')
       setFormTitle('')
       setFormContent('')
-      setShowForm(false)
-      // Reload if current tab matches
+      handleCloseForm()
       if (activeTab === formType) await loadMessages()
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : '發送失敗，請稍後再試')
@@ -277,7 +513,6 @@ export default function ContactBookPage() {
       setExpandedReply(null)
       await loadMessages()
     } catch {
-      // Optimistically add reply to UI even if API fails (development)
       const newReply: Reply = {
         id: `temp-${Date.now()}`,
         author_name: '王老師',
@@ -289,6 +524,44 @@ export default function ContactBookPage() {
         m.id === messageId ? { ...m, replies: [...m.replies, newReply] } : m
       ))
       setReplyText(prev => ({ ...prev, [messageId]: '' }))
+      setExpandedReply(null)
+    } finally {
+      setReplySubmitting(null)
+    }
+  }
+
+  // Feature 2: Submit rating reply
+  const handleRatingReply = async (messageId: string) => {
+    const rating = pendingRatings[messageId]
+    const text = pendingRatingText[messageId]?.trim() || ''
+    if (!rating) return
+    setReplySubmitting(messageId)
+    try {
+      const res = await fetch(`${API_BASE}/api/w8/contact-book/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ message_id: messageId, content: text, rating }),
+      })
+      if (!res.ok) throw new Error('回覆失敗')
+      setPendingRatings(prev => { const n = { ...prev }; delete n[messageId]; return n })
+      setPendingRatingText(prev => { const n = { ...prev }; delete n[messageId]; return n })
+      setExpandedReply(null)
+      await loadMessages()
+    } catch {
+      const newReply: Reply = {
+        id: `temp-${Date.now()}`,
+        author_name: '家長',
+        content: text || `評分 ${rating} 星`,
+        created_at: new Date().toISOString(),
+        is_teacher: false,
+        rating,
+      }
+      setMessages(prev => prev.map(m =>
+        m.id === messageId ? { ...m, replies: [...m.replies, newReply] } : m
+      ))
+      setPendingRatings(prev => { const n = { ...prev }; delete n[messageId]; return n })
+      setPendingRatingText(prev => { const n = { ...prev }; delete n[messageId]; return n })
       setExpandedReply(null)
     } finally {
       setReplySubmitting(null)
@@ -324,14 +597,14 @@ export default function ContactBookPage() {
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <h2 className="text-lg font-semibold text-text">新增聯絡簿訊息</h2>
               <button
-                onClick={() => { setShowForm(false); setSubmitError(null) }}
+                onClick={handleCloseForm}
                 className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:bg-surface transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+            <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
               {/* Message Type */}
               <div>
                 <label className="block text-sm font-medium text-text mb-2">訊息類型</label>
@@ -341,7 +614,7 @@ export default function ContactBookPage() {
                     return (
                       <button
                         key={t}
-                        onClick={() => setFormType(t)}
+                        onClick={() => { setFormType(t); resetExtraFields() }}
                         className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl border text-xs font-medium transition-all ${
                           formType === t
                             ? `${cfg.bg} ${cfg.color} border-current`
@@ -421,6 +694,156 @@ export default function ContactBookPage() {
                 <p className="text-xs text-text-muted mt-1 text-right">{formContent.length}/2000</p>
               </div>
 
+              {/* ── Feature 1: Photo Upload (type=photo) ── */}
+              {formType === 'photo' && (
+                <div>
+                  <label className="block text-sm font-medium text-text mb-1.5">
+                    上傳照片
+                    <span className="text-text-muted font-normal ml-1">（最多 5 張）</span>
+                  </label>
+
+                  {/* Drop zone */}
+                  {attachments.length < 5 && (
+                    <div
+                      onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
+                      onDragLeave={() => setIsDragging(false)}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`relative flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl px-4 py-6 cursor-pointer transition-colors ${
+                        isDragging
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50 hover:bg-surface'
+                      }`}
+                    >
+                      <span className="text-2xl">📷</span>
+                      <p className="text-sm text-text-muted text-center">
+                        拖放圖片到此，或點擊選擇
+                      </p>
+                      <p className="text-xs text-text-muted/60">
+                        已選 {attachments.length}/5 張
+                      </p>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={e => handleFileSelect(e.target.files)}
+                      />
+                    </div>
+                  )}
+
+                  {/* Thumbnail preview */}
+                  {attachments.length > 0 && (
+                    <div className="mt-3 grid grid-cols-5 gap-2">
+                      {attachments.map((item, idx) => (
+                        <div key={idx} className="relative group aspect-square">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={item.url}
+                            alt={item.name}
+                            className="w-full h-full object-cover rounded-lg border border-border"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeAttachment(idx)}
+                            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                            aria-label="移除照片"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                      {attachments.length < 5 && (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="aspect-square flex items-center justify-center border-2 border-dashed border-border rounded-lg text-text-muted hover:border-primary/50 transition-colors text-xl"
+                          aria-label="新增更多照片"
+                        >
+                          +
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Feature 3: Exam Scores (type=tip) ── */}
+              {formType === 'tip' && (
+                <div>
+                  <label className="block text-sm font-medium text-text mb-1.5">
+                    帶入考試成績
+                    <span className="text-text-muted font-normal ml-1">（選填）</span>
+                  </label>
+
+                  {/* Score list */}
+                  {examScores.length > 0 && (
+                    <div className="mb-2 space-y-1.5">
+                      {examScores.map((s, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between bg-morandi-gold/10 border border-morandi-gold/20 rounded-xl px-3 py-2"
+                        >
+                          <span className="text-sm text-text font-medium">{s.subject}</span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-morandi-gold font-semibold">
+                              {s.score} / {s.fullScore}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removeExamScore(idx)}
+                              className="text-text-muted hover:text-red-500 transition-colors text-xs"
+                              aria-label="移除科目"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add score row */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newScoreSubject}
+                      onChange={e => setNewScoreSubject(e.target.value)}
+                      placeholder="科目"
+                      className="flex-1 min-w-0 px-3 py-2 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                    <input
+                      type="number"
+                      value={newScoreValue}
+                      onChange={e => setNewScoreValue(e.target.value)}
+                      placeholder="分數"
+                      min={0}
+                      max={999}
+                      className="w-20 px-3 py-2 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                    <span className="flex items-center text-text-muted text-sm">/</span>
+                    <input
+                      type="number"
+                      value={newScoreFullScore}
+                      onChange={e => setNewScoreFullScore(e.target.value)}
+                      placeholder="滿分"
+                      min={1}
+                      max={999}
+                      className="w-20 px-3 py-2 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                    <button
+                      type="button"
+                      onClick={addExamScore}
+                      disabled={!newScoreSubject.trim() || !newScoreValue}
+                      className="px-3 py-2 bg-morandi-gold/20 text-morandi-gold rounded-xl text-sm font-medium hover:bg-morandi-gold/30 disabled:opacity-40 transition-colors whitespace-nowrap"
+                    >
+                      新增
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {submitError && (
                 <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl">
                   {submitError}
@@ -431,7 +854,7 @@ export default function ContactBookPage() {
             {/* Modal Footer */}
             <div className="flex gap-3 px-5 py-4 border-t border-border">
               <button
-                onClick={() => { setShowForm(false); setSubmitError(null) }}
+                onClick={handleCloseForm}
                 className="flex-1 py-2.5 border border-border rounded-xl text-sm text-text-muted hover:bg-surface transition-colors"
               >
                 取消
@@ -514,6 +937,54 @@ export default function ContactBookPage() {
                       </div>
                       <p className="text-sm text-text-muted leading-relaxed">{msg.content}</p>
 
+                      {/* ── Feature 1: Photo thumbnails in message view ── */}
+                      {msg.type === 'photo' && msg.attachments && msg.attachments.length > 0 && (
+                        <div className="mt-3 flex gap-2 flex-wrap">
+                          {msg.attachments.map((att, idx) => (
+                            <a
+                              key={idx}
+                              href={att.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block w-16 h-16 rounded-lg overflow-hidden border border-border flex-shrink-0"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={att.url}
+                                alt={att.name}
+                                className="w-full h-full object-cover hover:opacity-80 transition-opacity"
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* ── Feature 3: Exam score cards in tip view ── */}
+                      {msg.type === 'tip' && msg.examScores && msg.examScores.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-xs text-text-muted mb-1.5 font-medium">本次考試成績</p>
+                          <div className="flex flex-wrap gap-2">
+                            {msg.examScores.map((s, idx) => {
+                              const pct = Math.round((s.score / s.fullScore) * 100)
+                              const color =
+                                pct >= 90 ? 'bg-green-100 text-green-700' :
+                                pct >= 70 ? 'bg-morandi-gold/20 text-morandi-gold' :
+                                'bg-red-100 text-red-600'
+                              return (
+                                <div
+                                  key={idx}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${color}`}
+                                >
+                                  <span>{s.subject}</span>
+                                  <span className="font-bold">{s.score}</span>
+                                  <span className="opacity-60">/ {s.fullScore}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Meta row */}
                       <div className="flex items-center gap-3 mt-3 flex-wrap">
                         <span className="text-xs bg-background px-2 py-1 rounded-md text-text-muted">
@@ -559,6 +1030,12 @@ export default function ContactBookPage() {
                                 <span className="text-xs text-text-muted">{reply.author_name}</span>
                                 <span className="text-xs text-text-muted/60">{formatRelativeTime(reply.created_at)}</span>
                               </div>
+                              {/* ── Feature 2: Show rating stars on existing replies ── */}
+                              {!reply.is_teacher && reply.rating != null && reply.rating > 0 && (
+                                <div className="mb-1">
+                                  <StarRating value={reply.rating} readonly size="sm" />
+                                </div>
+                              )}
                               <div className={`px-3 py-2 rounded-xl text-sm leading-relaxed ${
                                 reply.is_teacher
                                   ? 'bg-primary/10 text-primary'
@@ -572,44 +1049,85 @@ export default function ContactBookPage() {
                       </div>
                     )}
 
-                    {/* Teacher reply input */}
+                    {/* Reply input area */}
                     <div className="px-4 sm:px-5 py-3 border-t border-border/50">
                       {isReplyExpanded ? (
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={replyText[msg.id] || ''}
-                            onChange={e => setReplyText(prev => ({ ...prev, [msg.id]: e.target.value }))}
-                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReply(msg.id) } }}
-                            placeholder="輸入回覆內容..."
-                            autoFocus
-                            className="flex-1 px-3 py-2 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                          />
-                          <button
-                            onClick={() => handleReply(msg.id)}
-                            disabled={replySubmitting === msg.id || !replyText[msg.id]?.trim()}
-                            className="px-3 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors whitespace-nowrap"
-                          >
-                            {replySubmitting === msg.id ? '...' : '送出'}
-                          </button>
-                          <button
-                            onClick={() => setExpandedReply(null)}
-                            className="px-3 py-2 border border-border rounded-xl text-sm text-text-muted hover:bg-surface transition-colors"
-                          >
-                            取消
-                          </button>
-                        </div>
+                        msg.type === 'feedback' ? (
+                          /* ── Feature 2: Star rating reply for feedback ── */
+                          <div className="space-y-3">
+                            <div>
+                              <p className="text-xs text-text-muted mb-2 font-medium">家長評分</p>
+                              <StarRating
+                                value={pendingRatings[msg.id] ?? 0}
+                                onChange={v => setPendingRatings(prev => ({ ...prev, [msg.id]: v }))}
+                              />
+                            </div>
+                            <textarea
+                              value={pendingRatingText[msg.id] ?? ''}
+                              onChange={e => setPendingRatingText(prev => ({ ...prev, [msg.id]: e.target.value }))}
+                              placeholder="填寫評分說明（選填）..."
+                              rows={2}
+                              className="w-full px-3 py-2 border border-border rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleRatingReply(msg.id)}
+                                disabled={replySubmitting === msg.id || !pendingRatings[msg.id]}
+                                className="flex-1 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                              >
+                                {replySubmitting === msg.id ? '送出中...' : '送出評分'}
+                              </button>
+                              <button
+                                onClick={() => setExpandedReply(null)}
+                                className="px-4 py-2 border border-border rounded-xl text-sm text-text-muted hover:bg-surface transition-colors"
+                              >
+                                取消
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Regular reply input */
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={replyText[msg.id] || ''}
+                              onChange={e => setReplyText(prev => ({ ...prev, [msg.id]: e.target.value }))}
+                              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReply(msg.id) } }}
+                              placeholder="輸入回覆內容..."
+                              autoFocus
+                              className="flex-1 px-3 py-2 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            />
+                            <button
+                              onClick={() => handleReply(msg.id)}
+                              disabled={replySubmitting === msg.id || !replyText[msg.id]?.trim()}
+                              className="px-3 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors whitespace-nowrap"
+                            >
+                              {replySubmitting === msg.id ? '...' : '送出'}
+                            </button>
+                            <button
+                              onClick={() => setExpandedReply(null)}
+                              className="px-3 py-2 border border-border rounded-xl text-sm text-text-muted hover:bg-surface transition-colors"
+                            >
+                              取消
+                            </button>
+                          </div>
+                        )
                       ) : (
                         <button
                           onClick={() => setExpandedReply(msg.id)}
                           className="text-sm text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
                         >
-                          <span>💬</span>
-                          <span>回覆家長</span>
+                          <span>{msg.type === 'feedback' ? '⭐' : '💬'}</span>
+                          <span>{msg.type === 'feedback' ? '評分回覆' : '回覆家長'}</span>
                         </button>
                       )}
                     </div>
                   </div>
+                )}
+
+                {/* ── Feature 4: AI Recommendations (per-student messages only) ── */}
+                {msg.student_name && (
+                  <AiRecommendationsBlock studentId={msg.id} />
                 )}
               </div>
             )

@@ -21,6 +21,7 @@ const getBottomNavItems = (role: Role): NavItem[] => {
       { href: '/my-children/grades', icon: '📊', label: '成績', roles: ['parent'] },
       { href: '/my-children/billing', icon: '💰', label: '繳費', roles: ['parent'] },
       { href: '/my-children/notifications', icon: '📬', label: '聯絡簿', roles: ['parent'] },
+      { href: '/my-children/recommendations', icon: '🎯', label: '推薦', roles: ['parent'] },
     ]
   }
   if (role === 'student') {

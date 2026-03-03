@@ -306,3 +306,25 @@ export const stockBarcodes = pgTable('stock_barcodes', {
 }, (table) => ({
   tenantIdx: index('stock_barcodes_tenant_id_idx').on(table.tenantId),
 }));
+
+// 庫存批次（先進先出追蹤）
+export const stockBatches = pgTable('stock_batches', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull(),
+  warehouseId: uuid('warehouse_id').notNull().references(() => stockWarehouses.id),
+  itemId: uuid('item_id').notNull().references(() => stockItems.id),
+  batchNo: varchar('batch_no', { length: 50 }).notNull(),
+  quantity: integer('quantity').default(0).notNull(),
+  remainingQty: integer('remaining_qty').default(0).notNull(),
+  manufactureDate: timestamp('manufacture_date'),
+  expiryDate: timestamp('expiry_date'),
+  receivedAt: timestamp('received_at').defaultNow().notNull(),
+  purchaseOrderId: uuid('purchase_order_id'),
+  unitCost: decimal('unit_cost', { precision: 10, scale: 2 }),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index('stock_batches_tenant_idx').on(table.tenantId),
+  itemIdx: index('stock_batches_item_idx').on(table.itemId),
+  expiryIdx: index('stock_batches_expiry_idx').on(table.expiryDate),
+}));

@@ -3,7 +3,7 @@ import { parseTelegramUpdate } from '../modules/platform-adapter';
 import { getParentBinding, updateParentLastActive } from '../firestore/parent-bindings';
 import { getParentInvite, markInviteUsed } from '../firestore/parent-invites';
 import { createParentBinding } from '../firestore/parent-bindings';
-import { parseParentIntent as parseParentIntentKeyword, executeParentIntent, tryKnowledgeBase, type ParentIntentResult, type ParentIntent } from '../handlers/parent-intent-router';
+import { parseParentIntent as parseParentIntentKeyword, executeParentIntent, tryKnowledgeBase, detectAndBuildFlexCard, flexToPlainText, type ParentIntentResult, type ParentIntent } from '../handlers/parent-intent-router';
 import { parseParentIntent as parseParentIntentAI, type ParentContext } from '../modules/ai-engine';
 import { createCrossBotRequest, notifyAdminOfParentRequest, notifyAdminOfParentMessage } from '../modules/cross-bot-bridge';
 import { saveConversation } from '../firestore/parent-conversations';
@@ -320,6 +320,25 @@ telegramParentWebhook.post('/', async (c) => {
     const apiResult = await executeParentIntent(intentResult, binding);
     // 用 aiResponse 當自然語言前綴，讓回覆更像人
     const reply = aiResponse ? `${aiResponse}\n\n${apiResult}` : apiResult;
+
+    // 嘗試偵測是否有 Flex Message 卡片（課表、學費、推薦）
+    // 目前 bot 為 Telegram，Flex Message 以 altText 純文字傳送；
+    // 未來接 LINE Messaging API 時只需換成 sendFlexMessage(chatId, flex)
+    try {
+      const flexCard = await detectAndBuildFlexCard(text, intentResult, binding);
+      if (flexCard) {
+        // Telegram fallback：使用 altText 作為提示，完整文字另附
+        const flexHint = `[Flex Card] ${flexToPlainText(flexCard)}`;
+        logger.info({ intent: intentResult.intent, altText: flexCard.altText }, '[ParentBot] Flex Message built');
+        await sendMessage(msg.chatId, `${reply}\n\n${flexHint}`, undefined, 'parent');
+        recordTurn('parent', msg.userId, binding.tenant_id, text, reply, intentResult.intent);
+        logConversation(reply, intentResult.intent);
+        return c.json({ ok: true });
+      }
+    } catch (flexErr) {
+      logger.warn({ err: flexErr instanceof Error ? flexErr : new Error(String(flexErr)) }, '[ParentBot] Flex card build failed, falling back to text');
+    }
+
     await sendMessage(msg.chatId, reply, undefined, 'parent');
     recordTurn('parent', msg.userId, binding.tenant_id, text, reply, intentResult.intent);
     logConversation(reply, intentResult.intent);

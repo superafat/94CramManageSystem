@@ -33,6 +33,7 @@ const navItems: NavEntry[] = [
   { href: '/dashboard/transfer', icon: '🔄', label: '調撥作業' },
   { href: '/dashboard/inventory-counts', icon: '📋', label: '盤點管理' },
   { href: '/dashboard/barcodes', icon: '🏷️', label: '條碼管理' },
+  { href: '/dashboard/expiry', icon: '⏰', label: '過期監控' },
   // 採購管理
   { separator: '採購管理' },
   { href: '/dashboard/suppliers', icon: '🏭', label: '供應商管理' },

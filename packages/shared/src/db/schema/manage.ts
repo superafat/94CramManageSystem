@@ -219,12 +219,37 @@ export const manageContactMessages = pgTable('manage_contact_messages', {
   isFromParent: boolean('is_from_parent').default(false),
   readByParent: boolean('read_by_parent').default(false),
   readAt: timestamp('read_at'),
+  // 家長反饋：五星評分
+  rating: integer('rating'), // 1-5 星
+  ratingComment: text('rating_comment'), // 評分說明
+  // 小叮嚀帶入成績
+  examScores: jsonb('exam_scores'), // [{subject, score, fullScore}]
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
   tenantIdx: index('manage_contact_msg_tenant_idx').on(table.tenantId),
   studentIdx: index('manage_contact_msg_student_idx').on(table.studentId),
   courseIdx: index('manage_contact_msg_course_idx').on(table.courseId),
   typeIdx: index('manage_contact_msg_type_idx').on(table.tenantId, table.type),
+}));
+
+// 學生請假紀錄
+export const manageStudentLeaves = pgTable('manage_student_leaves', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  studentId: uuid('student_id').references(() => manageStudents.id).notNull(),
+  courseId: uuid('course_id').references(() => manageCourses.id),
+  leaveDate: date('leave_date').notNull(),
+  leaveType: varchar('leave_type', { length: 20 }).notNull(), // sick, personal, family, other
+  reason: text('reason'),
+  parentNotified: boolean('parent_notified').default(false),
+  notifiedAt: timestamp('notified_at'),
+  approvedBy: uuid('approved_by').references(() => users.id),
+  status: varchar('status', { length: 20 }).default('pending'), // pending, approved, rejected
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  tenantIdx: index('manage_student_leave_tenant_idx').on(table.tenantId),
+  studentIdx: index('manage_student_leave_student_idx').on(table.studentId),
+  dateIdx: index('manage_student_leave_date_idx').on(table.tenantId, table.leaveDate),
 }));
 
 // AI 對話記錄
