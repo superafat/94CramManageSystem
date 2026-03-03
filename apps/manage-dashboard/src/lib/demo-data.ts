@@ -18,14 +18,14 @@ const TENANT_STATS: Record<string, { conversations: number; knowledgeChunks: num
 
 // ===== Students =====
 const STUDENTS = [
-  { id: 's1', name: '陳小利', grade: '國中一', phone: '0912-111-001', email: 'chen@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 95, average_grade: 88, risk_level: null },
-  { id: 's2', name: '王大明', grade: '國中二', phone: '0912-111-002', email: 'wang@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 90, average_grade: 76, risk_level: null },
-  { id: 's3', name: '林美琪', grade: '國中一', phone: '0912-111-003', email: 'lin@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 98, average_grade: 92, risk_level: null },
-  { id: 's4', name: '張志豪', grade: '國中三', phone: '0912-111-004', email: 'zhang@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 80, average_grade: 67, risk_level: 'medium' },
-  { id: 's5', name: '李宜庭', grade: '國小六', phone: '0912-111-005', email: 'li@demo.com', status: 'active', joined_date: '2026-02-01', attendance_rate: 85, average_grade: 0, risk_level: null },
-  { id: 's6', name: '黃柏翰', grade: '國中二', phone: '0912-111-006', email: 'huang@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 92, average_grade: 83, risk_level: null },
-  { id: 's7', name: '劉思涵', grade: '國中一', phone: '0912-111-007', email: 'liu@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 88, average_grade: 79, risk_level: null },
-  { id: 's8', name: '吳承恩', grade: '國中三', phone: '0912-111-008', email: 'wu@demo.com', status: 'at_risk', joined_date: '2025-09-01', attendance_rate: 65, average_grade: 58, risk_level: 'high' },
+  { id: 's1', name: '陳小利', grade: '國一', phone: '0912-111-001', email: 'chen@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 95, average_grade: 88, risk_level: null },
+  { id: 's2', name: '王大明', grade: '國二', phone: '0912-111-002', email: 'wang@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 90, average_grade: 76, risk_level: null },
+  { id: 's3', name: '林美琪', grade: '國一', phone: '0912-111-003', email: 'lin@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 98, average_grade: 92, risk_level: null },
+  { id: 's4', name: '張志豪', grade: '國三', phone: '0912-111-004', email: 'zhang@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 80, average_grade: 67, risk_level: 'medium' },
+  { id: 's5', name: '李宜庭', grade: '小六', phone: '0912-111-005', email: 'li@demo.com', status: 'active', joined_date: '2026-02-01', attendance_rate: 85, average_grade: 0, risk_level: null },
+  { id: 's6', name: '黃柏翰', grade: '國二', phone: '0912-111-006', email: 'huang@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 92, average_grade: 83, risk_level: null },
+  { id: 's7', name: '劉思涵', grade: '國一', phone: '0912-111-007', email: 'liu@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 88, average_grade: 79, risk_level: null },
+  { id: 's8', name: '吳承恩', grade: '國三', phone: '0912-111-008', email: 'wu@demo.com', status: 'at_risk', joined_date: '2025-09-01', attendance_rate: 65, average_grade: 58, risk_level: 'high' },
 ]
 
 // ===== Courses/Classes =====
@@ -292,28 +292,28 @@ const NOTIFICATIONS = [
 
 // ===== Teacher Attendance (師資出缺勤) =====
 const TEACHER_ATTENDANCE = [
-  { id: 'ta-1', teacher_id: 't1', teacher_name: '王老師', date: '2026-03-03', status: 'present', check_in_time: '15:30', check_out_time: '21:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
-  { id: 'ta-2', teacher_id: 't2', teacher_name: '李老師', date: '2026-03-03', status: 'present', check_in_time: '17:45', check_out_time: '20:10', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
-  { id: 'ta-3', teacher_id: 't3', teacher_name: '陳主任', date: '2026-03-03', status: 'present', check_in_time: '09:00', check_out_time: '18:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
-  { id: 'ta-4', teacher_id: 't4', teacher_name: '林助教', date: '2026-03-03', status: 'late', check_in_time: '16:20', check_out_time: '20:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: '遲到 20 分鐘' },
-  { id: 'ta-5', teacher_id: 't1', teacher_name: '王老師', date: '2026-03-01', status: 'present', check_in_time: '15:30', check_out_time: '21:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
-  { id: 'ta-6', teacher_id: 't2', teacher_name: '李老師', date: '2026-03-01', status: 'leave', check_in_time: null, check_out_time: null, leave_type: 'sick', leave_reason: '身體不適', substitute_teacher_id: 't1', approved: true, notes: '王老師代課' },
-  { id: 'ta-7', teacher_id: 't3', teacher_name: '陳主任', date: '2026-03-01', status: 'present', check_in_time: '09:00', check_out_time: '18:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
-  { id: 'ta-8', teacher_id: 't4', teacher_name: '林助教', date: '2026-03-01', status: 'present', check_in_time: '12:00', check_out_time: '16:10', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
-  { id: 'ta-9', teacher_id: 't2', teacher_name: '李老師', date: '2026-02-28', status: 'present', check_in_time: '17:50', check_out_time: '20:05', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
-  { id: 'ta-10', teacher_id: 't1', teacher_name: '王老師', date: '2026-02-27', status: 'leave', check_in_time: null, check_out_time: null, leave_type: 'personal', leave_reason: '家庭事務', substitute_teacher_id: null, approved: false, notes: '待審核' },
+  { id: 'ta-1', teacher_id: 't1', teacher_name: '王老師', role: '資深講師', date: '2026-03-03', status: 'present', check_in_time: '15:30', check_out_time: '21:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
+  { id: 'ta-2', teacher_id: 't2', teacher_name: '李老師', role: '首席講師', date: '2026-03-03', status: 'present', check_in_time: '17:45', check_out_time: '20:10', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
+  { id: 'ta-3', teacher_id: 't3', teacher_name: '陳主任', role: '教務主任', date: '2026-03-03', status: 'present', check_in_time: '09:00', check_out_time: '18:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
+  { id: 'ta-4', teacher_id: 't4', teacher_name: '林助教', role: '助教', date: '2026-03-03', status: 'late', check_in_time: '16:20', check_out_time: '20:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: '遲到 20 分鐘' },
+  { id: 'ta-5', teacher_id: 't1', teacher_name: '王老師', role: '資深講師', date: '2026-03-01', status: 'present', check_in_time: '15:30', check_out_time: '21:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
+  { id: 'ta-6', teacher_id: 't2', teacher_name: '李老師', role: '首席講師', date: '2026-03-01', status: 'leave', check_in_time: null, check_out_time: null, leave_type: 'sick', leave_reason: '身體不適', substitute_teacher_id: 't1', approved: true, notes: '王老師代課' },
+  { id: 'ta-7', teacher_id: 't3', teacher_name: '陳主任', role: '教務主任', date: '2026-03-01', status: 'present', check_in_time: '09:00', check_out_time: '18:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
+  { id: 'ta-8', teacher_id: 't4', teacher_name: '林助教', role: '助教', date: '2026-03-01', status: 'present', check_in_time: '12:00', check_out_time: '16:10', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
+  { id: 'ta-9', teacher_id: 't2', teacher_name: '李老師', role: '首席講師', date: '2026-02-28', status: 'present', check_in_time: '17:50', check_out_time: '20:05', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
+  { id: 'ta-10', teacher_id: 't1', teacher_name: '王老師', role: '資深講師', date: '2026-02-27', status: 'leave', check_in_time: null, check_out_time: null, leave_type: 'personal', leave_reason: '家庭事務', substitute_teacher_id: null, approved: false, notes: '待審核' },
 ]
 
 // ===== Contact Book Messages (電子聯絡簿) =====
 const CONTACT_MESSAGES = [
-  { id: 'cm-1', course_id: 'c1', course_name: '國中數學 A 班', student_id: null, student_name: '全班', teacher_id: 't1', teacher_name: '王老師', type: 'progress', title: '本週學習進度：一元二次方程式', content: '本週進入一元二次方程式，同學們掌握度約 80%。配合講義 P.45-52 練習，下週將進行隨堂測驗。建議回家多練習例題 5-8。', attachments: [], is_from_parent: false, read_by_parent: true, created_at: '2026-03-03T16:00:00Z' },
-  { id: 'cm-2', course_id: 'c1', course_name: '國中數學 A 班', student_id: 's1', student_name: '陳小利', teacher_id: 't1', teacher_name: '王老師', type: 'tip', title: '小叮嚀：考試準備', content: '陳小利上課很認真，但計算偶爾粗心。建議考前多做驗算練習，特別是「移項」步驟要仔細。加油！', attachments: [], is_from_parent: false, read_by_parent: true, created_at: '2026-03-02T17:30:00Z' },
-  { id: 'cm-3', course_id: 'c1', course_name: '國中數學 A 班', student_id: null, student_name: '全班', teacher_id: 't1', teacher_name: '王老師', type: 'homework', title: '作業通知：數學講義 P.48-50', content: '請完成講義第 48-50 頁的所有練習題，下週二上課前繳交。題目不懂可以在 LINE 群組問。', attachments: [], is_from_parent: false, read_by_parent: false, created_at: '2026-03-01T20:15:00Z' },
-  { id: 'cm-4', course_id: 'c2', course_name: '國中英文菁英班', student_id: null, student_name: '全班', teacher_id: 't2', teacher_name: '李老師', type: 'photo', title: '課堂花絮：英文話劇排練', content: '今天的英文話劇排練，同學們都很投入！附上幾張照片，歡迎家長分享。', attachments: [{ url: '/demo/photo1.jpg', name: '話劇排練1.jpg', type: 'image' }, { url: '/demo/photo2.jpg', name: '話劇排練2.jpg', type: 'image' }], is_from_parent: false, read_by_parent: true, created_at: '2026-02-28T19:00:00Z' },
-  { id: 'cm-5', course_id: 'c1', course_name: '國中數學 A 班', student_id: 's4', student_name: '張志豪', teacher_id: 't1', teacher_name: '王老師', type: 'progress', title: '個別學習報告：數學基礎加強', content: '張志豪近期數學有進步，從 58 分提升到 64 分。但一元二次方程式仍需加強。建議每天多做 5 題基礎練習，預計 2 週可見成效。', attachments: [], is_from_parent: false, read_by_parent: true, created_at: '2026-02-27T16:45:00Z' },
-  { id: 'cm-6', course_id: 'c1', course_name: '國中數學 A 班', student_id: 's4', student_name: '張志豪', teacher_id: null, teacher_name: null, parent_user_id: 'p4', type: 'feedback', title: '家長回覆：謝謝老師', content: '謝謝王老師的用心！志豪回家也有提到數學變好理解了。我們會督促他每天練習，有問題再請教。', attachments: [], is_from_parent: true, read_by_parent: true, created_at: '2026-02-27T21:00:00Z' },
-  { id: 'cm-7', course_id: 'c2', course_name: '國中英文菁英班', student_id: 's8', student_name: '吳承恩', teacher_id: 't2', teacher_name: '李老師', type: 'tip', title: '出勤提醒', content: '吳承恩近期缺課較多（本月已缺 3 次），請家長留意孩子的上課狀況。如有困難歡迎與老師溝通。', attachments: [], is_from_parent: false, read_by_parent: false, created_at: '2026-02-26T14:30:00Z' },
-  { id: 'cm-8', course_id: 'c6', course_name: '安親班（國小）', student_id: 's5', student_name: '李宜庭', teacher_id: 't4', teacher_name: '林助教', type: 'progress', title: '安親班學習報告', content: '李宜庭今天完成了數學和國語作業，表現很棒！國語閱讀測驗答對 9/10，數學作業全部正確。', attachments: [], is_from_parent: false, read_by_parent: true, created_at: '2026-03-03T16:30:00Z' },
+  { id: 'cm-1', course_id: 'c1', course_name: '國中數學 A 班', class_name: '國中數學 A 班', student_id: null, student_name: null, teacher_id: 't1', teacher_name: '王老師', type: 'progress', title: '本週學習進度：一元二次方程式', content: '本週進入一元二次方程式，同學們掌握度約 80%。配合講義 P.45-52 練習，下週將進行隨堂測驗。建議回家多練習例題 5-8。', attachments: [], read_count: 4, total_count: 5, replies: [{ id: 'r-cm1', author_name: '陳媽媽', content: '收到，會督促小利複習！', created_at: '2026-03-03T20:00:00Z', is_teacher: false }], created_at: '2026-03-03T16:00:00Z' },
+  { id: 'cm-2', course_id: 'c1', course_name: '國中數學 A 班', class_name: '國中數學 A 班', student_id: 's1', student_name: '陳小利', teacher_id: 't1', teacher_name: '王老師', type: 'tip', title: '小叮嚀：考試準備', content: '陳小利上課很認真，但計算偶爾粗心。建議考前多做驗算練習，特別是「移項」步驟要仔細。加油！', attachments: [], read_count: 1, total_count: 1, replies: [], created_at: '2026-03-02T17:30:00Z' },
+  { id: 'cm-3', course_id: 'c1', course_name: '國中數學 A 班', class_name: '國中數學 A 班', student_id: null, student_name: null, teacher_id: 't1', teacher_name: '王老師', type: 'homework', title: '作業通知：數學講義 P.48-50', content: '請完成講義第 48-50 頁的所有練習題，下週二上課前繳交。題目不懂可以在 LINE 群組問。', attachments: [], read_count: 3, total_count: 5, replies: [], created_at: '2026-03-01T20:15:00Z' },
+  { id: 'cm-4', course_id: 'c2', course_name: '國中英文菁英班', class_name: '國中英文菁英班', student_id: null, student_name: null, teacher_id: 't2', teacher_name: '李老師', type: 'photo', title: '課堂花絮：英文話劇排練', content: '今天的英文話劇排練，同學們都很投入！附上幾張照片，歡迎家長分享。', attachments: [{ url: '/demo/photo1.jpg', name: '話劇排練1.jpg', type: 'image' }, { url: '/demo/photo2.jpg', name: '話劇排練2.jpg', type: 'image' }], read_count: 3, total_count: 4, replies: [{ id: 'r-cm4', author_name: '林爸爸', content: '好棒！孩子回家說今天很開心', created_at: '2026-02-28T21:00:00Z', is_teacher: false }, { id: 'r-cm4b', author_name: '李老師', content: '謝謝家長的支持！', created_at: '2026-02-28T22:00:00Z', is_teacher: true }], created_at: '2026-02-28T19:00:00Z' },
+  { id: 'cm-5', course_id: 'c1', course_name: '國中數學 A 班', class_name: '國中數學 A 班', student_id: 's4', student_name: '張志豪', teacher_id: 't1', teacher_name: '王老師', type: 'progress', title: '個別學習報告：數學基礎加強', content: '張志豪近期數學有進步，從 58 分提升到 64 分。但一元二次方程式仍需加強。建議每天多做 5 題基礎練習，預計 2 週可見成效。', attachments: [], read_count: 1, total_count: 1, replies: [], created_at: '2026-02-27T16:45:00Z' },
+  { id: 'cm-6', course_id: 'c1', course_name: '國中數學 A 班', class_name: '國中數學 A 班', student_id: 's4', student_name: '張志豪', teacher_id: null, teacher_name: null, type: 'feedback', title: '家長回覆：謝謝老師', content: '謝謝王老師的用心！志豪回家也有提到數學變好理解了。我們會督促他每天練習，有問題再請教。', attachments: [], read_count: 1, total_count: 1, replies: [{ id: 'r-cm6', author_name: '王老師', content: '謝謝家長的配合，志豪一定會越來越好！', created_at: '2026-02-28T09:00:00Z', is_teacher: true }], created_at: '2026-02-27T21:00:00Z' },
+  { id: 'cm-7', course_id: 'c2', course_name: '國中英文菁英班', class_name: '國中英文菁英班', student_id: 's8', student_name: '吳承恩', teacher_id: 't2', teacher_name: '李老師', type: 'tip', title: '出勤提醒', content: '吳承恩近期缺課較多（本月已缺 3 次），請家長留意孩子的上課狀況。如有困難歡迎與老師溝通。', attachments: [], read_count: 0, total_count: 1, replies: [], created_at: '2026-02-26T14:30:00Z' },
+  { id: 'cm-8', course_id: 'c6', course_name: '安親班（國小）', class_name: '安親班（國小）', student_id: 's5', student_name: '李宜庭', teacher_id: 't4', teacher_name: '林助教', type: 'progress', title: '安親班學習報告', content: '李宜庭今天完成了數學和國語作業，表現很棒！國語閱讀測驗答對 9/10，數學作業全部正確。', attachments: [], read_count: 1, total_count: 1, replies: [], created_at: '2026-03-03T16:30:00Z' },
 ]
 
 // ===== Route handler =====
@@ -376,7 +376,7 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     if (path === '/api/w8/courses') return { status: 200, body: { success: true, data: { courses: COURSES } } }
 
     // Teachers
-    if (path === '/api/w8/teachers') return { status: 200, body: { teachers: TEACHERS } }
+    if (path === '/api/w8/teachers') return { status: 200, body: { teachers: TEACHERS.map(t => ({ ...t, full_name: t.name, role: t.teacher_role || t.title })) } }
 
     // Students (for schedule page individual tutoring)
     if (path === '/api/w8/students') {
@@ -455,11 +455,12 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
 
     // Billing — 個指帳務
     if (path === '/api/admin/billing/individual') {
+      const periodMonth = searchParams.get('periodMonth') || '2026-03'
       return { status: 200, body: { success: true, data: { students: [
-        { student_id: 's4', student_name: '張志豪', course_name: '張志豪 數學個指', sessions_this_month: 4, fee_per_session: 1200, total: 4800, status: 'paid' },
-        { student_id: 's1', student_name: '陳小利', course_name: '陳小利+林美琪 英文個指', sessions_this_month: 4, fee_per_session: 900, total: 3600, status: 'paid' },
-        { student_id: 's3', student_name: '林美琪', course_name: '陳小利+林美琪 英文個指', sessions_this_month: 4, fee_per_session: 900, total: 3600, status: 'pending' },
-      ] } } }
+        { id: 's4', full_name: '張志豪', grade_level: '國三', fee_per_session: 1200, sessions_completed: 4, payment_id: 'pay-ind-1', paid_amount: 4800, status: 'paid', period_month: periodMonth },
+        { id: 's1', full_name: '陳小利', grade_level: '國一', fee_per_session: 900, sessions_completed: 4, payment_id: 'pay-ind-2', paid_amount: 3600, status: 'paid', period_month: periodMonth },
+        { id: 's3', full_name: '林美琪', grade_level: '國一', fee_per_session: 900, sessions_completed: 4, status: 'pending', period_month: periodMonth },
+      ], stats: { total_amount: 12000, paid_amount: 8400, unpaid_amount: 3600, overdue_amount: 0 } } } }
     }
 
     // Billing — 家長繳費紀錄
@@ -558,10 +559,13 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     }
 
     // Teacher Attendance — 師資出缺勤
-    if (path === '/api/teacher-attendance' || path === '/api/teacher-attendance/') {
+    if (path === '/api/teacher-attendance' || path === '/api/teacher-attendance/' || path === '/api/admin/teacher-attendance') {
+      const date = searchParams.get('date')
       const month = searchParams.get('month') || '2026-03'
       const teacherId = searchParams.get('teacherId')
-      let filtered = TEACHER_ATTENDANCE.filter(ta => ta.date.startsWith(month))
+      let filtered = date
+        ? TEACHER_ATTENDANCE.filter(ta => ta.date === date)
+        : TEACHER_ATTENDANCE.filter(ta => ta.date.startsWith(month))
       if (teacherId) filtered = filtered.filter(ta => ta.teacher_id === teacherId)
       return { status: 200, body: { success: true, data: { records: filtered } } }
     }
