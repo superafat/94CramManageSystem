@@ -4,6 +4,13 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BackButton } from '@/components/ui/BackButton'
 
+const TEACHER_ROLE_OPTIONS = ['主任', '行政', '助教', '跑課老師']
+const SALARY_TYPE_OPTIONS = [
+  { value: 'per_class', label: '堂價計費' },
+  { value: 'hourly', label: '兼職時薪' },
+  { value: 'monthly', label: '正職底薪' },
+]
+
 interface Teacher {
   id: string
   name: string
@@ -12,6 +19,10 @@ interface Teacher {
   email: string
   rate_per_class: string
   status: string
+  teacher_role?: string
+  salary_type?: string
+  base_salary?: string
+  hourly_rate?: string
   // 個人資料
   id_number?: string
   birthday?: string
@@ -38,6 +49,7 @@ const GRADE_LEVEL_OPTIONS = ['國小', '國中', '高中']
 
 const EMPTY_FORM = {
   name: '', title: '教師', phone: '', email: '', rate_per_class: '',
+  teacher_role: '', salary_type: 'per_class', base_salary: '',
   id_number: '', birthday: '', address: '',
   emergency_contact: '', emergency_phone: '',
   bank_name: '', bank_branch: '', bank_account: '', bank_account_name: '',
@@ -102,7 +114,10 @@ export default function TeachersPage() {
           title: form.title,
           phone: form.phone || undefined,
           email: form.email || undefined,
-          ratePerClass: form.rate_per_class,
+          ratePerClass: form.rate_per_class || undefined,
+          teacherRole: form.teacher_role || undefined,
+          salaryType: form.salary_type || 'per_class',
+          baseSalary: form.base_salary || undefined,
           idNumber: form.id_number || undefined,
           birthday: form.birthday || undefined,
           address: form.address || undefined,
@@ -137,7 +152,10 @@ export default function TeachersPage() {
       title: teacher.title,
       phone: teacher.phone || '',
       email: teacher.email || '',
-      rate_per_class: teacher.rate_per_class,
+      rate_per_class: teacher.rate_per_class || '',
+      teacher_role: teacher.teacher_role || '',
+      salary_type: teacher.salary_type || 'per_class',
+      base_salary: teacher.base_salary || '',
       id_number: teacher.id_number || '',
       birthday: teacher.birthday || '',
       address: teacher.address || '',
@@ -216,11 +234,16 @@ export default function TeachersPage() {
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-text">{teacher.name}</span>
                     <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
                       {teacher.title}
                     </span>
+                    {teacher.teacher_role && (
+                      <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
+                        {teacher.teacher_role}
+                      </span>
+                    )}
                   </div>
                   {teacher.phone && (
                     <p className="text-sm text-text-muted mt-1">{teacher.phone}</p>
@@ -242,9 +265,13 @@ export default function TeachersPage() {
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-semibold text-primary">
-                    ${Number(teacher.rate_per_class).toLocaleString()}
+                    ${teacher.salary_type === 'monthly'
+                      ? Number(teacher.base_salary || 0).toLocaleString()
+                      : Number(teacher.rate_per_class || 0).toLocaleString()}
                   </p>
-                  <p className="text-xs text-text-muted">每堂</p>
+                  <p className="text-xs text-text-muted">
+                    {teacher.salary_type === 'monthly' ? '月薪' : teacher.salary_type === 'hourly' ? '時薪' : '每堂'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -287,13 +314,48 @@ export default function TeachersPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm text-text-muted mb-1">堂薪 *</label>
+                    <label className="block text-sm text-text-muted mb-1">身分</label>
+                    <select
+                      value={form.teacher_role}
+                      onChange={(e) => setForm({ ...form, teacher_role: e.target.value })}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                    >
+                      <option value="">未設定</option>
+                      {TEACHER_ROLE_OPTIONS.map((role) => (
+                        <option key={role} value={role}>{role}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1">計薪方式</label>
+                    <select
+                      value={form.salary_type}
+                      onChange={(e) => setForm({ ...form, salary_type: e.target.value })}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
+                    >
+                      {SALARY_TYPE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-text-muted mb-1">
+                      {form.salary_type === 'monthly' ? '月薪' : form.salary_type === 'hourly' ? '時薪' : '堂薪'}
+                    </label>
                     <input
                       type="number"
-                      value={form.rate_per_class}
-                      onChange={(e) => setForm({ ...form, rate_per_class: e.target.value })}
+                      value={form.salary_type === 'monthly' ? form.base_salary : form.rate_per_class}
+                      onChange={(e) => {
+                        if (form.salary_type === 'monthly') {
+                          setForm({ ...form, base_salary: e.target.value })
+                        } else {
+                          setForm({ ...form, rate_per_class: e.target.value })
+                        }
+                      }}
                       className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
-                      required
+                      placeholder={form.salary_type === 'monthly' ? '月薪金額' : '每堂/每小時'}
                     />
                   </div>
                 </div>

@@ -64,6 +64,7 @@ const getMoreMenuItems = (role: Role): NavItem[] => {
   if (['superadmin', 'admin'].includes(role)) {
     items.push({ href: '/teachers', icon: '👨‍🏫', label: '講師管理', roles: ['superadmin', 'admin'] })
     items.push({ href: '/salary', icon: '💵', label: '薪資管理', roles: ['superadmin', 'admin'] })
+    items.push({ href: '/expenses', icon: '🧾', label: '支出管理', roles: ['superadmin', 'admin'] })
   }
   if (role === 'superadmin') {
     items.push({ href: '/dashboard/settings', icon: '⚙️', label: '系統設定', roles: ['superadmin'] })

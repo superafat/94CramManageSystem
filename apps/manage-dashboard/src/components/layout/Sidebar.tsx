@@ -40,6 +40,7 @@ const navItems: NavItem[] = [
   { type: 'separator', separator: '講師管理', roles: ['superadmin', 'admin'] },
   { href: '/teachers', icon: '👨‍🏫', label: '講師名單', roles: ['superadmin', 'admin'] },
   { href: '/salary', icon: '💵', label: '薪資管理', roles: ['superadmin', 'admin'] },
+  { href: '/expenses', icon: '🧾', label: '支出管理', roles: ['superadmin', 'admin'] },
   
   // 家長專區
   { type: 'separator', separator: '我的孩子', roles: ['parent'] },

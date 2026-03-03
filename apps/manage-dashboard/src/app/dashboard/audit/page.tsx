@@ -86,6 +86,9 @@ export default function AuditLogsPage() {
       grades: '成績',
       payments: '繳費',
       payment_records: '繳費記錄',
+      teachers: '講師',
+      manage_salary_adjustments: '薪資調整',
+      manage_expenses: '支出',
     }
     return labels[table] || table
   }
@@ -110,6 +113,9 @@ export default function AuditLogsPage() {
           <option value="attendance">出勤</option>
           <option value="grades">成績</option>
           <option value="payment_records">繳費記錄</option>
+          <option value="teachers">講師</option>
+          <option value="manage_salary_adjustments">薪資調整</option>
+          <option value="manage_expenses">支出</option>
         </select>
 
         <select

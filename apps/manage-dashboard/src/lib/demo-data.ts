@@ -37,8 +37,10 @@ const COURSES = [
 
 // ===== Teachers =====
 const TEACHERS = [
-  { id: 't1', name: '王老師', title: '資深講師', email: 'wang@demo.com', phone: '0912-345-678', subject: '數學', hourly_rate: 800, rate_per_class: '800', status: 'active' },
-  { id: 't2', name: '李老師', title: '首席講師', email: 'lee@demo.com', phone: '0923-456-789', subject: '英文', hourly_rate: 900, rate_per_class: '900', status: 'active' },
+  { id: 't1', name: '王老師', title: '資深講師', email: 'wang@demo.com', phone: '0912-345-678', subject: '數學', hourly_rate: 800, rate_per_class: '800', status: 'active', teacher_role: null, salary_type: 'per_class', base_salary: null, subjects: ['數學'], grade_levels: ['國中', '國小'] },
+  { id: 't2', name: '李老師', title: '首席講師', email: 'lee@demo.com', phone: '0923-456-789', subject: '英文', hourly_rate: 900, rate_per_class: '900', status: 'active', teacher_role: null, salary_type: 'per_class', base_salary: null, subjects: ['英文'], grade_levels: ['國中'] },
+  { id: 't3', name: '陳主任', title: '教務主任', email: 'chen@demo.com', phone: '0934-567-890', subject: '國文', hourly_rate: 0, rate_per_class: '0', status: 'active', teacher_role: '主任', salary_type: 'monthly', base_salary: '45000', subjects: ['國文', '作文'], grade_levels: ['國中', '高中'] },
+  { id: 't4', name: '林助教', title: '助教', email: 'lin@demo.com', phone: '0945-678-901', subject: '數學', hourly_rate: 200, rate_per_class: '0', status: 'active', teacher_role: '助教', salary_type: 'hourly', base_salary: null, subjects: ['數學'], grade_levels: ['國中'] },
 ]
 
 // ===== Schedules =====
@@ -250,21 +252,41 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     // Trials
     if (path === '/api/admin/trials') return { status: 200, body: { trials: [] } }
 
+    // Salary — adjustments
+    if (path === '/api/w8/salary/adjustments') {
+      return { status: 200, body: { adjustments: [] } }
+    }
+
     // Salary — 薪資計算
     if (path.startsWith('/api/admin/salary') || path.startsWith('/api/w8/salary')) {
       const now = new Date()
       const startDate = searchParams.get('startDate') || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
       const endDate = searchParams.get('endDate') || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-28`
-      // 王老師：數學 A 班 (週二五) + 國小先修班 (週四) ≈ 12 堂/月；李老師：英文菁英班 (週三六) ≈ 8 堂/月
       return { status: 200, body: { data: {
         period: { start: startDate, end: endDate },
         teachers: [
-          { teacher_id: 't1', teacher_name: '王老師', title: '資深講師', rate_per_class: '800', total_classes: 12, total_amount: '9600' },
-          { teacher_id: 't2', teacher_name: '李老師', title: '首席講師', rate_per_class: '900', total_classes: 8, total_amount: '7200' },
+          { teacher_id: 't1', teacher_name: '王老師', title: '資深講師', teacher_role: null, salary_type: 'per_class', rate_per_class: '800', base_salary: '0', hourly_rate: '0', total_classes: 12, base_amount: 9600, bonus_total: 500, deduction_total: 0, total_amount: 10100, adjustments: [{ type: 'bonus', name: '全勤獎金', amount: '500' }] },
+          { teacher_id: 't2', teacher_name: '李老師', title: '首席講師', teacher_role: null, salary_type: 'per_class', rate_per_class: '900', base_salary: '0', hourly_rate: '0', total_classes: 8, base_amount: 7200, bonus_total: 0, deduction_total: 200, total_amount: 7000, adjustments: [{ type: 'deduction', name: '遲到扣薪', amount: '200' }] },
+          { teacher_id: 't3', teacher_name: '陳主任', title: '教務主任', teacher_role: '主任', salary_type: 'monthly', rate_per_class: '0', base_salary: '45000', hourly_rate: '0', total_classes: 0, base_amount: 45000, bonus_total: 0, deduction_total: 0, total_amount: 45000, adjustments: [] },
+          { teacher_id: 't4', teacher_name: '林助教', title: '助教', teacher_role: '助教', salary_type: 'hourly', rate_per_class: '0', base_salary: '0', hourly_rate: '200', total_classes: 20, base_amount: 8000, bonus_total: 0, deduction_total: 0, total_amount: 8000, adjustments: [] },
         ],
-        grand_total_classes: 20,
-        grand_total_amount: 16800,
+        grand_total_classes: 40,
+        grand_total_amount: 70100,
       } } }
+    }
+
+    // Expenses — 支出管理
+    if (path === '/api/w8/expenses/categories') {
+      return { status: 200, body: { categories: ['內務', '水電', '教材', '房租', '設備', '文具'] } }
+    }
+    if (path.startsWith('/api/w8/expenses')) {
+      return { status: 200, body: { expenses: [
+        { id: 'exp-1', name: '3月份房租', amount: 25000, category: '房租', expense_date: '2026-03-01', notes: '每月固定', created_at: '2026-03-01T00:00:00Z' },
+        { id: 'exp-2', name: '冷氣電費', amount: 4200, category: '水電', expense_date: '2026-03-05', notes: '2月份電費帳單', created_at: '2026-03-05T00:00:00Z' },
+        { id: 'exp-3', name: '數學講義印刷', amount: 1800, category: '教材', expense_date: '2026-03-03', notes: '國中數學 A 班 15 份', created_at: '2026-03-03T00:00:00Z' },
+        { id: 'exp-4', name: '白板筆/粉筆', amount: 350, category: '文具', expense_date: '2026-03-10', notes: null, created_at: '2026-03-10T00:00:00Z' },
+        { id: 'exp-5', name: '飲水機濾芯更換', amount: 600, category: '內務', expense_date: '2026-03-08', notes: '半年更換一次', created_at: '2026-03-08T00:00:00Z' },
+      ] } }
     }
 
     // Billing — 按課程查詢帳務

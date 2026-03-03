@@ -26,8 +26,12 @@ import {
   scheduleChangeSchema,
   salaryCalculateSchema,
   createSalaryRecordSchema,
+  createSalaryAdjustmentSchema,
+  createExpenseSchema,
+  updateExpenseSchema,
   uuidSchema,
   paginationSchema,
+  dateStringSchema,
   sanitizeString,
 } from '../utils/validation'
 import {
@@ -124,13 +128,15 @@ w8Routes.post('/teachers', requireRole(Role.ADMIN, Role.MANAGER), zValidator('js
     const result = await db.execute(sql`
       INSERT INTO teachers (
         user_id, tenant_id, branch_id, name, title, phone, email, rate_per_class,
+        teacher_role, salary_type, base_salary,
         id_number, birthday, address, emergency_contact, emergency_phone,
         bank_name, bank_branch, bank_account, bank_account_name,
         subjects, grade_levels
       )
       VALUES (
         ${body.userId || null}, ${user?.tenant_id ?? body.tenantId}, ${body.branchId},
-        ${sanitizeString(body.name)}, ${sanitizeString(body.title)}, ${body.phone || null}, ${body.email || null}, ${body.ratePerClass},
+        ${sanitizeString(body.name)}, ${sanitizeString(body.title)}, ${body.phone || null}, ${body.email || null}, ${body.ratePerClass ?? null},
+        ${body.teacherRole || null}, ${body.salaryType || 'per_class'}, ${body.baseSalary ?? null},
         ${body.idNumber || null}, ${body.birthday ? sql`${body.birthday}::date` : null},
         ${body.address ? sanitizeString(body.address) : null},
         ${body.emergencyContact ? sanitizeString(body.emergencyContact) : null}, ${body.emergencyPhone || null},
@@ -168,6 +174,9 @@ w8Routes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER),
             email = COALESCE(${body.email ?? null}, email),
             rate_per_class = COALESCE(${body.ratePerClass ?? null}, rate_per_class),
             status = COALESCE(${body.status ?? null}, status),
+            teacher_role = COALESCE(${body.teacherRole ?? null}, teacher_role),
+            salary_type = COALESCE(${body.salaryType ?? null}, salary_type),
+            base_salary = COALESCE(${body.baseSalary ?? null}, base_salary),
             id_number = COALESCE(${body.idNumber ?? null}, id_number),
             birthday = COALESCE(${body.birthday != null ? sql`${body.birthday}::date` : null}, birthday),
             address = COALESCE(${body.address != null ? sanitizeString(body.address) : null}, address),
@@ -608,28 +617,73 @@ w8Routes.get('/salary/calculate', requireRole(Role.ADMIN, Role.MANAGER),
       const where = sql.join(conditions, sql` AND `)
       
       const result = await db.execute(sql`
-        SELECT 
+        SELECT
           t.id as teacher_id,
           t.name as teacher_name,
           t.title,
+          t.teacher_role,
+          t.salary_type,
           t.rate_per_class,
+          t.base_salary,
+          t.hourly_rate,
           COUNT(s.id)::int as total_classes,
-          (COUNT(s.id) * t.rate_per_class)::numeric as total_amount
+          (COUNT(s.id) * COALESCE(t.rate_per_class, 0))::numeric as class_amount,
+          COALESCE(
+            SUM(EXTRACT(EPOCH FROM (s.end_time::time - s.start_time::time)) / 3600 * COALESCE(t.hourly_rate, 0)),
+            0
+          )::numeric as hourly_amount
         FROM teachers t
         LEFT JOIN schedules s ON t.id = s.teacher_id AND ${where}
         LEFT JOIN courses c ON s.course_id = c.id
         WHERE t.deleted_at IS NULL
-        GROUP BY t.id, t.name, t.title, t.rate_per_class
+        GROUP BY t.id, t.name, t.title, t.teacher_role, t.salary_type, t.rate_per_class, t.base_salary, t.hourly_rate
         ORDER BY t.name
       `)
-      
-      const teachers = rows(result)
-      
+
+      // 查詢薪資調整（獎金/扣薪）
+      const adjResult = await db.execute(sql`
+        SELECT teacher_id, type, name, amount
+        FROM manage_salary_adjustments
+        WHERE period_start >= ${query.startDate}::date
+          AND period_end <= ${query.endDate}::date
+          AND deleted_at IS NULL
+      `)
+      const adjustments = rows(adjResult)
+
+      const teachers = rows(result).map((t) => {
+        const salaryType = String(t.salary_type || 'per_class')
+        let baseAmount = 0
+        if (salaryType === 'monthly') {
+          baseAmount = parseFloat(String(t.base_salary || 0))
+        } else if (salaryType === 'hourly') {
+          baseAmount = parseFloat(String(t.hourly_amount || 0))
+        } else {
+          baseAmount = parseFloat(String(t.class_amount || 0))
+        }
+
+        // 加上獎金、扣除扣薪
+        const teacherAdj = adjustments.filter((a) => a.teacher_id === t.teacher_id)
+        const bonusTotal = teacherAdj.filter((a) => a.type === 'bonus').reduce((s, a) => s + parseFloat(String(a.amount || 0)), 0)
+        const deductionTotal = teacherAdj.filter((a) => a.type === 'deduction').reduce((s, a) => s + parseFloat(String(a.amount || 0)), 0)
+        const totalAmount = baseAmount + bonusTotal - deductionTotal
+
+        return {
+          ...t,
+          salary_type: salaryType,
+          total_classes: Number(t.total_classes) || 0,
+          base_amount: baseAmount,
+          bonus_total: bonusTotal,
+          deduction_total: deductionTotal,
+          total_amount: totalAmount,
+          adjustments: teacherAdj,
+        }
+      })
+
       return success(c, {
         period: { start: query.startDate, end: query.endDate },
         teachers,
         grandTotalClasses: teachers.reduce((sum: number, r) => sum + (Number(r.total_classes) || 0), 0),
-        grandTotalAmount: teachers.reduce((sum: number, r) => sum + parseFloat(String(r.total_amount || 0)), 0),
+        grandTotalAmount: teachers.reduce((sum: number, r) => sum + (r.total_amount || 0), 0),
       })
     } catch (error) {
       logger.error({ err: error }, 'Error calculating salary:')
@@ -773,6 +827,208 @@ w8Routes.put('/salary/records/:id/pay', requireRole(Role.ADMIN),
       return success(c, { record })
     } catch (error) {
       logger.error({ err: error }, 'Error marking salary as paid:')
+      return internalError(c, error)
+    }
+  }
+)
+
+// ========================================================================
+// SALARY ADJUSTMENTS (獎金/扣薪)
+// ========================================================================
+
+const adjQuerySchema = z.object({
+  teacher_id: uuidSchema.optional(),
+  period_start: dateStringSchema.optional(),
+  period_end: dateStringSchema.optional(),
+})
+
+w8Routes.get('/salary/adjustments', requireRole(Role.ADMIN, Role.MANAGER),
+  zValidator('query', adjQuerySchema),
+  async (c) => {
+    try {
+      const query = c.req.valid('query')
+      const user = c.get('user')
+      const conditions = [sql`sa.tenant_id = ${user?.tenant_id}`]
+      if (query.teacher_id) conditions.push(sql`sa.teacher_id = ${query.teacher_id}`)
+      if (query.period_start) conditions.push(sql`sa.period_start >= ${query.period_start}::date`)
+      if (query.period_end) conditions.push(sql`sa.period_end <= ${query.period_end}::date`)
+      const where = sql.join(conditions, sql` AND `)
+
+      const result = await db.execute(sql`
+        SELECT sa.*, t.name as teacher_name
+        FROM manage_salary_adjustments sa
+        JOIN teachers t ON sa.teacher_id = t.id
+        WHERE ${where}
+        ORDER BY sa.created_at DESC
+      `)
+      return success(c, { adjustments: rows(result) })
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching salary adjustments:')
+      return internalError(c, error)
+    }
+  }
+)
+
+w8Routes.post('/salary/adjustments', requireRole(Role.ADMIN, Role.MANAGER),
+  zValidator('json', createSalaryAdjustmentSchema),
+  async (c) => {
+    try {
+      const body = c.req.valid('json')
+      const user = c.get('user')
+
+      const result = await db.execute(sql`
+        INSERT INTO manage_salary_adjustments (tenant_id, teacher_id, period_start, period_end, type, name, amount, notes, created_by)
+        VALUES (${user?.tenant_id}, ${body.teacherId}, ${body.periodStart}::date, ${body.periodEnd}::date,
+                ${body.type}, ${sanitizeString(body.name)}, ${body.amount},
+                ${body.notes ? sanitizeString(body.notes) : null}, ${user?.id || null})
+        RETURNING *
+      `)
+      return success(c, { adjustment: first(result) }, 201)
+    } catch (error) {
+      logger.error({ err: error }, 'Error creating salary adjustment:')
+      return internalError(c, error)
+    }
+  }
+)
+
+w8Routes.delete('/salary/adjustments/:id', requireRole(Role.ADMIN),
+  zValidator('param', z.object({ id: uuidSchema })),
+  async (c) => {
+    try {
+      const { id } = c.req.valid('param')
+      const result = await db.execute(sql`
+        DELETE FROM manage_salary_adjustments WHERE id = ${id} RETURNING *
+      `)
+      const adj = first(result)
+      if (!adj) return notFound(c, 'Salary adjustment')
+      return success(c, { message: 'Deleted', adjustment: adj })
+    } catch (error) {
+      logger.error({ err: error }, 'Error deleting salary adjustment:')
+      return internalError(c, error)
+    }
+  }
+)
+
+// ========================================================================
+// EXPENSES (支出管理)
+// ========================================================================
+
+const expenseQuerySchema = z.object({
+  category: z.string().max(50).optional(),
+  start_date: dateStringSchema.optional(),
+  end_date: dateStringSchema.optional(),
+})
+
+w8Routes.get('/expenses', requireRole(Role.ADMIN, Role.MANAGER),
+  zValidator('query', expenseQuerySchema),
+  async (c) => {
+    try {
+      const query = c.req.valid('query')
+      const user = c.get('user')
+      const conditions = [sql`e.tenant_id = ${user?.tenant_id}`, sql`e.deleted_at IS NULL`]
+      if (query.category) conditions.push(sql`e.category = ${query.category}`)
+      if (query.start_date) conditions.push(sql`e.expense_date >= ${query.start_date}::date`)
+      if (query.end_date) conditions.push(sql`e.expense_date <= ${query.end_date}::date`)
+      const where = sql.join(conditions, sql` AND `)
+
+      const result = await db.execute(sql`
+        SELECT e.*, u.name as created_by_name
+        FROM manage_expenses e
+        LEFT JOIN users u ON e.created_by = u.id
+        WHERE ${where}
+        ORDER BY e.expense_date DESC
+      `)
+      return success(c, { expenses: rows(result) })
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching expenses:')
+      return internalError(c, error)
+    }
+  }
+)
+
+w8Routes.get('/expenses/categories', requireRole(Role.ADMIN, Role.MANAGER),
+  async (c) => {
+    try {
+      const user = c.get('user')
+      const result = await db.execute(sql`
+        SELECT DISTINCT category FROM manage_expenses
+        WHERE tenant_id = ${user?.tenant_id} AND deleted_at IS NULL
+        ORDER BY category
+      `)
+      return success(c, { categories: rows(result).map((r) => r.category) })
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching expense categories:')
+      return internalError(c, error)
+    }
+  }
+)
+
+w8Routes.post('/expenses', requireRole(Role.ADMIN, Role.MANAGER),
+  zValidator('json', createExpenseSchema),
+  async (c) => {
+    try {
+      const body = c.req.valid('json')
+      const user = c.get('user')
+
+      const result = await db.execute(sql`
+        INSERT INTO manage_expenses (tenant_id, branch_id, name, amount, category, expense_date, notes, created_by)
+        VALUES (${user?.tenant_id}, ${body.branchId || (user as Record<string, unknown>)?.branch_id || null},
+                ${sanitizeString(body.name)}, ${body.amount}, ${sanitizeString(body.category)},
+                ${body.expenseDate}::date, ${body.notes ? sanitizeString(body.notes) : null},
+                ${user?.id || null})
+        RETURNING *
+      `)
+      return success(c, { expense: first(result) }, 201)
+    } catch (error) {
+      logger.error({ err: error }, 'Error creating expense:')
+      return internalError(c, error)
+    }
+  }
+)
+
+w8Routes.put('/expenses/:id', requireRole(Role.ADMIN, Role.MANAGER),
+  zValidator('param', z.object({ id: uuidSchema })),
+  zValidator('json', updateExpenseSchema),
+  async (c) => {
+    try {
+      const { id } = c.req.valid('param')
+      const body = c.req.valid('json')
+
+      const result = await db.execute(sql`
+        UPDATE manage_expenses
+        SET name = COALESCE(${body.name != null ? sanitizeString(body.name) : null}, name),
+            amount = COALESCE(${body.amount ?? null}, amount),
+            category = COALESCE(${body.category != null ? sanitizeString(body.category) : null}, category),
+            expense_date = COALESCE(${body.expenseDate ? sql`${body.expenseDate}::date` : null}, expense_date),
+            notes = COALESCE(${body.notes != null ? sanitizeString(body.notes) : null}, notes)
+        WHERE id = ${id} AND deleted_at IS NULL
+        RETURNING *
+      `)
+      const expense = first(result)
+      if (!expense) return notFound(c, 'Expense')
+      return success(c, { expense })
+    } catch (error) {
+      logger.error({ err: error }, 'Error updating expense:')
+      return internalError(c, error)
+    }
+  }
+)
+
+w8Routes.delete('/expenses/:id', requireRole(Role.ADMIN),
+  zValidator('param', z.object({ id: uuidSchema })),
+  async (c) => {
+    try {
+      const { id } = c.req.valid('param')
+      const result = await db.execute(sql`
+        UPDATE manage_expenses SET deleted_at = NOW()
+        WHERE id = ${id} AND deleted_at IS NULL
+        RETURNING *
+      `)
+      const expense = first(result)
+      if (!expense) return notFound(c, 'Expense')
+      return success(c, { message: 'Deleted', expense })
+    } catch (error) {
+      logger.error({ err: error }, 'Error deleting expense:')
       return internalError(c, error)
     }
   }

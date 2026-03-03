@@ -107,6 +107,13 @@ export const updateStudentSchema = createStudentSchema.partial().extend({
 
 export const teacherStatusSchema = z.enum(['active', 'inactive', 'resigned'])
 
+// 師資身分與薪資類型
+export const TEACHER_ROLE_OPTIONS = ['主任', '行政', '助教', '跑課老師'] as const
+export const SALARY_TYPE_OPTIONS = ['monthly', 'hourly', 'per_class'] as const
+
+export const teacherRoleSchema = z.enum(TEACHER_ROLE_OPTIONS)
+export const salaryTypeSchema = z.enum(SALARY_TYPE_OPTIONS)
+
 // 科目與年級固定選項
 export const SUBJECT_OPTIONS = [
   '國文', '英文', '數學', '理化', '物理', '化學',
@@ -127,7 +134,11 @@ export const createTeacherSchema = z.object({
   title: z.string().max(20).default('教師'),
   phone: phoneSchema,
   email: emailSchema,
-  ratePerClass: z.coerce.number().positive('Rate must be positive'),
+  ratePerClass: z.coerce.number().nonnegative('Rate must be non-negative').optional(),
+  // 身分與薪資
+  teacherRole: teacherRoleSchema.optional(),
+  salaryType: salaryTypeSchema.default('per_class'),
+  baseSalary: z.coerce.number().nonnegative().optional(),
   // 個人資料
   idNumber: z.string().max(10).optional(),
   birthday: dateStringSchema.optional(),
@@ -149,8 +160,12 @@ export const updateTeacherSchema = z.object({
   title: z.string().max(20).optional(),
   phone: phoneSchema,
   email: emailSchema,
-  ratePerClass: z.coerce.number().positive().optional(),
+  ratePerClass: z.coerce.number().nonnegative().optional(),
   status: teacherStatusSchema.optional(),
+  // 身分與薪資
+  teacherRole: teacherRoleSchema.optional().nullable(),
+  salaryType: salaryTypeSchema.optional(),
+  baseSalary: z.coerce.number().nonnegative().optional().nullable(),
   // 個人資料
   idNumber: z.string().max(10).optional().nullable(),
   birthday: dateStringSchema.optional().nullable(),
@@ -236,6 +251,39 @@ export const createSalaryRecordSchema = z.object({
   (data) => new Date(data.periodStart) <= new Date(data.periodEnd),
   { message: 'Period start must be before or equal to period end' }
 )
+
+// ===== Salary Adjustment Schemas =====
+
+export const salaryAdjustmentTypeSchema = z.enum(['bonus', 'deduction'])
+
+export const createSalaryAdjustmentSchema = z.object({
+  teacherId: uuidSchema,
+  periodStart: dateStringSchema,
+  periodEnd: dateStringSchema,
+  type: salaryAdjustmentTypeSchema,
+  name: nonEmptyString.max(100),
+  amount: z.coerce.number().positive(),
+  notes: z.string().max(500).optional(),
+})
+
+// ===== Expense Schemas =====
+
+export const createExpenseSchema = z.object({
+  branchId: uuidSchema.optional(),
+  name: nonEmptyString.max(100),
+  amount: z.coerce.number().positive(),
+  category: nonEmptyString.max(50),
+  expenseDate: dateStringSchema,
+  notes: z.string().max(500).optional(),
+})
+
+export const updateExpenseSchema = z.object({
+  name: z.string().max(100).optional(),
+  amount: z.coerce.number().positive().optional(),
+  category: z.string().max(50).optional(),
+  expenseDate: dateStringSchema.optional(),
+  notes: z.string().max(500).optional().nullable(),
+})
 
 // ===== Attendance Schemas =====
 
