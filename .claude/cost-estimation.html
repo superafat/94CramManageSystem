@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>94CramManageSystem 平台營運成本預估表</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+    color: #2d3748;
+    background: #fff;
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 40px 50px;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 28px;
+    padding-bottom: 18px;
+    border-bottom: 3px solid #4a6fa5;
+  }
+  .header h1 { font-size: 24px; color: #2c3e50; font-weight: 700; margin-bottom: 6px; }
+  .header .subtitle { font-size: 15px; color: #6b7c93; font-weight: 400; }
+  .header .date { font-size: 12px; color: #9aa5b4; margin-top: 8px; }
+
+  .section { margin-bottom: 22px; }
+  .section-title {
+    font-size: 16px; font-weight: 700; color: #4a6fa5;
+    margin-bottom: 10px; padding-left: 10px; border-left: 4px solid #4a6fa5;
+  }
+
+  .assumptions {
+    background: #f7f9fc; border-radius: 8px;
+    padding: 16px 20px; margin-bottom: 22px;
+  }
+  .assumptions h3 { font-size: 14px; color: #4a6fa5; margin-bottom: 8px; }
+  .assumptions ul { list-style: none; padding: 0; }
+  .assumptions li {
+    padding: 3px 0; padding-left: 16px; position: relative; font-size: 12.5px;
+  }
+  .assumptions li::before {
+    content: "•"; color: #4a6fa5; position: absolute; left: 0; font-weight: bold;
+  }
+
+  table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 12.5px; }
+  thead th {
+    background: #4a6fa5; color: #fff; padding: 8px 10px;
+    text-align: left; font-weight: 500; font-size: 12px;
+  }
+  thead th:last-child, thead th:nth-child(3), thead th:nth-child(4) { text-align: right; }
+  tbody td { padding: 7px 10px; border-bottom: 1px solid #e8ecf1; }
+  tbody td:last-child, tbody td:nth-child(3), tbody td:nth-child(4) {
+    text-align: right; font-family: 'SF Mono', 'Menlo', monospace; font-size: 12px;
+  }
+  tbody tr:nth-child(even) { background: #f9fafb; }
+
+  .subtotal td {
+    font-weight: 700; background: #edf2f7 !important;
+    border-top: 2px solid #4a6fa5; padding: 9px 10px;
+  }
+  .grand-total td {
+    font-weight: 700; background: #4a6fa5 !important;
+    color: #fff; padding: 10px; font-size: 13.5px;
+  }
+
+  .highlight-box {
+    background: linear-gradient(135deg, #4a6fa5 0%, #6b8cce 100%);
+    border-radius: 10px; padding: 20px; color: #fff; text-align: center; margin-bottom: 22px;
+  }
+  .highlight-box .big-number { font-size: 36px; font-weight: 700; margin: 8px 0; }
+  .highlight-box .label { font-size: 13px; opacity: 0.9; }
+  .highlight-box .sub { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+
+  .cards { display: flex; gap: 14px; margin-bottom: 22px; }
+  .card {
+    flex: 1; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 14px; text-align: center;
+  }
+  .card .card-value { font-size: 22px; font-weight: 700; color: #4a6fa5; margin: 6px 0; }
+  .card .card-label { font-size: 11px; color: #9aa5b4; }
+  .card .card-desc { font-size: 11.5px; color: #6b7c93; margin-top: 4px; }
+
+  .notes {
+    background: #fffbea; border: 1px solid #f6e05e;
+    border-radius: 8px; padding: 14px 18px; font-size: 12px; color: #744210;
+  }
+  .notes h4 { margin-bottom: 6px; font-size: 13px; }
+  .notes ul { padding-left: 18px; }
+  .notes li { margin-bottom: 3px; }
+
+  .footer {
+    margin-top: 28px; padding-top: 14px; border-top: 1px solid #e2e8f0;
+    text-align: center; font-size: 11px; color: #a0aec0;
+  }
+
+  .page-break { page-break-before: always; }
+
+  .tag {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 500;
+  }
+  .tag-green { background: #c6f6d5; color: #276749; }
+
+  .per-school-box {
+    border: 2px solid #4a6fa5; border-radius: 10px;
+    padding: 18px 22px; margin-bottom: 20px; background: #f7f9fc;
+  }
+  .per-school-box h3 { font-size: 15px; color: #4a6fa5; margin-bottom: 12px; text-align: center; }
+
+  .msg-calc {
+    margin-top: 8px; padding: 10px 14px;
+    background: #f0f4f8; border-radius: 6px; font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>94CramManageSystem</h1>
+  <div class="subtitle">SaaS 平台營運成本預估表 — 100 間補習班規模（大型校）</div>
+  <div class="date">預估日期：2026 年 3 月 ｜ 版本 v2.0</div>
+</div>
+
+<!-- Assumptions -->
+<div class="assumptions">
+  <h3>基本假設</h3>
+  <ul>
+    <li><strong>客戶數量：</strong>100 間補習班（多租戶 SaaS 架構）</li>
+    <li><strong>每間規模：</strong>200 學生 + 1 館長 + 3 行政 + 15 老師 = <strong>219 位使用者</strong></li>
+    <li><strong>總使用者：</strong>21,900 位活躍使用者</li>
+    <li><strong>部署區域：</strong>GCP asia-east1（台灣彰化）</li>
+    <li><strong>系統組成：</strong>94Manage（學員管理）+ 94inClass（點名）+ 94Stock（庫存）+ 94Portal（入口）+ 94LineBot（LINE 推播）</li>
+    <li><strong>匯率假設：</strong>1 USD = 32 NTD</li>
+    <li><strong>每日請求量估算：</strong>每位使用者約 80–120 次/天（平均 100 次），總計約 65.7M 請求/月</li>
+  </ul>
+</div>
+
+<!-- Section 1: GCP Infrastructure -->
+<div class="section">
+  <div class="section-title">一、GCP 基礎設施成本（平台共享）</div>
+  <table>
+    <thead>
+      <tr><th>項目</th><th>規格說明</th><th>月費 (USD)</th><th>月費 (NTD)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Cloud SQL (PostgreSQL)</strong></td>
+        <td>db-custom-4-16384（4 vCPU / 16GB RAM），主資料庫</td>
+        <td>$280.00</td>
+        <td>$8,960</td>
+      </tr>
+      <tr>
+        <td>　└ SSD 儲存空間</td>
+        <td>200 GB SSD（$0.17/GB）</td>
+        <td>$34.00</td>
+        <td>$1,088</td>
+      </tr>
+      <tr>
+        <td>　└ 自動備份</td>
+        <td>100 GB 備份儲存（$0.08/GB）</td>
+        <td>$8.00</td>
+        <td>$256</td>
+      </tr>
+      <tr>
+        <td>　└ 高可用性（HA）</td>
+        <td>standby 備援實例（選配，強烈建議）</td>
+        <td>$280.00</td>
+        <td>$8,960</td>
+      </tr>
+      <tr>
+        <td><strong>Cloud Run — 前端服務 ×4</strong></td>
+        <td>manage / inclass / stock dashboard + portal（Next.js SSR）</td>
+        <td>$90.00</td>
+        <td>$2,880</td>
+      </tr>
+      <tr>
+        <td><strong>Cloud Run — 後端服務 ×3</strong></td>
+        <td>manage / inclass / stock backend（Hono API）</td>
+        <td>$70.00</td>
+        <td>$2,240</td>
+      </tr>
+      <tr>
+        <td><strong>Cloud Run — Bot Gateway ×1</strong></td>
+        <td>LINE Bot webhook + 推播服務</td>
+        <td>$25.00</td>
+        <td>$800</td>
+      </tr>
+      <tr>
+        <td><strong>Artifact Registry</strong></td>
+        <td>Docker images 儲存（~8 images, ~6GB）</td>
+        <td>$0.60</td>
+        <td>$19</td>
+      </tr>
+      <tr>
+        <td><strong>Secret Manager</strong></td>
+        <td>JWT_SECRET, DB 連線等（<10 secrets）</td>
+        <td>$0.50</td>
+        <td>$16</td>
+      </tr>
+      <tr>
+        <td><strong>Cloud DNS</strong></td>
+        <td>94cram.com 代管區域 + 子網域</td>
+        <td>$0.50</td>
+        <td>$16</td>
+      </tr>
+      <tr>
+        <td><strong>網路出口流量</strong></td>
+        <td>~150 GB/月（API response + 靜態資源）</td>
+        <td>$18.00</td>
+        <td>$576</td>
+      </tr>
+      <tr>
+        <td><strong>Cloud Monitoring</strong></td>
+        <td>日誌 + 指標監控 + 告警規則</td>
+        <td>$10.00</td>
+        <td>$320</td>
+      </tr>
+    </tbody>
+    <tbody>
+      <tr class="subtotal">
+        <td colspan="2">GCP 小計（含 HA）</td>
+        <td>$816.60</td>
+        <td>$26,131</td>
+      </tr>
+      <tr class="subtotal">
+        <td colspan="2">GCP 小計（不含 HA）</td>
+        <td>$536.60</td>
+        <td>$17,171</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Section 2: LINE -->
+<div class="section">
+  <div class="section-title">二、LINE Official Account 成本</div>
+
+  <div class="msg-calc" style="margin-bottom: 12px;">
+    <strong>每校推播訊息量估算（200 學生）：</strong><br>
+    每日點名通知 200人 × 20天 = 4,000 則 ＋ 週報/成績 200人 × 4週 = 800 則 ＋ 繳費提醒 ~200 則 ＋ 公告/活動 ~200 則<br>
+    <strong>合計：約 5,200 則/校/月</strong>　｜　100 校合計：<strong>520,000 則/月</strong>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>方案</th><th>說明</th><th>月費 (NTD)</th><th>每校分攤</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>方案 A：各校自營帳號</strong></td>
+        <td>每校申請 LINE 官方帳號，中用量方案（25,000 則）×100</td>
+        <td>$400,000</td>
+        <td>$4,000</td>
+      </tr>
+      <tr>
+        <td><strong>方案 B：平台統一帳號</strong></td>
+        <td>高用量 100,000 則 + 超額 420,000 則 × NT$0.15</td>
+        <td>$73,000</td>
+        <td>$730</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="msg-calc">
+    <strong>方案 B 計算明細：</strong>
+    LINE 高用量方案 NT$10,000/月（含 100,000 則）＋ 超額 420,000 則 × NT$0.15/則 = NT$63,000 → 合計 <strong>NT$73,000/月</strong>
+  </div>
+</div>
+
+<!-- Section 3: Other -->
+<div class="section">
+  <div class="section-title">三、其他固定成本</div>
+  <table>
+    <thead>
+      <tr><th>項目</th><th>說明</th><th>月費 (USD)</th><th>月費 (NTD)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>網域 94cram.com</strong></td>
+        <td>.com 年費 ~$12/年，攤提月費</td>
+        <td>$1.00</td>
+        <td>$32</td>
+      </tr>
+      <tr>
+        <td><strong>SSL 憑證</strong></td>
+        <td>Cloud Run / Let's Encrypt 自動提供</td>
+        <td>$0</td>
+        <td>$0</td>
+      </tr>
+      <tr>
+        <td><strong>GitHub Actions CI/CD</strong></td>
+        <td>Public repo 免費額度（2,000 分鐘/月）</td>
+        <td>$0</td>
+        <td>$0</td>
+      </tr>
+    </tbody>
+    <tbody>
+      <tr class="subtotal">
+        <td colspan="2">其他小計</td>
+        <td>$1.00</td>
+        <td>$32</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ==================== Page 2 ==================== -->
+<div class="page-break"></div>
+
+<div class="header" style="border-bottom: 3px solid #4a6fa5; margin-bottom: 24px;">
+  <h1 style="font-size: 20px;">每間補習班月均花費明細</h1>
+  <div class="subtitle">100 校規模 ｜ 每校 219 位使用者</div>
+</div>
+
+<!-- Per-school highlight -->
+<div class="highlight-box">
+  <div class="label">推薦方案：平台統一 LINE + Cloud SQL HA</div>
+  <div class="big-number">NT$991 / 校 / 月</div>
+  <div class="sub">平台總成本 NT$99,163/月 ÷ 100 校 ≈ NT$991/校/月</div>
+</div>
+
+<!-- Per School Detail -->
+<div class="per-school-box">
+  <h3>每校月費拆解（推薦方案 B + 含 HA）</h3>
+  <table>
+    <thead>
+      <tr><th>費用項目</th><th>平台總成本 (NTD)</th><th>每校分攤 (NTD)</th><th>占比</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Cloud SQL（含 HA + 儲存 + 備份）</td>
+        <td style="text-align:right">$19,264</td>
+        <td style="text-align:right">$193</td>
+        <td style="text-align:right">19.5%</td>
+      </tr>
+      <tr>
+        <td>Cloud Run — 前端 ×4（Next.js Dashboard）</td>
+        <td style="text-align:right">$2,880</td>
+        <td style="text-align:right">$29</td>
+        <td style="text-align:right">2.9%</td>
+      </tr>
+      <tr>
+        <td>Cloud Run — 後端 ×3（Hono API）</td>
+        <td style="text-align:right">$2,240</td>
+        <td style="text-align:right">$22</td>
+        <td style="text-align:right">2.2%</td>
+      </tr>
+      <tr>
+        <td>Cloud Run — Bot Gateway ×1</td>
+        <td style="text-align:right">$800</td>
+        <td style="text-align:right">$8</td>
+        <td style="text-align:right">0.8%</td>
+      </tr>
+      <tr>
+        <td>其他 GCP（DNS, Registry, 監控, 網路）</td>
+        <td style="text-align:right">$947</td>
+        <td style="text-align:right">$9</td>
+        <td style="text-align:right">0.9%</td>
+      </tr>
+      <tr>
+        <td><strong>LINE 推播（方案 B，平台統一）</strong></td>
+        <td style="text-align:right">$73,000</td>
+        <td style="text-align:right">$730</td>
+        <td style="text-align:right">73.7%</td>
+      </tr>
+      <tr>
+        <td>網域 + 其他</td>
+        <td style="text-align:right">$32</td>
+        <td style="text-align:right">$0.3</td>
+        <td style="text-align:right">0.0%</td>
+      </tr>
+    </tbody>
+    <tbody>
+      <tr class="grand-total">
+        <td>每校月費合計</td>
+        <td>NT$99,163</td>
+        <td>NT$991</td>
+        <td>100%</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 3 plan cards -->
+<div class="section">
+  <div class="section-title">四、三種方案比較（每校月費）</div>
+</div>
+<div class="cards">
+  <div class="card">
+    <div class="card-label">方案 A｜各校自營 LINE + 含 HA</div>
+    <div class="card-value">NT$4,261</div>
+    <div class="card-desc">GCP $261 + LINE $4,000</div>
+  </div>
+  <div class="card" style="border-color: #4a6fa5; background: #f7f9fc;">
+    <div class="card-label">方案 B｜平台統一 LINE + 含 HA <span class="tag tag-green">推薦</span></div>
+    <div class="card-value">NT$991</div>
+    <div class="card-desc">GCP $261 + LINE $730</div>
+  </div>
+  <div class="card">
+    <div class="card-label">方案 B｜不含 HA（最低成本）</div>
+    <div class="card-value">NT$901</div>
+    <div class="card-desc">GCP $171 + LINE $730</div>
+  </div>
+</div>
+
+<!-- Scale comparison -->
+<div class="section">
+  <div class="section-title">五、不同規模每校成本比較（方案 B + 含 HA）</div>
+  <table>
+    <thead>
+      <tr>
+        <th>規模</th>
+        <th>總使用者</th>
+        <th>GCP / 校</th>
+        <th>LINE / 校</th>
+        <th>每校月費</th>
+        <th>對比 1 校</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>1 校</strong></td>
+        <td>219 人</td>
+        <td>NT$780</td>
+        <td>NT$4,000</td>
+        <td><strong>NT$4,780</strong></td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td><strong>10 校</strong></td>
+        <td>2,190 人</td>
+        <td>NT$520</td>
+        <td>NT$1,100</td>
+        <td><strong>NT$1,620</strong></td>
+        <td>省 66%</td>
+      </tr>
+      <tr>
+        <td><strong>50 校</strong></td>
+        <td>10,950 人</td>
+        <td>NT$340</td>
+        <td>NT$800</td>
+        <td><strong>NT$1,140</strong></td>
+        <td>省 76%</td>
+      </tr>
+      <tr style="background: #edf2f7; font-weight: 600;">
+        <td><strong>100 校</strong></td>
+        <td>21,900 人</td>
+        <td>NT$261</td>
+        <td>NT$730</td>
+        <td><strong>NT$991</strong></td>
+        <td>省 79%</td>
+      </tr>
+      <tr>
+        <td><strong>200 校</strong></td>
+        <td>43,800 人</td>
+        <td>NT$200</td>
+        <td>NT$640</td>
+        <td><strong>NT$840</strong></td>
+        <td>省 82%</td>
+      </tr>
+      <tr>
+        <td><strong>500 校</strong></td>
+        <td>109,500 人</td>
+        <td>NT$150</td>
+        <td>NT$540</td>
+        <td><strong>NT$690</strong></td>
+        <td>省 86%</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Cost structure -->
+<div class="section">
+  <div class="section-title">六、100 校成本結構占比</div>
+  <div style="display: flex; gap: 20px; align-items: center;">
+    <table style="flex: 1;">
+      <thead>
+        <tr><th>類別</th><th>金額 (NTD)</th><th>占比</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Cloud SQL（含 HA + 儲存）</td>
+          <td style="text-align:right">$19,264</td>
+          <td style="text-align:right">19.4%</td>
+        </tr>
+        <tr>
+          <td>Cloud Run（8 服務）</td>
+          <td style="text-align:right">$5,920</td>
+          <td style="text-align:right">6.0%</td>
+        </tr>
+        <tr>
+          <td>LINE 推播</td>
+          <td style="text-align:right">$73,000</td>
+          <td style="text-align:right">73.6%</td>
+        </tr>
+        <tr>
+          <td>其他（DNS, Registry, 監控, 網路）</td>
+          <td style="text-align:right">$979</td>
+          <td style="text-align:right">1.0%</td>
+        </tr>
+      </tbody>
+      <tbody>
+        <tr class="subtotal">
+          <td>合計</td>
+          <td style="text-align:right">$99,163</td>
+          <td style="text-align:right">100%</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="flex: 0.7; text-align: left; font-size: 12px; color: #6b7c93; padding-left: 10px;">
+      <div style="margin-bottom: 10px;">
+        <div style="display:inline-block; width:40px; height:14px; background:#4a6fa5; border-radius:3px; vertical-align:middle;"></div>
+        <span style="vertical-align:middle; margin-left:6px;">LINE 推播 73.6%</span>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <div style="display:inline-block; width:40px; height:14px; background:#6b8cce; border-radius:3px; vertical-align:middle;"></div>
+        <span style="vertical-align:middle; margin-left:6px;">Cloud SQL 19.4%</span>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <div style="display:inline-block; width:40px; height:14px; background:#a3bffa; border-radius:3px; vertical-align:middle;"></div>
+        <span style="vertical-align:middle; margin-left:6px;">Cloud Run 6.0%</span>
+      </div>
+      <div>
+        <div style="display:inline-block; width:40px; height:14px; background:#e2e8f0; border-radius:3px; vertical-align:middle;"></div>
+        <span style="vertical-align:middle; margin-left:6px;">其他 1.0%</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Notes -->
+<div class="notes">
+  <h4>⚠ 注意事項與假設說明</h4>
+  <ul>
+    <li><strong>Cloud SQL</strong> 升級至 4 vCPU / 16GB RAM 以承載 21,900 位使用者的並發查詢</li>
+    <li><strong>Cloud Run</strong> 採 scale-to-zero，閒置不計費；尖峰時段自動擴展，費用依實際使用量</li>
+    <li><strong>LINE 是最大成本（73.6%）</strong>：善用 Reply Message（免費）+ Flex Message 可大幅降低推播量</li>
+    <li><strong>Cloud SQL HA</strong> 為選配但強烈建議；不開 HA 可省約 NT$8,960/月</li>
+    <li><strong>方案 A vs B</strong>：各校自營 LINE 每校需 NT$4,000，平台統一僅 NT$730（省 82%）</li>
+    <li><strong>未含項目</strong>：人事成本、客服成本、開發維護成本、CDN 加速、簡訊驗證費</li>
+    <li><strong>匯率波動</strong>：USD/NTD 以 1:32 估算，實際依即時匯率為準</li>
+    <li>以上為 GCP 公開定價估算，實際帳單可能因 <strong>Sustained Use Discount</strong> 或 <strong>CUD 承諾折扣</strong> 降低 20–30%</li>
+    <li>超過 200 校建議加入 <strong>Cloud SQL Read Replica</strong>（+~NT$9,000/月）與 <strong>Cloud CDN</strong> 提升效能</li>
+  </ul>
+</div>
+
+<div class="footer">
+  94CramManageSystem — 補習班管理生態系 ｜ 本文件僅供內部規劃參考，實際費用以 GCP 帳單與 LINE 官方定價為準<br>
+  Generated on 2026-03-04
+</div>
+
+</body>
+</html>
