@@ -54,8 +54,9 @@ export default function EnrollmentPage() {
     'X-Tenant-Id': getTenantId(),
   })
 
-  const loadFunnelData = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setLoadingFunnel(true)
+    setLoadingLeads(true)
     try {
       const [funnelRes, convRes] = await Promise.all([
         fetch(`${API_BASE}/api/admin/enrollment/funnel?period=${period}`, {
@@ -72,6 +73,7 @@ export default function EnrollmentPage() {
         const json = await funnelRes.json()
         const data = json.data ?? json
         setFunnelStages(data.stages || [])
+        setLeads(data.leads || [])
       }
 
       if (convRes.ok) {
@@ -88,33 +90,13 @@ export default function EnrollmentPage() {
       setError(err instanceof Error ? err.message : '載入失敗')
     } finally {
       setLoadingFunnel(false)
-    }
-  }, [period])
-
-  const loadLeads = useCallback(async () => {
-    setLoadingLeads(true)
-    try {
-      const res = await fetch(`${API_BASE}/api/admin/enrollment/funnel?period=${period}`, {
-        headers: getHeaders(),
-        credentials: 'include',
-      })
-      if (res.ok) {
-        const json = await res.json()
-        const data = json.data ?? json
-        // leads may come from funnel endpoint or a separate endpoint
-        setLeads(data.leads || [])
-      }
-    } catch {
-      // non-fatal
-    } finally {
       setLoadingLeads(false)
     }
   }, [period])
 
   useEffect(() => {
-    loadFunnelData()
-    loadLeads()
-  }, [loadFunnelData, loadLeads])
+    loadData()
+  }, [loadData])
 
   const handleStatusChange = async (id: string, status: string, followUpDate?: string) => {
     try {
@@ -131,7 +113,7 @@ export default function EnrollmentPage() {
           prev.map((lead) => (lead.id === id ? { ...lead, status } : lead))
         )
         // Refresh stats after status change
-        loadFunnelData()
+        loadData()
       }
     } catch {
       // handle silently
@@ -140,8 +122,7 @@ export default function EnrollmentPage() {
 
   const handleTrialSuccess = () => {
     setShowTrialModal(false)
-    loadFunnelData()
-    loadLeads()
+    loadData()
   }
 
   return (
@@ -183,7 +164,7 @@ export default function EnrollmentPage() {
         <div className="px-4 py-3 bg-[#B5706E]/10 text-[#B5706E] rounded-xl text-sm flex items-center justify-between">
           <span>{error}</span>
           <button
-            onClick={() => { setError(null); loadFunnelData(); loadLeads() }}
+            onClick={() => { setError(null); loadData() }}
             className="underline text-xs ml-4"
           >
             重試

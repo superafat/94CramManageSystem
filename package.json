@@ -16,5 +16,10 @@
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=8.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "drizzle-orm": "0.45.1"
+    }
   }
 }

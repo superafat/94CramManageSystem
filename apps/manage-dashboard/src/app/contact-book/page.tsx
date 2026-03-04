@@ -1,1139 +1,1221 @@
 'use client'
 
-import { BackButton } from '@/components/ui/BackButton'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
+import { Modal } from '@/components/ui/Modal'
+import { Rating } from '@/components/ui/Rating'
+import ToastContainer from '@/components/ui/ToastContainer'
+import { useToast } from '@/hooks/useToast'
 
-const API_BASE = ''
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-type MessageType = 'progress' | 'homework' | 'tip' | 'photo' | 'feedback'
-
-interface Class {
+interface Course {
   id: string
   name: string
 }
 
-interface Student {
-  id: string
-  full_name: string
-}
-
-interface Reply {
-  id: string
-  author_name: string
-  content: string
-  created_at: string
-  is_teacher: boolean
-  rating?: number
-}
-
-interface AttachmentItem {
-  url: string
-  name: string
-  type: 'image'
+interface ExamScoreInput {
+  subject: string
+  score: number | ''
+  classAvg: number | ''
 }
 
 interface ExamScore {
   subject: string
   score: number
-  fullScore: number
+  classAvg: number
 }
 
-interface Message {
+interface Photo {
   id: string
-  type: MessageType
+  url: string
+  name: string
+}
+
+interface ParentFeedback {
+  rating: number
+  comment: string
+  createdAt: string
+}
+
+interface AiAnalysis {
+  weakSummary: string
+  recommendations: string[]
+}
+
+type EntryStatus = 'draft' | 'sent' | 'read' | 'pending'
+
+interface ContactBookEntry {
+  id: string
+  studentId: string
+  studentName: string
+  date: string
+  status: EntryStatus
+  groupProgress: string
+  groupHomework: string
+  individualProgress: string
+  individualHomework: string
+  teacherNote: string
+  examScores: ExamScore[]
+  photos: Photo[]
+  parentFeedback: ParentFeedback | null
+  aiAnalysis: AiAnalysis | null
+}
+
+interface Student {
+  id: string
+  name: string
+  entry: ContactBookEntry | null
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function avatarColor(name: string): string {
+  const colors = [
+    'bg-morandi-sage/40 text-morandi-dark',
+    'bg-morandi-rose/40 text-morandi-dark',
+    'bg-morandi-blue/40 text-morandi-dark',
+    'bg-morandi-sand/40 text-morandi-dark',
+    'bg-morandi-mauve/40 text-morandi-dark',
+  ]
+  const idx = name.charCodeAt(0) % colors.length
+  return colors[idx]
+}
+
+function statusLabel(status: EntryStatus): string {
+  switch (status) {
+    case 'draft':   return '草稿'
+    case 'sent':    return '已發送'
+    case 'read':    return '已讀'
+    case 'pending': return '待處理'
+  }
+}
+
+function statusVariant(status: EntryStatus): 'outline' | 'primary' | 'success' | 'warning' {
+  switch (status) {
+    case 'draft':   return 'outline'
+    case 'sent':    return 'primary'
+    case 'read':    return 'success'
+    case 'pending': return 'warning'
+  }
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function SectionCard({
+  icon,
+  title,
+  hint,
+  children,
+}: {
+  icon: string
   title: string
-  content: string
-  class_name: string
-  student_name: string | null
-  created_at: string
-  read_count: number
-  total_count: number
-  replies: Reply[]
-  attachments?: AttachmentItem[]
-  examScores?: ExamScore[]
+  hint?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="bg-surface rounded-xl border border-border p-5 space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="text-lg">{icon}</span>
+        <h3 className="font-semibold text-text">{title}</h3>
+      </div>
+      {hint && <p className="text-xs text-text-muted bg-background rounded px-3 py-2">{hint}</p>}
+      {children}
+    </div>
+  )
 }
 
-interface AiRecommendation {
-  courseName: string
-  weakSubject: string
-  reason: string
-  priority: 'high' | 'medium' | 'low'
-}
-
-const TYPE_CONFIG: Record<MessageType, { icon: string; label: string; color: string; bg: string }> = {
-  progress: { icon: '📈', label: '學習進度', color: 'text-morandi-sage', bg: 'bg-morandi-sage/10' },
-  homework: { icon: '📝', label: '作業通知', color: 'text-primary', bg: 'bg-primary/10' },
-  tip:      { icon: '💡', label: '小叮嚀',   color: 'text-morandi-gold', bg: 'bg-morandi-gold/10' },
-  photo:    { icon: '📸', label: '照片分享', color: 'text-morandi-rose', bg: 'bg-morandi-rose/10' },
-  feedback: { icon: '💬', label: '家長反饋', color: 'text-[#7B7BA8]', bg: 'bg-[#7B7BA8]/10' },
-}
-
-const PRIORITY_CONFIG: Record<AiRecommendation['priority'], { label: string; cls: string }> = {
-  high:   { label: '高優先', cls: 'bg-red-100 text-red-600' },
-  medium: { label: '中優先', cls: 'bg-yellow-100 text-yellow-700' },
-  low:    { label: '低優先', cls: 'bg-green-100 text-green-700' },
-}
-
-function formatRelativeTime(dateStr: string): string {
-  const now = new Date()
-  const date = new Date(dateStr)
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-  if (diffMins < 1) return '剛剛'
-  if (diffMins < 60) return `${diffMins} 分鐘前`
-  if (diffHours < 24) return `${diffHours} 小時前`
-  if (diffDays === 1) return '昨天'
-  if (diffDays < 7) return `${diffDays} 天前`
-  return date.toLocaleDateString('zh-TW', { month: 'long', day: 'numeric' })
-}
-
-// Mock data for development (API will replace this)
-const MOCK_MESSAGES: Message[] = [
-  {
-    id: '1',
-    type: 'progress',
-    title: '本週學習進度報告',
-    content: '本週完成了二次函數的基礎教學，同學們表現優異，請在家多複習課堂筆記。',
-    class_name: '國三數學班',
-    student_name: null,
-    created_at: new Date(Date.now() - 3600000).toISOString(),
-    read_count: 12,
-    total_count: 15,
-    replies: [
-      { id: 'r1', author_name: '陳媽媽', content: '謝謝老師，小明回家有認真複習！', created_at: new Date(Date.now() - 1800000).toISOString(), is_teacher: false },
-    ],
-  },
-  {
-    id: '2',
-    type: 'homework',
-    title: '週末作業提醒',
-    content: '請完成練習冊第 45-47 頁，明天上課前繳交。',
-    class_name: '國三數學班',
-    student_name: '陳小明',
-    created_at: new Date(Date.now() - 7200000).toISOString(),
-    read_count: 1,
-    total_count: 1,
-    replies: [],
-  },
-  {
-    id: '3',
-    type: 'tip',
-    title: '考試注意事項',
-    content: '下週三有月考，請記得攜帶計算機及文具，考試範圍為第一至四章。',
-    class_name: '國三數學班',
-    student_name: null,
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-    read_count: 14,
-    total_count: 15,
-    replies: [],
-    examScores: [
-      { subject: '數學', score: 85, fullScore: 100 },
-      { subject: '理化', score: 78, fullScore: 100 },
-    ],
-  },
-  {
-    id: '4',
-    type: 'photo',
-    title: '課堂活動照片',
-    content: '今天的分組討論活動非常熱烈，孩子們都很積極參與！',
-    class_name: '國三數學班',
-    student_name: null,
-    created_at: new Date(Date.now() - 172800000).toISOString(),
-    read_count: 10,
-    total_count: 15,
-    replies: [
-      { id: 'r2', author_name: '林爸爸', content: '好棒！孩子回家說今天很開心', created_at: new Date(Date.now() - 150000000).toISOString(), is_teacher: false },
-      { id: 'r3', author_name: '王老師', content: '謝謝家長的支持，孩子們真的很棒！', created_at: new Date(Date.now() - 140000000).toISOString(), is_teacher: true },
-    ],
-  },
-  {
-    id: '5',
-    type: 'feedback',
-    title: '家長意見回饋',
-    content: '請問老師，孩子最近上課狀況如何？在家練習有什麼需要特別注意的地方嗎？',
-    class_name: '國三數學班',
-    student_name: '林小華',
-    created_at: new Date(Date.now() - 259200000).toISOString(),
-    read_count: 1,
-    total_count: 1,
-    replies: [
-      { id: 'r4', author_name: '林媽媽', content: '老師教得很用心，孩子進步很多！', created_at: new Date(Date.now() - 200000000).toISOString(), is_teacher: false, rating: 5 },
-    ],
-  },
-]
-
-const MOCK_CLASSES: Class[] = [
-  { id: 'c1', name: '國三數學班' },
-  { id: 'c2', name: '國二英文班' },
-  { id: 'c3', name: '國一理化班' },
-]
-
-const MOCK_STUDENTS: Record<string, Student[]> = {
-  c1: [{ id: 's1', full_name: '陳小明' }, { id: 's2', full_name: '林小華' }, { id: 's3', full_name: '王大成' }],
-  c2: [{ id: 's4', full_name: '張小美' }, { id: 's5', full_name: '李小龍' }],
-  c3: [{ id: 's6', full_name: '趙小雨' }, { id: 's7', full_name: '劉小安' }],
-}
-
-// ─── Star Rating Component ────────────────────────────────────────────────────
-
-function StarRating({
+function TextArea({
+  placeholder,
   value,
   onChange,
-  readonly = false,
-  size = 'md',
+  rows = 3,
 }: {
-  value: number
-  onChange?: (v: number) => void
-  readonly?: boolean
-  size?: 'sm' | 'md'
+  placeholder?: string
+  value: string
+  onChange: (v: string) => void
+  rows?: number
 }) {
-  const [hover, setHover] = useState(0)
-  const starSize = size === 'sm' ? 'text-base' : 'text-2xl'
-
   return (
-    <div className="flex gap-0.5">
-      {[1, 2, 3, 4, 5].map(star => {
-        const filled = (readonly ? value : hover || value) >= star
-        return (
-          <button
-            key={star}
-            type="button"
-            disabled={readonly}
-            onClick={() => onChange?.(star)}
-            onMouseEnter={() => !readonly && setHover(star)}
-            onMouseLeave={() => !readonly && setHover(0)}
-            className={`${starSize} transition-colors ${
-              readonly ? 'cursor-default' : 'cursor-pointer hover:scale-110 transition-transform'
-            } ${filled ? 'text-yellow-400' : 'text-gray-300'}`}
-            aria-label={`${star} 星`}
-          >
-            ★
-          </button>
-        )
-      })}
+    <textarea
+      rows={rows}
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+    />
+  )
+}
+
+function SkeletonLines({ count = 3 }: { count?: number }) {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="h-4 bg-border rounded animate-pulse" style={{ width: `${70 + (i % 3) * 10}%` }} />
+      ))}
     </div>
   )
 }
 
-// ─── AI Recommendations Block ────────────────────────────────────────────────
-
-function AiRecommendationsBlock({ studentId }: { studentId: string }) {
-  const [recs, setRecs] = useState<AiRecommendation[] | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(false)
-
-    const fetchRecs = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/w8/recommendations?studentId=${encodeURIComponent(studentId)}`, {
-          credentials: 'include',
-        })
-        if (!cancelled) {
-          if (res.ok) {
-            const json = await res.json()
-            setRecs(json.data ?? json.recommendations ?? [])
-          } else {
-            setError(true)
-          }
-        }
-      } catch {
-        if (!cancelled) setError(true)
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    fetchRecs()
-    return () => { cancelled = true }
-  }, [studentId])
-
-  return (
-    <div className="border-t border-border px-4 sm:px-5 py-4">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-base">🤖</span>
-        <h4 className="text-sm font-semibold text-text">AI 學習建議</h4>
-      </div>
-
-      {loading && (
-        <div className="space-y-2">
-          {[1, 2].map(i => (
-            <div key={i} className="h-16 bg-surface-hover animate-pulse rounded-xl" />
-          ))}
-        </div>
-      )}
-
-      {!loading && (error || !recs || recs.length === 0) && (
-        <p className="text-sm text-text-muted bg-surface-hover rounded-xl px-4 py-3">
-          暫無建議
-        </p>
-      )}
-
-      {!loading && !error && recs && recs.length > 0 && (
-        <div className="space-y-2">
-          {recs.map((rec, idx) => {
-            const p = PRIORITY_CONFIG[rec.priority]
-            return (
-              <div
-                key={idx}
-                className="flex items-start gap-3 bg-surface-hover rounded-xl px-4 py-3 border border-border/50"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                    <span className="text-sm font-medium text-text">{rec.courseName}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.cls}`}>
-                      {p.label}
-                    </span>
-                  </div>
-                  <p className="text-xs text-text-muted">
-                    弱科：{rec.weakSubject}｜{rec.reason}
-                  </p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ContactBookPage() {
-  const [activeTab, setActiveTab] = useState<MessageType>('progress')
-  const [messages, setMessages] = useState<Message[]>([])
-  const [loading, setLoading] = useState(true)
-  const [classes, setClasses] = useState<Class[]>([])
+  const toast = useToast()
+
+  // ── State ──
+  const [courses, setCourses] = useState<Course[]>([])
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('')
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr())
   const [students, setStudents] = useState<Student[]>([])
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState<string>('')
 
-  // Form state
-  const [showForm, setShowForm] = useState(false)
-  const [formType, setFormType] = useState<MessageType>('progress')
-  const [formClass, setFormClass] = useState('')
-  const [formStudent, setFormStudent] = useState('all')
-  const [formTitle, setFormTitle] = useState('')
-  const [formContent, setFormContent] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [loadingCourses, setLoadingCourses] = useState(true)
+  const [loadingStudents, setLoadingStudents] = useState(false)
+  const [savingEntry, setSavingEntry] = useState(false)
+  const [sendingEntry, setSendingEntry] = useState(false)
+  const [batchCreating, setBatchCreating] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Feature 1: Photo attachments
-  const [attachments, setAttachments] = useState<AttachmentItem[]>([])
-  const [isDragging, setIsDragging] = useState(false)
+  // Modal states
+  const [classProgressModalOpen, setClassProgressModalOpen] = useState(false)
+  const [previewModalOpen, setPreviewModalOpen] = useState(false)
+  const [sendConfirmOpen, setSendConfirmOpen] = useState(false)
+
+  // Entry form state (for selected student)
+  const [groupProgress, setGroupProgress] = useState('')
+  const [groupHomework, setGroupHomework] = useState('')
+  const [individualProgress, setIndividualProgress] = useState('')
+  const [individualHomework, setIndividualHomework] = useState('')
+  const [teacherNote, setTeacherNote] = useState('')
+  const [examScores, setExamScores] = useState<ExamScore[]>([])
+  const [photos, setPhotos] = useState<Photo[]>([])
+  const [aiAnalysis, setAiAnalysis] = useState<AiAnalysis | null>(null)
+
+  // New exam score input
+  const [newExamSubject, setNewExamSubject] = useState('')
+  const [newExamScore, setNewExamScore] = useState<number | ''>('')
+  const [newExamClassAvg, setNewExamClassAvg] = useState<number | ''>('')
+
+  // Class progress modal form
+  const [modalGroupProgress, setModalGroupProgress] = useState('')
+  const [modalGroupHomework, setModalGroupHomework] = useState('')
+
+  // Drag state
+  const [isDragOver, setIsDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Feature 3: Exam scores
-  const [examScores, setExamScores] = useState<ExamScore[]>([])
-  const [newScoreSubject, setNewScoreSubject] = useState('')
-  const [newScoreValue, setNewScoreValue] = useState('')
-  const [newScoreFullScore, setNewScoreFullScore] = useState('100')
+  // Debounce save ref
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const currentEntryId = useRef<string | null>(null)
 
-  // Reply state
-  const [expandedReply, setExpandedReply] = useState<string | null>(null)
-  const [replyText, setReplyText] = useState<Record<string, string>>({})
-  const [replySubmitting, setReplySubmitting] = useState<string | null>(null)
+  // ── API helpers ──
 
-  // Feature 2: Parent star rating (per-message reply state)
-  const [pendingRatings, setPendingRatings] = useState<Record<string, number>>({})
-  const [pendingRatingText, setPendingRatingText] = useState<Record<string, string>>({})
-
-  const loadMessages = useCallback(async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams({ type: activeTab, limit: '50' })
-      const res = await fetch(`${API_BASE}/api/w8/contact-book?${params}`, {
-        credentials: 'include',
-      })
-      if (res.ok) {
-        const json = await res.json()
-        const payload = json.data ?? json
-        setMessages(payload.messages || [])
-      } else {
-        setMessages(MOCK_MESSAGES.filter(m => m.type === activeTab))
-      }
-    } catch {
-      setMessages(MOCK_MESSAGES.filter(m => m.type === activeTab))
-    } finally {
-      setLoading(false)
+  async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+    const res = await fetch(path, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...(options?.headers ?? {}) },
+      ...options,
+    })
+    if (!res.ok) {
+      const body = await res.text()
+      throw new Error(body || `HTTP ${res.status}`)
     }
-  }, [activeTab])
+    return res.json() as Promise<T>
+  }
 
-  const loadClasses = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/admin/classes?limit=50`, { credentials: 'include' })
-      if (res.ok) {
-        const json = await res.json()
-        const payload = json.data ?? json
-        setClasses(payload.classes || [])
-      } else {
-        setClasses(MOCK_CLASSES)
-      }
-    } catch {
-      setClasses(MOCK_CLASSES)
-    }
-  }, [])
-
-  useEffect(() => { loadMessages() }, [loadMessages])
-  useEffect(() => { loadClasses() }, [loadClasses])
+  // ── Load courses ──
 
   useEffect(() => {
-    if (!formClass) { setStudents([]); return }
-    const fetchStudents = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/admin/students?class_id=${formClass}&limit=100`, { credentials: 'include' })
-        if (res.ok) {
-          const json = await res.json()
-          const payload = json.data ?? json
-          setStudents(payload.students || [])
-        } else {
-          setStudents(MOCK_STUDENTS[formClass] || [])
+    setLoadingCourses(true)
+    apiFetch<{ data: Course[] }>('/api/w8/courses')
+      .then((res) => {
+        setCourses(res.data ?? [])
+        if ((res.data ?? []).length > 0) {
+          setSelectedCourseId(res.data[0].id)
         }
-      } catch {
-        setStudents(MOCK_STUDENTS[formClass] || [])
-      }
+      })
+      .catch((err: unknown) => {
+        toast.error(`載入課程失敗：${err instanceof Error ? err.message : String(err)}`)
+      })
+      .finally(() => setLoadingCourses(false))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Load entries when course/date changes ──
+
+  const loadEntries = useCallback(async () => {
+    if (!selectedCourseId) return
+    setLoadingStudents(true)
+    try {
+      const res = await apiFetch<{ data: ContactBookEntry[] }>(
+        `/api/admin/contact-book/entries?courseId=${selectedCourseId}&date=${selectedDate}`
+      )
+      const entries = res.data ?? []
+      setStudents(
+        entries.map((e) => ({
+          id: e.studentId,
+          name: e.studentName,
+          entry: e,
+        }))
+      )
+      setSelectedStudentId(null)
+      clearForm()
+    } catch (err: unknown) {
+      toast.error(`載入學生列表失敗：${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setLoadingStudents(false)
     }
-    fetchStudents()
-  }, [formClass])
+  }, [selectedCourseId, selectedDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset extra fields when form closes or type changes
-  const resetExtraFields = () => {
-    setAttachments([])
+  useEffect(() => {
+    loadEntries()
+  }, [loadEntries])
+
+  // ── Select student ──
+
+  function clearForm() {
+    setGroupProgress('')
+    setGroupHomework('')
+    setIndividualProgress('')
+    setIndividualHomework('')
+    setTeacherNote('')
     setExamScores([])
-    setNewScoreSubject('')
-    setNewScoreValue('')
-    setNewScoreFullScore('100')
+    setPhotos([])
+    setAiAnalysis(null)
+    currentEntryId.current = null
   }
 
-  const handleCloseForm = () => {
-    setShowForm(false)
-    setSubmitError(null)
-    resetExtraFields()
-  }
-
-  // Feature 1: Photo handling
-  const handleFileSelect = (files: FileList | null) => {
-    if (!files) return
-    const remaining = 5 - attachments.length
-    const toAdd = Array.from(files).slice(0, remaining)
-    const newItems: AttachmentItem[] = toAdd.map(f => ({
-      url: URL.createObjectURL(f),
-      name: f.name,
-      type: 'image' as const,
-    }))
-    setAttachments(prev => [...prev, ...newItems])
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-    handleFileSelect(e.dataTransfer.files)
-  }
-
-  const removeAttachment = (idx: number) => {
-    setAttachments(prev => {
-      const next = [...prev]
-      URL.revokeObjectURL(next[idx].url)
-      next.splice(idx, 1)
-      return next
-    })
-  }
-
-  // Feature 3: Exam score handling
-  const addExamScore = () => {
-    const subject = newScoreSubject.trim()
-    const score = parseFloat(newScoreValue)
-    const fullScore = parseFloat(newScoreFullScore) || 100
-    if (!subject || isNaN(score)) return
-    setExamScores(prev => [...prev, { subject, score, fullScore }])
-    setNewScoreSubject('')
-    setNewScoreValue('')
-    setNewScoreFullScore('100')
-  }
-
-  const removeExamScore = (idx: number) => {
-    setExamScores(prev => prev.filter((_, i) => i !== idx))
-  }
-
-  const handleSubmit = async () => {
-    if (!formClass || !formTitle.trim() || !formContent.trim()) {
-      setSubmitError('請填寫所有必填欄位')
+  function selectStudent(studentId: string) {
+    setSelectedStudentId(studentId)
+    setSidebarOpen(false)
+    const student = students.find((s) => s.id === studentId)
+    if (!student?.entry) {
+      clearForm()
       return
     }
-    setSubmitting(true)
-    setSubmitError(null)
+    const e = student.entry
+    currentEntryId.current = e.id
+    setGroupProgress(e.groupProgress)
+    setGroupHomework(e.groupHomework)
+    setIndividualProgress(e.individualProgress)
+    setIndividualHomework(e.individualHomework)
+    setTeacherNote(e.teacherNote)
+    setExamScores(e.examScores)
+    setPhotos(e.photos)
+    setAiAnalysis(e.aiAnalysis)
+  }
+
+  // ── Auto-save (debounce 1s) ──
+
+  const triggerAutoSave = useCallback(() => {
+    if (!currentEntryId.current) return
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      void saveEntry(false)
+    }, 1000)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Call triggerAutoSave whenever form fields change
+  useEffect(() => { triggerAutoSave() }, [
+    groupProgress,
+    groupHomework,
+    individualProgress,
+    individualHomework,
+    teacherNote,
+    examScores,
+  ]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function saveEntry(showToast = true): Promise<void> {
+    if (!currentEntryId.current) return
+    setSavingEntry(true)
     try {
-      const body = {
-        type: formType,
-        class_id: formClass,
-        student_id: formStudent === 'all' ? null : formStudent,
-        title: formTitle.trim(),
-        content: formContent.trim(),
-        ...(formType === 'photo' && attachments.length > 0 ? { attachments } : {}),
-        ...(formType === 'tip' && examScores.length > 0 ? { examScores } : {}),
-      }
-      const res = await fetch(`${API_BASE}/api/w8/contact-book`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(body),
+      await apiFetch(`/api/admin/contact-book/entries/${currentEntryId.current}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          groupProgress,
+          groupHomework,
+          individualProgress,
+          individualHomework,
+          teacherNote,
+          examScores,
+        }),
       })
-      if (!res.ok) throw new Error('發送失敗')
-      setFormType('progress')
-      setFormClass('')
-      setFormStudent('all')
-      setFormTitle('')
-      setFormContent('')
-      handleCloseForm()
-      if (activeTab === formType) await loadMessages()
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : '發送失敗，請稍後再試')
+      if (showToast) toast.success('已儲存')
+    } catch (err: unknown) {
+      if (showToast) toast.error(`儲存失敗：${err instanceof Error ? err.message : String(err)}`)
     } finally {
-      setSubmitting(false)
+      setSavingEntry(false)
     }
   }
 
-  const handleReply = async (messageId: string) => {
-    const text = replyText[messageId]?.trim()
-    if (!text) return
-    setReplySubmitting(messageId)
+  // ── Batch create ──
+
+  async function batchCreate() {
+    if (!selectedCourseId) return
+    setBatchCreating(true)
     try {
-      const res = await fetch(`${API_BASE}/api/w8/contact-book/reply`, {
+      await apiFetch('/api/admin/contact-book/entries', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ message_id: messageId, content: text }),
+        body: JSON.stringify({ courseId: selectedCourseId, date: selectedDate }),
       })
-      if (!res.ok) throw new Error('回覆失敗')
-      setReplyText(prev => ({ ...prev, [messageId]: '' }))
-      setExpandedReply(null)
-      await loadMessages()
-    } catch {
-      const newReply: Reply = {
-        id: `temp-${Date.now()}`,
-        author_name: '王老師',
-        content: text,
-        created_at: new Date().toISOString(),
-        is_teacher: true,
-      }
-      setMessages(prev => prev.map(m =>
-        m.id === messageId ? { ...m, replies: [...m.replies, newReply] } : m
-      ))
-      setReplyText(prev => ({ ...prev, [messageId]: '' }))
-      setExpandedReply(null)
+      toast.success('批次建立完成')
+      await loadEntries()
+    } catch (err: unknown) {
+      toast.error(`批次建立失敗：${err instanceof Error ? err.message : String(err)}`)
     } finally {
-      setReplySubmitting(null)
+      setBatchCreating(false)
     }
   }
 
-  // Feature 2: Submit rating reply
-  const handleRatingReply = async (messageId: string) => {
-    const rating = pendingRatings[messageId]
-    const text = pendingRatingText[messageId]?.trim() || ''
-    if (!rating) return
-    setReplySubmitting(messageId)
+  // ── Send entry ──
+
+  async function sendEntry() {
+    if (!currentEntryId.current) return
+    setSendingEntry(true)
     try {
-      const res = await fetch(`${API_BASE}/api/w8/contact-book/reply`, {
+      await apiFetch(`/api/admin/contact-book/entries/${currentEntryId.current}/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ message_id: messageId, content: text, rating }),
       })
-      if (!res.ok) throw new Error('回覆失敗')
-      setPendingRatings(prev => { const n = { ...prev }; delete n[messageId]; return n })
-      setPendingRatingText(prev => { const n = { ...prev }; delete n[messageId]; return n })
-      setExpandedReply(null)
-      await loadMessages()
-    } catch {
-      const newReply: Reply = {
-        id: `temp-${Date.now()}`,
-        author_name: '家長',
-        content: text || `評分 ${rating} 星`,
-        created_at: new Date().toISOString(),
-        is_teacher: false,
-        rating,
-      }
-      setMessages(prev => prev.map(m =>
-        m.id === messageId ? { ...m, replies: [...m.replies, newReply] } : m
-      ))
-      setPendingRatings(prev => { const n = { ...prev }; delete n[messageId]; return n })
-      setPendingRatingText(prev => { const n = { ...prev }; delete n[messageId]; return n })
-      setExpandedReply(null)
+      toast.success('已正式發送給家長')
+      setSendConfirmOpen(false)
+      // Update local status
+      setStudents((prev) =>
+        prev.map((s) =>
+          s.entry?.id === currentEntryId.current
+            ? { ...s, entry: s.entry ? { ...s.entry, status: 'sent' } : s.entry }
+            : s
+        )
+      )
+    } catch (err: unknown) {
+      toast.error(`發送失敗：${err instanceof Error ? err.message : String(err)}`)
     } finally {
-      setReplySubmitting(null)
+      setSendingEntry(false)
     }
   }
 
-  const tabs: MessageType[] = ['progress', 'homework', 'tip', 'photo', 'feedback']
+  // ── Class progress modal save ──
+
+  async function saveClassProgress() {
+    if (!selectedCourseId) return
+    try {
+      await apiFetch('/api/admin/contact-book/templates', {
+        method: 'POST',
+        body: JSON.stringify({
+          courseId: selectedCourseId,
+          date: selectedDate,
+          groupProgress: modalGroupProgress,
+          groupHomework: modalGroupHomework,
+        }),
+      })
+      // Apply to all entries via batch update
+      await apiFetch('/api/admin/contact-book/entries', {
+        method: 'POST',
+        body: JSON.stringify({
+          courseId: selectedCourseId,
+          date: selectedDate,
+          groupProgress: modalGroupProgress,
+          groupHomework: modalGroupHomework,
+        }),
+      })
+      toast.success('已套用到所有學生')
+      setClassProgressModalOpen(false)
+      // Update current form if student is selected
+      setGroupProgress(modalGroupProgress)
+      setGroupHomework(modalGroupHomework)
+      await loadEntries()
+    } catch (err: unknown) {
+      toast.error(`儲存失敗：${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  // ── Add exam score ──
+
+  function addExamScore() {
+    if (!newExamSubject.trim() || newExamScore === '' || newExamClassAvg === '') return
+    setExamScores((prev) => [
+      ...prev,
+      { subject: newExamSubject.trim(), score: Number(newExamScore), classAvg: Number(newExamClassAvg) },
+    ])
+    setNewExamSubject('')
+    setNewExamScore('')
+    setNewExamClassAvg('')
+  }
+
+  function removeExamScore(idx: number) {
+    setExamScores((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  // ── Photo upload ──
+
+  async function uploadPhotos(files: FileList) {
+    if (photos.length + files.length > 5) {
+      toast.warning('最多只能上傳 5 張照片')
+      return
+    }
+    setUploadingPhoto(true)
+    try {
+      for (const file of Array.from(files)) {
+        const formData = new FormData()
+        formData.append('photo', file)
+        if (currentEntryId.current) {
+          formData.append('entryId', currentEntryId.current)
+        }
+        const res = await fetch('/api/admin/contact-book/upload', {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = (await res.json()) as { photo: Photo }
+        setPhotos((prev) => [...prev, data.photo])
+      }
+      toast.success('照片上傳成功')
+    } catch (err: unknown) {
+      toast.error(`上傳失敗：${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  async function deletePhoto(photoId: string) {
+    try {
+      await apiFetch(`/api/admin/contact-book/photos/${photoId}`, { method: 'DELETE' })
+      setPhotos((prev) => prev.filter((p) => p.id !== photoId))
+    } catch (err: unknown) {
+      toast.error(`刪除照片失敗：${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  // ── AI Analysis ──
+
+  async function generateAiAnalysis() {
+    if (!currentEntryId.current) return
+    setAiLoading(true)
+    try {
+      const res = await apiFetch<{ data: AiAnalysis }>('/api/admin/contact-book/ai-analysis', {
+        method: 'POST',
+        body: JSON.stringify({ entryId: currentEntryId.current }),
+      })
+      setAiAnalysis(res.data)
+    } catch (err: unknown) {
+      toast.error(`AI 分析失敗：${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  // ── Drag & Drop ──
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  function handleDragLeave() {
+    setIsDragOver(false)
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragOver(false)
+    if (e.dataTransfer.files.length > 0) {
+      void uploadPhotos(e.dataTransfer.files)
+    }
+  }
+
+  // ── Computed ──
+
+  const selectedStudent = students.find((s) => s.id === selectedStudentId) ?? null
+
+  const filteredStudents = students.filter((s) =>
+    s.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-5 pb-10">
-      <BackButton fallbackUrl="/dashboard" />
+    <div className="flex h-full min-h-screen bg-background relative">
+      {/* Toast Container */}
+      <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} position="top-right" />
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text">電子聯絡簿</h1>
-          <p className="text-text-muted mt-1">發布學習進度、作業、照片給家長</p>
-        </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors text-sm font-medium"
-        >
-          <span>+</span>
-          <span className="hidden sm:inline">新增訊息</span>
-        </button>
-      </div>
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-20 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-      {/* Compose Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-border overflow-hidden">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-text">新增聯絡簿訊息</h2>
-              <button
-                onClick={handleCloseForm}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:bg-surface transition-colors"
+      {/* ── Left Sidebar ── */}
+      <aside
+        className={`
+          fixed lg:static inset-y-0 left-0 z-30 lg:z-auto
+          w-80 bg-surface border-r border-border flex flex-col
+          transform transition-transform duration-300
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}
+      >
+        {/* Sidebar Header */}
+        <div className="p-4 border-b border-border space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-text">電子聯絡簿</h2>
+            <button
+              className="lg:hidden text-text-muted hover:text-text"
+              onClick={() => setSidebarOpen(false)}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Course selector */}
+          <div>
+            <label className="block text-xs text-text-muted mb-1">課程</label>
+            {loadingCourses ? (
+              <div className="h-9 bg-border/40 rounded-lg animate-pulse" />
+            ) : (
+              <select
+                value={selectedCourseId}
+                onChange={(e) => setSelectedCourseId(e.target.value)}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
-                ✕
-              </button>
-            </div>
+                {courses.length === 0 && <option value="">尚無課程</option>}
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
 
-            <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
-              {/* Message Type */}
-              <div>
-                <label className="block text-sm font-medium text-text mb-2">訊息類型</label>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-                  {tabs.map(t => {
-                    const cfg = TYPE_CONFIG[t]
-                    return (
-                      <button
-                        key={t}
-                        onClick={() => { setFormType(t); resetExtraFields() }}
-                        className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl border text-xs font-medium transition-all ${
-                          formType === t
-                            ? `${cfg.bg} ${cfg.color} border-current`
-                            : 'border-border text-text-muted hover:border-primary/50 hover:text-text'
-                        }`}
-                      >
-                        <span className="text-lg">{cfg.icon}</span>
-                        <span>{cfg.label}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
+          {/* Date selector */}
+          <div>
+            <label className="block text-xs text-text-muted mb-1">日期</label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
 
-              {/* Class selector */}
-              <div>
-                <label className="block text-sm font-medium text-text mb-1.5">
-                  選擇班級 <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formClass}
-                  onChange={e => { setFormClass(e.target.value); setFormStudent('all') }}
-                  className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30"
-                >
-                  <option value="">請選擇班級</option>
-                  {classes.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
+          {/* Class progress modal button */}
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full"
+            onClick={() => {
+              setModalGroupProgress(groupProgress)
+              setModalGroupHomework(groupHomework)
+              setClassProgressModalOpen(true)
+            }}
+          >
+            📋 班級進度設定
+          </Button>
+        </div>
 
-              {/* Student selector */}
-              {formClass && (
-                <div>
-                  <label className="block text-sm font-medium text-text mb-1.5">指定學生</label>
-                  <select
-                    value={formStudent}
-                    onChange={e => setFormStudent(e.target.value)}
-                    className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  >
-                    <option value="all">全班同學</option>
-                    {students.map(s => (
-                      <option key={s.id} value={s.id}>{s.full_name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+        {/* Student search */}
+        <div className="px-4 py-3 border-b border-border">
+          <input
+            type="text"
+            placeholder="搜尋學生姓名..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
 
-              {/* Title */}
-              <div>
-                <label className="block text-sm font-medium text-text mb-1.5">
-                  標題 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formTitle}
-                  onChange={e => setFormTitle(e.target.value)}
-                  placeholder="輸入訊息標題"
-                  maxLength={100}
-                  className="w-full px-3 py-2 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-              </div>
-
-              {/* Content */}
-              <div>
-                <label className="block text-sm font-medium text-text mb-1.5">
-                  內容 <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={formContent}
-                  onChange={e => setFormContent(e.target.value)}
-                  placeholder="輸入聯絡簿內容..."
-                  rows={4}
-                  maxLength={2000}
-                  className="w-full px-3 py-2 border border-border rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-                <p className="text-xs text-text-muted mt-1 text-right">{formContent.length}/2000</p>
-              </div>
-
-              {/* ── Feature 1: Photo Upload (type=photo) ── */}
-              {formType === 'photo' && (
-                <div>
-                  <label className="block text-sm font-medium text-text mb-1.5">
-                    上傳照片
-                    <span className="text-text-muted font-normal ml-1">（最多 5 張）</span>
-                  </label>
-
-                  {/* Drop zone */}
-                  {attachments.length < 5 && (
-                    <div
-                      onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
-                      onDragLeave={() => setIsDragging(false)}
-                      onDrop={handleDrop}
-                      onClick={() => fileInputRef.current?.click()}
-                      className={`relative flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl px-4 py-6 cursor-pointer transition-colors ${
-                        isDragging
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50 hover:bg-surface'
-                      }`}
-                    >
-                      <span className="text-2xl">📷</span>
-                      <p className="text-sm text-text-muted text-center">
-                        拖放圖片到此，或點擊選擇
-                      </p>
-                      <p className="text-xs text-text-muted/60">
-                        已選 {attachments.length}/5 張
-                      </p>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={e => handleFileSelect(e.target.files)}
-                      />
-                    </div>
-                  )}
-
-                  {/* Thumbnail preview */}
-                  {attachments.length > 0 && (
-                    <div className="mt-3 grid grid-cols-5 gap-2">
-                      {attachments.map((item, idx) => (
-                        <div key={idx} className="relative group aspect-square">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={item.url}
-                            alt={item.name}
-                            className="w-full h-full object-cover rounded-lg border border-border"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeAttachment(idx)}
-                            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
-                            aria-label="移除照片"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-                      {attachments.length < 5 && (
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="aspect-square flex items-center justify-center border-2 border-dashed border-border rounded-lg text-text-muted hover:border-primary/50 transition-colors text-xl"
-                          aria-label="新增更多照片"
-                        >
-                          +
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ── Feature 3: Exam Scores (type=tip) ── */}
-              {formType === 'tip' && (
-                <div>
-                  <label className="block text-sm font-medium text-text mb-1.5">
-                    帶入考試成績
-                    <span className="text-text-muted font-normal ml-1">（選填）</span>
-                  </label>
-
-                  {/* Score list */}
-                  {examScores.length > 0 && (
-                    <div className="mb-2 space-y-1.5">
-                      {examScores.map((s, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center justify-between bg-morandi-gold/10 border border-morandi-gold/20 rounded-xl px-3 py-2"
-                        >
-                          <span className="text-sm text-text font-medium">{s.subject}</span>
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm text-morandi-gold font-semibold">
-                              {s.score} / {s.fullScore}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => removeExamScore(idx)}
-                              className="text-text-muted hover:text-red-500 transition-colors text-xs"
-                              aria-label="移除科目"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Add score row */}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newScoreSubject}
-                      onChange={e => setNewScoreSubject(e.target.value)}
-                      placeholder="科目"
-                      className="flex-1 min-w-0 px-3 py-2 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-                    <input
-                      type="number"
-                      value={newScoreValue}
-                      onChange={e => setNewScoreValue(e.target.value)}
-                      placeholder="分數"
-                      min={0}
-                      max={999}
-                      className="w-20 px-3 py-2 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-                    <span className="flex items-center text-text-muted text-sm">/</span>
-                    <input
-                      type="number"
-                      value={newScoreFullScore}
-                      onChange={e => setNewScoreFullScore(e.target.value)}
-                      placeholder="滿分"
-                      min={1}
-                      max={999}
-                      className="w-20 px-3 py-2 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-                    <button
-                      type="button"
-                      onClick={addExamScore}
-                      disabled={!newScoreSubject.trim() || !newScoreValue}
-                      className="px-3 py-2 bg-morandi-gold/20 text-morandi-gold rounded-xl text-sm font-medium hover:bg-morandi-gold/30 disabled:opacity-40 transition-colors whitespace-nowrap"
-                    >
-                      新增
-                    </button>
+        {/* Student list */}
+        <div className="flex-1 overflow-y-auto py-2">
+          {loadingStudents ? (
+            <div className="px-4 py-3 space-y-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-border/40 animate-pulse" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-border/40 rounded animate-pulse w-2/3" />
+                    <div className="h-2 bg-border/40 rounded animate-pulse w-1/3" />
                   </div>
                 </div>
-              )}
-
-              {submitError && (
-                <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl">
-                  {submitError}
-                </div>
-              )}
+              ))}
             </div>
+          ) : filteredStudents.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-text-muted">
+              {students.length === 0 ? '尚無學生記錄，請先批次建立' : '找不到符合的學生'}
+            </div>
+          ) : (
+            filteredStudents.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => selectStudent(s.id)}
+                className={`
+                  w-full text-left px-4 py-3 flex items-center gap-3
+                  transition-colors hover:bg-surface-hover
+                  ${selectedStudentId === s.id ? 'bg-primary/10 border-l-2 border-primary' : ''}
+                `}
+              >
+                {/* Avatar */}
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 ${avatarColor(s.name)}`}>
+                  {s.name.charAt(0)}
+                </div>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-sm font-medium text-text truncate">{s.name}</span>
+                    {s.entry && (
+                      <Badge variant={statusVariant(s.entry.status)} size="sm">
+                        {statusLabel(s.entry.status)}
+                      </Badge>
+                    )}
+                  </div>
+                  {s.entry?.parentFeedback && (
+                    <Rating
+                      value={s.entry.parentFeedback.rating}
+                      readOnly
+                      size="sm"
+                      className="mt-0.5"
+                    />
+                  )}
+                </div>
+              </button>
+            ))
+          )}
+        </div>
 
-            {/* Modal Footer */}
-            <div className="flex gap-3 px-5 py-4 border-t border-border">
-              <button
-                onClick={handleCloseForm}
-                className="flex-1 py-2.5 border border-border rounded-xl text-sm text-text-muted hover:bg-surface transition-colors"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || !formClass || !formTitle.trim() || !formContent.trim()}
-                className="flex-1 py-2.5 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
-              >
-                {submitting ? '發送中...' : '發送訊息'}
-              </button>
+        {/* Batch create button */}
+        <div className="p-4 border-t border-border">
+          <Button
+            variant="primary"
+            size="sm"
+            className="w-full"
+            disabled={batchCreating || !selectedCourseId}
+            onClick={() => void batchCreate()}
+          >
+            {batchCreating ? '建立中...' : '📝 批次建立今日聯絡簿'}
+          </Button>
+        </div>
+      </aside>
+
+      {/* ── Right Main Area ── */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+
+        {/* Mobile top bar */}
+        <div className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-border bg-surface sticky top-0 z-10">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 rounded-lg hover:bg-surface-hover text-text-muted"
+          >
+            ☰
+          </button>
+          <span className="text-sm font-medium text-text">
+            {selectedStudent ? selectedStudent.name : '選取學生'}
+          </span>
+        </div>
+
+        {/* Empty state */}
+        {!selectedStudent && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-3">
+              <div className="text-5xl">📋</div>
+              <p className="text-text-muted text-sm">請從左側選取學生以編輯聯絡簿</p>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Tab bar */}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-        {tabs.map(t => {
-          const cfg = TYPE_CONFIG[t]
-          return (
-            <button
-              key={t}
-              onClick={() => setActiveTab(t)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
-                activeTab === t
-                  ? `bg-primary text-white shadow-sm`
-                  : 'bg-surface border border-border text-text-muted hover:border-primary/50 hover:text-text'
-              }`}
+        {/* Entry form */}
+        {selectedStudent && (
+          <div className="flex-1 p-4 md:p-6 space-y-4 max-w-3xl mx-auto w-full pb-10">
+
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <h1 className="text-xl font-bold text-text">{selectedStudent.name}</h1>
+                <p className="text-sm text-text-muted">{selectedDate}</p>
+                {savingEntry && <span className="text-xs text-text-muted">儲存中...</span>}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setPreviewModalOpen(true)}
+                >
+                  👁 預覽家長版
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={sendingEntry || !selectedStudent.entry}
+                  onClick={() => setSendConfirmOpen(true)}
+                >
+                  {sendingEntry ? '發送中...' : '🚀 正式發送'}
+                </Button>
+              </div>
+            </div>
+
+            {/* Section 1: 全班集體進度 & 作業 */}
+            <SectionCard
+              icon="📈"
+              title="全班集體進度 & 作業"
+              hint="所有學生聯絡簿將預設帶入此內容"
             >
-              <span>{cfg.icon}</span>
-              <span>{cfg.label}</span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Message List */}
-      {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-28 bg-surface-hover animate-pulse rounded-2xl" />
-          ))}
-        </div>
-      ) : messages.length === 0 ? (
-        <div className="text-center py-16 space-y-3">
-          <div className="text-5xl">{TYPE_CONFIG[activeTab].icon}</div>
-          <p className="text-text-muted">尚無{TYPE_CONFIG[activeTab].label}訊息</p>
-          <button
-            onClick={() => setShowForm(true)}
-            className="px-4 py-2 bg-primary/10 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors"
-          >
-            新增第一則訊息
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {messages.map(msg => {
-            const cfg = TYPE_CONFIG[msg.type]
-            const readPct = msg.total_count > 0 ? Math.round((msg.read_count / msg.total_count) * 100) : 0
-            const isReplyExpanded = expandedReply === msg.id
-
-            return (
-              <div key={msg.id} className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
-                {/* Message header */}
-                <div className="p-4 sm:p-5">
-                  <div className="flex gap-3">
-                    {/* Type icon */}
-                    <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-lg ${cfg.bg}`}>
-                      {cfg.icon}
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <h3 className="text-sm font-semibold text-text leading-tight">{msg.title}</h3>
-                        <span className="text-xs text-text-muted whitespace-nowrap flex-shrink-0">
-                          {formatRelativeTime(msg.created_at)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-text-muted leading-relaxed">{msg.content}</p>
-
-                      {/* ── Feature 1: Photo thumbnails in message view ── */}
-                      {msg.type === 'photo' && msg.attachments && msg.attachments.length > 0 && (
-                        <div className="mt-3 flex gap-2 flex-wrap">
-                          {msg.attachments.map((att, idx) => (
-                            <a
-                              key={idx}
-                              href={att.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="block w-16 h-16 rounded-lg overflow-hidden border border-border flex-shrink-0"
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={att.url}
-                                alt={att.name}
-                                className="w-full h-full object-cover hover:opacity-80 transition-opacity"
-                              />
-                            </a>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* ── Feature 3: Exam score cards in tip view ── */}
-                      {msg.type === 'tip' && msg.examScores && msg.examScores.length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-xs text-text-muted mb-1.5 font-medium">本次考試成績</p>
-                          <div className="flex flex-wrap gap-2">
-                            {msg.examScores.map((s, idx) => {
-                              const pct = Math.round((s.score / s.fullScore) * 100)
-                              const color =
-                                pct >= 90 ? 'bg-green-100 text-green-700' :
-                                pct >= 70 ? 'bg-morandi-gold/20 text-morandi-gold' :
-                                'bg-red-100 text-red-600'
-                              return (
-                                <div
-                                  key={idx}
-                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${color}`}
-                                >
-                                  <span>{s.subject}</span>
-                                  <span className="font-bold">{s.score}</span>
-                                  <span className="opacity-60">/ {s.fullScore}</span>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Meta row */}
-                      <div className="flex items-center gap-3 mt-3 flex-wrap">
-                        <span className="text-xs bg-background px-2 py-1 rounded-md text-text-muted">
-                          {msg.class_name}
-                        </span>
-                        {msg.student_name && (
-                          <span className="text-xs bg-background px-2 py-1 rounded-md text-text-muted">
-                            {msg.student_name}
-                          </span>
-                        )}
-
-                        {/* Read rate */}
-                        <div className="flex items-center gap-1.5 ml-auto">
-                          <div className="w-16 h-1.5 bg-border rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-morandi-sage rounded-full transition-all"
-                              style={{ width: `${readPct}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-text-muted">
-                            {msg.read_count}/{msg.total_count} 已讀
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">今日團體課程進度</label>
+                  <TextArea
+                    placeholder="今天上課到哪裡..."
+                    value={groupProgress}
+                    onChange={setGroupProgress}
+                  />
                 </div>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">全體共同作業</label>
+                  <TextArea
+                    placeholder="回家作業、複習範圍..."
+                    value={groupHomework}
+                    onChange={setGroupHomework}
+                  />
+                </div>
+              </div>
+            </SectionCard>
 
-                {/* Replies section */}
-                {(msg.replies.length > 0 || activeTab === 'feedback') && (
-                  <div className="border-t border-border">
-                    {msg.replies.length > 0 && (
-                      <div className="px-4 sm:px-5 py-3 space-y-3">
-                        {msg.replies.map(reply => (
-                          <div key={reply.id} className={`flex gap-2.5 ${reply.is_teacher ? 'flex-row-reverse' : ''}`}>
-                            <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs ${
-                              reply.is_teacher ? 'bg-primary/10 text-primary' : 'bg-morandi-rose/10 text-morandi-rose'
-                            }`}>
-                              {reply.is_teacher ? '師' : '家'}
-                            </div>
-                            <div className={`max-w-[75%] ${reply.is_teacher ? 'items-end' : 'items-start'} flex flex-col`}>
-                              <div className="flex items-center gap-1.5 mb-1">
-                                <span className="text-xs text-text-muted">{reply.author_name}</span>
-                                <span className="text-xs text-text-muted/60">{formatRelativeTime(reply.created_at)}</span>
-                              </div>
-                              {/* ── Feature 2: Show rating stars on existing replies ── */}
-                              {!reply.is_teacher && reply.rating != null && reply.rating > 0 && (
-                                <div className="mb-1">
-                                  <StarRating value={reply.rating} readonly size="sm" />
-                                </div>
-                              )}
-                              <div className={`px-3 py-2 rounded-xl text-sm leading-relaxed ${
-                                reply.is_teacher
-                                  ? 'bg-primary/10 text-primary'
-                                  : 'bg-surface-hover text-text'
-                              }`}>
-                                {reply.content}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+            {/* Section 2: 個別指導與加強 */}
+            <SectionCard icon="🎯" title="個別指導與加強">
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">個別學習說明</label>
+                  <TextArea
+                    placeholder={`針對 ${selectedStudent.name} 的個別進度說明...`}
+                    value={individualProgress}
+                    onChange={setIndividualProgress}
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">個別專屬作業</label>
+                  <TextArea
+                    placeholder="針對個人弱點的補強作業..."
+                    value={individualHomework}
+                    onChange={setIndividualHomework}
+                  />
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void generateAiAnalysis()}
+                  disabled={aiLoading}
+                >
+                  {aiLoading ? '分析中...' : '🤖 載入歷史弱點建議'}
+                </Button>
+              </div>
+            </SectionCard>
 
-                    {/* Reply input area */}
-                    <div className="px-4 sm:px-5 py-3 border-t border-border/50">
-                      {isReplyExpanded ? (
-                        msg.type === 'feedback' ? (
-                          /* ── Feature 2: Star rating reply for feedback ── */
-                          <div className="space-y-3">
-                            <div>
-                              <p className="text-xs text-text-muted mb-2 font-medium">家長評分</p>
-                              <StarRating
-                                value={pendingRatings[msg.id] ?? 0}
-                                onChange={v => setPendingRatings(prev => ({ ...prev, [msg.id]: v }))}
-                              />
-                            </div>
-                            <textarea
-                              value={pendingRatingText[msg.id] ?? ''}
-                              onChange={e => setPendingRatingText(prev => ({ ...prev, [msg.id]: e.target.value }))}
-                              placeholder="填寫評分說明（選填）..."
-                              rows={2}
-                              className="w-full px-3 py-2 border border-border rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
-                            />
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleRatingReply(msg.id)}
-                                disabled={replySubmitting === msg.id || !pendingRatings[msg.id]}
-                                className="flex-1 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                              >
-                                {replySubmitting === msg.id ? '送出中...' : '送出評分'}
-                              </button>
-                              <button
-                                onClick={() => setExpandedReply(null)}
-                                className="px-4 py-2 border border-border rounded-xl text-sm text-text-muted hover:bg-surface transition-colors"
-                              >
-                                取消
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          /* Regular reply input */
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={replyText[msg.id] || ''}
-                              onChange={e => setReplyText(prev => ({ ...prev, [msg.id]: e.target.value }))}
-                              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReply(msg.id) } }}
-                              placeholder="輸入回覆內容..."
-                              autoFocus
-                              className="flex-1 px-3 py-2 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                            />
-                            <button
-                              onClick={() => handleReply(msg.id)}
-                              disabled={replySubmitting === msg.id || !replyText[msg.id]?.trim()}
-                              className="px-3 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors whitespace-nowrap"
-                            >
-                              {replySubmitting === msg.id ? '...' : '送出'}
-                            </button>
-                            <button
-                              onClick={() => setExpandedReply(null)}
-                              className="px-3 py-2 border border-border rounded-xl text-sm text-text-muted hover:bg-surface transition-colors"
-                            >
-                              取消
-                            </button>
-                          </div>
-                        )
-                      ) : (
-                        <button
-                          onClick={() => setExpandedReply(msg.id)}
-                          className="text-sm text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
-                        >
-                          <span>{msg.type === 'feedback' ? '⭐' : '💬'}</span>
-                          <span>{msg.type === 'feedback' ? '評分回覆' : '回覆家長'}</span>
-                        </button>
-                      )}
+            {/* Section 3: 考試成績 */}
+            <SectionCard
+              icon="📊"
+              title="今日考試成績錄入"
+              hint="填寫完成後將同步更新至成績管理中心"
+            >
+              {/* Existing scores */}
+              {examScores.length > 0 && (
+                <div className="space-y-2 mb-3">
+                  {examScores.map((sc, i) => (
+                    <div key={i} className="flex items-center gap-2 bg-background rounded-lg px-3 py-2 text-sm">
+                      <span className="font-medium text-text flex-1">{sc.subject}</span>
+                      <span className="text-primary font-semibold">{sc.score} 分</span>
+                      <span className="text-text-muted text-xs">均 {sc.classAvg}</span>
+                      <button
+                        className="text-text-muted hover:text-red-500 ml-1"
+                        onClick={() => removeExamScore(i)}
+                      >
+                        ✕
+                      </button>
                     </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add score row */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="text"
+                  placeholder="科目"
+                  value={newExamSubject}
+                  onChange={(e) => setNewExamSubject(e.target.value)}
+                  className="flex-1 min-w-[80px] rounded-lg border border-border bg-background px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <input
+                  type="number"
+                  placeholder="分數"
+                  value={newExamScore}
+                  onChange={(e) => setNewExamScore(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-20 rounded-lg border border-border bg-background px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <input
+                  type="number"
+                  placeholder="班平均"
+                  value={newExamClassAvg}
+                  onChange={(e) => setNewExamClassAvg(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <button
+                  onClick={addExamScore}
+                  disabled={!newExamSubject.trim() || newExamScore === '' || newExamClassAvg === ''}
+                  className="w-9 h-9 rounded-lg bg-primary text-white flex items-center justify-center text-lg font-bold disabled:opacity-40 hover:bg-primary/90 transition-colors"
+                >
+                  +
+                </button>
+              </div>
+            </SectionCard>
+
+            {/* Section 4: 親師通訊小叮嚀 */}
+            <SectionCard icon="💡" title="親師通訊小叮嚀">
+              <TextArea
+                placeholder="想對家長說的話..."
+                value={teacherNote}
+                onChange={setTeacherNote}
+                rows={4}
+              />
+            </SectionCard>
+
+            {/* Section 5: 今日學習剪影 */}
+            <SectionCard icon="📸" title="今日學習剪影">
+              {/* Upload area */}
+              {photos.length < 5 && (
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`
+                    border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors
+                    ${isDragOver
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50 hover:bg-surface-hover'}
+                  `}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        void uploadPhotos(e.target.files)
+                      }
+                    }}
+                  />
+                  {uploadingPhoto ? (
+                    <div className="flex items-center justify-center gap-2 text-text-muted">
+                      <div className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                      <span className="text-sm">上傳中...</span>
+                    </div>
+                  ) : (
+                    <div className="text-text-muted space-y-1">
+                      <div className="text-3xl">📁</div>
+                      <p className="text-sm">拖曳或點擊上傳照片</p>
+                      <p className="text-xs">最多 5 張（剩餘 {5 - photos.length} 張）</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Photo grid */}
+              {photos.length > 0 && (
+                <div className="grid grid-cols-3 gap-2 mt-3">
+                  {photos.map((photo) => (
+                    <div key={photo.id} className="relative group rounded-lg overflow-hidden aspect-square bg-border/20">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={photo.url}
+                        alt={photo.name}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        onClick={() => void deletePhoto(photo.id)}
+                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SectionCard>
+
+            {/* Section 6: AI 智能分析建議 */}
+            <SectionCard icon="🤖" title="AI 智能分析建議">
+              {!aiAnalysis && !aiLoading && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void generateAiAnalysis()}
+                >
+                  生成 AI 分析
+                </Button>
+              )}
+              {aiLoading && (
+                <div className="space-y-2">
+                  <SkeletonLines count={4} />
+                </div>
+              )}
+              {aiAnalysis && !aiLoading && (
+                <div className="space-y-3">
+                  <div className="bg-morandi-sage/10 rounded-lg px-4 py-3">
+                    <p className="text-sm font-medium text-morandi-sage mb-1">弱點摘要</p>
+                    <p className="text-sm text-text">{aiAnalysis.weakSummary}</p>
+                  </div>
+                  {aiAnalysis.recommendations.length > 0 && (
+                    <div>
+                      <p className="text-xs text-text-muted mb-2">推薦加強項目</p>
+                      <ul className="space-y-1">
+                        {aiAnalysis.recommendations.map((r, i) => (
+                          <li key={i} className="text-sm text-text flex items-start gap-2">
+                            <span className="text-morandi-gold mt-0.5">•</span>
+                            <span>{r}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const combined = [aiAnalysis.weakSummary, ...aiAnalysis.recommendations].join('\n')
+                      setTeacherNote((prev) => prev ? `${prev}\n\n${combined}` : combined)
+                      toast.success('已加入聯絡簿推薦項目')
+                    }}
+                  >
+                    加入聯絡簿推薦項目
+                  </Button>
+                </div>
+              )}
+            </SectionCard>
+
+            {/* Section 7: 最新家長反饋 */}
+            {selectedStudent.entry?.parentFeedback && (
+              <SectionCard icon="💬" title="最新家長反饋">
+                <div className="bg-background rounded-lg px-4 py-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Rating
+                      value={selectedStudent.entry.parentFeedback.rating}
+                      readOnly
+                      size="sm"
+                    />
+                    <span className="text-xs text-text-muted">
+                      {new Date(selectedStudent.entry.parentFeedback.createdAt).toLocaleDateString('zh-TW')}
+                    </span>
+                  </div>
+                  {selectedStudent.entry.parentFeedback.comment && (
+                    <p className="text-sm text-text">{selectedStudent.entry.parentFeedback.comment}</p>
+                  )}
+                </div>
+              </SectionCard>
+            )}
+
+            {/* Manual save button */}
+            <div className="flex justify-end pb-4">
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={savingEntry}
+                onClick={() => void saveEntry(true)}
+              >
+                {savingEntry ? '儲存中...' : '💾 手動儲存'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* ── Class Progress Modal ── */}
+      <Modal
+        isOpen={classProgressModalOpen}
+        onClose={() => setClassProgressModalOpen(false)}
+        title="班級進度設定"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text-muted">設定後將套用到所有學生的聯絡簿</p>
+          <div>
+            <label className="block text-sm font-medium text-text mb-1">今日團體課程進度</label>
+            <textarea
+              rows={4}
+              value={modalGroupProgress}
+              onChange={(e) => setModalGroupProgress(e.target.value)}
+              placeholder="今天全班上課到哪裡..."
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text mb-1">全體共同作業</label>
+            <textarea
+              rows={4}
+              value={modalGroupHomework}
+              onChange={(e) => setModalGroupHomework(e.target.value)}
+              placeholder="全體回家作業、複習範圍..."
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setClassProgressModalOpen(false)}>
+              取消
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => void saveClassProgress()}>
+              儲存並套用到所有學生
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Preview Modal (Parent view) ── */}
+      <Modal
+        isOpen={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        title={`家長版預覽 — ${selectedStudent?.name ?? ''}`}
+        size="xl"
+      >
+        {selectedStudent && (
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+            {/* Header card */}
+            <div className="bg-gradient-to-br from-morandi-sage/20 to-morandi-blue/20 rounded-xl p-4 text-center">
+              <div className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center text-2xl font-bold mb-2 ${avatarColor(selectedStudent.name)}`}>
+                {selectedStudent.name.charAt(0)}
+              </div>
+              <h3 className="font-bold text-text text-lg">{selectedStudent.name}</h3>
+              <p className="text-text-muted text-sm">{selectedDate} 學習日報</p>
+            </div>
+
+            {/* Exam scores */}
+            {examScores.length > 0 && (
+              <div className="bg-surface rounded-xl p-4">
+                <h4 className="font-semibold text-text mb-3">📊 今日學習成就</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {examScores.map((sc, i) => (
+                    <div key={i} className="bg-background rounded-lg p-3 text-center">
+                      <p className="text-xs text-text-muted">{sc.subject}</p>
+                      <p className="text-2xl font-bold text-primary">{sc.score}</p>
+                      <p className="text-xs text-text-muted">班級平均 {sc.classAvg}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Progress */}
+            {(groupProgress || individualProgress) && (
+              <div className="bg-surface rounded-xl p-4 space-y-3">
+                <h4 className="font-semibold text-text">📈 今日課表與進度</h4>
+                {groupProgress && (
+                  <div>
+                    <p className="text-xs text-text-muted mb-1">全班課程進度</p>
+                    <p className="text-sm text-text whitespace-pre-wrap">{groupProgress}</p>
                   </div>
                 )}
-
-                {/* ── Feature 4: AI Recommendations (per-student messages only) ── */}
-                {msg.student_name && (
-                  <AiRecommendationsBlock studentId={msg.id} />
+                {individualProgress && (
+                  <div>
+                    <p className="text-xs text-text-muted mb-1">個別學習說明</p>
+                    <p className="text-sm text-text whitespace-pre-wrap">{individualProgress}</p>
+                  </div>
                 )}
               </div>
-            )
-          })}
+            )}
+
+            {/* Homework */}
+            {(groupHomework || individualHomework) && (
+              <div className="bg-surface rounded-xl p-4 space-y-3">
+                <h4 className="font-semibold text-text">📝 今日作業</h4>
+                {groupHomework && (
+                  <div>
+                    <p className="text-xs text-text-muted mb-1">共同作業</p>
+                    <p className="text-sm text-text whitespace-pre-wrap">{groupHomework}</p>
+                  </div>
+                )}
+                {individualHomework && (
+                  <div>
+                    <p className="text-xs text-text-muted mb-1">個別作業</p>
+                    <p className="text-sm text-text whitespace-pre-wrap">{individualHomework}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Photos */}
+            {photos.length > 0 && (
+              <div className="bg-surface rounded-xl p-4">
+                <h4 className="font-semibold text-text mb-3">📸 學習剪影</h4>
+                <div className="grid grid-cols-3 gap-2">
+                  {photos.map((photo) => (
+                    <div key={photo.id} className="rounded-lg overflow-hidden aspect-square">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={photo.url} alt={photo.name} className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Teacher note */}
+            {teacherNote && (
+              <div className="bg-morandi-gold/10 rounded-xl p-4">
+                <h4 className="font-semibold text-morandi-gold mb-2">💡 老師的小叮嚀</h4>
+                <p className="text-sm text-text whitespace-pre-wrap">{teacherNote}</p>
+              </div>
+            )}
+
+            {/* AI recommendations */}
+            {aiAnalysis && (
+              <div className="bg-morandi-sage/10 rounded-xl p-4">
+                <h4 className="font-semibold text-morandi-sage mb-2">🤖 AI 學習建議</h4>
+                <p className="text-sm text-text mb-2">{aiAnalysis.weakSummary}</p>
+                {aiAnalysis.recommendations.length > 0 && (
+                  <ul className="space-y-1">
+                    {aiAnalysis.recommendations.map((r, i) => (
+                      <li key={i} className="text-sm text-text flex items-start gap-2">
+                        <span className="text-morandi-sage">•</span>
+                        <span>{r}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Send Confirm Modal ── */}
+      <Modal
+        isOpen={sendConfirmOpen}
+        onClose={() => setSendConfirmOpen(false)}
+        title="確認發送"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text">
+            確定要正式發送 <strong>{selectedStudent?.name}</strong> 的聯絡簿給家長嗎？發送後家長即可查看。
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setSendConfirmOpen(false)}>
+              取消
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={sendingEntry}
+              onClick={() => void sendEntry()}
+            >
+              {sendingEntry ? '發送中...' : '確認發送'}
+            </Button>
+          </div>
         </div>
-      )}
+      </Modal>
     </div>
   )
 }

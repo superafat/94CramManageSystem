@@ -84,11 +84,17 @@ app.post('/bind', async (c) => {
 
     const matched = candidates[0]
 
-    // Bind the LINE user ID
-    await db
-      .update(users)
-      .set({ lineUserId: line_user_id, updatedAt: sql`NOW()` })
-      .where(eq(users.id, matched.id))
+    // Atomic bind: only if still unbound (prevents TOCTOU race)
+    const bindResult = await db.execute(sql`
+      UPDATE users
+      SET line_user_id = ${line_user_id}, updated_at = NOW()
+      WHERE id = ${matched.id} AND line_user_id IS NULL
+      RETURNING id
+    `)
+    const bound = Array.isArray(bindResult) ? bindResult : []
+    if (bound.length === 0) {
+      return c.json({ success: false, error: 'race_condition', message: '綁定失敗，帳號已被綁定，請重試' })
+    }
 
     return c.json({
       success: true,
@@ -117,7 +123,8 @@ app.get('/conversations', async (c) => {
     const limit = Math.min(Math.max(1, Number(limitParam) || 10), 50)
 
     const rows = await db.execute(sql`
-      SELECT * FROM line_conversations
+      SELECT id, line_user_id, user_name, user_role, user_message, bot_reply, intent, model, latency_ms, created_at
+      FROM line_conversations
       WHERE line_user_id = ${line_user_id}
       ORDER BY created_at DESC
       LIMIT ${limit}

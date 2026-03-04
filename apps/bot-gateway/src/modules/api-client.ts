@@ -20,29 +20,44 @@ export interface BotApiResponse {
   suggestions?: Array<Record<string, unknown>>;
 }
 
-export async function callBotApi(
+async function callBotApiBase(
   service: ServiceName,
+  method: 'GET' | 'POST',
   path: string,
-  body: Record<string, unknown>
+  options?: { body?: Record<string, unknown>; query?: Record<string, string | number> }
 ): Promise<BotApiResponse> {
   const baseUrl = SERVICES[service];
   const prefix = service === 'manage' ? '/api/bot-ext' : '/api/bot';
-  const url = `${baseUrl}${prefix}${path}`;
+  let url = `${baseUrl}${prefix}${path}`;
+
+  if (options?.query) {
+    const params = new URLSearchParams(
+      Object.entries(options.query).map(([k, v]) => [k, String(v)])
+    ).toString();
+    if (params) url += `?${params}`;
+  }
 
   try {
     const client = await auth.getIdTokenClient(baseUrl);
     const res = await client.request<BotApiResponse>({
       url,
-      method: 'POST',
-      data: body,
-      headers: { 'Content-Type': 'application/json' },
+      method,
+      ...(options?.body ? { data: options.body, headers: { 'Content-Type': 'application/json' } } : {}),
     });
     return res.data;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown API error';
-    logger.error({ err: error instanceof Error ? error : new Error(message) }, `[API Client] ${service}${path} failed`)
+    logger.error({ err: error instanceof Error ? error : new Error(message) }, `[API Client] ${method} ${service}${path} failed`);
     return { success: false, error: 'api_error', message };
   }
+}
+
+export async function callBotApi(
+  service: ServiceName,
+  path: string,
+  body: Record<string, unknown>
+): Promise<BotApiResponse> {
+  return callBotApiBase(service, 'POST', path, { body });
 }
 
 export async function callBotApiGet(
@@ -50,23 +65,5 @@ export async function callBotApiGet(
   path: string,
   query: Record<string, string | number>
 ): Promise<BotApiResponse> {
-  const baseUrl = SERVICES[service];
-  const prefix = service === 'manage' ? '/api/bot-ext' : '/api/bot';
-  const params = new URLSearchParams(
-    Object.entries(query).map(([k, v]) => [k, String(v)])
-  ).toString();
-  const url = `${baseUrl}${prefix}${path}${params ? `?${params}` : ''}`;
-
-  try {
-    const client = await auth.getIdTokenClient(baseUrl);
-    const res = await client.request<BotApiResponse>({
-      url,
-      method: 'GET',
-    });
-    return res.data;
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown API error';
-    logger.error({ err: error instanceof Error ? error : new Error(message) }, `[API Client] ${service}${path} GET failed`)
-    return { success: false, error: 'api_error', message };
-  }
+  return callBotApiBase(service, 'GET', path, { query });
 }

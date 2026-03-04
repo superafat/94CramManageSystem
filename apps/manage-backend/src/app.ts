@@ -14,10 +14,12 @@ import { w8Routes } from './routes/w8/index'
 import { teacherAttendanceRoutes } from './routes/teacher-attendance'
 import notificationRoutes from './routes/notifications'
 import lineRoutes from './routes/line'
+import liffContactBookRoutes from './routes/line/contact-book'
 import { errorTestRoutes } from './routes/error-test'
 import { healthRoutes } from './routes/health'
 import internalRoutes from './routes/internal'
 import parentExtRoutes from './routes/parent-ext'
+import { parentRoutes } from './routes/parent'
 import botExtRoutes from './routes/bot-ext'
 import { errorHandler } from './middleware/errorHandler'
 import { tenantMiddleware } from './middleware/tenant'
@@ -143,6 +145,9 @@ app.route('/api/parent-ext', parentExtRoutes)
 // LINE webhook (public, no auth, no tenant middleware)
 app.route('/api/line', lineRoutes)
 
+// LINE LIFF API (LINE token auth via middleware inside the router)
+app.route('/api/line/contact-book', liffContactBookRoutes)
+
 // Bot routes — require bot API key in production
 if (process.env.NODE_ENV === 'production') {
   app.use('/api/bot/*', async (c, next) => {
@@ -176,6 +181,9 @@ app.route('/api', usersRoutes)
 
 // Demo fallback (for /admin legacy path without /api prefix)
 app.route('/admin', demoRoutes)
+
+// Parent: 家長端 JWT 認證 API
+app.route('/api/parent', parentRoutes)
 
 // W8: 講師排課 + 薪資系統 (JWT + RBAC protected)
 app.route('/api/w8', w8Routes)

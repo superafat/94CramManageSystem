@@ -120,6 +120,10 @@ teacherRoutes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER),
     try {
       const { id } = c.req.valid('param')
       const body = c.req.valid('json')
+      const user = c.get('user')
+      if (!user?.tenant_id) {
+        return badRequest(c, 'Missing tenant context')
+      }
 
       const result = await db.execute(sql`
         UPDATE teachers
@@ -144,7 +148,7 @@ teacherRoutes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER),
             subjects = COALESCE(${body.subjects ? sql`${body.subjects}::text[]` : null}, subjects),
             grade_levels = COALESCE(${body.gradeLevels ? sql`${body.gradeLevels}::text[]` : null}, grade_levels),
             updated_at = NOW()
-        WHERE id = ${id}
+        WHERE id = ${id} AND tenant_id = ${user.tenant_id}
         RETURNING *
       `)
 
@@ -164,11 +168,15 @@ teacherRoutes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER),
 teacherRoutes.delete('/teachers/:id', requireRole(Role.ADMIN), zValidator('param', z.object({ id: uuidSchema })), async (c) => {
   try {
     const { id } = c.req.valid('param')
+    const user = c.get('user')
+    if (!user?.tenant_id) {
+      return badRequest(c, 'Missing tenant context')
+    }
 
     // Soft delete
     const result = await db.execute(sql`
       UPDATE teachers SET deleted_at = NOW(), status = 'resigned'
-      WHERE id = ${id} AND deleted_at IS NULL
+      WHERE id = ${id} AND tenant_id = ${user.tenant_id} AND deleted_at IS NULL
       RETURNING *
     `)
 

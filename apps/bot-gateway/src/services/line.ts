@@ -3,7 +3,7 @@
  * 提供 signature 驗證、Reply/Push 訊息發送、取得用戶資料
  */
 
-import { createHmac } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { logger } from '../utils/logger';
 
 const LINE_API_BASE = 'https://api.line.me/v2/bot';
@@ -79,10 +79,42 @@ export function verifyLineSignature(body: string, signature: string, channelSecr
       .digest('base64');
 
     // 使用常數時間比較防止 timing attack
-    return hash.length === signature.length && hash === signature;
+    if (hash.length !== signature.length) return false;
+    return timingSafeEqual(Buffer.from(hash), Buffer.from(signature));
   } catch (error) {
     logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[LINE] Signature verification error');
     return false;
+  }
+}
+
+function validateMessages(messages: LineMessage[]): boolean {
+  if (!Array.isArray(messages) || messages.length === 0 || messages.length > 5) {
+    logger.error('[LINE] Messages must be array with 1-5 items');
+    return false;
+  }
+  return true;
+}
+
+async function sendLineMessage(endpoint: string, payload: Record<string, unknown>): Promise<void> {
+  const accessToken = getLineAccessToken();
+  if (!accessToken) return;
+
+  try {
+    const response = await fetch(`${LINE_API_BASE}/message/${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      logger.error({ status: response.status, body: errorBody }, `[LINE] ${endpoint} API error`);
+    }
+  } catch (error) {
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, `[LINE] ${endpoint} error`);
   }
 }
 
@@ -98,32 +130,8 @@ export async function sendLineReplyMessage(
     logger.error('[LINE] Invalid replyToken');
     return;
   }
-
-  if (!Array.isArray(messages) || messages.length === 0 || messages.length > 5) {
-    logger.error('[LINE] Messages must be array with 1-5 items');
-    return;
-  }
-
-  const accessToken = getLineAccessToken();
-  if (!accessToken) return;
-
-  try {
-    const response = await fetch(`${LINE_API_BASE}/message/reply`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ replyToken, messages }),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      logger.error({ status: response.status, body: errorBody }, '[LINE] Reply API error');
-    }
-  } catch (error) {
-    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[LINE] Reply error');
-  }
+  if (!validateMessages(messages)) return;
+  await sendLineMessage('reply', { replyToken, messages });
 }
 
 /**
@@ -138,32 +146,8 @@ export async function sendLinePushMessage(
     logger.error('[LINE] Invalid recipient userId');
     return;
   }
-
-  if (!Array.isArray(messages) || messages.length === 0 || messages.length > 5) {
-    logger.error('[LINE] Messages must be array with 1-5 items');
-    return;
-  }
-
-  const accessToken = getLineAccessToken();
-  if (!accessToken) return;
-
-  try {
-    const response = await fetch(`${LINE_API_BASE}/message/push`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ to, messages }),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      logger.error({ status: response.status, body: errorBody }, '[LINE] Push API error');
-    }
-  } catch (error) {
-    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[LINE] Push error');
-  }
+  if (!validateMessages(messages)) return;
+  await sendLineMessage('push', { to, messages });
 }
 
 /**

@@ -151,14 +151,17 @@ lineWebhook.post('/', async (c) => {
     const events = body.events.slice(0, 100);
 
     // Process events asynchronously to respond quickly to LINE
-    for (const event of events) {
-      if (event && typeof event === 'object' && event.type) {
-        setTimeout(() => {
-          processLineEvent(event).catch((err: unknown) => {
-            logger.error({ err: err instanceof Error ? err : new Error(String(err)) }, '[LINE] Event processing error');
-          });
-        }, 0);
-      }
+    const validEvents = events.filter(
+      (e): e is LineEvent => e != null && typeof e === 'object' && typeof e.type === 'string'
+    );
+    if (validEvents.length > 0) {
+      void Promise.allSettled(validEvents.map((e) => processLineEvent(e))).then((results) => {
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            logger.error({ err: r.reason instanceof Error ? r.reason : new Error(String(r.reason)) }, '[LINE] Event processing error');
+          }
+        }
+      });
     }
 
     return c.json({ ok: true });

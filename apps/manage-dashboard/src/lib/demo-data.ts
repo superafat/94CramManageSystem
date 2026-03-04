@@ -304,16 +304,118 @@ const TEACHER_ATTENDANCE = [
   { id: 'ta-10', teacher_id: 't1', teacher_name: '王老師', role: '資深講師', date: '2026-02-27', status: 'leave', check_in_time: null, check_out_time: null, leave_type: 'personal', leave_reason: '家庭事務', substitute_teacher_id: null, approved: false, notes: '待審核' },
 ]
 
-// ===== Contact Book Messages (電子聯絡簿) =====
-const CONTACT_MESSAGES = [
-  { id: 'cm-1', course_id: 'c1', course_name: '國中數學 A 班', class_name: '國中數學 A 班', student_id: null, student_name: null, teacher_id: 't1', teacher_name: '王老師', type: 'progress', title: '本週學習進度：一元二次方程式', content: '本週進入一元二次方程式，同學們掌握度約 80%。配合講義 P.45-52 練習，下週將進行隨堂測驗。建議回家多練習例題 5-8。', attachments: [], read_count: 4, total_count: 5, replies: [{ id: 'r-cm1', author_name: '陳媽媽', content: '收到，會督促小利複習！', created_at: '2026-03-03T20:00:00Z', is_teacher: false }], created_at: '2026-03-03T16:00:00Z' },
-  { id: 'cm-2', course_id: 'c1', course_name: '國中數學 A 班', class_name: '國中數學 A 班', student_id: 's1', student_name: '陳小利', teacher_id: 't1', teacher_name: '王老師', type: 'tip', title: '小叮嚀：考試準備', content: '陳小利上課很認真，但計算偶爾粗心。建議考前多做驗算練習，特別是「移項」步驟要仔細。加油！', attachments: [], read_count: 1, total_count: 1, replies: [], created_at: '2026-03-02T17:30:00Z' },
-  { id: 'cm-3', course_id: 'c1', course_name: '國中數學 A 班', class_name: '國中數學 A 班', student_id: null, student_name: null, teacher_id: 't1', teacher_name: '王老師', type: 'homework', title: '作業通知：數學講義 P.48-50', content: '請完成講義第 48-50 頁的所有練習題，下週二上課前繳交。題目不懂可以在 LINE 群組問。', attachments: [], read_count: 3, total_count: 5, replies: [], created_at: '2026-03-01T20:15:00Z' },
-  { id: 'cm-4', course_id: 'c2', course_name: '國中英文菁英班', class_name: '國中英文菁英班', student_id: null, student_name: null, teacher_id: 't2', teacher_name: '李老師', type: 'photo', title: '課堂花絮：英文話劇排練', content: '今天的英文話劇排練，同學們都很投入！附上幾張照片，歡迎家長分享。', attachments: [{ url: '/demo/photo1.jpg', name: '話劇排練1.jpg', type: 'image' }, { url: '/demo/photo2.jpg', name: '話劇排練2.jpg', type: 'image' }], read_count: 3, total_count: 4, replies: [{ id: 'r-cm4', author_name: '林爸爸', content: '好棒！孩子回家說今天很開心', created_at: '2026-02-28T21:00:00Z', is_teacher: false }, { id: 'r-cm4b', author_name: '李老師', content: '謝謝家長的支持！', created_at: '2026-02-28T22:00:00Z', is_teacher: true }], created_at: '2026-02-28T19:00:00Z' },
-  { id: 'cm-5', course_id: 'c1', course_name: '國中數學 A 班', class_name: '國中數學 A 班', student_id: 's4', student_name: '張志豪', teacher_id: 't1', teacher_name: '王老師', type: 'progress', title: '個別學習報告：數學基礎加強', content: '張志豪近期數學有進步，從 58 分提升到 64 分。但一元二次方程式仍需加強。建議每天多做 5 題基礎練習，預計 2 週可見成效。', attachments: [], read_count: 1, total_count: 1, replies: [], created_at: '2026-02-27T16:45:00Z' },
-  { id: 'cm-6', course_id: 'c1', course_name: '國中數學 A 班', class_name: '國中數學 A 班', student_id: 's4', student_name: '張志豪', teacher_id: null, teacher_name: null, type: 'feedback', title: '家長回覆：謝謝老師', content: '謝謝王老師的用心！志豪回家也有提到數學變好理解了。我們會督促他每天練習，有問題再請教。', attachments: [], read_count: 1, total_count: 1, replies: [{ id: 'r-cm6', author_name: '王老師', content: '謝謝家長的配合，志豪一定會越來越好！', created_at: '2026-02-28T09:00:00Z', is_teacher: true }], created_at: '2026-02-27T21:00:00Z' },
-  { id: 'cm-7', course_id: 'c2', course_name: '國中英文菁英班', class_name: '國中英文菁英班', student_id: 's8', student_name: '吳承恩', teacher_id: 't2', teacher_name: '李老師', type: 'tip', title: '出勤提醒', content: '吳承恩近期缺課較多（本月已缺 3 次），請家長留意孩子的上課狀況。如有困難歡迎與老師溝通。', attachments: [], read_count: 0, total_count: 1, replies: [], created_at: '2026-02-26T14:30:00Z' },
-  { id: 'cm-8', course_id: 'c6', course_name: '安親班（國小）', class_name: '安親班（國小）', student_id: 's5', student_name: '李宜庭', teacher_id: 't4', teacher_name: '林助教', type: 'progress', title: '安親班學習報告', content: '李宜庭今天完成了數學和國語作業，表現很棒！國語閱讀測驗答對 9/10，數學作業全部正確。', attachments: [], read_count: 1, total_count: 1, replies: [], created_at: '2026-03-03T16:30:00Z' },
+// ===== Contact Book v2 (電子聯絡簿 v2) =====
+const CONTACT_BOOK_ENTRIES = [
+  {
+    id: 'cb-1', studentId: 's1', studentName: '陳小利', courseId: 'c1', courseName: '國中數學 A 班',
+    date: '2026-03-05', status: 'read' as const,
+    groupProgress: '本週進入一元二次方程式，同學們掌握度約 80%。配合講義 P.45-52 練習。',
+    groupHomework: '數學講義 P.48-50 所有練習題，下週二前繳交。',
+    individualProgress: '小利上課認真，但計算偶爾粗心。建議考前多做驗算練習。',
+    individualHomework: '額外練習：講義 P.51 進階題 1-5。',
+    teacherNote: '小利最近進步很多，繼續保持！考前記得多練習移項步驟。',
+    examScores: [
+      { id: 'es-1', subject: '數學', score: 88, classAvg: 75, fullScore: 100 },
+      { id: 'es-2', subject: '英文', score: 72, classAvg: 78, fullScore: 100 },
+    ],
+    photos: [
+      { id: 'ph-1', url: 'https://placehold.co/400x300/e8dfd5/6b5e50?text=課堂照片1', name: '課堂互動.jpg' },
+      { id: 'ph-2', url: 'https://placehold.co/400x300/d5dfe8/50596b?text=課堂照片2', name: '小組討論.jpg' },
+    ],
+    parentFeedback: { rating: 5, comment: '收到，會督促小利複習！謝謝老師用心！', createdAt: '2026-03-05T20:00:00Z' },
+    aiAnalysis: { weakSummary: '英文科目表現略低於班級平均，建議加強單字量與文法練習。', recommendations: ['加強英文文法練習', '每日背誦 10 個新單字', '建議報名英文加強班'] },
+    sentAt: '2026-03-05T16:30:00Z', readAt: '2026-03-05T19:45:00Z', createdAt: '2026-03-05T15:00:00Z',
+  },
+  {
+    id: 'cb-2', studentId: 's2', studentName: '林小美', courseId: 'c1', courseName: '國中數學 A 班',
+    date: '2026-03-05', status: 'sent' as const,
+    groupProgress: '本週進入一元二次方程式，同學們掌握度約 80%。配合講義 P.45-52 練習。',
+    groupHomework: '數學講義 P.48-50 所有練習題，下週二前繳交。',
+    individualProgress: '小美理解力佳，但速度略慢。建議多做限時練習提升答題速度。',
+    individualHomework: '限時練習：20 分鐘內完成講義 P.49 計算題。',
+    teacherNote: '小美上課很專注，答題品質很高，再加強速度就完美了！',
+    examScores: [
+      { id: 'es-3', subject: '數學', score: 92, classAvg: 75, fullScore: 100 },
+      { id: 'es-4', subject: '英文', score: 95, classAvg: 78, fullScore: 100 },
+    ],
+    photos: [],
+    parentFeedback: null,
+    aiAnalysis: null,
+    sentAt: '2026-03-05T16:30:00Z', readAt: null, createdAt: '2026-03-05T15:00:00Z',
+  },
+  {
+    id: 'cb-3', studentId: 's4', studentName: '張志豪', courseId: 'c1', courseName: '國中數學 A 班',
+    date: '2026-03-05', status: 'draft' as const,
+    groupProgress: '本週進入一元二次方程式，同學們掌握度約 80%。配合講義 P.45-52 練習。',
+    groupHomework: '數學講義 P.48-50 所有練習題，下週二前繳交。',
+    individualProgress: '',
+    individualHomework: '',
+    teacherNote: '',
+    examScores: [
+      { id: 'es-5', subject: '數學', score: 64, classAvg: 75, fullScore: 100 },
+    ],
+    photos: [],
+    parentFeedback: null,
+    aiAnalysis: { weakSummary: '數學成績低於班級平均 11 分，一元二次方程式概念仍需加強。', recommendations: ['每天多做 5 題基礎練習', '建議參加個別指導課程', '預計 2 週可見成效'] },
+    sentAt: null, readAt: null, createdAt: '2026-03-05T15:00:00Z',
+  },
+  {
+    id: 'cb-4', studentId: 's3', studentName: '王大明', courseId: 'c2', courseName: '國中英文菁英班',
+    date: '2026-03-05', status: 'read' as const,
+    groupProgress: '今天完成 Unit 5 閱讀理解+口語練習，同學表現優異。',
+    groupHomework: 'Workbook P.30-32，下週三繳交。',
+    individualProgress: '大明口說能力強，但拼字偶有錯誤，建議多寫。',
+    individualHomework: '額外：抄寫本週 20 個新單字各三遍。',
+    teacherNote: '大明很有語言天賦，鼓勵他多看英文影片培養語感！',
+    examScores: [
+      { id: 'es-6', subject: '英文', score: 85, classAvg: 80, fullScore: 100 },
+    ],
+    photos: [
+      { id: 'ph-3', url: 'https://placehold.co/400x300/d5e8d5/506b50?text=英文話劇', name: '話劇排練.jpg' },
+    ],
+    parentFeedback: { rating: 4, comment: '好棒！孩子回家說今天很開心', createdAt: '2026-03-05T21:00:00Z' },
+    aiAnalysis: null,
+    sentAt: '2026-03-05T17:00:00Z', readAt: '2026-03-05T20:30:00Z', createdAt: '2026-03-05T16:00:00Z',
+  },
+  {
+    id: 'cb-5', studentId: 's5', studentName: '李宜庭', courseId: 'c6', courseName: '安親班（國小）',
+    date: '2026-03-05', status: 'sent' as const,
+    groupProgress: '今天完成國語和數學作業指導，全班表現良好。',
+    groupHomework: '無額外回家作業。',
+    individualProgress: '宜庭今天完成了數學和國語作業，表現很棒！國語閱讀測驗答對 9/10。',
+    individualHomework: '回家閱讀課外書 30 分鐘。',
+    teacherNote: '宜庭很乖巧，今天幫忙整理教室，是小幫手！',
+    examScores: [
+      { id: 'es-7', subject: '國語', score: 90, classAvg: 82, fullScore: 100 },
+      { id: 'es-8', subject: '數學', score: 100, classAvg: 85, fullScore: 100 },
+    ],
+    photos: [],
+    parentFeedback: null,
+    aiAnalysis: null,
+    sentAt: '2026-03-05T16:30:00Z', readAt: null, createdAt: '2026-03-05T16:00:00Z',
+  },
+  // 昨天的記錄
+  {
+    id: 'cb-6', studentId: 's1', studentName: '陳小利', courseId: 'c1', courseName: '國中數學 A 班',
+    date: '2026-03-04', status: 'read' as const,
+    groupProgress: '複習因式分解，全班練習測驗平均 78 分。',
+    groupHomework: '講義 P.42-44 複習題。',
+    individualProgress: '小利因式分解掌握不錯，速度可以再快一些。',
+    individualHomework: '限時練習 P.43 第 1-10 題（15 分鐘內完成）。',
+    teacherNote: '明天小考，記得複習第三章！',
+    examScores: [
+      { id: 'es-9', subject: '數學（隨堂）', score: 82, classAvg: 78, fullScore: 100 },
+    ],
+    photos: [],
+    parentFeedback: { rating: 4, comment: '會提醒小利複習的，謝謝！', createdAt: '2026-03-04T21:00:00Z' },
+    aiAnalysis: null,
+    sentAt: '2026-03-04T16:30:00Z', readAt: '2026-03-04T20:15:00Z', createdAt: '2026-03-04T15:00:00Z',
+  },
+]
+
+const CONTACT_BOOK_TEMPLATES = [
+  { id: 'tpl-1', courseId: 'c1', groupProgress: '本週學習進度：', groupHomework: '回家作業：', createdAt: '2026-03-01T10:00:00Z' },
+  { id: 'tpl-2', courseId: 'c6', groupProgress: '今日安親班學習概況：', groupHomework: '回家注意事項：', createdAt: '2026-03-01T10:00:00Z' },
 ]
 
 // ===== Route handler =====
@@ -590,16 +692,83 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
       return { status: 200, body: { success: true, data: { stats, month } } }
     }
 
-    // Contact Book — 電子聯絡簿
-    if (path === '/api/w8/contact-book') {
+    // Contact Book v2 — 電子聯絡簿（分校端）
+    if (path === '/api/admin/contact-book/entries') {
       const courseId = searchParams.get('courseId')
+      const date = searchParams.get('date')
+      let filtered = CONTACT_BOOK_ENTRIES
+      if (courseId) filtered = filtered.filter(e => e.courseId === courseId)
+      if (date) filtered = filtered.filter(e => e.date === date)
+      return { status: 200, body: { success: true, data: filtered } }
+    }
+    const cbEntryMatch = path.match(/^\/api\/admin\/contact-book\/entries\/([\w-]+)$/)
+    if (cbEntryMatch) {
+      const entry = CONTACT_BOOK_ENTRIES.find(e => e.id === cbEntryMatch[1])
+      if (entry) return { status: 200, body: { success: true, data: entry } }
+      return { status: 404, body: { success: false, error: 'not_found' } }
+    }
+    if (path === '/api/admin/contact-book/templates') {
+      return { status: 200, body: { success: true, data: CONTACT_BOOK_TEMPLATES } }
+    }
+    const cbPhotoMatch = path.match(/^\/api\/admin\/contact-book\/photos\/([\w-]+)$/)
+    if (cbPhotoMatch) {
+      return { status: 200, body: { success: true } }
+    }
+
+    // Contact Book v2 — 家長端
+    if (path === '/api/parent/contact-book') {
       const studentId = searchParams.get('studentId')
-      const type = searchParams.get('type')
-      let filtered = CONTACT_MESSAGES
-      if (courseId) filtered = filtered.filter(m => m.course_id === courseId)
-      if (studentId) filtered = filtered.filter(m => m.student_id === studentId || m.student_id === null)
-      if (type && type !== 'all') filtered = filtered.filter(m => m.type === type)
-      return { status: 200, body: { success: true, data: { messages: filtered, total: filtered.length } } }
+      let filtered = CONTACT_BOOK_ENTRIES.filter(e => e.status === 'sent' || e.status === 'read')
+      if (studentId) filtered = filtered.filter(e => e.studentId === studentId)
+      const data = filtered.map(e => ({
+        id: e.id, entryDate: e.date, status: e.status, isRead: e.status === 'read',
+        readAt: e.readAt, sentAt: e.sentAt, courseId: e.courseId, courseName: e.courseName,
+        groupProgress: e.groupProgress, groupHomework: e.groupHomework,
+        individualNote: e.individualProgress, individualHomework: e.individualHomework,
+        teacherTip: e.teacherNote,
+        scores: e.examScores.map(s => ({ subject: s.subject, score: String(s.score) })),
+      }))
+      return { status: 200, body: { success: true, data } }
+    }
+    const parentCbMatch = path.match(/^\/api\/parent\/contact-book\/([\w-]+)$/)
+    if (parentCbMatch) {
+      const entry = CONTACT_BOOK_ENTRIES.find(e => e.id === parentCbMatch[1])
+      if (entry && (entry.status === 'sent' || entry.status === 'read')) {
+        return { status: 200, body: { success: true, data: {
+          id: entry.id, tenantId: DEMO_TENANT_1, studentId: entry.studentId, courseId: entry.courseId,
+          entryDate: entry.date, status: entry.status, groupProgress: entry.groupProgress,
+          groupHomework: entry.groupHomework, individualNote: entry.individualProgress,
+          individualHomework: entry.individualHomework, teacherTip: entry.teacherNote,
+          sentAt: entry.sentAt, readAt: entry.readAt, createdAt: entry.createdAt,
+          courseName: entry.courseName, isRead: entry.status === 'read',
+          scores: entry.examScores.map(s => ({ id: s.id, subject: s.subject, score: String(s.score), classAvg: String(s.classAvg), fullScore: String(s.fullScore) })),
+          photos: entry.photos.map(p => ({ id: p.id, url: p.url, caption: p.name, sortOrder: 0 })),
+          feedbacks: entry.parentFeedback ? [{ id: 'fb-1', parentUserId: 'demo-parent', rating: entry.parentFeedback.rating, comment: entry.parentFeedback.comment, createdAt: entry.parentFeedback.createdAt }] : [],
+          aiAnalysis: entry.aiAnalysis ? { id: 'ai-1', weaknessSummary: entry.aiAnalysis.weakSummary, recommendedCourseName: entry.aiAnalysis.recommendations[0] ?? '', recommendedCourseDesc: entry.aiAnalysis.recommendations.join('；'), createdAt: entry.createdAt } : null,
+        } } }
+      }
+      return { status: 404, body: { success: false, error: 'not_found' } }
+    }
+
+    // LIFF Contact Book (same shape as parent detail)
+    const liffCbMatch = path.match(/^\/api\/line\/contact-book\/([\w-]+)$/)
+    if (liffCbMatch) {
+      const entry = CONTACT_BOOK_ENTRIES.find(e => e.id === liffCbMatch[1])
+      if (entry && (entry.status === 'sent' || entry.status === 'read')) {
+        return { status: 200, body: { success: true, data: {
+          id: entry.id, tenantId: DEMO_TENANT_1, studentId: entry.studentId, courseId: entry.courseId,
+          entryDate: entry.date, status: entry.status, groupProgress: entry.groupProgress,
+          groupHomework: entry.groupHomework, individualNote: entry.individualProgress,
+          individualHomework: entry.individualHomework, teacherTip: entry.teacherNote,
+          sentAt: entry.sentAt, readAt: entry.readAt, createdAt: entry.createdAt,
+          courseName: entry.courseName, isRead: entry.status === 'read',
+          scores: entry.examScores.map(s => ({ id: s.id, subject: s.subject, score: String(s.score), classAvg: String(s.classAvg), fullScore: String(s.fullScore) })),
+          photos: entry.photos.map(p => ({ id: p.id, url: p.url, caption: p.name, sortOrder: 0 })),
+          feedbacks: entry.parentFeedback ? [{ id: 'fb-1', parentUserId: 'demo-parent', rating: entry.parentFeedback.rating, comment: entry.parentFeedback.comment, createdAt: entry.parentFeedback.createdAt }] : [],
+          aiAnalysis: entry.aiAnalysis ? { id: 'ai-1', weaknessSummary: entry.aiAnalysis.weakSummary, recommendedCourseName: entry.aiAnalysis.recommendations[0] ?? '', recommendedCourseDesc: entry.aiAnalysis.recommendations.join('；'), createdAt: entry.createdAt } : null,
+        } } }
+      }
+      return { status: 404, body: { success: false, error: 'not_found' } }
     }
 
     // Conversations — AI 對話紀錄
@@ -627,6 +796,32 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     if (path.includes('/knowledge/ingest')) {
       return { status: 200, body: { ok: true, stored: 1 } }
     }
+    // Contact Book v2 POST handlers
+    if (path === '/api/admin/contact-book/entries') {
+      return { status: 201, body: { success: true, data: [{ id: 'cb-demo-new', message: '已建立聯絡簿' }] } }
+    }
+    const cbSendMatch = path.match(/^\/api\/admin\/contact-book\/entries\/([\w-]+)\/send$/)
+    if (cbSendMatch) {
+      return { status: 200, body: { success: true, data: { message: '聯絡簿已發送' } } }
+    }
+    if (path === '/api/admin/contact-book/templates') {
+      return { status: 200, body: { success: true, data: { id: 'tpl-demo', message: '範本已儲存' } } }
+    }
+    if (path === '/api/admin/contact-book/upload') {
+      return { status: 200, body: { success: true, data: { id: 'ph-demo', url: 'https://placehold.co/400x300/e8dfd5/6b5e50?text=上傳照片', name: 'demo-upload.jpg' } } }
+    }
+    if (path === '/api/admin/contact-book/ai-analysis') {
+      return { status: 200, body: { success: true, data: { weakSummary: '（Demo）數學科目表現低於班級平均，建議加強基礎運算與方程式練習。', recommendations: ['每日練習 10 題基礎計算', '建議參加數學加強班', '考前複習重點公式'] } } }
+    }
+    const parentFbMatch = path.match(/^\/api\/parent\/contact-book\/([\w-]+)\/feedback$/)
+    if (parentFbMatch) {
+      return { status: 201, body: { success: true, data: { id: 'fb-demo', message: '反饋已提交' } } }
+    }
+    const liffFbMatch = path.match(/^\/api\/line\/contact-book\/([\w-]+)\/feedback$/)
+    if (liffFbMatch) {
+      return { status: 201, body: { success: true, data: { id: 'fb-demo', message: '反饋已提交' } } }
+    }
+
     // Generic POST success
     return { status: 200, body: { success: true, message: 'Demo 操作成功' } }
   }

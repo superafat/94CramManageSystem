@@ -252,6 +252,85 @@ export const manageStudentLeaves = pgTable('manage_student_leaves', {
   dateIdx: index('manage_student_leave_date_idx').on(table.tenantId, table.leaveDate),
 }));
 
+// 電子聯絡簿 v2 - 班級模板（每堂課每日一筆）
+export const manageContactBookTemplates = pgTable('manage_contact_book_templates', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  courseId: uuid('course_id').references(() => manageCourses.id).notNull(),
+  entryDate: date('entry_date').notNull(),
+  groupProgress: text('group_progress'),
+  groupHomework: text('group_homework'),
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  uniqueTenantCourseDate: uniqueIndex('manage_cb_templates_tenant_course_date_idx').on(table.tenantId, table.courseId, table.entryDate),
+}));
+
+// 電子聯絡簿 v2 - 主表（每日每生一筆）
+export const manageContactBookEntries = pgTable('manage_contact_book_entries', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  studentId: uuid('student_id').references(() => manageStudents.id).notNull(),
+  teacherId: uuid('teacher_id').references(() => manageTeachers.id),
+  courseId: uuid('course_id').references(() => manageCourses.id).notNull(),
+  entryDate: date('entry_date').notNull(),
+  status: varchar('status', { length: 20 }).notNull().default('draft'), // draft/sent/read
+  groupProgress: text('group_progress'),
+  groupHomework: text('group_homework'),
+  individualNote: text('individual_note'),
+  individualHomework: text('individual_homework'),
+  teacherTip: text('teacher_tip'),
+  sentAt: timestamp('sent_at'),
+  readAt: timestamp('read_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  tenantCourseDate: index('manage_cb_entries_tenant_course_date_idx').on(table.tenantId, table.courseId, table.entryDate),
+  uniqueTenantStudentDate: uniqueIndex('manage_cb_entries_tenant_student_date_idx').on(table.tenantId, table.studentId, table.entryDate),
+}));
+
+// 電子聯絡簿 v2 - 成績子表
+export const manageContactBookScores = pgTable('manage_contact_book_scores', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  entryId: uuid('entry_id').references(() => manageContactBookEntries.id, { onDelete: 'cascade' }).notNull(),
+  subject: varchar('subject', { length: 100 }).notNull(),
+  score: decimal('score', { precision: 10, scale: 2 }).notNull(),
+  classAvg: decimal('class_avg', { precision: 10, scale: 2 }),
+  fullScore: decimal('full_score', { precision: 10, scale: 2 }).default('100'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// 電子聯絡簿 v2 - 照片子表
+export const manageContactBookPhotos = pgTable('manage_contact_book_photos', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  entryId: uuid('entry_id').references(() => manageContactBookEntries.id, { onDelete: 'cascade' }).notNull(),
+  url: text('url').notNull(),
+  caption: varchar('caption', { length: 200 }),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// 電子聯絡簿 v2 - 家長反饋子表
+export const manageContactBookFeedback = pgTable('manage_contact_book_feedback', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  entryId: uuid('entry_id').references(() => manageContactBookEntries.id, { onDelete: 'cascade' }).notNull(),
+  parentUserId: uuid('parent_user_id').references(() => users.id).notNull(),
+  rating: integer('rating'), // 1-5
+  comment: text('comment'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// 電子聯絡簿 v2 - AI 分析子表
+export const manageContactBookAiAnalysis = pgTable('manage_contact_book_ai_analysis', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  entryId: uuid('entry_id').references(() => manageContactBookEntries.id, { onDelete: 'cascade' }).notNull(),
+  weaknessSummary: text('weakness_summary'),
+  recommendedCourseName: varchar('recommended_course_name', { length: 200 }),
+  recommendedCourseDesc: text('recommended_course_desc'),
+  rawResponse: jsonb('raw_response'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 // AI 對話記錄
 export const conversations = pgTable('conversations', {
   id: uuid('id').defaultRandom().primaryKey(),

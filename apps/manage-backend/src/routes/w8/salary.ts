@@ -57,10 +57,12 @@ salaryRoutes.get('/salary/calculate', requireRole(Role.ADMIN, Role.MANAGER),
       `)
 
       // 查詢薪資調整（獎金/扣薪）
+      const user = c.get('user')
       const adjResult = await db.execute(sql`
         SELECT teacher_id, type, name, amount
         FROM manage_salary_adjustments
-        WHERE period_start >= ${query.startDate}::date
+        WHERE tenant_id = ${user?.tenant_id}
+          AND period_start >= ${query.startDate}::date
           AND period_end <= ${query.endDate}::date
           AND deleted_at IS NULL
       `)
@@ -312,8 +314,9 @@ salaryRoutes.delete('/salary/adjustments/:id', requireRole(Role.ADMIN),
   async (c) => {
     try {
       const { id } = c.req.valid('param')
+      const user = c.get('user')
       const result = await db.execute(sql`
-        DELETE FROM manage_salary_adjustments WHERE id = ${id} RETURNING *
+        DELETE FROM manage_salary_adjustments WHERE id = ${id} AND tenant_id = ${user?.tenant_id} RETURNING *
       `)
       const adj = first(result)
       if (!adj) return notFound(c, 'Salary adjustment')
