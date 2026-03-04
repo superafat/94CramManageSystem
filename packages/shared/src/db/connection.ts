@@ -6,7 +6,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 
 // Re-export column helpers
-export { pgTable, serial, varchar, uuid, timestamp, boolean, text, integer, decimal, jsonb, index, primaryKey, uniqueIndex, date } from 'drizzle-orm/pg-core';
+export { pgTable, serial, varchar, uuid, timestamp, boolean, text, integer, decimal, jsonb, index, primaryKey, uniqueIndex, unique, date } from 'drizzle-orm/pg-core';
 
 /**
  * 解析 DATABASE_URL，支援 Cloud SQL Unix socket

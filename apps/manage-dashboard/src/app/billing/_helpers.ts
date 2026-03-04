@@ -1,4 +1,5 @@
 import type { OverdueLevel, PaymentType } from './_types'
+import { apiFetch } from '@/lib/api'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -96,6 +97,66 @@ export function savePriceMemoryBatch(records: Array<{ courseId: string; studentI
 export function getLastPrice(courseId: string, studentId: string): { amount: number; paymentType: string } | null {
   const mem = loadPriceMemory()
   return mem[courseId]?.[studentId] || null
+}
+
+// ─── 價格記憶（後端持久化 + localStorage fallback）─────────────────────────────
+
+export async function loadPriceMemoryFromAPI(courseId: string, studentIds?: string[]): Promise<PriceMemory> {
+  try {
+    const params = new URLSearchParams({ courseId })
+    if (studentIds?.length) params.set('studentIds', studentIds.join(','))
+    const res = await apiFetch<{ data: Array<{ courseId?: string; course_id?: string; studentId?: string; student_id?: string; amount: number; paymentType?: string; payment_type?: string; updatedAt?: string; updated_at?: string }> }>(
+      `/api/admin/billing/price-memory?${params}`
+    )
+    const records = res?.data || []
+    const mem: PriceMemory = {}
+    for (const r of records) {
+      const cid = r.courseId || r.course_id || ''
+      const sid = r.studentId || r.student_id || ''
+      if (!cid || !sid) continue
+      if (!mem[cid]) mem[cid] = {}
+      mem[cid][sid] = {
+        amount: Number(r.amount),
+        paymentType: r.paymentType || r.payment_type || '',
+        updatedAt: r.updatedAt || r.updated_at || new Date().toISOString(),
+      }
+    }
+    return mem
+  } catch {
+    // fallback to localStorage
+    return loadPriceMemory()
+  }
+}
+
+export async function savePriceMemoryToAPI(records: Array<{ courseId: string; studentId: string; amount: number; paymentType: string }>) {
+  // 同步寫入 localStorage（離線 fallback）
+  savePriceMemoryBatch(records)
+
+  // 嘗試寫入後端
+  try {
+    await apiFetch<{ ok: boolean }>('/api/admin/billing/price-memory', {
+      method: 'PUT',
+      body: JSON.stringify({
+        records: records.map(r => ({
+          courseId: r.courseId,
+          studentId: r.studentId,
+          amount: r.amount,
+          paymentType: r.paymentType,
+        })),
+      }),
+    })
+  } catch {
+    // API 失敗時 localStorage 已保存，靜默失敗
+  }
+}
+
+export async function getLastPriceFromAPI(courseId: string, studentId: string): Promise<{ amount: number; paymentType: string } | null> {
+  try {
+    const mem = await loadPriceMemoryFromAPI(courseId, [studentId])
+    return mem[courseId]?.[studentId] || getLastPrice(courseId, studentId)
+  } catch {
+    return getLastPrice(courseId, studentId)
+  }
 }
 
 // ─── Date Helpers ─────────────────────────────────────────────────────────────

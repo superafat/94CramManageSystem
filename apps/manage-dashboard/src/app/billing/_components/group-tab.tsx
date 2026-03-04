@@ -8,6 +8,8 @@ import { ReminderButton } from './reminder-button'
 import { OverdueBanner } from './overdue-banner'
 import { StatBar } from './stat-bar'
 
+type BillingMode = 'monthly' | 'per_session'
+
 export function GroupTab() {
   const [courses, setCourses] = useState<CourseInfo[]>([])
   const [selectedCourseId, setSelectedCourseId] = useState('')
@@ -22,11 +24,70 @@ export function GroupTab() {
   const [showFeeEditor, setShowFeeEditor] = useState(false)
   const [feeForm, setFeeForm] = useState({ feeMonthly: 0, feeQuarterly: 0, feeSemester: 0, feeYearly: 0 })
 
+  // 月繳 / 堂繳模式
+  const [billingMode, setBillingMode] = useState<BillingMode>('monthly')
+  const [sessionCounts, setSessionCounts] = useState<Record<string, number>>({}) // courseId → 當月堂數
+  const [manualSessionCount, setManualSessionCount] = useState<Record<string, number>>({}) // courseId → 手動輸入堂數
+  const [sessionCountLoading, setSessionCountLoading] = useState(false)
+
   const monthOptions = getMonthOptions()
 
   useEffect(() => { fetchCourses() }, [])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (selectedCourseId) fetchBilling() }, [selectedCourseId, selectedMonth])
+
+  // 切換到堂繳模式時，fetch session count
+  useEffect(() => {
+    if (billingMode === 'per_session' && selectedCourseId && selectedMonth) {
+      fetchSessionCount(selectedCourseId, selectedMonth)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [billingMode, selectedCourseId, selectedMonth])
+
+  const fetchSessionCount = async (courseId: string, month: string) => {
+    setSessionCountLoading(true)
+    try {
+      const res = await fetch(
+        `/api/admin/billing/session-count?courseId=${courseId}&month=${month}`,
+        { credentials: 'include' }
+      )
+      if (!res.ok) throw new Error('API failed')
+      const data = await res.json()
+      if (data.success && typeof data.data?.count === 'number') {
+        setSessionCounts(prev => ({ ...prev, [courseId]: data.data.count }))
+      } else {
+        // API 回傳格式不符，fallback 讓使用者手動輸入
+        setSessionCounts(prev => {
+          const next = { ...prev }
+          delete next[courseId]
+          return next
+        })
+      }
+    } catch {
+      // API 失敗，fallback 讓使用者手動輸入
+      setSessionCounts(prev => {
+        const next = { ...prev }
+        delete next[courseId]
+        return next
+      })
+    }
+    setSessionCountLoading(false)
+  }
+
+  // 取得當前課程的堂數（API 回傳或手動輸入）
+  const getSessionCount = (courseId: string): number | null => {
+    if (courseId in sessionCounts) return sessionCounts[courseId]
+    if (courseId in manualSessionCount) return manualSessionCount[courseId]
+    return null
+  }
+
+  // 堂繳模式下計算金額
+  const getPerSessionAmount = (course: CourseInfo, courseId: string): number | null => {
+    if (!course.fee_per_session) return null
+    const count = getSessionCount(courseId)
+    if (count === null) return null
+    return course.fee_per_session * count
+  }
 
   const fetchCourses = async () => {
     setLoading(true)
@@ -137,6 +198,35 @@ export function GroupTab() {
 
   const showMsg = (m: string) => { setMessage(m); setTimeout(() => setMessage(''), 3000) }
 
+  // 當 billingMode 或 sessionCounts/manualSessionCount 改變時，更新未繳學生的金額
+  useEffect(() => {
+    if (!billingData) return
+    if (billingMode === 'per_session') {
+      const perSessionAmt = getPerSessionAmount(billingData.course, selectedCourseId)
+      if (perSessionAmt !== null) {
+        const newAmt: Record<string, number> = { ...amounts }
+        billingData.students.forEach(s => {
+          if (!s.payment_id) {
+            newAmt[s.id] = perSessionAmt
+          }
+        })
+        setAmounts(newAmt)
+      }
+    } else {
+      // 月繳模式：恢復 default fee
+      const defaultFee = getDefaultFee(billingData.course)
+      const newAmt: Record<string, number> = { ...amounts }
+      billingData.students.forEach(s => {
+        if (!s.payment_id) {
+          const remembered = getLastPrice(selectedCourseId, s.id)
+          newAmt[s.id] = remembered?.amount ?? defaultFee
+        }
+      })
+      setAmounts(newAmt)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [billingMode, sessionCounts, manualSessionCount])
+
   const disc = DISCOUNT_LABELS[paymentType]
 
   // 計算遲繳學生清單
@@ -162,11 +252,18 @@ export function GroupTab() {
 
   // Compute group stats as amounts
   const groupStats = billingData
-    ? {
-        paid: billingData.students.filter(s => s.payment_id).reduce((a, s) => a + (s.paid_amount || 0), 0),
-        unpaid: billingData.students.filter(s => !s.payment_id).length * getDefaultFee(billingData.course),
-        overdue: 0,
-      }
+    ? (() => {
+        const paid = billingData.students.filter(s => s.payment_id).reduce((a, s) => a + (s.paid_amount || 0), 0)
+        let unpaidPerStudent: number
+        if (billingMode === 'per_session') {
+          const perSessionAmt = getPerSessionAmount(billingData.course, selectedCourseId)
+          unpaidPerStudent = perSessionAmt ?? 0
+        } else {
+          unpaidPerStudent = getDefaultFee(billingData.course)
+        }
+        const unpaid = billingData.students.filter(s => !s.payment_id).length * unpaidPerStudent
+        return { paid, unpaid, overdue: 0 }
+      })()
     : null
 
   if (loading && !billingData) {
@@ -223,15 +320,17 @@ export function GroupTab() {
             <option key={m.value} value={m.value}>{m.label}</option>
           ))}
         </select>
-        <select
-          value={paymentType}
-          onChange={e => setPaymentType(e.target.value as PaymentType)}
-          className="px-3 py-2 border border-border rounded-lg bg-white text-sm"
-        >
-          {(Object.keys(DISCOUNT_LABELS) as PaymentType[]).map(k => (
-            <option key={k} value={k}>{DISCOUNT_LABELS[k].label}</option>
-          ))}
-        </select>
+        {billingMode === 'monthly' && (
+          <select
+            value={paymentType}
+            onChange={e => setPaymentType(e.target.value as PaymentType)}
+            className="px-3 py-2 border border-border rounded-lg bg-white text-sm"
+          >
+            {(Object.keys(DISCOUNT_LABELS) as PaymentType[]).map(k => (
+              <option key={k} value={k}>{DISCOUNT_LABELS[k].label}</option>
+            ))}
+          </select>
+        )}
         <button
           onClick={() => setShowFeeEditor(!showFeeEditor)}
           className="text-xs text-primary hover:underline whitespace-nowrap"
@@ -240,8 +339,86 @@ export function GroupTab() {
         </button>
       </div>
 
-      {/* Discount badge */}
-      {paymentType !== 'monthly' && (
+      {/* 月繳 / 堂繳 Toggle */}
+      <div className="flex items-center gap-2">
+        <div className="flex rounded-lg overflow-hidden border border-border">
+          <button
+            onClick={() => setBillingMode('monthly')}
+            className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+              billingMode === 'monthly'
+                ? 'bg-[#8FA895] text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            月繳
+          </button>
+          <button
+            onClick={() => setBillingMode('per_session')}
+            className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+              billingMode === 'per_session'
+                ? 'bg-[#8FA895] text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            堂繳
+          </button>
+        </div>
+        {billingMode === 'per_session' && sessionCountLoading && (
+          <span className="text-xs text-text-muted">讀取堂數中...</span>
+        )}
+      </div>
+
+      {/* 堂繳模式資訊 */}
+      {billingMode === 'per_session' && billingData && (
+        <div className="bg-white rounded-xl border border-border px-4 py-3 space-y-2">
+          {billingData.course.fee_per_session ? (
+            <>
+              {getSessionCount(selectedCourseId) !== null ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-text-muted">本月</span>
+                  <span className="font-bold text-text">{getSessionCount(selectedCourseId)} 堂</span>
+                  <span className="text-text-muted">×</span>
+                  <span className="font-bold text-text">${billingData.course.fee_per_session.toLocaleString()}/堂</span>
+                  <span className="text-text-muted">=</span>
+                  <span className="font-bold text-[#8FA895]">
+                    ${(getPerSessionAmount(billingData.course, selectedCourseId) ?? 0).toLocaleString()}
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="text-sm text-amber-600">無法自動取得堂數，請手動輸入：</div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      value={manualSessionCount[selectedCourseId] ?? ''}
+                      onChange={e => {
+                        const val = Number(e.target.value)
+                        setManualSessionCount(prev => ({ ...prev, [selectedCourseId]: val }))
+                      }}
+                      className="w-20 px-2 py-1 border border-border rounded text-sm text-right"
+                      placeholder="堂數"
+                    />
+                    <span className="text-sm text-text-muted">
+                      堂 × ${billingData.course.fee_per_session.toLocaleString()}/堂
+                      {manualSessionCount[selectedCourseId] != null && (
+                        <> = <span className="font-bold text-[#8FA895]">
+                          ${(billingData.course.fee_per_session * (manualSessionCount[selectedCourseId] || 0)).toLocaleString()}
+                        </span></>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-sm text-amber-600">⚠️ 請先設定單堂費用（在課程管理中設定 fee_per_session）</div>
+          )}
+        </div>
+      )}
+
+      {/* Discount badge (月繳模式限定) */}
+      {billingMode === 'monthly' && paymentType !== 'monthly' && (
         <div className="flex items-center gap-2 bg-white rounded-xl border border-border px-4 py-2 text-sm">
           <span className="text-text-muted">折扣方案</span>
           <span className={`font-bold ${disc.color}`}>{disc.discount}</span>

@@ -13,6 +13,7 @@ export interface CourseInfo {
   fee_quarterly?: number
   fee_semester?: number
   fee_yearly?: number
+  fee_per_session?: number
   course_type?: string
 }
 
@@ -81,6 +82,17 @@ export interface IndividualStats {
   paid_amount: number
   unpaid_amount: number
   overdue_amount: number
+}
+
+// 安親班套餐
+export interface DaycarePackage {
+  id: string
+  name: string
+  services: string[]
+  price: number
+  description?: string
+  is_active: boolean
+  branch_id?: string
 }
 
 // 遲繳相關

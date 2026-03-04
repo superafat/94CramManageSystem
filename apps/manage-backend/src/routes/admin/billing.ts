@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
+import { eq, and, inArray, isNull } from 'drizzle-orm'
+import { manageDaycarePackages, managePriceMemory, inclassSchedules } from '@94cram/shared'
 import type { RBACVariables } from '../../middleware/rbac'
 import { requirePermission, Permission } from '../../middleware/rbac'
 import { uuidSchema } from '../../utils/validation'
@@ -314,5 +316,333 @@ billingRoutes.get('/billing/payment-records', requirePermission(Permission.BILLI
     return internalError(c, err)
   }
 })
+
+// ==================== 安親套餐 CRUD ====================
+
+const daycarePackageBodySchema = z.object({
+  branchId: z.string().uuid().optional(),
+  name: z.string().min(1).max(100),
+  services: z.array(z.string()).min(1),
+  price: z.number().positive(),
+  description: z.string().optional(),
+  isActive: z.boolean().optional(),
+})
+
+// GET /billing/daycare-packages — 列出套餐
+billingRoutes.get('/billing/daycare-packages',
+  requirePermission(Permission.BILLING_READ),
+  async (c) => {
+    const user = c.get('user')
+    const tenantId = user.tenant_id
+    const branchId = c.req.query('branchId')
+
+    try {
+      const conditions = [
+        eq(manageDaycarePackages.tenantId, tenantId),
+        eq(manageDaycarePackages.isActive, true),
+      ]
+      if (branchId) {
+        conditions.push(eq(manageDaycarePackages.branchId, branchId))
+      }
+
+      const packages = await db
+        .select()
+        .from(manageDaycarePackages)
+        .where(and(...conditions))
+
+      return success(c, { packages })
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
+
+// POST /billing/daycare-packages — 新增套餐
+billingRoutes.post('/billing/daycare-packages',
+  requirePermission(Permission.BILLING_WRITE),
+  zValidator('json', daycarePackageBodySchema),
+  async (c) => {
+    const user = c.get('user')
+    const body = c.req.valid('json')
+
+    try {
+      const [created] = await db
+        .insert(manageDaycarePackages)
+        .values({
+          tenantId: user.tenant_id,
+          branchId: body.branchId ?? null,
+          name: body.name,
+          services: body.services,
+          price: String(body.price),
+          description: body.description ?? null,
+          isActive: body.isActive ?? true,
+        })
+        .returning()
+
+      return success(c, { package: created }, 201)
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
+
+// PUT /billing/daycare-packages/:id — 更新套餐
+billingRoutes.put('/billing/daycare-packages/:id',
+  requirePermission(Permission.BILLING_WRITE),
+  zValidator('param', z.object({ id: uuidSchema })),
+  zValidator('json', daycarePackageBodySchema.partial()),
+  async (c) => {
+    const user = c.get('user')
+    const { id } = c.req.valid('param')
+    const body = c.req.valid('json')
+
+    try {
+      // 建構更新物件，只包含有值的欄位
+      const updateData: Record<string, unknown> = {}
+      if (body.branchId !== undefined) updateData.branchId = body.branchId
+      if (body.name !== undefined) updateData.name = body.name
+      if (body.services !== undefined) updateData.services = body.services
+      if (body.price !== undefined) updateData.price = String(body.price)
+      if (body.description !== undefined) updateData.description = body.description
+      if (body.isActive !== undefined) updateData.isActive = body.isActive
+
+      if (Object.keys(updateData).length === 0) {
+        return badRequest(c, 'No fields to update')
+      }
+
+      const [updated] = await db
+        .update(manageDaycarePackages)
+        .set(updateData)
+        .where(
+          and(
+            eq(manageDaycarePackages.id, id),
+            eq(manageDaycarePackages.tenantId, user.tenant_id),
+          )
+        )
+        .returning()
+
+      if (!updated) return notFound(c, 'Package not found')
+      return success(c, { package: updated })
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
+
+// DELETE /billing/daycare-packages/:id — 軟刪除（isActive=false）
+billingRoutes.delete('/billing/daycare-packages/:id',
+  requirePermission(Permission.BILLING_WRITE),
+  zValidator('param', z.object({ id: uuidSchema })),
+  async (c) => {
+    const user = c.get('user')
+    const { id } = c.req.valid('param')
+
+    try {
+      const [deleted] = await db
+        .update(manageDaycarePackages)
+        .set({ isActive: false })
+        .where(
+          and(
+            eq(manageDaycarePackages.id, id),
+            eq(manageDaycarePackages.tenantId, user.tenant_id),
+          )
+        )
+        .returning()
+
+      if (!deleted) return notFound(c, 'Package not found')
+      return success(c, { deleted: true })
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
+
+// ==================== 價格記憶 ====================
+
+// GET /billing/price-memory — 批量查詢價格記憶
+billingRoutes.get('/billing/price-memory',
+  requirePermission(Permission.BILLING_READ),
+  zValidator('query', z.object({
+    courseId: z.string().min(1),
+    studentIds: z.string().optional(),
+  })),
+  async (c) => {
+    const user = c.get('user')
+    const tenantId = user.tenant_id
+    const { courseId, studentIds } = c.req.valid('query')
+
+    try {
+      const conditions = [
+        eq(managePriceMemory.tenantId, tenantId),
+        eq(managePriceMemory.courseId, courseId),
+      ]
+
+      if (studentIds) {
+        const ids = studentIds.split(',').map((s) => s.trim()).filter(Boolean)
+        if (ids.length > 0) {
+          conditions.push(inArray(managePriceMemory.studentId, ids))
+        }
+      }
+
+      const records = await db
+        .select()
+        .from(managePriceMemory)
+        .where(and(...conditions))
+
+      return success(c, { data: records })
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
+
+// PUT /billing/price-memory — 批量更新/建立價格記憶（UPSERT）
+const priceMemoryBatchSchema = z.object({
+  records: z.array(z.object({
+    courseId: z.string().min(1),
+    studentId: z.string().min(1),
+    amount: z.number().positive(),
+    paymentType: z.string().optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  })).min(1),
+})
+
+billingRoutes.put('/billing/price-memory',
+  requirePermission(Permission.BILLING_WRITE),
+  zValidator('json', priceMemoryBatchSchema),
+  async (c) => {
+    const user = c.get('user')
+    const tenantId = user.tenant_id
+    const { records } = c.req.valid('json')
+
+    try {
+      const results = []
+
+      for (const rec of records) {
+        const [upserted] = await db
+          .insert(managePriceMemory)
+          .values({
+            tenantId,
+            courseId: rec.courseId,
+            studentId: rec.studentId,
+            amount: String(rec.amount),
+            paymentType: rec.paymentType ?? null,
+            metadata: rec.metadata ?? null,
+            updatedAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: [managePriceMemory.tenantId, managePriceMemory.courseId, managePriceMemory.studentId],
+            set: {
+              amount: String(rec.amount),
+              paymentType: rec.paymentType ?? null,
+              metadata: rec.metadata ?? null,
+              updatedAt: new Date(),
+            },
+          })
+          .returning()
+
+        results.push(upserted)
+      }
+
+      return success(c, { data: results })
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
+
+// ==================== 堂數計算 ====================
+
+/**
+ * 根據 dayOfWeek 展開指定月份內所有實際排課日期
+ */
+function expandScheduleDates(year: number, month: number, dayOfWeek: number): string[] {
+  const dates: string[] = []
+  // month 是 1-based，Date constructor 的 month 是 0-based
+  const firstDay = new Date(year, month - 1, 1)
+  const lastDay = new Date(year, month, 0) // 該月最後一天
+
+  // 找到該月第一個符合 dayOfWeek 的日期
+  let current = new Date(firstDay)
+  const currentDow = current.getDay() // 0=Sunday
+  let diff = dayOfWeek - currentDow
+  if (diff < 0) diff += 7
+  current.setDate(current.getDate() + diff)
+
+  while (current <= lastDay) {
+    const y = current.getFullYear()
+    const m = String(current.getMonth() + 1).padStart(2, '0')
+    const d = String(current.getDate()).padStart(2, '0')
+    dates.push(`${y}-${m}-${d}`)
+    current.setDate(current.getDate() + 7)
+  }
+
+  return dates
+}
+
+const sessionCountQuerySchema = z.object({
+  courseId: z.string().uuid(),
+  month: z.string().regex(/^\d{4}-\d{2}$/),
+})
+
+// GET /billing/session-count — 查詢指定課程在指定月份的實際排課堂數
+billingRoutes.get('/billing/session-count',
+  requirePermission(Permission.BILLING_READ),
+  zValidator('query', sessionCountQuerySchema),
+  async (c) => {
+    const user = c.get('user')
+    const tenantId = user.tenant_id
+    const { courseId, month } = c.req.valid('query')
+
+    try {
+      // 從 inclassSchedules 查出該課程的所有排課規則（未刪除的）
+      const schedules = await db
+        .select()
+        .from(inclassSchedules)
+        .where(
+          and(
+            eq(inclassSchedules.tenantId, tenantId),
+            eq(inclassSchedules.courseId, courseId),
+            isNull(inclassSchedules.deletedAt),
+          )
+        )
+
+      // 解析 YYYY-MM
+      const [yearStr, monthStr] = month.split('-')
+      const year = parseInt(yearStr, 10)
+      const mon = parseInt(monthStr, 10)
+
+      // 展開每條排課規則為實際日期
+      const sessions: { date: string; startTime: string; endTime: string; status: string }[] = []
+
+      for (const sched of schedules) {
+        const dates = expandScheduleDates(year, mon, sched.dayOfWeek)
+        for (const date of dates) {
+          sessions.push({
+            date,
+            startTime: sched.startTime,
+            endTime: sched.endTime,
+            status: 'scheduled',
+          })
+        }
+      }
+
+      // 按日期 + 開始時間排序
+      sessions.sort((a, b) => {
+        const cmp = a.date.localeCompare(b.date)
+        return cmp !== 0 ? cmp : a.startTime.localeCompare(b.startTime)
+      })
+
+      return success(c, {
+        courseId,
+        month,
+        sessionCount: sessions.length,
+        sessions,
+      })
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
 
 export { billingRoutes }

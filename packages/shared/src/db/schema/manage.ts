@@ -1,5 +1,5 @@
 // 94Manage Schema - 學員管理專屬表
-import { pgTable, uuid, varchar, text, timestamp, boolean, integer, decimal, jsonb, uniqueIndex, index, date } from '../connection';
+import { pgTable, uuid, varchar, text, timestamp, boolean, integer, decimal, jsonb, uniqueIndex, unique, index, date } from '../connection';
 import { tenants, users, branches } from './common';
 
 // 課程
@@ -330,6 +330,35 @@ export const manageContactBookAiAnalysis = pgTable('manage_contact_book_ai_analy
   rawResponse: jsonb('raw_response'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+// 安親套餐定義
+export const manageDaycarePackages = pgTable('manage_daycare_packages', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  branchId: uuid('branch_id').references(() => branches.id),  // nullable, null=全分校通用
+  name: varchar('name', { length: 100 }).notNull(),
+  services: text('services').array(),  // ['安親','課輔','餐食','才藝']
+  price: decimal('price', { precision: 10, scale: 2 }).notNull(),
+  description: text('description'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  tenantIdx: index('manage_daycare_packages_tenant_idx').on(table.tenantId),
+}));
+
+// 價格記憶持久化
+export const managePriceMemory = pgTable('manage_price_memory', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  courseId: varchar('course_id', { length: 100 }).notNull(),
+  studentId: varchar('student_id', { length: 100 }).notNull(),
+  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+  paymentType: varchar('payment_type', { length: 20 }),  // monthly/quarterly/semester/yearly/per_session/package
+  metadata: jsonb('metadata'),  // 額外資訊（套餐名稱等）
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  uniqueTenantCourseStudent: unique().on(table.tenantId, table.courseId, table.studentId),
+}));
 
 // AI 對話記錄
 export const conversations = pgTable('conversations', {

@@ -437,6 +437,68 @@ const CONTACT_BOOK_TEMPLATES = [
   { id: 'tpl-2', courseId: 'c6', groupProgress: '今日安親班學習概況：', groupHomework: '回家注意事項：', createdAt: '2026-03-01T10:00:00Z' },
 ]
 
+// ===== Daycare Packages =====
+const DEMO_DAYCARE_PACKAGES = [
+  {
+    id: 'pkg-1',
+    tenant_id: DEMO_TENANT_1,
+    branch_id: null,
+    name: '全方位套餐',
+    services: ['安親', '課輔', '餐食', '才藝'],
+    price: '8000',
+    description: '含安親看顧、課業輔導、午餐晚餐、才藝課程',
+    is_active: true,
+    created_at: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'pkg-2',
+    tenant_id: DEMO_TENANT_1,
+    branch_id: null,
+    name: '基礎安親',
+    services: ['安親', '課輔'],
+    price: '5000',
+    description: '含安親看顧、課業輔導',
+    is_active: true,
+    created_at: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'pkg-3',
+    tenant_id: DEMO_TENANT_1,
+    branch_id: null,
+    name: '安親+餐食',
+    services: ['安親', '餐食'],
+    price: '6500',
+    description: '含安親看顧、午餐晚餐',
+    is_active: true,
+    created_at: '2026-01-01T00:00:00Z',
+  },
+]
+
+// ===== Price Memory =====
+const DEMO_PRICE_MEMORY = [
+  { id: 'pm-1', course_id: 'c1', student_id: 's1', amount: '3500', payment_type: 'monthly', metadata: null, updated_at: '2026-02-15T00:00:00Z' },
+  { id: 'pm-2', course_id: 'c1', student_id: 's2', amount: '9500', payment_type: 'quarterly', metadata: null, updated_at: '2026-02-15T00:00:00Z' },
+  { id: 'pm-3', course_id: 'c6', student_id: 's3', amount: '8000', payment_type: 'monthly', metadata: { packageName: '全方位套餐' }, updated_at: '2026-03-01T00:00:00Z' },
+]
+
+// ===== Session Count =====
+function getDemoSessionCount(courseId: string, month: string) {
+  const counts: Record<string, number> = { 'c1': 12, 'c2': 8, 'c3': 16, 'c4': 4 }
+  const count = counts[courseId] || 8
+  const sessions = []
+  const [year, m] = month.split('-').map(Number)
+  for (let i = 0; i < count; i++) {
+    const day = Math.min(1 + i * 2, 28)
+    sessions.push({
+      date: `${year}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+      startTime: '14:00',
+      endTime: '16:00',
+      status: 'scheduled',
+    })
+  }
+  return { courseId, month, sessionCount: count, sessions }
+}
+
 // ===== Route handler =====
 
 export const DEMO_TENANTS = [DEMO_TENANT_1, DEMO_TENANT_2]
@@ -582,6 +644,23 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
         { id: 's1', full_name: '陳小利', grade_level: '國一', fee_per_session: 900, sessions_completed: 4, payment_id: 'pay-ind-2', paid_amount: 3600, status: 'paid', period_month: periodMonth },
         { id: 's3', full_name: '林美琪', grade_level: '國一', fee_per_session: 900, sessions_completed: 4, status: 'pending', period_month: periodMonth },
       ], stats: { total_amount: 12000, paid_amount: 8400, unpaid_amount: 3600, overdue_amount: 0 } } } }
+    }
+
+    // Billing — 安親套餐
+    if (path === '/api/admin/billing/daycare-packages') {
+      return { status: 200, body: { success: true, data: DEMO_DAYCARE_PACKAGES } }
+    }
+
+    // Billing — 價格記憶
+    if (path === '/api/admin/billing/price-memory') {
+      return { status: 200, body: { success: true, data: DEMO_PRICE_MEMORY } }
+    }
+
+    // Billing — 堂數計算
+    if (path === '/api/admin/billing/session-count') {
+      const courseId = searchParams.get('courseId') || 'c1'
+      const month = searchParams.get('month') || '2026-03'
+      return { status: 200, body: { success: true, data: getDemoSessionCount(courseId, month) } }
     }
 
     // Billing — 家長繳費紀錄
@@ -944,15 +1023,32 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
       return { status: 201, body: { success: true, data: { id: 'fb-demo', message: '反饋已提交' } } }
     }
 
+    // Billing — 安親套餐 POST
+    if (path === '/api/admin/billing/daycare-packages') {
+      return { status: 201, body: { success: true, data: { id: 'pkg-demo-new', message: '套餐已建立' } } }
+    }
+
     // Generic POST success
     return { status: 200, body: { success: true, message: 'Demo 操作成功' } }
   }
 
   if (method === 'PUT' || method === 'PATCH') {
+    // Billing — 價格記憶 PUT
+    if (path === '/api/admin/billing/price-memory') {
+      return { status: 200, body: { success: true, data: { records: DEMO_PRICE_MEMORY, message: '價格記憶已更新' } } }
+    }
+    // Billing — 安親套餐 PUT
+    if (path === '/api/admin/billing/daycare-packages' || path.startsWith('/api/admin/billing/daycare-packages/')) {
+      return { status: 200, body: { success: true, data: { message: '套餐已更新' } } }
+    }
     return { status: 200, body: { success: true } }
   }
 
   if (method === 'DELETE') {
+    // Billing — 安親套餐 DELETE
+    if (path.startsWith('/api/admin/billing/daycare-packages')) {
+      return { status: 200, body: { success: true, data: { message: '套餐已刪除' } } }
+    }
     return { status: 200, body: { success: true } }
   }
 
