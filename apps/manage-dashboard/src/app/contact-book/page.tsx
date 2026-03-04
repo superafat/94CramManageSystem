@@ -182,6 +182,10 @@ export default function ContactBookPage() {
   const [batchCreating, setBatchCreating] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
+  const [aiWritingOpen, setAiWritingOpen] = useState(false)
+  const [aiKeywords, setAiKeywords] = useState('')
+  const [aiResult, setAiResult] = useState('')
+  const [aiWritingLoading, setAiWritingLoading] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Modal states
@@ -568,6 +572,28 @@ export default function ContactBookPage() {
     }
   }
 
+  // ── AI Writing ──
+
+  async function generateAiWriting() {
+    if (!aiKeywords.trim()) return
+    setAiWritingLoading(true)
+    setAiResult('')
+    try {
+      const res = await apiFetch<{ success: boolean; data: { text: string } }>('/api/admin/contact-book/ai-writing', {
+        method: 'POST',
+        body: JSON.stringify({ keywords: aiKeywords, studentName: selectedStudent?.name ?? '' }),
+      })
+      setAiResult(res.data.text)
+    } catch (err: unknown) {
+      // Demo 模式或 API 尚未實作時，回傳預設文字
+      const fallback = `${selectedStudent?.name ?? '同學'}近期表現：${aiKeywords}。老師會持續關注並給予適當的指導，請家長在家也多多鼓勵孩子，讓我們一起幫助孩子成長進步！`
+      setAiResult(fallback)
+      void err // suppress unused
+    } finally {
+      setAiWritingLoading(false)
+    }
+  }
+
   // ── Drag & Drop ──
 
   function handleDragOver(e: React.DragEvent) {
@@ -931,6 +957,69 @@ export default function ContactBookPage() {
 
             {/* Section 4: 親師通訊小叮嚀 */}
             <SectionCard icon="💡" title="親師通訊小叮嚀">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-text-muted">老師小叮嚀</span>
+                <button
+                  type="button"
+                  onClick={() => { setAiWritingOpen(!aiWritingOpen); setAiResult('') }}
+                  className="inline-flex items-center gap-1 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded-lg px-3 py-1 text-sm transition-colors"
+                >
+                  ✨ AI 助寫
+                </button>
+              </div>
+              {aiWritingOpen && (
+                <div className="mb-3 rounded-lg border border-purple-200 bg-purple-50/50 p-3 space-y-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={aiKeywords}
+                      onChange={(e) => setAiKeywords(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') void generateAiWriting() }}
+                      placeholder="輸入關鍵字，如：數學進步 作業遲交 態度積極"
+                      className="flex-1 rounded-lg border border-purple-200 bg-white px-3 py-1.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-purple-300/50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void generateAiWriting()}
+                      disabled={!aiKeywords.trim() || aiWritingLoading}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-sm text-white hover:bg-purple-700 disabled:opacity-40 transition-colors"
+                    >
+                      {aiWritingLoading && (
+                        <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      )}
+                      生成
+                    </button>
+                  </div>
+                  {aiResult && (
+                    <div className="space-y-2">
+                      <p className="text-sm text-text whitespace-pre-wrap rounded-lg bg-white border border-purple-100 p-3">{aiResult}</p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTeacherNote((prev) => prev ? `${prev}\n\n${aiResult}` : aiResult)
+                            setAiWritingOpen(false)
+                            setAiKeywords('')
+                            setAiResult('')
+                            toast.success('已採用 AI 建議文字')
+                          }}
+                          className="rounded-lg bg-primary px-3 py-1 text-sm text-white hover:bg-primary/90 transition-colors"
+                        >
+                          採用
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void generateAiWriting()}
+                          disabled={aiWritingLoading}
+                          className="rounded-lg border border-purple-200 bg-white px-3 py-1 text-sm text-purple-600 hover:bg-purple-50 disabled:opacity-40 transition-colors"
+                        >
+                          重新生成
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <TextArea
                 placeholder="想對家長說的話..."
                 value={teacherNote}

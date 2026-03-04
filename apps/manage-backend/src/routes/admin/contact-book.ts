@@ -5,8 +5,9 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
-import { eq, and, sql, inArray, gte, desc } from 'drizzle-orm'
+import { eq, and, sql, inArray, gte, desc, isNotNull, lte } from 'drizzle-orm'
 import type { RBACVariables } from '../../middleware/rbac'
+import { requirePermission, Permission } from '../../middleware/rbac'
 import {
   manageContactBookEntries,
   manageContactBookScores,
@@ -21,6 +22,7 @@ import {
 } from '@94cram/shared/db'
 import { users } from '../../db/schema'
 import { db, success, notFound, badRequest, internalError } from './_helpers'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import { analyzeStudentWeakness } from '../../services/ai-analysis'
 import { uploadContactBookPhoto } from '../../services/gcs'
 import { pushContactBookNotification } from '../../services/line-notify'
@@ -734,6 +736,62 @@ contactBookRoutes.post(
   }
 )
 
+// ─── POST /contact-book/ai-writing ──────────────────────────────────────────
+
+const aiWritingBodySchema = z.object({
+  keywords: z.string().min(1).max(500),
+  studentName: z.string().optional(),
+  context: z.string().optional(),
+})
+
+contactBookRoutes.post(
+  '/contact-book/ai-writing',
+  zValidator('json', aiWritingBodySchema),
+  async (c) => {
+    const { keywords, studentName, context: extraContext } = c.req.valid('json')
+
+    try {
+      // 若無 GEMINI_API_KEY，回傳預設模板文字（demo mode）
+      if (!process.env.GEMINI_API_KEY) {
+        const fallbackName = studentName ? `${studentName}同學` : '同學'
+        const fallbackText = `${fallbackName}在課堂上表現認真，學習態度良好。根據「${keywords}」的觀察，建議在相關方面持續加強練習。老師相信只要保持努力，一定會有更好的表現！`
+        return success(c, { text: fallbackText, keywords })
+      }
+
+      const prompt = `你是一位經驗豐富的補習班老師，正在撰寫給家長的聯絡簿。
+請根據以下關鍵字，生成一段專業、溫暖的家長對話文字。
+
+要求：
+- 語氣親切但專業
+- 正體中文
+- 200字以內
+- 先肯定學生的優點，再提出需要改進的地方
+- 結尾給予鼓勵
+
+${studentName ? `學生姓名：${studentName}` : ''}
+${extraContext ? `背景資訊：${extraContext}` : ''}
+關鍵字：${keywords}`
+
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
+      const result = await model.generateContent(prompt)
+      const text = result.response.text().trim()
+
+      return success(c, { text, keywords })
+    } catch (err) {
+      logger.error({ err }, '[ContactBook/ai-writing] Gemini API error')
+      // Gemini 失敗時回傳 500 + fallback 提示
+      return c.json(
+        {
+          success: false,
+          error: 'AI 助寫服務暫時無法使用，請稍後再試或手動輸入。',
+        },
+        500
+      )
+    }
+  }
+)
+
 // ─── POST /contact-book/upload ────────────────────────────────────────────────
 
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
@@ -833,3 +891,165 @@ contactBookRoutes.delete('/contact-book/photos/:photoId', async (c) => {
     return internalError(c, err)
   }
 })
+
+// ─── GET /contact-book/feedback-stats ────────────────────────────────────────
+
+const feedbackStatsQuerySchema = z.object({
+  month: z.string().regex(/^\d{4}-\d{2}$/, 'month must be YYYY-MM').optional(),
+  days: z.coerce.number().int().min(1).max(365).default(30),
+})
+
+contactBookRoutes.get(
+  '/contact-book/feedback-stats',
+  requirePermission(Permission.REPORTS_READ),
+  zValidator('query', feedbackStatsQuerySchema),
+  async (c) => {
+    const user = c.get('user')
+    const tenantId = user.tenant_id
+    const { month, days } = c.req.valid('query')
+
+    try {
+      // Build date filter conditions
+      const dateConditions = [
+        eq(manageContactBookEntries.tenantId, tenantId),
+        isNotNull(manageContactBookFeedback.rating),
+      ]
+
+      if (month) {
+        // Filter by specific month: YYYY-MM
+        const startDate = `${month}-01`
+        const [yearStr, monthStr] = month.split('-')
+        const nextMonth = new Date(Number(yearStr), Number(monthStr), 1) // month is 1-indexed here, Date uses 0-indexed but we pass the next month
+        const endDate = nextMonth.toISOString().split('T')[0]
+        dateConditions.push(gte(manageContactBookEntries.entryDate, startDate))
+        dateConditions.push(lte(manageContactBookEntries.entryDate, endDate))
+      } else {
+        // Filter by recent N days
+        const since = new Date()
+        since.setDate(since.getDate() - days)
+        dateConditions.push(gte(manageContactBookEntries.entryDate, since.toISOString().split('T')[0]))
+      }
+
+      const whereClause = and(...dateConditions)
+
+      // 1. Summary: total count, average rating, rating distribution
+      const summaryRows = await db
+        .select({
+          rating: manageContactBookFeedback.rating,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(manageContactBookFeedback)
+        .innerJoin(
+          manageContactBookEntries,
+          eq(manageContactBookFeedback.entryId, manageContactBookEntries.id)
+        )
+        .where(whereClause)
+        .groupBy(manageContactBookFeedback.rating)
+
+      let totalFeedbacks = 0
+      let ratingSum = 0
+      const ratingDistribution: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 }
+
+      for (const row of summaryRows) {
+        const r = row.rating
+        const cnt = row.count
+        if (r != null) {
+          totalFeedbacks += cnt
+          ratingSum += r * cnt
+          ratingDistribution[String(r)] = cnt
+        }
+      }
+
+      const averageRating = totalFeedbacks > 0
+        ? Math.round((ratingSum / totalFeedbacks) * 10) / 10
+        : 0
+
+      // 2. By course
+      const byCourse = await db
+        .select({
+          courseId: manageContactBookEntries.courseId,
+          courseName: manageCourses.name,
+          avgRating: sql<number>`round(avg(${manageContactBookFeedback.rating})::numeric, 1)::float`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(manageContactBookFeedback)
+        .innerJoin(
+          manageContactBookEntries,
+          eq(manageContactBookFeedback.entryId, manageContactBookEntries.id)
+        )
+        .innerJoin(
+          manageCourses,
+          eq(manageContactBookEntries.courseId, manageCourses.id)
+        )
+        .where(whereClause)
+        .groupBy(manageContactBookEntries.courseId, manageCourses.name)
+
+      // 3. By teacher
+      const byTeacher = await db
+        .select({
+          teacherId: manageContactBookEntries.teacherId,
+          teacherName: manageTeachers.name,
+          avgRating: sql<number>`round(avg(${manageContactBookFeedback.rating})::numeric, 1)::float`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(manageContactBookFeedback)
+        .innerJoin(
+          manageContactBookEntries,
+          eq(manageContactBookFeedback.entryId, manageContactBookEntries.id)
+        )
+        .innerJoin(
+          manageTeachers,
+          eq(manageContactBookEntries.teacherId, manageTeachers.id)
+        )
+        .where(and(...dateConditions, isNotNull(manageContactBookEntries.teacherId)))
+        .groupBy(manageContactBookEntries.teacherId, manageTeachers.name)
+
+      // 4. Recent feedbacks (last 10 with comments or ratings)
+      const recentFeedbacks = await db
+        .select({
+          id: manageContactBookFeedback.id,
+          studentName: manageStudents.name,
+          rating: manageContactBookFeedback.rating,
+          comment: manageContactBookFeedback.comment,
+          date: manageContactBookFeedback.createdAt,
+          courseName: manageCourses.name,
+        })
+        .from(manageContactBookFeedback)
+        .innerJoin(
+          manageContactBookEntries,
+          eq(manageContactBookFeedback.entryId, manageContactBookEntries.id)
+        )
+        .innerJoin(
+          manageStudents,
+          eq(manageContactBookEntries.studentId, manageStudents.id)
+        )
+        .innerJoin(
+          manageCourses,
+          eq(manageContactBookEntries.courseId, manageCourses.id)
+        )
+        .where(whereClause)
+        .orderBy(desc(manageContactBookFeedback.createdAt))
+        .limit(10)
+
+      return success(c, {
+        summary: {
+          totalFeedbacks,
+          averageRating,
+          ratingDistribution,
+        },
+        byCourse,
+        byTeacher,
+        recentFeedbacks: recentFeedbacks.map((f) => ({
+          id: f.id,
+          studentName: f.studentName,
+          rating: f.rating,
+          comment: f.comment,
+          date: f.date ? (f.date instanceof Date ? f.date.toISOString().split('T')[0] : String(f.date)) : null,
+          courseName: f.courseName,
+        })),
+      })
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)

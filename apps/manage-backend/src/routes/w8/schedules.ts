@@ -42,11 +42,14 @@ scheduleRoutes.get('/schedules', requirePermission(Permission.SCHEDULE_READ), zV
 
     const result = await db.execute(sql`
       SELECT s.*,
-        c.name as course_name, c.subject,
-        t.name as teacher_name, t.title as teacher_title, t.rate_per_class
+        c.name as course_name, c.subject, c.course_type,
+        t.name as teacher_name, t.title as teacher_title, t.rate_per_class,
+        ms.full_name as student_name
       FROM schedules s
       JOIN courses c ON s.course_id = c.id
       LEFT JOIN teachers t ON s.teacher_id = t.id
+      LEFT JOIN manage_enrollments me ON me.course_id = s.course_id AND me.status = 'active' AND me.deleted_at IS NULL
+      LEFT JOIN manage_students ms ON ms.id = me.student_id
       WHERE ${where}
       ORDER BY s.scheduled_date, s.start_time
     `)

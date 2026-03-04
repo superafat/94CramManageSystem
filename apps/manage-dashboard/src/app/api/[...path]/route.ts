@@ -26,7 +26,15 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
   // Demo mode: return mock data instead of proxying to backend
   const tenantId = extractTenantFromJwt(request)
   if (tenantId && DEMO_TENANTS.includes(tenantId)) {
-    const demoResult = getDemoResponse(request.method, targetPath, request.nextUrl.searchParams)
+    let requestBody: Record<string, unknown> | undefined
+    if (!['GET', 'HEAD'].includes(request.method)) {
+      try {
+        requestBody = await request.clone().json()
+      } catch {
+        // body is not JSON or empty — ignore
+      }
+    }
+    const demoResult = getDemoResponse(request.method, targetPath, request.nextUrl.searchParams, requestBody)
     if (demoResult) {
       return NextResponse.json(demoResult.body, { status: demoResult.status })
     }

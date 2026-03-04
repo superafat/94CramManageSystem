@@ -499,11 +499,63 @@ function getDemoSessionCount(courseId: string, month: string) {
   return { courseId, month, sessionCount: count, sessions }
 }
 
+// ===== Makeup Classes =====
+const DEMO_MAKEUP_CLASSES = [
+  {
+    id: 'mk-1', tenant_id: '11111111-1111-1111-1111-111111111111',
+    student_id: 's1', student_name: '陳小明',
+    original_date: '2026-03-03', original_course_id: 'c1', original_course_name: '國中數學A班',
+    status: 'pending', makeup_date: null, makeup_time: null, makeup_end_time: null,
+    makeup_teacher_id: null, makeup_teacher_name: null, makeup_room: null, notes: '家長已告知',
+    created_at: '2026-03-03T10:00:00Z',
+  },
+  {
+    id: 'mk-2', tenant_id: '11111111-1111-1111-1111-111111111111',
+    student_id: 's2', student_name: '林小華',
+    original_date: '2026-03-01', original_course_id: 'c2', original_course_name: '國中英文B班',
+    status: 'scheduled', makeup_date: '2026-03-08', makeup_time: '14:00', makeup_end_time: '16:00',
+    makeup_teacher_id: 't1', makeup_teacher_name: '王老師', makeup_room: '教室A',
+    notes: null, created_at: '2026-03-01T10:00:00Z',
+  },
+  {
+    id: 'mk-3', tenant_id: '11111111-1111-1111-1111-111111111111',
+    student_id: 's3', student_name: '張志豪',
+    original_date: '2026-02-27', original_course_id: 'c1', original_course_name: '國中數學A班',
+    status: 'completed', makeup_date: '2026-03-02', makeup_time: '10:00', makeup_end_time: '12:00',
+    makeup_teacher_id: 't2', makeup_teacher_name: '李老師', makeup_room: '教室B',
+    notes: null, created_at: '2026-02-27T10:00:00Z',
+  },
+  {
+    id: 'mk-4', tenant_id: '11111111-1111-1111-1111-111111111111',
+    student_id: 's4', student_name: '王小美',
+    original_date: '2026-03-04', original_course_id: 'c3', original_course_name: '高中國文班',
+    status: 'pending', makeup_date: null, makeup_time: null, makeup_end_time: null,
+    makeup_teacher_id: null, makeup_teacher_name: null, makeup_room: null, notes: null,
+    created_at: '2026-03-04T10:00:00Z',
+  },
+  {
+    id: 'mk-5', tenant_id: '11111111-1111-1111-1111-111111111111',
+    student_id: 's1', student_name: '陳小明',
+    original_date: '2026-02-25', original_course_id: 'c2', original_course_name: '國中英文B班',
+    status: 'cancelled', makeup_date: null, makeup_time: null, makeup_end_time: null,
+    makeup_teacher_id: null, makeup_teacher_name: null, makeup_room: null, notes: '學生轉班',
+    created_at: '2026-02-25T10:00:00Z',
+  },
+]
+
+// ===== Makeup Slots (補課時段) =====
+const DEMO_MAKEUP_SLOTS = [
+  { id: 'ms-1', tenant_id: '11111111-1111-1111-1111-111111111111', subject: '數學', makeup_date: '2026-03-10', start_time: '18:00', end_time: '20:00', teacher_id: 't1', teacher_name: '王大明', room: 'A201', max_students: 10, current_students: 3, notes: null, created_at: '2026-03-05T10:00:00Z' },
+  { id: 'ms-2', tenant_id: '11111111-1111-1111-1111-111111111111', subject: '英文', makeup_date: '2026-03-12', start_time: '14:00', end_time: '16:00', teacher_id: 't2', teacher_name: '李小華', room: 'B102', max_students: 8, current_students: 5, notes: null, created_at: '2026-03-05T10:00:00Z' },
+  { id: 'ms-3', tenant_id: '11111111-1111-1111-1111-111111111111', subject: '國文', makeup_date: '2026-03-15', start_time: '10:00', end_time: '12:00', teacher_id: 't1', teacher_name: '王大明', room: 'A201', max_students: 10, current_students: 0, notes: null, created_at: '2026-03-05T10:00:00Z' },
+]
+
 // ===== Route handler =====
 
 export const DEMO_TENANTS = [DEMO_TENANT_1, DEMO_TENANT_2]
 
-export function getDemoResponse(method: string, path: string, searchParams: URLSearchParams): { status: number; body: unknown } | null {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getDemoResponse(method: string, path: string, searchParams: URLSearchParams, body?: Record<string, any>): { status: number; body: unknown } | null {
   if (method === 'GET') {
     // Tenant APIs
     if (path === '/api/admin/tenants') return { status: 200, body: { tenants: TENANTS } }
@@ -572,6 +624,91 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
       const start = searchParams.get('start_date') || '2026-02-24'
       const end = searchParams.get('end_date') || '2026-03-02'
       return { status: 200, body: { schedules: getWeekSchedules(start, end) } }
+    }
+
+    // Makeup Slots — 補課時段
+    if (path === '/api/admin/makeup-slots') {
+      let filtered = DEMO_MAKEUP_SLOTS
+      const subject = searchParams.get('subject')
+      const dateFrom = searchParams.get('dateFrom')
+      const dateTo = searchParams.get('dateTo')
+      if (subject) filtered = filtered.filter(s => s.subject === subject)
+      if (dateFrom) filtered = filtered.filter(s => s.makeup_date >= dateFrom)
+      if (dateTo) filtered = filtered.filter(s => s.makeup_date <= dateTo)
+      return { status: 200, body: { success: true, data: { slots: filtered } } }
+    }
+    const makeupSlotStudentsMatch = path.match(/^\/api\/admin\/makeup-slots\/([\w-]+)\/students$/)
+    if (makeupSlotStudentsMatch) {
+      return { status: 200, body: { success: true, data: { students: [
+        { id: 's1', name: '陳小利', grade: '國一', original_course: '國中數學 A 班', original_date: '2026-03-03' },
+        { id: 's4', name: '張志豪', grade: '國三', original_course: '國中數學 A 班', original_date: '2026-03-05' },
+        { id: 's7', name: '劉思涵', grade: '國一', original_course: '國中數學 A 班', original_date: '2026-03-03' },
+      ] } } }
+    }
+
+    // Course detail — 課程詳情 + 學生名單
+    const courseDetailMatch = path.match(/^\/api\/w8\/courses\/([\w-]+)$/)
+    if (courseDetailMatch) {
+      const courseId = courseDetailMatch[1]
+      const course = COURSES.find(c => c.id === courseId)
+      if (!course) return { status: 404, body: { success: false, error: 'Course not found' } }
+      const students = (COURSE_STUDENTS[courseId] || []).map(s => ({
+        id: s.id, full_name: s.full_name, grade_level: s.grade_level,
+      }))
+      return { status: 200, body: { success: true, data: { course, students } } }
+    }
+
+    // Makeup Classes notice PDF — HTML 補課通知書
+    const makeupNoticePdfMatch = path.match(/^\/api\/admin\/makeup-classes\/([\w-]+)\/notice-pdf$/)
+    if (makeupNoticePdfMatch) {
+      const mkId = makeupNoticePdfMatch[1]
+      const mk = DEMO_MAKEUP_CLASSES.find(m => m.id === mkId)
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>補課通知書</title></head><body style="font-family:sans-serif;max-width:600px;margin:40px auto;padding:20px;border:1px solid #ccc;">
+<h1 style="text-align:center;">補課通知書</h1>
+<p>親愛的家長您好：</p>
+<p>貴子弟 <strong>${mk?.student_name || '學生'}</strong> 因 ${mk?.original_date || '日期'} 之 <strong>${mk?.original_course_name || '課程'}</strong> 缺席，需安排補課。</p>
+<p>補課日期：${mk?.makeup_date || '待定'}<br/>補課時間：${mk?.makeup_time || '待定'} ~ ${mk?.makeup_end_time || '待定'}<br/>教室：${mk?.makeup_room || '待定'}<br/>授課老師：${mk?.makeup_teacher_name || '待定'}</p>
+<p>請準時出席，謝謝！</p>
+<p style="text-align:right;margin-top:40px;">蜂神榜示範補習班 敬上</p>
+</body></html>`
+      return { status: 200, body: html }
+    }
+
+    // Makeup Classes — 補課管理
+    if (path === '/api/admin/makeup-classes') {
+      const status = searchParams.get('status')
+      let filtered = DEMO_MAKEUP_CLASSES
+      if (status) filtered = filtered.filter(m => m.status === status)
+      return { status: 200, body: { success: true, data: { makeupClasses: filtered } } }
+    }
+
+    // Contact Book — 反饋統計
+    if (path === '/api/admin/contact-book/feedback-stats') {
+      return { status: 200, body: { success: true, data: {
+        summary: {
+          totalFeedbacks: 47,
+          averageRating: 4.3,
+          ratingDistribution: { '1': 1, '2': 2, '3': 6, '4': 18, '5': 20 },
+        },
+        byCourse: [
+          { courseId: 'c1', courseName: '國中數學A班', avgRating: 4.5, count: 15 },
+          { courseId: 'c2', courseName: '國中英文B班', avgRating: 4.2, count: 12 },
+          { courseId: 'c3', courseName: '高中國文班', avgRating: 4.1, count: 10 },
+          { courseId: 'c6', courseName: '小學安親班', avgRating: 4.6, count: 10 },
+        ],
+        byTeacher: [
+          { teacherId: 't1', teacherName: '王老師', avgRating: 4.6, count: 18 },
+          { teacherId: 't2', teacherName: '李老師', avgRating: 4.3, count: 15 },
+          { teacherId: 't3', teacherName: '陳主任', avgRating: 4.0, count: 14 },
+        ],
+        recentFeedbacks: [
+          { id: 'fb-1', studentName: '陳小明', rating: 5, comment: '老師非常用心，孩子進步很多！', date: '2026-03-04', courseName: '國中數學A班' },
+          { id: 'fb-2', studentName: '林小華', rating: 4, comment: '整體不錯，希望能多些練習', date: '2026-03-03', courseName: '國中英文B班' },
+          { id: 'fb-3', studentName: '張志豪', rating: 5, comment: '很滿意教學品質', date: '2026-03-02', courseName: '高中國文班' },
+          { id: 'fb-4', studentName: '王小美', rating: 3, comment: '希望作業量能再調整', date: '2026-03-01', courseName: '小學安親班' },
+          { id: 'fb-5', studentName: '吳承恩', rating: 4, comment: '孩子很喜歡上課', date: '2026-02-28', courseName: '國中數學A班' },
+        ],
+      } } }
     }
 
     // Health
@@ -1028,11 +1165,61 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
       return { status: 201, body: { success: true, data: { id: 'pkg-demo-new', message: '套餐已建立' } } }
     }
 
+    // Makeup Slots — 補課時段 POST
+    if (path === '/api/admin/makeup-slots') {
+      return { status: 201, body: { success: true, data: { slot: { id: 'ms-demo-new', ...body } } } }
+    }
+
+    // Makeup Classes — batch-assign
+    if (path === '/api/admin/makeup-classes/batch-assign') {
+      return { status: 200, body: { success: true, data: { updated: body?.makeupClassIds?.length || 0 } } }
+    }
+
+    // Makeup Classes — notify
+    const makeupNotifyMatch = path.match(/^\/api\/admin\/makeup-classes\/([\w-]+)\/notify$/)
+    if (makeupNotifyMatch) {
+      return { status: 200, body: { success: true, data: { message: '通知已發送（Demo）' } } }
+    }
+
+    // Enrollments — batch
+    if (path === '/api/admin/enrollments/batch') {
+      return { status: 200, body: { success: true, data: { enrolled: body?.studentIds?.length || 0 } } }
+    }
+
+    // Makeup Classes — 補課管理 POST/PUT/DELETE
+    if (path === '/api/admin/makeup-classes') {
+      return { status: 201, body: { success: true, data: { id: 'mk-demo-new', message: '補課記錄已建立' } } }
+    }
+
+    // Contact Book — AI 助寫
+    if (path === '/api/admin/contact-book/ai-writing') {
+      const studentName = body?.studentName || '貴子弟'
+      const keywords = body?.keywords || '各科目'
+      return { status: 200, body: { success: true, data: {
+        text: `親愛的家長您好，${studentName}在近期的學習中展現了積極的態度，特別在${keywords}方面有明顯的進步。老師觀察到孩子上課時專注力提升，也更願意主動發問。建議在家時可以多鼓勵孩子複習當天所學，持續保持這份學習動力。相信在您的支持下，孩子一定能有更出色的表現！`,
+        keywords,
+      } } }
+    }
+
+    // Notifications — 通知發送
+    if (path === '/api/notifications/send') {
+      return { status: 200, body: { success: true, data: { message: '通知已發送（Demo模式）' } } }
+    }
+
     // Generic POST success
     return { status: 200, body: { success: true, message: 'Demo 操作成功' } }
   }
 
   if (method === 'PUT' || method === 'PATCH') {
+    // Makeup Slots — 補課時段 PUT
+    const makeupSlotPutMatch = path.match(/^\/api\/admin\/makeup-slots\/([\w-]+)$/)
+    if (makeupSlotPutMatch) {
+      return { status: 200, body: { success: true, data: { slot: { id: makeupSlotPutMatch[1], ...body } } } }
+    }
+    // Makeup Classes — 補課管理 PUT
+    if (path.startsWith('/api/admin/makeup-classes')) {
+      return { status: 200, body: { success: true, data: { message: '補課記錄已更新' } } }
+    }
     // Billing — 價格記憶 PUT
     if (path === '/api/admin/billing/price-memory') {
       return { status: 200, body: { success: true, data: { records: DEMO_PRICE_MEMORY, message: '價格記憶已更新' } } }
@@ -1045,6 +1232,19 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
   }
 
   if (method === 'DELETE') {
+    // Makeup Slots — 補課時段 DELETE
+    const makeupSlotDeleteMatch = path.match(/^\/api\/admin\/makeup-slots\/([\w-]+)$/)
+    if (makeupSlotDeleteMatch) {
+      return { status: 200, body: { success: true, data: { message: '已刪除' } } }
+    }
+    // Enrollments — batch DELETE
+    if (path === '/api/admin/enrollments/batch') {
+      return { status: 200, body: { success: true, data: { removed: body?.studentIds?.length || 0 } } }
+    }
+    // Makeup Classes — 補課管理 DELETE
+    if (path.startsWith('/api/admin/makeup-classes')) {
+      return { status: 200, body: { success: true, data: { message: '補課記錄已刪除' } } }
+    }
     // Billing — 安親套餐 DELETE
     if (path.startsWith('/api/admin/billing/daycare-packages')) {
       return { status: 200, body: { success: true, data: { message: '套餐已刪除' } } }

@@ -82,6 +82,29 @@ export default function TeacherAttendancePage() {
   const [leaveSubmitting, setLeaveSubmitting] = useState(false)
   const [leaveSuccess, setLeaveSuccess] = useState<string | null>(null)
 
+  // 曠職通知 toast
+  const [absenceToast, setAbsenceToast] = useState<string | null>(null)
+
+  // 發送曠職通知（失敗時靜默處理，不阻塞主流程）
+  const sendAbsenceNotification = async (teacherId: string, teacherName: string) => {
+    try {
+      await fetch(`${API_BASE}/api/notifications/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          type: 'teacher_absence',
+          teacherId,
+          date: selectedDate,
+          message: `${teacherName} 老師今日未出勤，請確認是否請假。`,
+        }),
+      })
+      setAbsenceToast(`已通知 ${teacherName} 老師曠職`)
+    } catch {
+      // 靜默處理：通知失敗不影響主流程
+    }
+  }
+
   const loadData = async () => {
     try {
       setLoading(true)
@@ -144,6 +167,14 @@ export default function TeacherAttendancePage() {
 
   useEffect(() => { loadData() }, [selectedDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 曠職通知 toast 自動消失
+  useEffect(() => {
+    if (absenceToast) {
+      const timer = setTimeout(() => setAbsenceToast(null), 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [absenceToast])
+
   const handleStatusChange = (teacherId: string, status: 'present' | 'late' | 'absent') => {
     setChanges(prev => ({ ...prev, [teacherId]: status }))
   }
@@ -152,6 +183,15 @@ export default function TeacherAttendancePage() {
     if (Object.keys(changes).length === 0) return
     setSaving(true)
     try {
+      // 找出被標記為 absent 的教師，用於儲存後發送通知
+      const absentTeachers = Object.entries(changes)
+        .filter(([, status]) => status === 'absent')
+        .map(([teacherId]) => {
+          const teacher = teachers.find(t => t.id === teacherId)
+          const record = records.find(r => r.teacher_id === teacherId)
+          return { teacherId, teacherName: teacher?.full_name || record?.teacher_name || teacherId }
+        })
+
       if (!isDemo) {
         await Promise.all(
           Object.entries(changes).map(([teacherId, status]) =>
@@ -176,6 +216,17 @@ export default function TeacherAttendancePage() {
         )
         setChanges({})
         setEditMode(false)
+      }
+
+      // 儲存成功後，對曠職教師發送通知
+      for (const { teacherId, teacherName } of absentTeachers) {
+        await sendAbsenceNotification(teacherId, teacherName)
+      }
+
+      // Demo 模式下也顯示通知 toast
+      if (isDemo && absentTeachers.length > 0) {
+        const names = absentTeachers.map(t => t.teacherName).join('、')
+        setAbsenceToast(`已通知 ${names} 老師曠職`)
       }
     } catch {
       setError('儲存失敗')
@@ -344,6 +395,16 @@ export default function TeacherAttendancePage() {
         </div>
       )}
 
+      {/* 曠職通知 toast */}
+      {absenceToast && (
+        <div className="bg-[#7B9E89]/10 text-[#7B9E89] p-4 rounded-xl flex justify-between items-center animate-fade-in">
+          <span className="text-sm font-medium">{absenceToast}</span>
+          <button onClick={() => setAbsenceToast(null)} className="text-[#7B9E89] hover:text-[#7B9E89]/70 text-lg leading-none">
+            &times;
+          </button>
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-5 gap-4">
         <div className="bg-white rounded-2xl shadow-sm border border-border p-4">
@@ -426,7 +487,7 @@ export default function TeacherAttendancePage() {
                   </td>
                   {editMode && (
                     <td className="px-6 py-4">
-                      <div className="flex gap-2">
+                      <div className="flex items-center gap-2">
                         {(['present', 'late', 'absent'] as const).map(status => (
                           <button
                             key={status}
@@ -442,6 +503,11 @@ export default function TeacherAttendancePage() {
                             {status === 'present' ? '出席' : status === 'late' ? '遲到' : '缺席'}
                           </button>
                         ))}
+                        {currentStatus === 'absent' && (
+                          <span className="text-xs text-[#B5706E]/70" title="儲存後將自動發送曠職通知">
+                            * 將自動通知
+                          </span>
+                        )}
                       </div>
                     </td>
                   )}

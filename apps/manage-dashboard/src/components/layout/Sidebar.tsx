@@ -32,8 +32,9 @@ const navItems: NavItem[] = [
   // 班務管理區塊
   { type: 'separator', separator: '班務管理', roles: ['superadmin', 'admin', 'staff', 'teacher'] },
   { href: '/students', icon: '👥', label: '學生管理', roles: ['superadmin', 'admin', 'staff'] },
-  { href: '/schedules', icon: '📅', label: '課表管理', roles: ['superadmin', 'admin', 'staff', 'teacher', 'student'] },
+  { href: '/scheduling-center', icon: '📅', label: '排課中心', roles: ['superadmin', 'admin', 'staff', 'teacher', 'student'] },
   { href: '/attendance', icon: '✅', label: '出席管理', roles: ['superadmin', 'admin', 'staff', 'teacher'] },
+  { href: '/makeup-classes', icon: '📝', label: '補課管理', roles: ['superadmin', 'admin', 'staff'] },
   { href: '/grades', icon: '📊', label: '成績管理', roles: ['superadmin', 'admin', 'staff', 'teacher'] },
   { href: '/billing', icon: '💰', label: '帳務管理', roles: ['superadmin', 'admin', 'staff'] },
   { href: '/reports', icon: '📈', label: '報表中心', roles: ['superadmin', 'admin'] },

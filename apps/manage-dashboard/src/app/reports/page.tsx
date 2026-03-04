@@ -17,6 +17,42 @@ interface ReportData {
   churnRiskCount: number
 }
 
+interface FeedbackSummary {
+  totalFeedbacks: number
+  averageRating: number
+  ratingDistribution: Record<string, number>
+}
+
+interface CourseFeedback {
+  courseId: string
+  courseName: string
+  avgRating: number
+  count: number
+}
+
+interface TeacherFeedback {
+  teacherId: string
+  teacherName: string
+  avgRating: number
+  count: number
+}
+
+interface RecentFeedback {
+  id: string
+  studentName: string
+  rating: number
+  comment: string
+  date: string
+  courseName: string
+}
+
+interface FeedbackStats {
+  summary: FeedbackSummary
+  byCourse: CourseFeedback[]
+  byTeacher: TeacherFeedback[]
+  recentFeedbacks: RecentFeedback[]
+}
+
 interface ChurnStudent {
   id: string
   name: string
@@ -68,6 +104,7 @@ export default function ReportsPage() {
   const [recommendations, setRecommendations] = useState<CourseRecommendation[]>([])
   const [rawGrades, setRawGrades] = useState<GradeRecord[]>([])
   const [trendMonths, setTrendMonths] = useState<TrendMonth[]>([])
+  const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [period, setPeriod] = useState(() => {
@@ -150,6 +187,19 @@ export default function ReportsPage() {
       if (trendRes.ok) {
         const trendJson = await trendRes.json()
         setTrendMonths(trendJson.data?.months ?? [])
+      }
+
+      // 取得家長反饋統計
+      try {
+        const feedbackRes = await fetch(`${API_BASE}/api/admin/contact-book/feedback-stats`, {
+          credentials: 'include',
+        })
+        if (feedbackRes.ok) {
+          const feedbackJson = await feedbackRes.json()
+          setFeedbackStats(feedbackJson.data ?? null)
+        }
+      } catch {
+        // 反饋 API 失敗不影響其他報表
       }
 
     } catch (err) {
@@ -434,6 +484,165 @@ export default function ReportsPage() {
         ) : (
           <div className="text-center py-8 text-text-muted">
             ✨ 所有學生成績良好，暫無課程推薦
+          </div>
+        )}
+      </div>
+
+      {/* 家長反饋分析 */}
+      <div className="bg-white rounded-2xl shadow-sm border border-border p-6">
+        <h3 className="text-lg font-semibold text-text mb-6">💬 家長反饋分析</h3>
+
+        {feedbackStats ? (
+          <div className="space-y-8">
+            {/* 平均星級卡片 + 星級分布 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* 平均星級卡片 */}
+              <div className="flex flex-col items-center justify-center p-6 bg-surface rounded-xl">
+                <div className="text-5xl font-bold text-text mb-2">
+                  {feedbackStats.summary.averageRating.toFixed(1)}
+                </div>
+                <div className="flex gap-0.5 mb-2">
+                  {[1, 2, 3, 4, 5].map((star) => {
+                    const filled = feedbackStats.summary.averageRating >= star
+                    const partial = !filled && feedbackStats.summary.averageRating > star - 1
+                    const fillPercent = partial
+                      ? Math.round((feedbackStats.summary.averageRating - (star - 1)) * 100)
+                      : filled ? 100 : 0
+                    return (
+                      <span
+                        key={star}
+                        className="text-2xl"
+                        style={{
+                          background: `linear-gradient(90deg, #C4956A ${fillPercent}%, #D1D5DB ${fillPercent}%)`,
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                        }}
+                      >
+                        ★
+                      </span>
+                    )
+                  })}
+                </div>
+                <div className="text-sm text-text-muted">
+                  共 {feedbackStats.summary.totalFeedbacks} 則評價
+                </div>
+              </div>
+
+              {/* 星級分布 */}
+              <div className="space-y-2 flex flex-col justify-center">
+                {[5, 4, 3, 2, 1].map((star) => {
+                  const count = feedbackStats.summary.ratingDistribution[String(star)] || 0
+                  const total = feedbackStats.summary.totalFeedbacks || 1
+                  const percent = Math.round((count / total) * 100)
+                  return (
+                    <div key={star} className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-text w-12 text-right">{star} 星</span>
+                      <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${percent}%`,
+                            backgroundColor: '#8FA895',
+                          }}
+                        />
+                      </div>
+                      <span className="text-sm text-text-muted w-16 text-right">{count} ({percent}%)</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* 按課程/老師滿意度排行 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* 課程排行 */}
+              <div>
+                <h4 className="text-sm font-semibold text-text mb-3">課程滿意度排行</h4>
+                {feedbackStats.byCourse.length > 0 ? (
+                  <div className="space-y-2">
+                    {feedbackStats.byCourse.map((course, idx) => (
+                      <div key={course.courseId} className="flex items-center justify-between p-3 bg-surface rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-bold text-text-muted w-6">{idx + 1}</span>
+                          <span className="text-sm font-medium text-text">{course.courseName}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span style={{ color: '#C4956A' }}>★</span>
+                          <span className="text-sm font-semibold text-text">{course.avgRating.toFixed(1)}</span>
+                          <span className="text-xs text-text-muted">({course.count})</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-text-muted text-sm">暫無數據</div>
+                )}
+              </div>
+
+              {/* 老師排行 */}
+              <div>
+                <h4 className="text-sm font-semibold text-text mb-3">老師滿意度排行</h4>
+                {feedbackStats.byTeacher.length > 0 ? (
+                  <div className="space-y-2">
+                    {feedbackStats.byTeacher.map((teacher, idx) => (
+                      <div key={teacher.teacherId} className="flex items-center justify-between p-3 bg-surface rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-bold text-text-muted w-6">{idx + 1}</span>
+                          <span className="text-sm font-medium text-text">{teacher.teacherName}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span style={{ color: '#C4956A' }}>★</span>
+                          <span className="text-sm font-semibold text-text">{teacher.avgRating.toFixed(1)}</span>
+                          <span className="text-xs text-text-muted">({teacher.count})</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-text-muted text-sm">暫無數據</div>
+                )}
+              </div>
+            </div>
+
+            {/* 最新反饋列表 */}
+            <div>
+              <h4 className="text-sm font-semibold text-text mb-3">最新家長反饋</h4>
+              {feedbackStats.recentFeedbacks.length > 0 ? (
+                <div className="space-y-2">
+                  {feedbackStats.recentFeedbacks.map((fb) => (
+                    <div key={fb.id} className="flex items-start justify-between p-3 bg-surface rounded-xl gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium text-text">{fb.studentName}</span>
+                          <span className="text-xs text-text-muted">{fb.courseName}</span>
+                        </div>
+                        <div className="flex items-center gap-1 mb-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <span
+                              key={star}
+                              className="text-xs"
+                              style={{ color: star <= fb.rating ? '#C4956A' : '#D1D5DB' }}
+                            >
+                              ★
+                            </span>
+                          ))}
+                        </div>
+                        {fb.comment && (
+                          <p className="text-sm text-text-muted truncate">{fb.comment}</p>
+                        )}
+                      </div>
+                      <span className="text-xs text-text-muted whitespace-nowrap">{fb.date}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-text-muted text-sm">暫無反饋</div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-text-muted">
+            暫無數據
           </div>
         )}
       </div>

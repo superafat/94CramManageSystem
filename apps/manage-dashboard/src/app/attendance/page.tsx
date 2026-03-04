@@ -46,6 +46,8 @@ export default function AttendancePage() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [editMode, setEditMode] = useState(false)
   const [changes, setChanges] = useState<Record<string, 'present' | 'late' | 'absent'>>({})
+  const [autoNotifyAbsent, setAutoNotifyAbsent] = useState(true)
+  const [notifyResult, setNotifyResult] = useState<string | null>(null)
 
   // 請假相關 state
   const [leaveModalOpen, setLeaveModalOpen] = useState(false)
@@ -101,6 +103,7 @@ export default function AttendancePage() {
     if (Object.keys(changes).length === 0) return
 
     setSaving(true)
+    setNotifyResult(null)
 
     try {
       for (const [studentId, status] of Object.entries(changes)) {
@@ -116,6 +119,58 @@ export default function AttendancePage() {
           })
         })
       }
+
+      // 自動通知缺席學生家長 & 建立待補課記錄（fire-and-forget）
+      if (autoNotifyAbsent) {
+        const absentEntries = Object.entries(changes).filter(([, status]) => status === 'absent')
+        if (absentEntries.length > 0) {
+          const notifyAndCreateMakeup = async () => {
+            let notifiedCount = 0
+            for (const [studentId] of absentEntries) {
+              const student = students.find(s => s.id === studentId)
+              const studentName = student?.full_name ?? '學生'
+
+              // 通知家長
+              try {
+                await fetch(`${API_BASE}/api/notifications/send`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({
+                    type: 'absence_alert',
+                    studentId,
+                    date: selectedDate,
+                    message: `您的孩子 ${studentName} 今日缺席，請確認。`,
+                  }),
+                })
+                notifiedCount++
+              } catch {
+                // 通知失敗不影響主流程
+              }
+
+              // 建立待補課記錄
+              try {
+                await fetch(`${API_BASE}/api/admin/makeup-classes`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({
+                    studentId,
+                    originalDate: selectedDate,
+                    originalCourseName: '（待確認）',
+                  }),
+                })
+              } catch {
+                // 補課建立失敗不影響主流程
+              }
+            }
+            setNotifyResult(`已通知 ${notifiedCount} 位缺席學生家長`)
+          }
+          // fire-and-forget：不 await，不阻塞主流程
+          notifyAndCreateMakeup().catch(() => {})
+        }
+      }
+
       setChanges({})
       setEditMode(false)
       await loadData()
@@ -253,8 +308,17 @@ export default function AttendancePage() {
           />
           {editMode ? (
             <>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={autoNotifyAbsent}
+                  onChange={(e) => setAutoNotifyAbsent(e.target.checked)}
+                  className="w-4 h-4 rounded border-border text-primary focus:ring-primary/30"
+                />
+                <span className="text-sm text-text-muted whitespace-nowrap">自動通知缺席家長</span>
+              </label>
               <button
-                onClick={() => { setEditMode(false); setChanges({}) }}
+                onClick={() => { setEditMode(false); setChanges({}); setNotifyResult(null) }}
                 className="px-4 py-2 border border-border rounded-xl hover:bg-surface"
               >
                 取消
@@ -282,6 +346,13 @@ export default function AttendancePage() {
         <div className="bg-red-50 text-red-600 p-4 rounded-xl flex justify-between items-center">
           <span>{error}</span>
           <button onClick={loadData} className="text-sm underline">重試</button>
+        </div>
+      )}
+
+      {notifyResult && (
+        <div className="bg-[#7B9E89]/10 text-[#7B9E89] p-4 rounded-xl flex justify-between items-center">
+          <span>{notifyResult}</span>
+          <button onClick={() => setNotifyResult(null)} className="text-sm underline">關閉</button>
         </div>
       )}
 
