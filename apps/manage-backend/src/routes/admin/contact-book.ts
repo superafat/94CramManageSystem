@@ -114,11 +114,12 @@ contactBookRoutes.get(
     const { courseId, date } = c.req.valid('query')
 
     try {
-      // 1. Existing entries for this course + date
+      // 1. Existing entries for this course + date (join student name)
       const entries = await db
         .select({
           id: manageContactBookEntries.id,
           studentId: manageContactBookEntries.studentId,
+          studentName: manageStudents.name,
           teacherId: manageContactBookEntries.teacherId,
           courseId: manageContactBookEntries.courseId,
           entryDate: manageContactBookEntries.entryDate,
@@ -134,6 +135,7 @@ contactBookRoutes.get(
           updatedAt: manageContactBookEntries.updatedAt,
         })
         .from(manageContactBookEntries)
+        .leftJoin(manageStudents, eq(manageContactBookEntries.studentId, manageStudents.id))
         .where(
           and(
             eq(manageContactBookEntries.tenantId, tenantId),

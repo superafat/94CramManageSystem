@@ -235,11 +235,12 @@ export default function ContactBookPage() {
 
   useEffect(() => {
     setLoadingCourses(true)
-    apiFetch<{ data: Course[] }>('/api/w8/courses')
+    apiFetch<{ success: boolean; data: { courses: Array<{ id: string; name: string }> } }>('/api/w8/courses')
       .then((res) => {
-        setCourses(res.data ?? [])
-        if ((res.data ?? []).length > 0) {
-          setSelectedCourseId(res.data[0].id)
+        const list = (res.data?.courses ?? []).map((c) => ({ id: c.id, name: c.name }))
+        setCourses(list)
+        if (list.length > 0) {
+          setSelectedCourseId(list[0].id)
         }
       })
       .catch((err: unknown) => {
@@ -254,17 +255,59 @@ export default function ContactBookPage() {
     if (!selectedCourseId) return
     setLoadingStudents(true)
     try {
-      const res = await apiFetch<{ data: ContactBookEntry[] }>(
+      interface BackendEntry {
+        id: string
+        studentId: string
+        studentName: string | null
+        courseId: string
+        entryDate: string
+        status: EntryStatus
+        groupProgress: string | null
+        groupHomework: string | null
+        individualNote: string | null
+        individualHomework: string | null
+        teacherTip: string | null
+        sentAt: string | null
+        readAt: string | null
+        createdAt: string
+        scores?: Array<{ id: string; subject: string; score: number; classAvg?: number; fullScore?: number }>
+        photos?: Array<{ id: string; url: string; caption?: string; sortOrder?: number }>
+        feedback?: Array<{ id: string; parentUserId: string; rating: number; comment?: string; createdAt: string }>
+        aiAnalysis?: { id: string; weaknessSummary: string; recommendedCourseName?: string; recommendedCourseDesc?: string } | null
+      }
+      interface BackendStudent { studentId: string; studentName: string; studentGrade?: string }
+      const res = await apiFetch<{ success: boolean; data: { entries: BackendEntry[]; studentsWithoutEntry: BackendStudent[] } }>(
         `/api/admin/contact-book/entries?courseId=${selectedCourseId}&date=${selectedDate}`
       )
-      const entries = res.data ?? []
-      setStudents(
-        entries.map((e) => ({
-          id: e.studentId,
-          name: e.studentName,
-          entry: e,
-        }))
-      )
+      const { entries = [], studentsWithoutEntry = [] } = res.data ?? {}
+
+      const mapEntry = (e: BackendEntry): Student => ({
+        id: e.studentId,
+        name: e.studentName ?? '',
+        entry: {
+          id: e.id,
+          studentId: e.studentId,
+          studentName: e.studentName ?? '',
+          date: e.entryDate,
+          status: e.status,
+          groupProgress: e.groupProgress ?? '',
+          groupHomework: e.groupHomework ?? '',
+          individualProgress: e.individualNote ?? '',
+          individualHomework: e.individualHomework ?? '',
+          teacherNote: e.teacherTip ?? '',
+          examScores: (e.scores ?? []).map((s) => ({ subject: s.subject, score: s.score, classAvg: s.classAvg ?? 0 })),
+          photos: (e.photos ?? []).map((p) => ({ id: p.id, url: p.url, name: p.caption ?? '' })),
+          parentFeedback: e.feedback?.[0] ? { rating: e.feedback[0].rating, comment: e.feedback[0].comment ?? '', createdAt: e.feedback[0].createdAt } : null,
+          aiAnalysis: e.aiAnalysis ? { weakSummary: e.aiAnalysis.weaknessSummary, recommendations: e.aiAnalysis.recommendedCourseDesc ? e.aiAnalysis.recommendedCourseDesc.split('；') : [] } : null,
+        },
+      })
+
+      const studentsFromEntries = entries.map((e) => mapEntry(e))
+      const studentsWithout = studentsWithoutEntry
+        .filter((s) => !entries.some((e) => e.studentId === s.studentId))
+        .map((s) => ({ id: s.studentId, name: s.studentName, entry: null }))
+
+      setStudents([...studentsFromEntries, ...studentsWithout])
       setSelectedStudentId(null)
       clearForm()
     } catch (err: unknown) {
@@ -341,10 +384,10 @@ export default function ContactBookPage() {
         body: JSON.stringify({
           groupProgress,
           groupHomework,
-          individualProgress,
+          individualNote: individualProgress,
           individualHomework,
-          teacherNote,
-          examScores,
+          teacherTip: teacherNote,
+          scores: examScores,
         }),
       })
       if (showToast) toast.success('已儲存')
@@ -359,11 +402,16 @@ export default function ContactBookPage() {
 
   async function batchCreate() {
     if (!selectedCourseId) return
+    const studentIds = students.filter((s) => !s.entry).map((s) => s.id)
+    if (studentIds.length === 0) {
+      toast.warning('所有學生已有聯絡簿')
+      return
+    }
     setBatchCreating(true)
     try {
       await apiFetch('/api/admin/contact-book/entries', {
         method: 'POST',
-        body: JSON.stringify({ courseId: selectedCourseId, date: selectedDate }),
+        body: JSON.stringify({ courseId: selectedCourseId, entryDate: selectedDate, studentIds }),
       })
       toast.success('批次建立完成')
       await loadEntries()
@@ -409,21 +457,25 @@ export default function ContactBookPage() {
         method: 'POST',
         body: JSON.stringify({
           courseId: selectedCourseId,
-          date: selectedDate,
+          entryDate: selectedDate,
           groupProgress: modalGroupProgress,
           groupHomework: modalGroupHomework,
         }),
       })
-      // Apply to all entries via batch update
-      await apiFetch('/api/admin/contact-book/entries', {
-        method: 'POST',
-        body: JSON.stringify({
-          courseId: selectedCourseId,
-          date: selectedDate,
-          groupProgress: modalGroupProgress,
-          groupHomework: modalGroupHomework,
-        }),
-      })
+      // Apply to all entries via batch update — send studentIds of all students
+      const allStudentIds = students.map((s) => s.id)
+      if (allStudentIds.length > 0) {
+        await apiFetch('/api/admin/contact-book/entries', {
+          method: 'POST',
+          body: JSON.stringify({
+            courseId: selectedCourseId,
+            entryDate: selectedDate,
+            studentIds: allStudentIds,
+            groupProgress: modalGroupProgress,
+            groupHomework: modalGroupHomework,
+          }),
+        })
+      }
       toast.success('已套用到所有學生')
       setClassProgressModalOpen(false)
       // Update current form if student is selected
@@ -473,8 +525,9 @@ export default function ContactBookPage() {
           body: formData,
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = (await res.json()) as { photo: Photo }
-        setPhotos((prev) => [...prev, data.photo])
+        const data = (await res.json()) as { success: boolean; data: { id: string; url: string; caption?: string } }
+        const photo = data.data
+        setPhotos((prev) => [...prev, { id: photo.id, url: photo.url, name: photo.caption ?? '' }])
       }
       toast.success('照片上傳成功')
     } catch (err: unknown) {
@@ -499,11 +552,15 @@ export default function ContactBookPage() {
     if (!currentEntryId.current) return
     setAiLoading(true)
     try {
-      const res = await apiFetch<{ data: AiAnalysis }>('/api/admin/contact-book/ai-analysis', {
+      const res = await apiFetch<{ success: boolean; data: { weaknessSummary: string; recommendedCourseName?: string; recommendedCourseDesc?: string } }>('/api/admin/contact-book/ai-analysis', {
         method: 'POST',
         body: JSON.stringify({ entryId: currentEntryId.current }),
       })
-      setAiAnalysis(res.data)
+      const ai = res.data
+      setAiAnalysis({
+        weakSummary: ai.weaknessSummary ?? '',
+        recommendations: ai.recommendedCourseDesc ? ai.recommendedCourseDesc.split('；') : [],
+      })
     } catch (err: unknown) {
       toast.error(`AI 分析失敗：${err instanceof Error ? err.message : String(err)}`)
     } finally {

@@ -699,12 +699,40 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
       let filtered = CONTACT_BOOK_ENTRIES
       if (courseId) filtered = filtered.filter(e => e.courseId === courseId)
       if (date) filtered = filtered.filter(e => e.date === date)
-      return { status: 200, body: { success: true, data: filtered } }
+      // Map to backend format
+      const entries = filtered.map(e => ({
+        id: e.id, studentId: e.studentId, studentName: e.studentName,
+        courseId: e.courseId, entryDate: e.date, status: e.status,
+        groupProgress: e.groupProgress, groupHomework: e.groupHomework,
+        individualNote: e.individualProgress, individualHomework: e.individualHomework,
+        teacherTip: e.teacherNote, sentAt: e.sentAt, readAt: e.readAt, createdAt: e.createdAt,
+        scores: e.examScores, photos: e.photos.map(p => ({ id: p.id, url: p.url, caption: p.name, sortOrder: 0 })),
+        feedback: e.parentFeedback ? [{ id: 'fb-' + e.id, parentUserId: 'demo-parent', rating: e.parentFeedback.rating, comment: e.parentFeedback.comment, createdAt: e.parentFeedback.createdAt }] : [],
+        aiAnalysis: e.aiAnalysis ? { id: 'ai-' + e.id, weaknessSummary: e.aiAnalysis.weakSummary, recommendedCourseName: e.aiAnalysis.recommendations[0] ?? '', recommendedCourseDesc: e.aiAnalysis.recommendations.join('；') } : null,
+      }))
+      const entryStudentIds = new Set(entries.map(e => e.studentId))
+      const studentsWithoutEntry = STUDENTS
+        .filter(s => !entryStudentIds.has(s.id))
+        .slice(0, 3)
+        .map(s => ({ studentId: s.id, studentName: s.name, studentGrade: s.grade }))
+      return { status: 200, body: { success: true, data: { entries, studentsWithoutEntry } } }
     }
     const cbEntryMatch = path.match(/^\/api\/admin\/contact-book\/entries\/([\w-]+)$/)
     if (cbEntryMatch) {
       const entry = CONTACT_BOOK_ENTRIES.find(e => e.id === cbEntryMatch[1])
-      if (entry) return { status: 200, body: { success: true, data: entry } }
+      if (entry) {
+        return { status: 200, body: { success: true, data: {
+          id: entry.id, studentId: entry.studentId, studentName: entry.studentName,
+          courseId: entry.courseId, entryDate: entry.date, status: entry.status,
+          groupProgress: entry.groupProgress, groupHomework: entry.groupHomework,
+          individualNote: entry.individualProgress, individualHomework: entry.individualHomework,
+          teacherTip: entry.teacherNote, sentAt: entry.sentAt, readAt: entry.readAt, createdAt: entry.createdAt,
+          scores: entry.examScores,
+          photos: entry.photos.map(p => ({ id: p.id, url: p.url, caption: p.name, sortOrder: 0 })),
+          feedback: entry.parentFeedback ? [{ id: 'fb-1', parentUserId: 'demo-parent', rating: entry.parentFeedback.rating, comment: entry.parentFeedback.comment, createdAt: entry.parentFeedback.createdAt }] : [],
+          aiAnalysis: entry.aiAnalysis ? { id: 'ai-1', weaknessSummary: entry.aiAnalysis.weakSummary, recommendedCourseName: entry.aiAnalysis.recommendations[0] ?? '', recommendedCourseDesc: entry.aiAnalysis.recommendations.join('；') } : null,
+        } } }
+      }
       return { status: 404, body: { success: false, error: 'not_found' } }
     }
     if (path === '/api/admin/contact-book/templates') {
@@ -877,10 +905,10 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
       return { status: 200, body: { success: true, data: { id: 'tpl-demo', message: '範本已儲存' } } }
     }
     if (path === '/api/admin/contact-book/upload') {
-      return { status: 200, body: { success: true, data: { id: 'ph-demo', url: 'https://placehold.co/400x300/e8dfd5/6b5e50?text=上傳照片', name: 'demo-upload.jpg' } } }
+      return { status: 200, body: { success: true, data: { id: 'ph-demo', url: 'https://placehold.co/400x300/e8dfd5/6b5e50?text=上傳照片', caption: 'demo-upload.jpg', sortOrder: 0 } } }
     }
     if (path === '/api/admin/contact-book/ai-analysis') {
-      return { status: 200, body: { success: true, data: { weakSummary: '（Demo）數學科目表現低於班級平均，建議加強基礎運算與方程式練習。', recommendations: ['每日練習 10 題基礎計算', '建議參加數學加強班', '考前複習重點公式'] } } }
+      return { status: 200, body: { success: true, data: { weaknessSummary: '（Demo）數學科目表現低於班級平均，建議加強基礎運算與方程式練習。', recommendedCourseName: '數學加強班', recommendedCourseDesc: '每日練習 10 題基礎計算；建議參加數學加強班；考前複習重點公式' } } }
     }
     const parentFbMatch = path.match(/^\/api\/parent\/contact-book\/([\w-]+)\/feedback$/)
     if (parentFbMatch) {
