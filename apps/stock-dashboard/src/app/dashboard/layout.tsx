@@ -27,6 +27,7 @@ const navItems: NavEntry[] = [
   // 庫存管理
   { separator: '庫存管理' },
   { href: '/dashboard/items', icon: '📦', label: '品項管理' },
+  { href: '/dashboard/categories', icon: '🏷️', label: '分類管理' },
   { href: '/dashboard/inventory', icon: '🏪', label: '庫存總覽' },
   { href: '/dashboard/stock-in', icon: '📥', label: '入庫作業' },
   { href: '/dashboard/stock-out', icon: '📤', label: '出庫作業' },

@@ -6,6 +6,8 @@ export const stockCategories = pgTable('stock_categories', {
   name: varchar('name', { length: 100 }).notNull(),
   description: text('description'),
   color: varchar('color', { length: 20 }),
+  restockLeadDays: integer('restock_lead_days').default(7),
+  minOrderQuantity: integer('min_order_quantity').default(1),
   deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({

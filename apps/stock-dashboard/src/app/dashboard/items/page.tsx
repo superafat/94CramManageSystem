@@ -15,6 +15,9 @@ interface StockItem {
   schoolYear: string;
   version: string;
   isActive: boolean;
+  categoryId: string | null;
+  categoryName: string | null;
+  categoryColor: string | null;
 }
 
 export default function ItemsPage() {
@@ -25,9 +28,12 @@ export default function ItemsPage() {
   const [editItem, setEditItem] = useState<StockItem | undefined>();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [categories, setCategories] = useState<{id: string; name: string; color: string | null}[]>([]);
+  const [filterCategory, setFilterCategory] = useState<string>('all');
 
   useEffect(() => {
     fetchItems();
+    fetchCategories();
   }, []);
 
   const fetchItems = async () => {
@@ -42,6 +48,15 @@ export default function ItemsPage() {
       toast.error('無法載入資料');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const res = await api.get('/categories');
+      setCategories(res.data);
+    } catch (error) {
+      console.error('Failed to fetch categories', error);
     }
   };
 
@@ -73,7 +88,8 @@ export default function ItemsPage() {
     const matchesFilter = filterStatus === 'all' ||
       (filterStatus === 'active' && item.isActive) ||
       (filterStatus === 'inactive' && !item.isActive);
-    return matchesSearch && matchesFilter;
+    const matchesCategory = filterCategory === 'all' || item.categoryId === filterCategory;
+    return matchesSearch && matchesFilter && matchesCategory;
   });
 
   return (
@@ -110,6 +126,16 @@ export default function ItemsPage() {
           />
         </div>
         <div className="flex gap-2">
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8FA895]"
+          >
+            <option value="all">全部分類</option>
+            {categories.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'inactive')}
@@ -175,6 +201,7 @@ export default function ItemsPage() {
             <tr>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">品名</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">分類</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">學年/版本</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">單位</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">安全庫存</th>
@@ -188,6 +215,15 @@ export default function ItemsPage() {
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.sku || '-'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{item.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {item.categoryName ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${item.categoryColor || '#8FA895'}20`, color: item.categoryColor || '#8FA895' }}>
+                        {item.categoryName}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">未分類</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {item.schoolYear ? `${item.schoolYear}學年` : '-'} {item.version ? `v${item.version}` : ''}
                   </td>

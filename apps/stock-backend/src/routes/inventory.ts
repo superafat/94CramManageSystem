@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { db } from '../db/index';
-import { stockBarcodes, stockInventory, stockTransactions, stockItems, stockWarehouses } from '@94cram/shared/db';
+import { stockBarcodes, stockInventory, stockTransactions, stockItems, stockWarehouses, stockCategories } from '@94cram/shared/db';
 import { eq, and, desc, gte, sql } from 'drizzle-orm';
 import { authMiddleware } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
@@ -63,6 +63,76 @@ void nonEmptyString;
 
 app.use('*', authMiddleware, tenantMiddleware);
 
+// 聯動叫貨建議 — 按分類分組低庫存品項
+app.get('/low-stock-by-category', async (c) => {
+  try {
+    const tenantId = getTenantId(c);
+    const rows = await db.select({
+      inventoryId: stockInventory.id,
+      itemId: stockItems.id,
+      itemName: stockItems.name,
+      sku: stockItems.sku,
+      unit: stockItems.unit,
+      warehouseId: stockWarehouses.id,
+      warehouseName: stockWarehouses.name,
+      quantity: stockInventory.quantity,
+      safetyStock: stockItems.safetyStock,
+      categoryId: stockCategories.id,
+      categoryName: stockCategories.name,
+      categoryColor: stockCategories.color,
+      restockLeadDays: stockCategories.restockLeadDays,
+      minOrderQuantity: stockCategories.minOrderQuantity,
+    })
+    .from(stockInventory)
+    .innerJoin(stockItems, eq(stockInventory.itemId, stockItems.id))
+    .innerJoin(stockWarehouses, eq(stockInventory.warehouseId, stockWarehouses.id))
+    .leftJoin(stockCategories, eq(stockItems.categoryId, stockCategories.id))
+    .where(eq(stockInventory.tenantId, tenantId));
+
+    // Filter to low-stock items and group by category
+    const lowStock = rows.filter(r => r.quantity <= (r.safetyStock ?? 0));
+    const grouped = new Map<string, { categoryName: string; categoryColor: string | null; restockLeadDays: number | null; minOrderQuantity: number | null; items: typeof lowStock }>();
+
+    for (const item of lowStock) {
+      const key = item.categoryId || 'uncategorized';
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          categoryName: item.categoryName || '未分類',
+          categoryColor: item.categoryColor,
+          restockLeadDays: item.restockLeadDays,
+          minOrderQuantity: item.minOrderQuantity,
+          items: [],
+        });
+      }
+      grouped.get(key)!.items.push(item);
+    }
+
+    const result = Array.from(grouped.entries()).map(([categoryId, group]) => ({
+      categoryId,
+      categoryName: group.categoryName,
+      categoryColor: group.categoryColor,
+      restockLeadDays: group.restockLeadDays ?? 7,
+      minOrderQuantity: group.minOrderQuantity ?? 1,
+      items: group.items.map(i => ({
+        itemId: i.itemId,
+        itemName: i.itemName,
+        sku: i.sku,
+        unit: i.unit,
+        warehouseId: i.warehouseId,
+        warehouseName: i.warehouseName,
+        quantity: i.quantity,
+        safetyStock: i.safetyStock ?? 0,
+        suggestedQty: Math.max(1, (i.safetyStock ?? 0) * 2 - i.quantity),
+      })),
+    }));
+
+    return c.json(result);
+  } catch (err) {
+    logger.error({ err }, 'Route error');
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 // GET inventory for a warehouse
 app.get('/warehouse/:warehouseId', async (c) => {
   try {
@@ -77,11 +147,13 @@ app.get('/warehouse/:warehouseId', async (c) => {
     const inventory = await db.select({
       inventory: stockInventory,
       item: stockItems,
-      warehouse: stockWarehouses
+      warehouse: stockWarehouses,
+      category: { id: stockCategories.id, name: stockCategories.name, color: stockCategories.color, restockLeadDays: stockCategories.restockLeadDays, minOrderQuantity: stockCategories.minOrderQuantity }
     })
       .from(stockInventory)
       .innerJoin(stockItems, eq(stockInventory.itemId, stockItems.id))
       .innerJoin(stockWarehouses, eq(stockInventory.warehouseId, stockWarehouses.id))
+      .leftJoin(stockCategories, eq(stockItems.categoryId, stockCategories.id))
       .where(and(
         eq(stockInventory.tenantId, tenantId),
         eq(stockInventory.warehouseId, warehouseId)
@@ -109,11 +181,13 @@ app.get('/', async (c) => {
     const inventory = await db.select({
       inventory: stockInventory,
       item: stockItems,
-      warehouse: stockWarehouses
+      warehouse: stockWarehouses,
+      category: { id: stockCategories.id, name: stockCategories.name, color: stockCategories.color, restockLeadDays: stockCategories.restockLeadDays, minOrderQuantity: stockCategories.minOrderQuantity }
     })
       .from(stockInventory)
       .innerJoin(stockItems, eq(stockInventory.itemId, stockItems.id))
       .innerJoin(stockWarehouses, eq(stockInventory.warehouseId, stockWarehouses.id))
+      .leftJoin(stockCategories, eq(stockItems.categoryId, stockCategories.id))
       .where(eq(stockInventory.tenantId, tenantId))
       .limit(limit)
       .offset(offset);

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from '../db/index';
-import { stockItems } from '@94cram/shared/db';
-import { eq, and } from 'drizzle-orm';
+import { stockItems, stockCategories } from '@94cram/shared/db';
+import { eq, and, isNull } from 'drizzle-orm';
 import { authMiddleware } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { z } from 'zod';
@@ -28,6 +28,7 @@ const itemUpdateSchema = itemCreateSchema.partial().refine(
 const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).default(50),
   offset: z.coerce.number().int().min(0).default(0),
+  categoryId: z.string().uuid().optional(),
 });
 
 app.use('*', authMiddleware, tenantMiddleware);
@@ -39,14 +40,37 @@ app.get('/', async (c) => {
     const parsed = paginationSchema.safeParse({
       limit: c.req.query('limit'),
       offset: c.req.query('offset'),
+      categoryId: c.req.query('categoryId'),
     });
-    const { limit, offset } = parsed.success ? parsed.data : { limit: 50, offset: 0 };
+    const { limit, offset, categoryId } = parsed.success ? parsed.data : { limit: 50, offset: 0, categoryId: undefined };
 
-    const items = await db.select()
-      .from(stockItems)
-      .where(eq(stockItems.tenantId, tenantId))
-      .limit(limit)
-      .offset(offset);
+    const conditions = [eq(stockItems.tenantId, tenantId)];
+    if (categoryId) {
+      conditions.push(eq(stockItems.categoryId, categoryId));
+    }
+
+    const items = await db.select({
+      id: stockItems.id,
+      name: stockItems.name,
+      sku: stockItems.sku,
+      unit: stockItems.unit,
+      safetyStock: stockItems.safetyStock,
+      schoolYear: stockItems.schoolYear,
+      version: stockItems.version,
+      description: stockItems.description,
+      isActive: stockItems.isActive,
+      categoryId: stockItems.categoryId,
+      categoryName: stockCategories.name,
+      categoryColor: stockCategories.color,
+      restockLeadDays: stockCategories.restockLeadDays,
+      createdAt: stockItems.createdAt,
+      updatedAt: stockItems.updatedAt,
+    })
+    .from(stockItems)
+    .leftJoin(stockCategories, eq(stockItems.categoryId, stockCategories.id))
+    .where(and(...conditions))
+    .limit(limit)
+    .offset(offset);
     return c.json(items);
   } catch (err) {
     logger.error({ err }, 'Route error');
@@ -60,12 +84,29 @@ app.get('/:id', async (c) => {
     const id = c.req.param('id');
     const tenantId = getTenantId(c);
 
-    const [item] = await db.select()
-      .from(stockItems)
-      .where(and(
-        eq(stockItems.id, id),
-        eq(stockItems.tenantId, tenantId)
-      ));
+    const [item] = await db.select({
+      id: stockItems.id,
+      name: stockItems.name,
+      sku: stockItems.sku,
+      unit: stockItems.unit,
+      safetyStock: stockItems.safetyStock,
+      schoolYear: stockItems.schoolYear,
+      version: stockItems.version,
+      description: stockItems.description,
+      isActive: stockItems.isActive,
+      categoryId: stockItems.categoryId,
+      categoryName: stockCategories.name,
+      categoryColor: stockCategories.color,
+      restockLeadDays: stockCategories.restockLeadDays,
+      createdAt: stockItems.createdAt,
+      updatedAt: stockItems.updatedAt,
+    })
+    .from(stockItems)
+    .leftJoin(stockCategories, eq(stockItems.categoryId, stockCategories.id))
+    .where(and(
+      eq(stockItems.id, id),
+      eq(stockItems.tenantId, tenantId)
+    ));
 
     if (!item) return c.json({ error: 'Item not found' }, 404);
     return c.json(item);

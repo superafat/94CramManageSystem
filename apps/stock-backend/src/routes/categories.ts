@@ -12,6 +12,8 @@ const categoryBodySchema = z.object({
   name: z.string().trim().min(1),
   description: z.string().optional(),
   color: z.string().optional(),
+  restockLeadDays: z.number().int().min(0).optional(),
+  minOrderQuantity: z.number().int().min(1).optional(),
 });
 
 const app = new Hono();
@@ -76,6 +78,8 @@ app.post('/', async (c) => {
         name: body.name,
         description: body.description,
         color: body.color,
+        restockLeadDays: body.restockLeadDays,
+        minOrderQuantity: body.minOrderQuantity,
       })
       .returning();
 
@@ -112,6 +116,8 @@ app.put('/:id', async (c) => {
         name: body.name,
         description: body.description,
         color: body.color,
+        restockLeadDays: body.restockLeadDays,
+        minOrderQuantity: body.minOrderQuantity,
       })
       .where(and(
         eq(stockCategories.id, id),

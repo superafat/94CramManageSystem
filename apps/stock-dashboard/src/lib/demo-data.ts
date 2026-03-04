@@ -17,25 +17,25 @@ const WAREHOUSES = [
 
 // ===== Categories =====
 const CATEGORIES = [
-  { id: 'cat1', name: '講義', color: '#8FA895', itemCount: 5 },
-  { id: 'cat2', name: '教材', color: '#9DAEBB', itemCount: 3 },
-  { id: 'cat3', name: '耗材', color: '#C4A4A0', itemCount: 4 },
+  { id: 'cat1', name: '講義', description: '各科講義教材', color: '#8FA895', restockLeadDays: 14, minOrderQuantity: 50, itemCount: 5, createdAt: '2026-01-01T00:00:00Z' },
+  { id: 'cat2', name: '教材', description: '教學輔助教材', color: '#C4956A', restockLeadDays: 7, minOrderQuantity: 20, itemCount: 3, createdAt: '2026-01-01T00:00:00Z' },
+  { id: 'cat3', name: '耗材', description: '辦公耗材用品', color: '#9DAEBB', restockLeadDays: 3, minOrderQuantity: 10, itemCount: 4, createdAt: '2026-01-01T00:00:00Z' },
 ]
 
 // ===== Items (StockItem: { id, name, sku, unit, safetyStock, schoolYear, version, isActive }) =====
 const ITEMS = [
-  { id: 'item1', name: '國中數學 A 班講義 Vol.1', sku: 'MTH-A-V1', categoryId: 'cat1', categoryName: '講義', unit: '本', safetyStock: 20, schoolYear: '114', version: 'v1', isActive: true },
-  { id: 'item2', name: '國中數學 A 班講義 Vol.2', sku: 'MTH-A-V2', categoryId: 'cat1', categoryName: '講義', unit: '本', safetyStock: 20, schoolYear: '114', version: 'v1', isActive: true },
-  { id: 'item3', name: '國中英文菁英班講義', sku: 'ENG-E-V1', categoryId: 'cat1', categoryName: '講義', unit: '本', safetyStock: 15, schoolYear: '114', version: 'v1', isActive: true },
-  { id: 'item4', name: '國小先修班數學講義', sku: 'MTH-P-V1', categoryId: 'cat1', categoryName: '講義', unit: '本', safetyStock: 12, schoolYear: '114', version: 'v1', isActive: true },
-  { id: 'item5', name: '英文文法練習冊', sku: 'ENG-WB-1', categoryId: 'cat1', categoryName: '講義', unit: '本', safetyStock: 15, schoolYear: '114', version: 'v1', isActive: true },
-  { id: 'item6', name: '白板筆（黑色）', sku: 'SUP-PEN-B', categoryId: 'cat3', categoryName: '耗材', unit: '支', safetyStock: 30, schoolYear: '', version: '', isActive: true },
-  { id: 'item7', name: '白板筆（紅色）', sku: 'SUP-PEN-R', categoryId: 'cat3', categoryName: '耗材', unit: '支', safetyStock: 20, schoolYear: '', version: '', isActive: true },
-  { id: 'item8', name: 'A4 影印紙', sku: 'SUP-A4', categoryId: 'cat3', categoryName: '耗材', unit: '包', safetyStock: 10, schoolYear: '', version: '', isActive: true },
-  { id: 'item9', name: '計算機', sku: 'EQP-CALC', categoryId: 'cat2', categoryName: '教材', unit: '台', safetyStock: 5, schoolYear: '', version: '', isActive: true },
-  { id: 'item10', name: '英文字典', sku: 'EQP-DICT', categoryId: 'cat2', categoryName: '教材', unit: '本', safetyStock: 5, schoolYear: '', version: '', isActive: true },
-  { id: 'item11', name: '三角板組', sku: 'EQP-TRI', categoryId: 'cat2', categoryName: '教材', unit: '組', safetyStock: 8, schoolYear: '', version: '', isActive: true },
-  { id: 'item12', name: '板擦', sku: 'SUP-ERASER', categoryId: 'cat3', categoryName: '耗材', unit: '個', safetyStock: 10, schoolYear: '', version: '', isActive: true },
+  { id: 'item1', name: '國中數學 A 班講義 Vol.1', sku: 'MTH-A-V1', categoryId: 'cat1', categoryName: '講義', categoryColor: '#8FA895', unit: '本', safetyStock: 20, schoolYear: '114', version: 'v1', isActive: true },
+  { id: 'item2', name: '國中數學 A 班講義 Vol.2', sku: 'MTH-A-V2', categoryId: 'cat1', categoryName: '講義', categoryColor: '#8FA895', unit: '本', safetyStock: 20, schoolYear: '114', version: 'v1', isActive: true },
+  { id: 'item3', name: '國中英文菁英班講義', sku: 'ENG-E-V1', categoryId: 'cat1', categoryName: '講義', categoryColor: '#8FA895', unit: '本', safetyStock: 15, schoolYear: '114', version: 'v1', isActive: true },
+  { id: 'item4', name: '國小先修班數學講義', sku: 'MTH-P-V1', categoryId: 'cat1', categoryName: '講義', categoryColor: '#8FA895', unit: '本', safetyStock: 12, schoolYear: '114', version: 'v1', isActive: true },
+  { id: 'item5', name: '英文文法練習冊', sku: 'ENG-WB-1', categoryId: 'cat1', categoryName: '講義', categoryColor: '#8FA895', unit: '本', safetyStock: 15, schoolYear: '114', version: 'v1', isActive: true },
+  { id: 'item6', name: '白板筆（黑色）', sku: 'SUP-PEN-B', categoryId: 'cat3', categoryName: '耗材', categoryColor: '#9DAEBB', unit: '支', safetyStock: 30, schoolYear: '', version: '', isActive: true },
+  { id: 'item7', name: '白板筆（紅色）', sku: 'SUP-PEN-R', categoryId: 'cat3', categoryName: '耗材', categoryColor: '#9DAEBB', unit: '支', safetyStock: 20, schoolYear: '', version: '', isActive: true },
+  { id: 'item8', name: 'A4 影印紙', sku: 'SUP-A4', categoryId: 'cat3', categoryName: '耗材', categoryColor: '#9DAEBB', unit: '包', safetyStock: 10, schoolYear: '', version: '', isActive: true },
+  { id: 'item9', name: '計算機', sku: 'EQP-CALC', categoryId: 'cat2', categoryName: '教材', categoryColor: '#C4956A', unit: '台', safetyStock: 5, schoolYear: '', version: '', isActive: true },
+  { id: 'item10', name: '英文字典', sku: 'EQP-DICT', categoryId: 'cat2', categoryName: '教材', categoryColor: '#C4956A', unit: '本', safetyStock: 5, schoolYear: '', version: '', isActive: true },
+  { id: 'item11', name: '三角板組', sku: 'EQP-TRI', categoryId: 'cat2', categoryName: '教材', categoryColor: '#C4956A', unit: '組', safetyStock: 8, schoolYear: '', version: '', isActive: true },
+  { id: 'item12', name: '板擦', sku: 'SUP-ERASER', categoryId: 'cat3', categoryName: '耗材', categoryColor: '#9DAEBB', unit: '個', safetyStock: 10, schoolYear: '', version: '', isActive: true },
 ]
 
 // ===== Inventory (InventoryItem: { id, itemId, itemName, sku, unit, warehouseName, quantity, safetyStock }) =====
@@ -88,6 +88,17 @@ const PURCHASE_ORDER_DETAILS: Record<string, unknown> = {
   po2: { order: { id: 'po2', status: 'approved', orderDate: '2026-02-28T14:00:00Z', totalAmount: '4500', notes: '' }, supplierName: '台灣文具批發', warehouseName: '總部教材倉', items: [{ id: 'poi3', itemId: 'item6', itemName: '白板筆（黑色）', quantity: 60, unitPrice: 25, subtotal: 1500 }, { id: 'poi4', itemId: 'item7', itemName: '白板筆（紅色）', quantity: 40, unitPrice: 25, subtotal: 1000 }, { id: 'poi5', itemId: 'item8', itemName: 'A4 影印紙', quantity: 20, unitPrice: 100, subtotal: 2000 }] },
   po3: { order: { id: 'po3', status: 'pending', orderDate: '2026-03-01T11:00:00Z', totalAmount: '8000', notes: '' }, supplierName: '教育圖書社', warehouseName: '總部教材倉', items: [{ id: 'poi6', itemId: 'item10', itemName: '英文字典', quantity: 10, unitPrice: 500, subtotal: 5000 }, { id: 'poi7', itemId: 'item11', itemName: '三角板組', quantity: 20, unitPrice: 150, subtotal: 3000 }] },
 }
+
+// ===== Batches =====
+const DEMO_BATCHES = [
+  { id: 'b1', batchNo: 'B2026-001', warehouseId: 'wh1', itemId: 'item1', quantity: 100, remainingQty: 45, manufactureDate: '2025-12-01', expiryDate: '2026-12-01', receivedAt: '2026-01-15T10:00:00Z', unitCost: '25.00', notes: null },
+  { id: 'b2', batchNo: 'B2026-002', warehouseId: 'wh1', itemId: 'item1', quantity: 50, remainingQty: 50, manufactureDate: '2026-01-15', expiryDate: '2027-01-15', receivedAt: '2026-02-01T10:00:00Z', unitCost: '26.00', notes: null },
+  { id: 'b3', batchNo: 'B2026-003', warehouseId: 'wh1', itemId: 'item2', quantity: 80, remainingQty: 30, manufactureDate: '2025-11-01', expiryDate: '2026-05-01', receivedAt: '2025-12-01T10:00:00Z', unitCost: '40.00', notes: '即將過期' },
+  { id: 'b4', batchNo: 'B2026-004', warehouseId: 'wh2', itemId: 'item3', quantity: 200, remainingQty: 180, manufactureDate: '2026-02-01', expiryDate: null, receivedAt: '2026-02-15T10:00:00Z', unitCost: '5.00', notes: '耗材無過期' },
+  { id: 'b5', batchNo: 'B2025-010', warehouseId: 'wh1', itemId: 'item4', quantity: 30, remainingQty: 8, manufactureDate: '2025-06-01', expiryDate: '2026-03-01', receivedAt: '2025-07-01T10:00:00Z', unitCost: '35.00', notes: '已過期' },
+  { id: 'b6', batchNo: 'B2026-005', warehouseId: 'wh1', itemId: 'item7', quantity: 100, remainingQty: 5, manufactureDate: '2025-10-01', expiryDate: '2026-10-01', receivedAt: '2025-11-01T10:00:00Z', unitCost: '15.00', notes: null },
+  { id: 'b7', batchNo: 'B2026-006', warehouseId: 'wh2', itemId: 'item8', quantity: 50, remainingQty: 3, manufactureDate: '2025-09-01', expiryDate: '2026-04-15', receivedAt: '2025-10-01T10:00:00Z', unitCost: '8.00', notes: '即將過期' },
+]
 
 // ===== Barcodes =====
 const BARCODES = ITEMS.map(item => ({
@@ -224,7 +235,33 @@ export function getDemoResponse(method: string, path: string, _searchParams: URL
     }
 
     // Inventory
-    if (path === '/api/inventory') return { status: 200, body: INVENTORY }
+    if (path === '/api/inventory') {
+      const enriched = INVENTORY.map(inv => {
+        const item = ITEMS.find(i => i.id === inv.itemId)
+        const cat = item ? CATEGORIES.find(c => c.id === item.categoryId) : null
+        return {
+          ...inv,
+          category: cat ? { id: cat.id, name: cat.name, color: cat.color, restockLeadDays: cat.restockLeadDays, minOrderQuantity: cat.minOrderQuantity } : null,
+        }
+      })
+      return { status: 200, body: enriched }
+    }
+
+    // Inventory low-stock-by-category
+    if (path === '/api/inventory/low-stock-by-category') {
+      const lowStock = INVENTORY.filter(inv => inv.quantity <= inv.safetyStock)
+      const grouped: Record<string, { categoryId: string; categoryName: string; categoryColor: string; restockLeadDays: number; minOrderQuantity: number; items: typeof INVENTORY }> = {}
+      for (const inv of lowStock) {
+        const item = ITEMS.find(i => i.id === inv.itemId)
+        const cat = item ? CATEGORIES.find(c => c.id === item.categoryId) : null
+        if (!cat) continue
+        if (!grouped[cat.id]) {
+          grouped[cat.id] = { categoryId: cat.id, categoryName: cat.name, categoryColor: cat.color, restockLeadDays: cat.restockLeadDays, minOrderQuantity: cat.minOrderQuantity, items: [] }
+        }
+        grouped[cat.id].items.push(inv)
+      }
+      return { status: 200, body: Object.values(grouped) }
+    }
 
     // Inventory Transactions (used by stock-in, stock-out, transfer pages)
     if (path === '/api/inventory/transactions') return { status: 200, body: TRANSACTIONS }
@@ -238,6 +275,16 @@ export function getDemoResponse(method: string, path: string, _searchParams: URL
     if (poMatch) {
       const detail = PURCHASE_ORDER_DETAILS[poMatch[1]]
       return detail ? { status: 200, body: detail } : { status: 404, body: { error: 'Not found' } }
+    }
+
+    // Batches
+    if (path === '/api/batches') {
+      let batches = DEMO_BATCHES
+      const itemId = _searchParams.get('itemId')
+      const warehouseId = _searchParams.get('warehouseId')
+      if (itemId) batches = batches.filter(b => b.itemId === itemId)
+      if (warehouseId) batches = batches.filter(b => b.warehouseId === warehouseId)
+      return { status: 200, body: batches }
     }
 
     // Barcodes

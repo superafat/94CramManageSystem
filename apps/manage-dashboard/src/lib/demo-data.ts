@@ -291,18 +291,37 @@ const NOTIFICATIONS = [
 ]
 
 // ===== Teacher Attendance (師資出缺勤) =====
-const TEACHER_ATTENDANCE = [
-  { id: 'ta-1', teacher_id: 't1', teacher_name: '王老師', role: '資深講師', date: '2026-03-03', status: 'present', check_in_time: '15:30', check_out_time: '21:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
-  { id: 'ta-2', teacher_id: 't2', teacher_name: '李老師', role: '首席講師', date: '2026-03-03', status: 'present', check_in_time: '17:45', check_out_time: '20:10', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
-  { id: 'ta-3', teacher_id: 't3', teacher_name: '陳主任', role: '教務主任', date: '2026-03-03', status: 'present', check_in_time: '09:00', check_out_time: '18:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
-  { id: 'ta-4', teacher_id: 't4', teacher_name: '林助教', role: '助教', date: '2026-03-03', status: 'late', check_in_time: '16:20', check_out_time: '20:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: '遲到 20 分鐘' },
-  { id: 'ta-5', teacher_id: 't1', teacher_name: '王老師', role: '資深講師', date: '2026-03-01', status: 'present', check_in_time: '15:30', check_out_time: '21:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
-  { id: 'ta-6', teacher_id: 't2', teacher_name: '李老師', role: '首席講師', date: '2026-03-01', status: 'leave', check_in_time: null, check_out_time: null, leave_type: 'sick', leave_reason: '身體不適', substitute_teacher_id: 't1', approved: true, notes: '王老師代課' },
-  { id: 'ta-7', teacher_id: 't3', teacher_name: '陳主任', role: '教務主任', date: '2026-03-01', status: 'present', check_in_time: '09:00', check_out_time: '18:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
-  { id: 'ta-8', teacher_id: 't4', teacher_name: '林助教', role: '助教', date: '2026-03-01', status: 'present', check_in_time: '12:00', check_out_time: '16:10', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
-  { id: 'ta-9', teacher_id: 't2', teacher_name: '李老師', role: '首席講師', date: '2026-02-28', status: 'present', check_in_time: '17:50', check_out_time: '20:05', leave_type: null, leave_reason: null, substitute_teacher_id: null, approved: true, notes: null },
-  { id: 'ta-10', teacher_id: 't1', teacher_name: '王老師', role: '資深講師', date: '2026-02-27', status: 'leave', check_in_time: null, check_out_time: null, leave_type: 'personal', leave_reason: '家庭事務', substitute_teacher_id: null, approved: false, notes: '待審核' },
-]
+// 動態產生指定日期的出缺勤記錄（確保 demo 在任何日期都有數據）
+function buildDemoTeacherAttendance(date: string) {
+  const dateHash = date.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+  const statuses: Array<{ status: string; check_in_time: string | null; check_out_time: string | null; leave_type: string | null; leave_reason: string | null; substitute_teacher_id: string | null; notes: string | null }> = [
+    { status: 'present', check_in_time: '15:30', check_out_time: '21:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, notes: null },
+    { status: 'present', check_in_time: '17:45', check_out_time: '20:10', leave_type: null, leave_reason: null, substitute_teacher_id: null, notes: null },
+    { status: 'present', check_in_time: '09:00', check_out_time: '18:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, notes: null },
+    { status: 'late', check_in_time: '16:20', check_out_time: '20:00', leave_type: null, leave_reason: null, substitute_teacher_id: null, notes: '遲到 20 分鐘' },
+    { status: 'leave', check_in_time: null, check_out_time: null, leave_type: 'sick', leave_reason: '身體不適', substitute_teacher_id: 't1', notes: '王老師代課' },
+    { status: 'present', check_in_time: '13:00', check_out_time: '17:30', leave_type: null, leave_reason: null, substitute_teacher_id: null, notes: null },
+  ]
+  return TEACHERS.map((t, i) => {
+    const idx = (i + dateHash) % statuses.length
+    const s = statuses[idx]
+    return { id: `ta-${date}-${t.id}`, teacher_id: t.id, teacher_name: t.name, role: t.title, date, ...s, approved: true }
+  })
+}
+
+// 預建近期日期的記錄（讓月統計也有資料）
+const TEACHER_ATTENDANCE = (() => {
+  const today = new Date()
+  const dates: string[] = []
+  for (let d = 0; d < 14; d++) {
+    const dt = new Date(today)
+    dt.setDate(today.getDate() - d)
+    // 跳過週末（週六=6, 週日=0）
+    if (dt.getDay() === 0 || dt.getDay() === 6) continue
+    dates.push(dt.toISOString().split('T')[0])
+  }
+  return dates.flatMap(date => buildDemoTeacherAttendance(date))
+})()
 
 // ===== Contact Book v2 (電子聯絡簿 v2) =====
 const CONTACT_BOOK_ENTRIES = [
@@ -478,7 +497,7 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     if (path === '/api/w8/courses') return { status: 200, body: { success: true, data: { courses: COURSES } } }
 
     // Teachers
-    if (path === '/api/w8/teachers') return { status: 200, body: { teachers: TEACHERS.map(t => ({ ...t, full_name: t.name, role: t.teacher_role || t.title })) } }
+    if (path === '/api/w8/teachers') return { status: 200, body: { success: true, data: { teachers: TEACHERS.map(t => ({ ...t, full_name: t.name, role: t.teacher_role || t.title })) } } }
 
     // Students (for schedule page individual tutoring)
     if (path === '/api/w8/students') {
@@ -666,16 +685,22 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     // Teacher Attendance — 師資出缺勤
     if (path === '/api/teacher-attendance' || path === '/api/teacher-attendance/' || path === '/api/admin/teacher-attendance') {
       const date = searchParams.get('date')
-      const month = searchParams.get('month') || '2026-03'
+      const now = new Date()
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const month = searchParams.get('month') || currentMonth
       const teacherId = searchParams.get('teacherId')
       let filtered = date
-        ? TEACHER_ATTENDANCE.filter(ta => ta.date === date)
+        ? (TEACHER_ATTENDANCE.filter(ta => ta.date === date).length > 0
+            ? TEACHER_ATTENDANCE.filter(ta => ta.date === date)
+            : buildDemoTeacherAttendance(date))
         : TEACHER_ATTENDANCE.filter(ta => ta.date.startsWith(month))
       if (teacherId) filtered = filtered.filter(ta => ta.teacher_id === teacherId)
       return { status: 200, body: { success: true, data: { records: filtered } } }
     }
     if (path === '/api/teacher-attendance/stats') {
-      const month = searchParams.get('month') || '2026-03'
+      const now = new Date()
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const month = searchParams.get('month') || currentMonth
       const records = TEACHER_ATTENDANCE.filter(ta => ta.date.startsWith(month))
       const stats = TEACHERS.map(t => {
         const tRecs = records.filter(r => r.teacher_id === t.id)
