@@ -1,5 +1,5 @@
 // 共用 Schema - tenants, users, branches, permissions
-import { pgTable, serial, varchar, uuid, timestamp, boolean, text, jsonb, index } from '../connection';
+import { pgTable, serial, varchar, uuid, timestamp, boolean, text, jsonb, index, integer } from '../connection';
 
 export const tenants = pgTable('tenants', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -71,3 +71,37 @@ export const auditLogs = pgTable('audit_logs', {
 }, (table) => ({
   tenantIdx: index('audit_logs_tenant_id_idx').on(table.tenantId),
 }));
+
+// ===== Analytics =====
+export const managePageViews = pgTable('manage_page_views', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id'),
+  path: varchar('path', { length: 500 }).notNull(),
+  referrer: varchar('referrer', { length: 1000 }),
+  userAgent: text('user_agent'),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  sessionId: varchar('session_id', { length: 100 }),
+  deviceType: varchar('device_type', { length: 20 }),
+  isBot: boolean('is_bot').default(false),
+  botName: varchar('bot_name', { length: 100 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_page_views_created').on(table.createdAt),
+  index('idx_page_views_path').on(table.path, table.createdAt),
+  index('idx_page_views_bot').on(table.isBot, table.createdAt),
+])
+
+export const manageBotVisits = pgTable('manage_bot_visits', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  botName: varchar('bot_name', { length: 100 }).notNull(),
+  botCategory: varchar('bot_category', { length: 50 }).notNull(),
+  path: varchar('path', { length: 500 }).notNull(),
+  userAgent: text('user_agent'),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  statusCode: integer('status_code'),
+  responseTimeMs: integer('response_time_ms'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_bot_visits_name').on(table.botName, table.createdAt),
+  index('idx_bot_visits_category').on(table.botCategory, table.createdAt),
+])

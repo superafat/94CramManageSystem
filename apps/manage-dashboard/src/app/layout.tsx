@@ -30,10 +30,25 @@ export const metadata: Metadata = {
   },
 }
 
+const softwareJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "94Manage 補習班管理系統",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web",
+  "offers": { "@type": "Offer", "price": "999", "priceCurrency": "TWD", "description": "基礎方案月費" },
+  "description": "台灣最完整的補習班管理系統，整合學員管理、出勤追蹤、成績管理、帳務、薪資計算、AI 分析",
+  "url": "https://94cram.com"
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-TW">
       <body className={`${notoSansTC.className} antialiased`}>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
+        />
         <ToastProvider position="top-right">
           {children}
         </ToastProvider>

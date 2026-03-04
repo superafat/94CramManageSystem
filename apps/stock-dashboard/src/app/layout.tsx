@@ -29,6 +29,17 @@ export const metadata: Metadata = {
   },
 };
 
+const softwareJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "94Stock 補習班庫存管理系統",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web",
+  "offers": { "@type": "Offer", "price": "199", "priceCurrency": "TWD", "description": "基礎方案月費" },
+  "description": "專為補習班、才藝教室設計的智能庫存管理系統，支援多校區統一管理、AI 備貨量預測、低庫存自動預警",
+  "url": "https://cram94-stock-dashboard-1015149159553.asia-east1.run.app"
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -36,7 +47,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-TW">
-      <body className={notoSansTC.className}>{children}</body>
+      <body className={notoSansTC.className}>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

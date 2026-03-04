@@ -24,6 +24,17 @@ export const metadata: Metadata = {
   },
 }
 
+const softwareJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "94inClass 補習班點名系統",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web",
+  "offers": { "@type": "Offer", "price": "299", "priceCurrency": "TWD", "description": "基礎方案月費" },
+  "description": "專為補習班設計的智能點名系統，支援 NFC 刷卡點名、AI 臉部辨識、LINE 家長即時通知",
+  "url": "https://cram94-inclass-dashboard-1015149159553.asia-east1.run.app"
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -32,6 +43,10 @@ export default function RootLayout({
   return (
     <html lang="zh-TW">
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
+        />
         <ClientProviders>
           {children}
         </ClientProviders>

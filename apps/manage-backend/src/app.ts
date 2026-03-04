@@ -21,6 +21,8 @@ import internalRoutes from './routes/internal'
 import parentExtRoutes from './routes/parent-ext'
 import { parentRoutes } from './routes/parent'
 import botExtRoutes from './routes/bot-ext'
+import { analyticsTrackRoutes } from './routes/analytics-track'
+import { analyticsMiddleware } from './middleware/analytics'
 import { errorHandler } from './middleware/errorHandler'
 import { tenantMiddleware } from './middleware/tenant'
 import { requestTrackingMiddleware } from './middleware/requestTracking'
@@ -111,6 +113,12 @@ app.use('/api/*', async (c, next) => {
 })
 
 app.use('/api/*', tenantMiddleware)
+
+// Analytics middleware (non-blocking, fire-and-forget)
+app.use('*', analyticsMiddleware())
+
+// Public analytics track endpoint (no auth required)
+app.route('/api', analyticsTrackRoutes)
 
 // Health check — no middleware overhead
 app.get('/health', (c) => c.json(createSuccessResponse({ status: 'ok', ts: Date.now() })))

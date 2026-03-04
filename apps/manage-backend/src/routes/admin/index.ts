@@ -14,6 +14,7 @@ import { aiProvidersRoutes } from './ai-providers'
 import { conversationsRoutes } from './conversations'
 import { settingsRoutes } from './settings'
 import { contactBookRoutes } from './contact-book'
+import { analyticsRoutes } from './analytics'
 
 export const adminRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -33,3 +34,4 @@ adminRoutes.route('/', aiProvidersRoutes)
 adminRoutes.route('/', conversationsRoutes)
 adminRoutes.route('/', settingsRoutes)
 adminRoutes.route('/', contactBookRoutes)
+adminRoutes.route('/', analyticsRoutes)

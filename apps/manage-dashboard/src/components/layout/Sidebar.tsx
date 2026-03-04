@@ -27,7 +27,8 @@ const navItems: NavItem[] = [
   { href: '/headquarters', icon: '🏢', label: '總部管理', roles: ['superadmin'] },
   { href: '/dashboard/audit', icon: '📋', label: '異動日誌', roles: ['superadmin', 'admin'] },
   { href: '/dashboard/settings', icon: '⚙️', label: '系統設定', roles: ['superadmin'] }, // 只有系統管理員可見
-  
+  { href: '/dashboard/analytics', icon: '📡', label: '網站監控', roles: ['superadmin'] },
+
   // 班務管理區塊
   { type: 'separator', separator: '班務管理', roles: ['superadmin', 'admin', 'staff', 'teacher'] },
   { href: '/students', icon: '👥', label: '學生管理', roles: ['superadmin', 'admin', 'staff'] },

@@ -124,6 +124,32 @@ const orgJsonLd = {
   "knowsAbout": ["補習班管理", "教育科技", "AI 點名系統", "庫存管理", "Telegram AI 助手"]
 };
 
+const softwareJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "蜂神榜 Ai 教育管理平台",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "TWD",
+    "description": "免費試用 30 天"
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.8",
+    "ratingCount": "156",
+    "bestRating": "5"
+  },
+  "description": "整合學員管理、智能點名、庫存管理、AI 助手的補習班管理平台",
+  "url": "https://94cram.com",
+  "author": {
+    "@type": "Organization",
+    "name": "蜂神榜 Ai 教育科技"
+  }
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-TW">
@@ -135,6 +161,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
         />
       </head>
       <body className={`${notoSansTC.className} min-h-screen bg-morandi-bg`}>

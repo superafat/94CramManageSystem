@@ -771,6 +771,75 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
       return { status: 404, body: { success: false, error: 'not_found' } }
     }
 
+    // Analytics — 網站監控（superadmin）
+    if (path === '/api/admin/analytics/overview') {
+      const daily = Array.from({ length: 30 }, (_, i) => {
+        const d = new Date(); d.setDate(d.getDate() - 29 + i)
+        const date = d.toISOString().split('T')[0]
+        return { date, pv: 40 + Math.floor(Math.random() * 80), uv: 15 + Math.floor(Math.random() * 30) }
+      })
+      const todayData = daily[daily.length - 1]
+      const weekData = daily.slice(-7)
+      return { status: 200, body: { success: true, data: {
+        today: { pv: todayData.pv, uv: todayData.uv },
+        thisWeek: { pv: weekData.reduce((s, d) => s + d.pv, 0), uv: weekData.reduce((s, d) => s + d.uv, 0) },
+        thisMonth: { pv: daily.reduce((s, d) => s + d.pv, 0), uv: daily.reduce((s, d) => s + d.uv, 0) },
+        daily,
+      } } }
+    }
+    if (path === '/api/admin/analytics/pages') {
+      return { status: 200, body: { success: true, data: [
+        { path: '/', pv: 820, uv: 310 }, { path: '/landing', pv: 540, uv: 280 },
+        { path: '/login', pv: 320, uv: 190 }, { path: '/trial-signup', pv: 180, uv: 120 },
+        { path: '/demo', pv: 150, uv: 95 }, { path: '/dashboard', pv: 130, uv: 45 },
+        { path: '/students', pv: 95, uv: 35 }, { path: '/schedules', pv: 88, uv: 32 },
+        { path: '/grades', pv: 76, uv: 28 }, { path: '/contact-book', pv: 65, uv: 24 },
+      ] } }
+    }
+    if (path === '/api/admin/analytics/referrers') {
+      return { status: 200, body: { success: true, data: [
+        { referrer: '', count: 420 }, { referrer: 'google.com', count: 280 },
+        { referrer: 'line.me', count: 150 }, { referrer: 'facebook.com', count: 95 },
+        { referrer: 'ptt.cc', count: 45 }, { referrer: 'perplexity.ai', count: 32 },
+      ] } }
+    }
+    if (path === '/api/admin/analytics/bots') {
+      return { status: 200, body: { success: true, data: {
+        today: 47, thisMonth: 1280, activeBots: 6,
+        bots: [
+          { botName: 'GPTBot', category: 'ai_crawler', today: 15, thisMonth: 420, lastSeen: new Date().toISOString() },
+          { botName: 'ClaudeBot', category: 'ai_crawler', today: 8, thisMonth: 280, lastSeen: new Date().toISOString() },
+          { botName: 'PerplexityBot', category: 'ai_crawler', today: 5, thisMonth: 150, lastSeen: new Date(Date.now() - 3600000).toISOString() },
+          { botName: 'Googlebot', category: 'search_engine', today: 12, thisMonth: 320, lastSeen: new Date().toISOString() },
+          { botName: 'Bingbot', category: 'search_engine', today: 4, thisMonth: 80, lastSeen: new Date(Date.now() - 7200000).toISOString() },
+          { botName: 'facebookexternalhit', category: 'social', today: 3, thisMonth: 30, lastSeen: new Date(Date.now() - 86400000).toISOString() },
+        ],
+        distribution: [
+          { botName: 'GPTBot', count: 420, percentage: 33 },
+          { botName: 'Googlebot', count: 320, percentage: 25 },
+          { botName: 'ClaudeBot', count: 280, percentage: 22 },
+          { botName: 'PerplexityBot', count: 150, percentage: 12 },
+          { botName: 'Bingbot', count: 80, percentage: 6 },
+          { botName: 'facebookexternalhit', count: 30, percentage: 2 },
+        ],
+      } } }
+    }
+    if (path === '/api/admin/analytics/bots/logs') {
+      const logs = Array.from({ length: 20 }, (_, i) => {
+        const bots = ['GPTBot', 'ClaudeBot', 'PerplexityBot', 'Googlebot', 'Bingbot']
+        const cats = ['ai_crawler', 'ai_crawler', 'ai_crawler', 'search_engine', 'search_engine']
+        const paths = ['/', '/landing', '/login', '/trial-signup', '/demo', '/sitemap.xml', '/robots.txt', '/llms.txt']
+        const bi = i % bots.length
+        return {
+          id: `log-${i}`, botName: bots[bi], category: cats[bi],
+          path: paths[i % paths.length], ipAddress: `203.0.113.${10 + i}`,
+          statusCode: i === 7 ? 404 : 200, responseTimeMs: 20 + Math.floor(Math.random() * 80),
+          createdAt: new Date(Date.now() - i * 1800000).toISOString(),
+        }
+      })
+      return { status: 200, body: { success: true, data: { logs, total: 47 } } }
+    }
+
     // Conversations — AI 對話紀錄
     if (path.startsWith('/api/admin/conversations') || path.startsWith('/api/bot/conversations')) {
       const limit = parseInt(searchParams.get('limit') || '20')
