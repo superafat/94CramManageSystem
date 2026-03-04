@@ -3,6 +3,7 @@ import { botAuth } from '../../middleware/botAuth'
 import finance from './finance'
 import student from './student'
 import data from './data'
+import lineRoutes from './line'
 
 type BotExtVariables = { tenantId: string; botRequest: boolean }
 
@@ -12,5 +13,6 @@ app.use('*', botAuth)
 app.route('/finance', finance)
 app.route('/student', student)
 app.route('/data', data)
+app.route('/line', lineRoutes)
 
 export default app

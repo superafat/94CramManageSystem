@@ -44,3 +44,29 @@ export async function callBotApi(
     return { success: false, error: 'api_error', message };
   }
 }
+
+export async function callBotApiGet(
+  service: ServiceName,
+  path: string,
+  query: Record<string, string | number>
+): Promise<BotApiResponse> {
+  const baseUrl = SERVICES[service];
+  const prefix = service === 'manage' ? '/api/bot-ext' : '/api/bot';
+  const params = new URLSearchParams(
+    Object.entries(query).map(([k, v]) => [k, String(v)])
+  ).toString();
+  const url = `${baseUrl}${prefix}${path}${params ? `?${params}` : ''}`;
+
+  try {
+    const client = await auth.getIdTokenClient(baseUrl);
+    const res = await client.request<BotApiResponse>({
+      url,
+      method: 'GET',
+    });
+    return res.data;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown API error';
+    logger.error({ err: error instanceof Error ? error : new Error(message) }, `[API Client] ${service}${path} GET failed`)
+    return { success: false, error: 'api_error', message };
+  }
+}

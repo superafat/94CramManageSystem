@@ -9,7 +9,8 @@
     "build": "tsup",
     "start": "node dist/index.js",
     "test": "vitest",
-    "db:migrate": "psql $DATABASE_URL -f src/db/migrate.sql"
+    "db:migrate": "psql $DATABASE_URL -f src/db/migrate.sql",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "imStudy",

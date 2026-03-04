@@ -4,6 +4,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import { bodyLimit } from 'hono/body-limit';
 import { telegramWebhook } from './webhooks/telegram';
 import { telegramParentWebhook } from './webhooks/telegram-parent';
+import { lineWebhook } from './webhooks/line';
 import { apiRouter } from './api/index';
 
 export const app = new Hono();
@@ -34,6 +35,9 @@ app.get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }));
 // Telegram webhooks
 app.route('/webhook/telegram', telegramWebhook);
 app.route('/webhook/telegram-parent', telegramParentWebhook);
+
+// LINE webhook
+app.route('/webhook/line', lineWebhook);
 
 // Dashboard REST API
 app.route('/api', apiRouter);

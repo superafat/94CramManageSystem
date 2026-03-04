@@ -522,6 +522,68 @@ enrollment.get('/performance', async (c) => {
   }
 });
 
+// ==================== Leads 列表 ====================
+
+/**
+ * GET /api/admin/enrollment/leads
+ * Lead 列表（含可選狀態篩選）
+ */
+enrollment.get('/leads', async (c) => {
+  try {
+    const currentTenantId = getTenantId(c);
+    if (!currentTenantId) return c.json({ success: false, error: 'Missing tenant context' }, 400);
+    const { status } = c.req.query();
+
+    const conditions = [
+      eq(manageLeads.tenantId, currentTenantId),
+      isNull(manageLeads.deletedAt),
+    ];
+    if (status && (leadStatuses as readonly string[]).includes(status)) {
+      conditions.push(eq(manageLeads.status, status));
+    }
+
+    const leads = await db.select().from(manageLeads)
+      .where(and(...conditions))
+      .orderBy(sql`${manageLeads.createdAt} DESC`)
+      .limit(5000);
+
+    return c.json({ success: true, data: { leads: leads.map(toSnakeCase) } });
+  } catch (error) {
+    logger.error({ err: error }, '獲取 Lead 列表失敗:');
+    return c.json({ success: false, error: '獲取數據失敗' }, 500);
+  }
+});
+
+/**
+ * GET /api/admin/enrollment/leads/overdue
+ * 逾期未跟進的 Lead
+ */
+enrollment.get('/leads/overdue', async (c) => {
+  try {
+    const currentTenantId = getTenantId(c);
+    if (!currentTenantId) return c.json({ success: false, error: 'Missing tenant context' }, 400);
+
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+    const leads = await db.select().from(manageLeads).where(
+      and(
+        eq(manageLeads.tenantId, currentTenantId),
+        isNull(manageLeads.deletedAt),
+        sql`${manageLeads.status} IN ('new', 'contacted', 'trial_scheduled')`,
+        sql`(${manageLeads.followUpDate} IS NULL OR ${manageLeads.followUpDate} <= CURRENT_DATE)`,
+        sql`${manageLeads.createdAt} <= ${threeDaysAgo}`
+      )
+    ).orderBy(sql`${manageLeads.createdAt} ASC`);
+
+    const result = leads.map(toSnakeCase);
+    return c.json({ success: true, data: { overdue: result, count: result.length } });
+  } catch (error) {
+    logger.error({ err: error }, '獲取逾期 Lead 失敗:');
+    return c.json({ success: false, error: '獲取數據失敗' }, 500);
+  }
+});
+
 // ==================== 匯出路由 ====================
 
 export default enrollment;

@@ -9,8 +9,6 @@ import { attendanceRoutes } from './attendance'
 import { gradesRoutes } from './grades'
 import { reportsRoutes } from './reports'
 import { billingRoutes } from './billing'
-import { payrollRoutes } from './payroll'
-import { teachersRoutes } from './teachers'
 import { auditRoutes } from './audit'
 import { aiProvidersRoutes } from './ai-providers'
 import { conversationsRoutes } from './conversations'
@@ -29,8 +27,6 @@ adminRoutes.route('/', attendanceRoutes)
 adminRoutes.route('/', gradesRoutes)
 adminRoutes.route('/', reportsRoutes)
 adminRoutes.route('/', billingRoutes)
-adminRoutes.route('/', payrollRoutes)
-adminRoutes.route('/', teachersRoutes)
 adminRoutes.route('/', auditRoutes)
 adminRoutes.route('/', aiProvidersRoutes)
 adminRoutes.route('/', conversationsRoutes)

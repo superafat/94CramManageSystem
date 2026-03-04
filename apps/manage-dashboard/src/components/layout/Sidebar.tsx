@@ -36,6 +36,7 @@ const navItems: NavItem[] = [
   { href: '/grades', icon: '📊', label: '成績管理', roles: ['superadmin', 'admin', 'staff', 'teacher'] },
   { href: '/billing', icon: '💰', label: '帳務管理', roles: ['superadmin', 'admin', 'staff'] },
   { href: '/reports', icon: '📈', label: '報表中心', roles: ['superadmin', 'admin'] },
+  { href: '/enrollment', icon: '🎪', label: '招生管理', roles: ['superadmin', 'admin'] },
   
   // 講師管理區塊 (W8)
   { type: 'separator', separator: '講師管理', roles: ['superadmin', 'admin'] },
