@@ -1,16 +1,24 @@
 /**
  * Google Cloud Storage service for contact book photos
+ * Lazy-loads @google-cloud/storage to avoid heavy import at startup
  */
-import { Storage } from '@google-cloud/storage'
-
-const storage = new Storage()
+let storageInstance: any = null
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME ?? 'cram94-contact-book-photos'
+
+async function getStorage() {
+  if (!storageInstance) {
+    const { Storage } = await import('@google-cloud/storage')
+    storageInstance = new Storage()
+  }
+  return storageInstance
+}
 
 export async function uploadContactBookPhoto(
   buffer: Buffer,
   fileName: string,
   contentType: string
 ): Promise<string> {
+  const storage = await getStorage()
   const bucket = storage.bucket(BUCKET_NAME)
   const filePath = `contact-book/${Date.now()}-${fileName}`
   const file = bucket.file(filePath)

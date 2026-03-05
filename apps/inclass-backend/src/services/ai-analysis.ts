@@ -1,9 +1,16 @@
 /**
- * AI 弱點分析服務 - 使用 Gemini 分析學生成績
+ * AI weakness analysis service - uses Gemini to analyze student scores
+ * Lazy-loads @google/generative-ai to avoid heavy import at startup
  */
-import { GoogleGenerativeAI } from '@google/generative-ai'
+let genAIInstance: any = null
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '')
+async function getGenAI() {
+  if (!genAIInstance) {
+    const { GoogleGenerativeAI } = await import('@google/generative-ai')
+    genAIInstance = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '')
+  }
+  return genAIInstance
+}
 
 interface ScoreData {
   subject: string
@@ -23,29 +30,30 @@ export async function analyzeStudentWeakness(
   studentName: string,
   scores: ScoreData[]
 ): Promise<AnalysisResult> {
+  const genAI = await getGenAI()
   const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
 
   const scoreText = scores
     .map(
       (s) =>
-        `- ${s.date} ${s.subject}: ${s.score}/${s.fullScore ?? '?'}${s.classAvg ? ` (班級平均: ${s.classAvg})` : ''}`
+        `- ${s.date} ${s.subject}: ${s.score}/${s.fullScore ?? '?'}${s.classAvg ? ` (class avg: ${s.classAvg})` : ''}`
     )
     .join('\n')
 
-  const prompt = `你是一位資深補習班教學顧問。請根據以下學生近期考試成績，分析學習弱點並推薦補強方向。
+  const prompt = `You are a senior tutoring consultant. Analyze the following student's recent exam scores, identify learning weaknesses, and recommend improvement areas.
 
-學生姓名：${studentName}
-近期成績：
+Student: ${studentName}
+Recent scores:
 ${scoreText}
 
-請以 JSON 格式回傳（不要包含 markdown code block）：
+Respond in JSON format (no markdown code blocks):
 {
-  "weaknessSummary": "弱點分析摘要（100字以內）",
-  "recommendedCourseName": "推薦課程名稱",
-  "recommendedCourseDesc": "推薦課程說明（80字以內）"
+  "weaknessSummary": "Weakness analysis summary (within 100 chars, in Traditional Chinese)",
+  "recommendedCourseName": "Recommended course name (in Traditional Chinese)",
+  "recommendedCourseDesc": "Course description (within 80 chars, in Traditional Chinese)"
 }
 
-如果成績資料不足以分析，請回傳合理的通用建議。`
+If there isn't enough data to analyze, provide reasonable general suggestions.`
 
   const result = await model.generateContent(prompt)
   const text = result.response.text().trim()
@@ -58,15 +66,15 @@ ${scoreText}
     const parsed = JSON.parse(jsonStr) as Partial<AnalysisResult>
 
     return {
-      weaknessSummary: parsed.weaknessSummary ?? '暫無分析',
-      recommendedCourseName: parsed.recommendedCourseName ?? '基礎加強班',
-      recommendedCourseDesc: parsed.recommendedCourseDesc ?? '建議加強基礎訓練',
+      weaknessSummary: parsed.weaknessSummary ?? 'No analysis available',
+      recommendedCourseName: parsed.recommendedCourseName ?? 'Basic reinforcement',
+      recommendedCourseDesc: parsed.recommendedCourseDesc ?? 'Recommend strengthening basics',
     }
   } catch {
     return {
-      weaknessSummary: '暫無分析',
-      recommendedCourseName: '基礎加強班',
-      recommendedCourseDesc: '建議加強基礎訓練',
+      weaknessSummary: 'No analysis available',
+      recommendedCourseName: 'Basic reinforcement',
+      recommendedCourseDesc: 'Recommend strengthening basics',
     }
   }
 }
