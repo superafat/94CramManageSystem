@@ -62,7 +62,7 @@ export default function MyGradesPage() {
       <div className="space-y-6">
         <div className="h-8 w-24 bg-surface-hover animate-pulse rounded" />
         <div className="h-8 w-48 bg-surface-hover animate-pulse rounded" />
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="h-24 bg-surface-hover animate-pulse rounded-2xl" />
           ))}
@@ -88,7 +88,7 @@ export default function MyGradesPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <div className="bg-surface rounded-2xl border border-border p-6 text-center">
           <p className="text-3xl font-bold text-primary">{avgScore || '-'}</p>
           <p className="text-sm text-text-muted mt-1">本學期平均</p>

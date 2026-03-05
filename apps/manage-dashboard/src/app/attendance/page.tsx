@@ -288,7 +288,7 @@ export default function AttendancePage() {
     return (
       <div className="space-y-6">
         <div className="h-8 w-32 bg-surface-hover animate-pulse rounded" />
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="h-24 bg-surface-hover animate-pulse rounded-2xl" />
           ))}
@@ -303,9 +303,9 @@ export default function AttendancePage() {
       <BackButton />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-2xl font-semibold text-text">出席管理</h1>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2 sm:gap-3">
           <input
             type="date"
             value={selectedDate}
@@ -363,7 +363,7 @@ export default function AttendancePage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4">
         <div className="bg-white rounded-2xl shadow-sm border border-border p-4">
           <div className="text-3xl font-bold text-text">{stats.total}</div>
           <div className="text-sm text-text-muted">總人數</div>
@@ -386,8 +386,92 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-border overflow-hidden">
+      {/* Mobile Cards */}
+      <div className="lg:hidden space-y-3">
+        {attendanceList.map((record) => {
+          const isOnLeave = record.status === 'leave'
+          return (
+            <div key={record.student_id} className="bg-white rounded-2xl shadow-sm border border-border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-medium text-text">{record.student_name}</div>
+                  <div className="text-xs text-text-muted">{record.grade_level}</div>
+                </div>
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                  isOnLeave
+                    ? 'bg-[#C4956A]/10 text-[#C4956A]'
+                    : record.present || record.status === 'present'
+                    ? 'bg-[#7B9E89]/10 text-[#7B9E89]'
+                    : record.status === 'late'
+                    ? 'bg-[#C4956A]/10 text-[#C4956A]'
+                    : 'bg-[#B5706E]/10 text-[#B5706E]'
+                }`}>
+                  {isOnLeave
+                    ? `請假${record.leave_type ? `（${LEAVE_TYPE_LABELS[record.leave_type]}）` : ''}`
+                    : record.present || record.status === 'present'
+                    ? '✓ 出席'
+                    : record.status === 'late'
+                    ? '⏰ 遲到'
+                    : '✗ 缺席'}
+                </span>
+              </div>
+              {editMode && (
+                <div className="flex gap-2">
+                  {(['present', 'late', 'absent'] as const).map(status => (
+                    <button
+                      key={status}
+                      onClick={() => handleStatusChange(record.student_id, status)}
+                      className={`flex-1 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                        (changes[record.student_id] || record.status) === status
+                          ? status === 'present' ? 'bg-[#7B9E89] text-white'
+                            : status === 'late' ? 'bg-[#C4956A] text-white'
+                            : 'bg-[#B5706E] text-white'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {status === 'present' ? '出席' : status === 'late' ? '遲到' : '缺席'}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {record.notes && <div className="text-xs text-text-muted">備註：{record.notes}</div>}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => openLeaveModal({ id: record.student_id, name: record.student_name })}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[#C4956A]/40 text-[#C4956A] hover:bg-[#C4956A]/10 transition-colors"
+                >
+                  請假
+                </button>
+                {isOnLeave && (
+                  <button
+                    onClick={() => notifyParent(record.student_id, record.student_name)}
+                    disabled={notifyingParent === record.student_id}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[#7B9E89]/40 text-[#7B9E89] hover:bg-[#7B9E89]/10 transition-colors disabled:opacity-50"
+                  >
+                    {notifyingParent === record.student_id ? '發送中...' : '通知家長'}
+                  </button>
+                )}
+                {(record.status === 'absent' || record.status === 'leave') && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setMakeupTarget({ studentId: record.student_id, studentName: record.student_name, date: record.date }) }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[#C4956A] text-[#C4956A] hover:bg-[#C4956A]/10 transition-colors"
+                  >
+                    安排補課
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+        {attendanceList.length === 0 && (
+          <div className="text-center py-12 text-text-muted bg-white rounded-2xl border border-border">
+            {editMode ? '載入學生清單中...' : '該日期無出席記錄，點擊「點名模式」開始點名'}
+          </div>
+        )}
+      </div>
+
+      {/* Table (desktop) */}
+      <div className="hidden lg:block bg-white rounded-2xl shadow-sm border border-border overflow-hidden">
         <table className="w-full">
           <thead className="bg-surface">
             <tr>

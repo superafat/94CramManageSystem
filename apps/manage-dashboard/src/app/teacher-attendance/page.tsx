@@ -330,7 +330,7 @@ export default function TeacherAttendancePage() {
     return (
       <div className="space-y-6">
         <div className="h-8 w-32 bg-surface-hover animate-pulse rounded" />
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="h-24 bg-surface-hover animate-pulse rounded-2xl" />
           ))}
@@ -345,7 +345,7 @@ export default function TeacherAttendancePage() {
       <BackButton />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-text">師資出缺勤</h1>
           {isDemo && (
@@ -354,7 +354,7 @@ export default function TeacherAttendancePage() {
             </span>
           )}
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2 sm:gap-3">
           <input
             type="date"
             value={selectedDate}
@@ -406,7 +406,7 @@ export default function TeacherAttendancePage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4">
         <div className="bg-white rounded-2xl shadow-sm border border-border p-4">
           <div className="text-3xl font-bold text-text">{stats.total}</div>
           <div className="text-sm text-text-muted">總人數</div>

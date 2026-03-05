@@ -8,7 +8,7 @@ import { db, sql, success, successWithPagination, notFound, internalError, rows,
 const auditRoutes = new Hono<{ Variables: RBACVariables }>()
 
 // Helper function to create audit log
-async function createAuditLog(
+export async function createAuditLog(
   tenantId: string,
   userId: string | null,
   userName: string | null,
@@ -19,19 +19,20 @@ async function createAuditLog(
   oldValue: unknown,
   newValue: unknown,
   changeSummary: string,
-  needsAlert: boolean = false
+  needsAlert: boolean = false,
+  ipAddress: string | null = null
 ) {
   await db.execute(sql`
     INSERT INTO audit_logs (
       tenant_id, user_id, user_name, user_role,
       action, table_name, record_id,
       old_value, new_value, change_summary,
-      needs_alert, created_at
+      needs_alert, ip_address, created_at
     ) VALUES (
       ${tenantId}, ${userId}, ${userName}, ${userRole},
       ${action}, ${tableName}, ${recordId},
       ${JSON.stringify(oldValue)}, ${JSON.stringify(newValue)}, ${changeSummary},
-      ${needsAlert}, NOW()
+      ${needsAlert}, ${ipAddress}, NOW()
     )
   `)
 
@@ -59,6 +60,7 @@ async function createAuditLog(
           changeSummary,
           needsAlert,
           sourceTenantId: tenantId,
+          ipAddress,
           timestamp: new Date().toISOString(),
         }),
       })
@@ -180,6 +182,7 @@ auditRoutes.post('/alerts/:id/revert', requirePermission(Permission.STUDENTS_WRI
     }
 
     // Create a revert audit log
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || null
     await createAuditLog(
       user.tenant_id,
       user.id,
@@ -191,7 +194,8 @@ auditRoutes.post('/alerts/:id/revert', requirePermission(Permission.STUDENTS_WRI
       original.new_value,
       original.old_value,
       `Reverted: ${original.change_summary}`,
-      false
+      false,
+      ip
     )
 
     // Confirm the original alert
