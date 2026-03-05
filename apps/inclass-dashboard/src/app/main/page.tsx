@@ -368,7 +368,7 @@ export default function Home() {
   const attendanceRate = stats.total > 0 ? Math.round(((stats.arrived + stats.late) / stats.total) * 100) : 0
 
   return (
-    <main style={{ padding: '16px', maxWidth: '100vw', minHeight: '100vh', background: 'var(--background)', paddingBottom: '80px' }}>
+    <main style={{ maxWidth: '100vw' }}>
       {/* 整合提示橫幅 */}
       <div style={{ background: 'linear-gradient(135deg, #E8F4F8 0%, #D4E8F0 100%)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: '12px', border: '1px solid #B8D4E0', boxShadow: 'var(--shadow-sm)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
@@ -380,22 +380,10 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Header with School Info */}
-      <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-        <div style={{ fontSize: '48px' }} className="animate-bounce">🐝</div>
-        <h1 style={{ fontSize: '24px', color: 'var(--primary)', fontWeight: 'bold', margin: 0 }}>
-          🎒 {school?.name || '蜂神榜 Ai 點名系統'}
-        </h1>
-        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-          {user?.name} · {user?.email}
-        </p>
-        <button
-          onClick={logout}
-          style={{ marginTop: '8px', padding: '6px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--error)', color: 'white', border: 'none', fontSize: '12px', cursor: 'pointer' }}
-        >
-          登出
-        </button>
-      </div>
+      {/* Page Title */}
+      <h1 style={{ fontSize: '20px', color: 'var(--primary)', fontWeight: 'bold', margin: '0 0 16px' }}>
+        🎒 {school?.name || '蜂神榜 Ai 點名系統'}
+      </h1>
 
       {/* Stats Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '16px' }}>

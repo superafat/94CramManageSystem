@@ -40,11 +40,8 @@ function isUser(value: unknown): value is User {
   const candidate = value as Record<string, unknown>
   return (
     typeof candidate.id === 'string' &&
-    typeof candidate.email === 'string' &&
     typeof candidate.name === 'string' &&
-    typeof candidate.role === 'string' &&
-    typeof candidate.status === 'string' &&
-    typeof candidate.createdAt === 'string'
+    typeof candidate.role === 'string'
   )
 }
 
@@ -223,7 +220,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--background)', padding: '20px' }}>
+    <div style={{ maxWidth: '900px', margin: '0 auto' }}>
       <AdminHeader userName={user?.name} />
 
       {/* Messages */}

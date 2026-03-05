@@ -1,20 +1,10 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
-
 export default function GuidePage() {
-  const router = useRouter()
-
   return (
-    <div className="p-5 max-w-4xl mx-auto pb-24">
+    <div className="max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <button
-          onClick={() => router.push('/main')}
-          className="px-4 py-2 bg-primary text-white border-none rounded-lg text-sm mb-5 cursor-pointer hover:opacity-90 transition-opacity"
-        >
-          ← 返回首頁
-        </button>
         <h1 className="text-3xl text-primary mb-2 flex items-center gap-3">
           <span className="text-4xl">📚</span>
           蜂神榜 Ai 點名系統 使用說明
