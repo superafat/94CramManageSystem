@@ -17,11 +17,15 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/dashboard', icon: '📊', label: '總覽', roles: ['admin', 'staff'] },
-  { type: 'separator', separator: 'LINE Bot 管理', roles: ['admin', 'staff'] },
-  { href: '/dashboard/conversations', icon: '💬', label: '對話紀錄', roles: ['admin', 'staff'] },
-  { href: '/dashboard/bindings', icon: '🔗', label: '綁定管理', roles: ['admin', 'staff'] },
-  { type: 'separator', separator: '系統設定', roles: ['admin'] },
-  { href: '/dashboard/line-bot', icon: '🤖', label: '聞太師設定', roles: ['admin'] },
+
+  { type: 'separator', separator: 'Telegram', roles: ['admin', 'staff'] },
+  { href: '/dashboard/clairvoyant', icon: '🏫', label: '千里眼（行政端）', roles: ['admin', 'staff'] },
+  { href: '/dashboard/windear', icon: '👨‍👩‍👧', label: '順風耳（家長端）', roles: ['admin'] },
+
+  { type: 'separator', separator: 'LINE', roles: ['admin'] },
+  { href: '/dashboard/wentaishi', icon: '🤖', label: '聞太師（家長端）', roles: ['admin'] },
+
+  { type: 'separator', separator: '系統', roles: ['admin'] },
   { href: '/dashboard/plans', icon: '💎', label: '方案加購', roles: ['admin'] },
 ]
 

@@ -5,9 +5,9 @@ import { usePathname } from 'next/navigation'
 
 const mobileNavItems = [
   { href: '/dashboard', icon: '📊', label: '總覽' },
-  { href: '/dashboard/conversations', icon: '💬', label: '對話' },
-  { href: '/dashboard/bindings', icon: '🔗', label: '綁定' },
-  { href: '/dashboard/line-bot', icon: '🤖', label: '設定' },
+  { href: '/dashboard/clairvoyant', icon: '🏫', label: '千里眼' },
+  { href: '/dashboard/windear', icon: '👨‍👩‍👧', label: '順風耳' },
+  { href: '/dashboard/wentaishi', icon: '🤖', label: '聞太師' },
   { href: '/dashboard/plans', icon: '💎', label: '方案' },
 ]
 

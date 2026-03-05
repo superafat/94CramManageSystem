@@ -3,7 +3,23 @@ const DEMO_TENANT_2 = '22222222-2222-2222-2222-222222222222'
 
 export const DEMO_TENANTS = [DEMO_TENANT_1, DEMO_TENANT_2]
 
-const CONVERSATIONS = [
+const CLAIRVOYANT_CONVERSATIONS = [
+  { id: 'cv1', user_name: 'Demo 館長', message: '今天出勤統計', reply: '今日出勤：已到 45 人、未到 3 人、請假 2 人。出勤率 90%。缺席名單：張志豪、吳承恩、李宜庭（請假）。', intent: '出勤查詢', created_at: '2026-03-06T08:00:00Z' },
+  { id: 'cv2', user_name: 'Demo 行政', message: '本月營收報表', reply: '3 月營收統計：應收 NT$186,000、已收 NT$152,000、未收 NT$34,000。繳費率 81.7%。未繳名單已發送至您的信箱。', intent: '營收查詢', created_at: '2026-03-05T17:30:00Z' },
+  { id: 'cv3', user_name: 'Demo 館長', message: '張志豪出勤異常', reply: '張志豪近 30 日出勤率 65%（低於平均 88%），遲到 5 次、缺席 4 次。系統已標記為高風險學生，建議聯繫家長。', intent: '學生查詢', created_at: '2026-03-05T10:00:00Z' },
+  { id: 'cv4', user_name: 'Demo 行政', message: '下週排課狀態', reply: '下週一至五共排 12 堂課，2 間教室。週三王老師請假，需代課安排。建議調整：林助教代上國小先修班。', intent: '排課查詢', created_at: '2026-03-04T14:00:00Z' },
+  { id: 'cv5', user_name: 'Demo 館長', message: '教師薪資試算', reply: '本月薪資試算：王老師 12 堂 × NT$800 = NT$9,600、李老師 10 堂 × NT$900 = NT$9,000、陳主任月薪 NT$45,000、林助教 40hr × NT$200 = NT$8,000。合計 NT$71,600。', intent: '薪資查詢', created_at: '2026-03-03T16:00:00Z' },
+]
+
+const WINDEAR_CONVERSATIONS = [
+  { id: 'we1', user_name: '陳媽媽', message: '小利今天有到嗎', reply: '陳小利今天 17:55 已到班，準時出席數學課！', intent: '出勤查詢', created_at: '2026-03-06T18:10:00Z' },
+  { id: 'we2', user_name: '王爸爸', message: '大明最近考試分數', reply: '王大明最近一次數學小考 85 分（班級平均 78 分），進步 5 分！', intent: '成績查詢', created_at: '2026-03-05T20:00:00Z' },
+  { id: 'we3', user_name: '林媽媽', message: '美琪下週課表', reply: '林美琪下週課表：週二/五 數學 18:00-20:00、週三 英文 18:00-20:00、週六 英文 10:00-12:00。', intent: '課表查詢', created_at: '2026-03-05T19:00:00Z' },
+  { id: 'we4', user_name: '張媽媽', message: '志豪請假', reply: '已登記張志豪下週二數學課請假。如需補課請回覆「補課」。', intent: '請假申請', created_at: '2026-03-04T21:00:00Z' },
+  { id: 'we5', user_name: '黃媽媽', message: '學費繳了嗎', reply: '黃柏翰 3 月學費 NT$3,500 已於 3/2 繳清。收據編號 R2026030201。', intent: '繳費查詢', created_at: '2026-03-03T10:00:00Z' },
+]
+
+const LINE_CONVERSATIONS = [
   { id: 'conv1', parent_name: '陳媽媽', parent_line_id: 'U001', student_name: '陳小利', message: '請問明天有上課嗎？', reply: '您好！明天（週三）陳小利有英文課，時間是 18:00-20:00，教室 202。', intent: 'schedule_query', created_at: '2026-03-06T09:15:00Z' },
   { id: 'conv2', parent_name: '王爸爸', parent_line_id: 'U002', student_name: '王大明', message: '大明這週考試成績怎麼樣？', reply: '王大明本週數學小考 85 分，班級平均 78 分，表現不錯！英文成績尚未出來，出來後會再通知您。', intent: 'grade_query', created_at: '2026-03-06T08:30:00Z' },
   { id: 'conv3', parent_name: '林媽媽', parent_line_id: 'U003', student_name: '林美琪', message: '美琪昨天有準時到嗎？', reply: '林美琪昨天（週二）數學課 17:55 到班，準時出席！', intent: 'attendance_query', created_at: '2026-03-05T20:10:00Z' },
@@ -34,6 +50,7 @@ const PARENT_INVITES = [
 const SUBSCRIPTION = {
   tenant_id: DEMO_TENANT_1,
   plan: 'standard',
+  admin_bot_active: true,
   parent_bot_active: true,
   ai_reply_limit: 500,
   push_limit: 200,
@@ -47,6 +64,7 @@ const SUBSCRIPTION = {
 const USAGE = {
   tenant_id: DEMO_TENANT_1,
   month: '2026-03',
+  api_calls: 83,
   ai_calls: 127,
   push_calls: 45,
   ai_tokens_used: 38500,
@@ -97,9 +115,28 @@ export function getDemoResponse(
     return { body: SETTINGS, status: 200 }
   }
 
+  // GET /api/bindings (admin bot bindings)
+  if (method === 'GET' && path === '/api/bindings') {
+    const adminBindings = [
+      { id: 'ab1', user_id: 'T001', user_name: 'Demo 館長', platform_id: 'T001', extra: 'admin', bound_at: '2026-02-10T10:00:00Z' },
+      { id: 'ab2', user_id: 'T002', user_name: 'Demo 行政', platform_id: 'T002', extra: 'staff', bound_at: '2026-02-12T14:00:00Z' },
+      { id: 'ab3', user_id: 'T003', user_name: 'Demo 老師', platform_id: 'T003', extra: 'teacher', bound_at: '2026-02-20T09:00:00Z' },
+    ]
+    return { body: { data: adminBindings, total: adminBindings.length } as unknown as Record<string, unknown>, status: 200 }
+  }
+
   // GET /api/parent-bindings
   if (method === 'GET' && path === '/api/parent-bindings') {
-    return { body: { data: PARENT_BINDINGS, total: PARENT_BINDINGS.length } as unknown as Record<string, unknown>, status: 200 }
+    // Normalize to { id, user_id, user_name, bound_at, platform_id, extra }
+    const normalized = PARENT_BINDINGS.map(b => ({
+      id: b.id,
+      user_id: b.line_user_id,
+      user_name: b.parent_name,
+      bound_at: b.bound_at,
+      platform_id: b.line_user_id,
+      extra: b.student_name,
+    }))
+    return { body: { data: normalized, total: normalized.length } as unknown as Record<string, unknown>, status: 200 }
   }
 
   // DELETE /api/parent-bindings/:id
@@ -119,13 +156,27 @@ export function getDemoResponse(
 
   // GET /api/conversations
   if (method === 'GET' && path === '/api/conversations') {
-    return { body: { data: CONVERSATIONS, total: CONVERSATIONS.length } as unknown as Record<string, unknown>, status: 200 }
+    const bot = _searchParams.get('bot')
+    const rawConvs = bot === 'clairvoyant' ? CLAIRVOYANT_CONVERSATIONS
+      : bot === 'windear' ? WINDEAR_CONVERSATIONS
+      : LINE_CONVERSATIONS
+    // Normalize to { id, user_name, message, reply, intent, created_at }
+    const convs = rawConvs.map(c => ({
+      id: c.id,
+      user_name: 'user_name' in c ? c.user_name : 'parent_name' in c ? c.parent_name : '未知',
+      message: c.message,
+      reply: c.reply,
+      intent: c.intent,
+      created_at: c.created_at,
+    }))
+    return { body: { data: convs, total: convs.length } as unknown as Record<string, unknown>, status: 200 }
   }
 
   // GET /api/conversations/:id
   if (method === 'GET' && path.match(/^\/api\/conversations\/[\w-]+$/)) {
     const id = path.split('/').pop()
-    const conv = CONVERSATIONS.find(c => c.id === id) || CONVERSATIONS[0]
+    const allConvs = [...LINE_CONVERSATIONS, ...CLAIRVOYANT_CONVERSATIONS, ...WINDEAR_CONVERSATIONS] as Record<string, unknown>[]
+    const conv = allConvs.find(c => c.id === id) || LINE_CONVERSATIONS[0]
     return { body: conv as unknown as Record<string, unknown>, status: 200 }
   }
 
