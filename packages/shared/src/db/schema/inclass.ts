@@ -209,3 +209,44 @@ export const inclassContactBookAiAnalysis = pgTable('inclass_contact_book_ai_ana
   rawResponse: jsonb('raw_response'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+// 補課時段
+export const inclassMakeupSlots = pgTable('inclass_makeup_slots', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  subject: varchar('subject', { length: 100 }).notNull(),
+  makeupDate: date('makeup_date').notNull(),
+  startTime: varchar('start_time', { length: 10 }).notNull(),
+  endTime: varchar('end_time', { length: 10 }).notNull(),
+  teacherId: uuid('teacher_id').references(() => manageTeachers.id),
+  room: varchar('room', { length: 50 }),
+  maxStudents: integer('max_students').default(10),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  tenantIdx: index('idx_inclass_makeup_slots_tenant').on(table.tenantId),
+  dateIdx: index('idx_inclass_makeup_slots_date').on(table.tenantId, table.makeupDate),
+}));
+
+// 補課管理
+export const inclassMakeupClasses = pgTable('inclass_makeup_classes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  studentId: uuid('student_id').references(() => manageStudents.id).notNull(),
+  originalDate: date('original_date').notNull(),
+  originalCourseId: uuid('original_course_id'),
+  originalCourseName: varchar('original_course_name', { length: 100 }),
+  status: varchar('status', { length: 20 }).default('pending').notNull(), // pending/scheduled/completed/cancelled
+  makeupDate: date('makeup_date'),
+  makeupTime: varchar('makeup_time', { length: 10 }), // HH:MM
+  makeupEndTime: varchar('makeup_end_time', { length: 10 }),
+  makeupTeacherId: uuid('makeup_teacher_id').references(() => manageTeachers.id),
+  makeupRoom: varchar('makeup_room', { length: 50 }),
+  slotId: uuid('slot_id').references(() => inclassMakeupSlots.id),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  tenantIdx: index('inclass_makeup_classes_tenant_idx').on(table.tenantId),
+  studentIdx: index('inclass_makeup_classes_student_idx').on(table.studentId),
+  statusIdx: index('inclass_makeup_classes_status_idx').on(table.tenantId, table.status),
+}));

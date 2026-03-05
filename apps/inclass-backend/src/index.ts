@@ -40,6 +40,8 @@ import webhookRoutes from './routes/webhooks.js'
 import botRoutes from './routes/bot/index.js'
 import parentExtRoutes from './routes/parent-ext.js'
 import faceRoutes from './routes/face.js'
+import { contactBookRoutes } from './routes/contact-book.js'
+import { contactBookParentRoutes } from './routes/contact-book-parent.js'
 import { loadModels } from './services/faceRecognition.js'
 type Variables = {
   schoolId: string
@@ -187,6 +189,9 @@ app.route('/api/webhooks', webhookRoutes)
 app.route('/internal', internalRoutes)
 // Face recognition routes (image-based, requires increased body limit)
 app.route('/api/face', faceRoutes)
+// Contact book routes (migrated from manage-backend)
+app.route('/api/contact-book', contactBookRoutes)
+app.route('/api/parent/contact-book', contactBookParentRoutes)
 // ===== Global Error Handler =====
 app.onError((err, c) => {
   logger.error({ err }, `[Global Error Handler] ${c.req.path}`)
