@@ -32,11 +32,11 @@ interface OverviewResponse {
 
 interface PricingPlan {
   id: string
-  plan_key: string
+  planKey: string
   name: string
-  monthly_price: number
+  monthlyPrice: number
   features: string[]
-  is_active: boolean
+  isActive: boolean
 }
 
 interface PricingResponse {
@@ -226,7 +226,7 @@ export default function FinancePage() {
               >
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-gray-800">{plan.name}</span>
-                  {plan.is_active ? (
+                  {plan.isActive ? (
                     <span
                       className="text-xs px-2 py-0.5 rounded-full"
                       style={{ backgroundColor: '#D1FAE5', color: '#059669' }}
@@ -243,7 +243,7 @@ export default function FinancePage() {
                   )}
                 </div>
                 <p className="text-2xl font-bold" style={{ color: '#8FA895' }}>
-                  {formatNTD(plan.monthly_price)}
+                  {formatNTD(plan.monthlyPrice)}
                   <span className="text-sm font-normal text-gray-400"> / 月</span>
                 </p>
                 <ul className="mt-1 space-y-1">

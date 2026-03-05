@@ -21,12 +21,14 @@ interface Tenant {
 
 interface TenantsResponse {
   success: boolean
-  data: {
-    tenants: Tenant[]
-    total: number
-    page: number
-    limit: number
-    totalPages: number
+  data: Tenant[]
+  meta: {
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+    }
   }
 }
 
@@ -308,9 +310,9 @@ export default function TenantsPage() {
       params.set('limit', '10')
 
       const res = await platformFetch<TenantsResponse>(`/tenants?${params.toString()}`)
-      setTenants(res.data.tenants)
-      setTotal(res.data.total)
-      setTotalPages(res.data.totalPages)
+      setTenants(res.data)
+      setTotal(res.meta.pagination.total)
+      setTotalPages(res.meta.pagination.totalPages)
     } catch (err) {
       setError(err instanceof Error ? err.message : '載入失敗')
     } finally {

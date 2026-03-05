@@ -9,7 +9,7 @@ interface Setting {
   id: string
   key: string
   value: string
-  updated_at: string
+  updatedAt: string
 }
 
 interface SettingsResponse {
@@ -259,7 +259,7 @@ export default function SettingsPage() {
                           </pre>
                         </td>
                         <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">
-                          {formatDateTime(s.updated_at)}
+                          {formatDateTime(s.updatedAt)}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button

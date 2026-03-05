@@ -7,17 +7,17 @@ import { platformFetch } from '@/lib/api'
 
 interface FailedLoginLog {
   id: string
-  user_name: string
-  user_email: string
-  tenant_name: string
-  ip_address: string
-  created_at: string
+  userName: string
+  userEmail: string
+  tenantName: string
+  ipAddress: string
+  createdAt: string
   details: string | null
 }
 
 interface FailedLoginsResponse {
-  data: {
-    logs: FailedLoginLog[]
+  data: FailedLoginLog[]
+  meta: {
     pagination: {
       page: number
       limit: number
@@ -108,8 +108,8 @@ export default function SecurityPage() {
         days: String(days),
       })
       const res = await platformFetch<FailedLoginsResponse>(`/security/failed-logins?${params}`)
-      setLogs(res.data.logs)
-      setPagination(res.data.pagination)
+      setLogs(res.data)
+      setPagination(res.meta.pagination)
     } catch (err) {
       setLogsError(err instanceof Error ? err.message : '載入失敗')
     } finally {
@@ -196,12 +196,12 @@ export default function SecurityPage() {
                   <tbody className="divide-y divide-gray-100">
                     {logs.map((log) => (
                       <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-4 py-3 text-gray-800 font-medium">{log.user_name || '—'}</td>
-                        <td className="px-4 py-3 text-gray-600">{log.user_email || '—'}</td>
-                        <td className="px-4 py-3 text-gray-600">{log.tenant_name || '—'}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-gray-700">{log.ip_address}</td>
+                        <td className="px-4 py-3 text-gray-800 font-medium">{log.userName || '—'}</td>
+                        <td className="px-4 py-3 text-gray-600">{log.userEmail || '—'}</td>
+                        <td className="px-4 py-3 text-gray-600">{log.tenantName || '—'}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-gray-700">{log.ipAddress}</td>
                         <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                          {formatDateTime(log.created_at)}
+                          {formatDateTime(log.createdAt)}
                         </td>
                         <td className="px-4 py-3 text-gray-500 max-w-[200px] truncate" title={log.details ?? ''}>
                           {log.details || '—'}

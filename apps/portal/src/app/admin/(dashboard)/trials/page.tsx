@@ -8,18 +8,26 @@ import { formatDate } from '@/lib/format'
 
 interface Trial {
   id: string
-  tenant_id: string
+  tenantId: string
   name: string
   status: 'pending' | 'approved' | 'rejected' | 'expired' | 'none'
   plan: string
-  created_at: string
-  trial_start_at: string | null
-  trial_end_at: string | null
+  createdAt: string
+  trialStartAt: string | null
+  trialEndAt: string | null
 }
 
 interface TrialsResponse {
   success: boolean
   data: Trial[]
+  meta: {
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+    }
+  }
 }
 
 // ---------- 常數 ----------
@@ -164,7 +172,7 @@ export default function TrialsPage() {
     if (!actionTarget) return
     try {
       setActionLoading(true)
-      await platformFetch(`/trials/${actionTarget.tenant_id}/approve`, {
+      await platformFetch(`/trials/${actionTarget.tenantId}/approve`, {
         method: 'POST',
       })
       setShowApprove(false)
@@ -188,7 +196,7 @@ export default function TrialsPage() {
     if (!actionTarget || !rejectNotes.trim()) return
     try {
       setActionLoading(true)
-      await platformFetch(`/trials/${actionTarget.tenant_id}/reject`, {
+      await platformFetch(`/trials/${actionTarget.tenantId}/reject`, {
         method: 'POST',
         body: JSON.stringify({ notes: rejectNotes }),
       })
@@ -212,7 +220,7 @@ export default function TrialsPage() {
     if (!actionTarget) return
     try {
       setActionLoading(true)
-      await platformFetch(`/trials/${actionTarget.tenant_id}/revoke`, {
+      await platformFetch(`/trials/${actionTarget.tenantId}/revoke`, {
         method: 'POST',
       })
       setShowRevoke(false)
@@ -283,13 +291,13 @@ export default function TrialsPage() {
                       {PLAN_LABELS[trial.plan] ?? trial.plan}
                     </td>
                     <td className="px-4 py-3 text-gray-500">
-                      {formatDate(trial.created_at)}
+                      {formatDate(trial.createdAt)}
                     </td>
                     <td className="px-4 py-3 text-gray-500">
-                      {formatDate(trial.trial_start_at)}
+                      {formatDate(trial.trialStartAt)}
                     </td>
                     <td className="px-4 py-3 text-gray-500">
-                      {formatDate(trial.trial_end_at)}
+                      {formatDate(trial.trialEndAt)}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">

@@ -11,14 +11,22 @@ interface Account {
   name: string
   email: string
   role: string
-  tenant_name: string
-  branch_name: string
-  created_at: string
+  tenantName: string
+  branchName: string
+  createdAt: string
 }
 
 interface AccountsResponse {
   success: boolean
   data: Account[]
+  meta: {
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+    }
+  }
 }
 
 // ---------- 常數 ----------
@@ -265,13 +273,13 @@ export default function AccountsPage() {
                       {ROLE_LABELS[acc.role] ?? acc.role}
                     </td>
                     <td className="px-4 py-3 text-gray-700">
-                      {acc.tenant_name}
+                      {acc.tenantName}
                     </td>
                     <td className="px-4 py-3 text-gray-700">
-                      {acc.branch_name}
+                      {acc.branchName}
                     </td>
                     <td className="px-4 py-3 text-gray-500">
-                      {formatDate(acc.created_at)}
+                      {formatDate(acc.createdAt)}
                     </td>
                     {activeTab === 'pending' && (
                       <td className="px-4 py-3 text-center">

@@ -32,9 +32,9 @@ interface Subscription {
   name: string
   plan: string
   status: string
-  ai_usage: number
-  ai_quota: number
-  bot_enabled: boolean
+  aiUsage: number
+  aiQuota: number
+  botEnabled: boolean
 }
 
 interface SubscriptionsResponse {
@@ -216,7 +216,7 @@ export default function AiPage() {
 
   function openEdit(sub: Subscription) {
     setEditTarget(sub)
-    setEditForm({ plan: sub.plan, aiQuota: String(sub.ai_quota), botEnabled: sub.bot_enabled })
+    setEditForm({ plan: sub.plan, aiQuota: String(sub.aiQuota), botEnabled: sub.botEnabled })
     setEditError(null)
   }
 
@@ -340,12 +340,12 @@ export default function AiPage() {
                         <td className="px-4 py-3"><PlanTag plan={sub.plan} /></td>
                         <td className="px-4 py-3 text-gray-700">
                           <div className="flex items-center gap-2">
-                            <span>{sub.ai_usage.toLocaleString()} / {sub.ai_quota.toLocaleString()}</span>
+                            <span>{sub.aiUsage.toLocaleString()} / {sub.aiQuota.toLocaleString()}</span>
                             <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                               <div
                                 className="h-full rounded-full"
                                 style={{
-                                  width: `${Math.min(100, sub.ai_quota > 0 ? (sub.ai_usage / sub.ai_quota) * 100 : 0)}%`,
+                                  width: `${Math.min(100, sub.aiQuota > 0 ? (sub.aiUsage / sub.aiQuota) * 100 : 0)}%`,
                                   backgroundColor: '#8FA895',
                                 }}
                               />
@@ -356,12 +356,12 @@ export default function AiPage() {
                           <span
                             className="inline-block px-2 py-0.5 rounded-full text-xs font-medium"
                             style={
-                              sub.bot_enabled
+                              sub.botEnabled
                                 ? { backgroundColor: '#D1FAE5', color: '#059669' }
                                 : { backgroundColor: '#E5E7EB', color: '#6B7280' }
                             }
                           >
-                            {sub.bot_enabled ? '已啟用' : '未啟用'}
+                            {sub.botEnabled ? '已啟用' : '未啟用'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center">

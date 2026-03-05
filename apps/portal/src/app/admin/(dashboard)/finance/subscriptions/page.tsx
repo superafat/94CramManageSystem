@@ -8,21 +8,21 @@ import { formatNTD, formatDate } from '@/lib/format'
 
 interface Payment {
   id: string
-  tenant_id: string
+  tenantId: string
   amount: number
-  paid_at: string
+  paidAt: string
   method: 'transfer' | 'cash' | 'other'
-  invoice_no: string | null
-  period_start: string | null
-  period_end: string | null
+  invoiceNo: string | null
+  periodStart: string | null
+  periodEnd: string | null
   notes: string | null
-  tenant_name: string
+  tenantName: string
 }
 
 interface PaymentsResponse {
   success: boolean
-  data: {
-    data: Payment[]
+  data: Payment[]
+  meta: {
     pagination: {
       page: number
       limit: number
@@ -39,8 +39,14 @@ interface TenantOption {
 
 interface TenantsResponse {
   success: boolean
-  data: {
-    tenants: TenantOption[]
+  data: TenantOption[]
+  meta: {
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+    }
   }
 }
 
@@ -222,7 +228,7 @@ export default function SubscriptionsPage() {
 
   useEffect(() => {
     platformFetch<TenantsResponse>('/tenants?limit=200')
-      .then((res) => setTenantOptions(res.data.tenants))
+      .then((res) => setTenantOptions(res.data))
       .catch(() => {})
   }, [])
 
@@ -239,11 +245,11 @@ export default function SubscriptionsPage() {
       if (endDate) params.set('endDate', endDate)
 
       const res = await platformFetch<PaymentsResponse>(`/finance/payments?${params.toString()}`)
-      setPayments(res.data.data)
+      setPayments(res.data)
       setPagination({
-        page: res.data.pagination.page,
-        total: res.data.pagination.total,
-        totalPages: res.data.pagination.totalPages,
+        page: res.meta.pagination.page,
+        total: res.meta.pagination.total,
+        totalPages: res.meta.pagination.totalPages,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : '載入失敗')
@@ -302,13 +308,13 @@ export default function SubscriptionsPage() {
   function openEdit(payment: Payment) {
     setEditTarget(payment)
     setForm({
-      tenantId: payment.tenant_id,
+      tenantId: payment.tenantId,
       amount: String(payment.amount),
-      paidAt: formatDate(payment.paid_at),
+      paidAt: formatDate(payment.paidAt),
       method: payment.method,
-      invoiceNo: payment.invoice_no ?? '',
-      periodStart: payment.period_start ? formatDate(payment.period_start) : '',
-      periodEnd: payment.period_end ? formatDate(payment.period_end) : '',
+      invoiceNo: payment.invoiceNo ?? '',
+      periodStart: payment.periodStart ? formatDate(payment.periodStart) : '',
+      periodEnd: payment.periodEnd ? formatDate(payment.periodEnd) : '',
       notes: payment.notes ?? '',
     })
     setFormErrors({})
@@ -523,14 +529,14 @@ export default function SubscriptionsPage() {
               <tbody className="divide-y divide-gray-100">
                 {payments.map((p) => (
                   <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-gray-800">{p.tenant_name}</td>
+                    <td className="px-4 py-3 font-medium text-gray-800">{p.tenantName}</td>
                     <td className="px-4 py-3 text-right text-gray-700">{formatNTD(p.amount)}</td>
-                    <td className="px-4 py-3 text-gray-600">{formatDate(p.paid_at)}</td>
+                    <td className="px-4 py-3 text-gray-600">{formatDate(p.paidAt)}</td>
                     <td className="px-4 py-3 text-gray-600">{METHOD_LABELS[p.method] ?? p.method}</td>
-                    <td className="px-4 py-3 text-gray-500">{p.invoice_no ?? '—'}</td>
+                    <td className="px-4 py-3 text-gray-500">{p.invoiceNo ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                      {p.period_start && p.period_end
-                        ? `${formatDate(p.period_start)} ~ ${formatDate(p.period_end)}`
+                      {p.periodStart && p.periodEnd
+                        ? `${formatDate(p.periodStart)} ~ ${formatDate(p.periodEnd)}`
                         : '—'}
                     </td>
                     <td className="px-4 py-3 text-gray-500 max-w-[120px] truncate">{p.notes ?? '—'}</td>
@@ -631,7 +637,7 @@ export default function SubscriptionsPage() {
         onClose={() => setShowDelete(false)}
         onConfirm={handleDelete}
         title="刪除收款紀錄"
-        message={`確定要刪除「${deleteTarget?.tenant_name ?? ''}」的這筆收款紀錄嗎？此操作無法還原。`}
+        message={`確定要刪除「${deleteTarget?.tenantName ?? ''}」的這筆收款紀錄嗎？此操作無法還原。`}
         loading={actionLoading}
       />
     </div>

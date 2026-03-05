@@ -13,13 +13,13 @@ interface Cost {
   amount: number
   date: string
   description: string | null
-  is_recurring: boolean
+  isRecurring: boolean
 }
 
 interface CostsResponse {
   success: boolean
-  data: {
-    data: Cost[]
+  data: Cost[]
+  meta: {
     pagination: {
       page: number
       limit: number
@@ -229,11 +229,11 @@ export default function CostsPage() {
       if (endDate) params.set('endDate', endDate)
 
       const res = await platformFetch<CostsResponse>(`/finance/costs?${params.toString()}`)
-      setCosts(res.data.data)
+      setCosts(res.data)
       setPagination({
-        page: res.data.pagination.page,
-        total: res.data.pagination.total,
-        totalPages: res.data.pagination.totalPages,
+        page: res.meta.pagination.page,
+        total: res.meta.pagination.total,
+        totalPages: res.meta.pagination.totalPages,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : '載入失敗')
@@ -295,7 +295,7 @@ export default function CostsPage() {
       amount: String(cost.amount),
       date: formatDate(cost.date),
       description: cost.description ?? '',
-      isRecurring: cost.is_recurring,
+      isRecurring: cost.isRecurring,
     })
     setFormErrors({})
     setShowEdit(true)
@@ -505,7 +505,7 @@ export default function CostsPage() {
                     <td className="px-4 py-3 text-gray-600">{formatDate(c.date)}</td>
                     <td className="px-4 py-3 text-gray-500 max-w-[160px] truncate">{c.description ?? '—'}</td>
                     <td className="px-4 py-3 text-center">
-                      {c.is_recurring ? (
+                      {c.isRecurring ? (
                         <span
                           className="inline-block px-2 py-0.5 rounded-full text-xs font-medium"
                           style={{ backgroundColor: '#D1FAE5', color: '#059669' }}

@@ -37,9 +37,8 @@ interface Payment {
 
 interface PaymentsResponse {
   success: boolean
-  data: {
-    payments: Payment[]
-  }
+  data: Payment[]
+  meta?: { pagination: { page: number; limit: number; total: number; totalPages: number } }
 }
 
 // ---------- 常數 ----------
@@ -267,7 +266,7 @@ export default function TenantDetailPage() {
       const res = await platformFetch<PaymentsResponse>(
         `/finance/payments?tenantId=${tenantId}`
       )
-      setPayments(res.data.payments)
+      setPayments(res.data)
     } catch {
       // 付款紀錄載入失敗不阻斷頁面
     } finally {
