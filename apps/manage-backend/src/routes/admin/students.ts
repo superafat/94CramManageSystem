@@ -68,7 +68,7 @@ studentsRoutes.get('/students', requirePermission(Permission.STUDENTS_READ), zVa
 
     const studentRows = await db.execute(sql`
       SELECT s.id, s.student_code, s.full_name, s.nickname, s.gender,
-        s.date_of_birth, s.school_name, s.grade_level, s.branch_id,
+        s.date_of_birth, s.school_name, s.grade_level, s.grade_override, s.branch_id,
         s.phone, s.email, s.status, s.enrollment_date, s.notes, s.created_at,
         (SELECT json_agg(json_build_object(
           'id', e.id, 'course_id', e.course_id, 'status', e.status,
@@ -245,6 +245,7 @@ studentsRoutes.put('/students/:id',
           date_of_birth = COALESCE(${body.dateOfBirth ?? null}::date, date_of_birth),
           status = COALESCE(${body.status ?? null}, status),
           notes = COALESCE(${body.notes ?? null}, notes),
+          grade_override = ${body.gradeOverride ?? null},
           updated_at = NOW()
         WHERE id = ${studentId} AND tenant_id = ${tenantId} AND deleted_at IS NULL
         RETURNING id

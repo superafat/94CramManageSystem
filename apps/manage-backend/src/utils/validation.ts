@@ -93,6 +93,7 @@ export const createStudentSchema = z.object({
   dateOfBirth: dateStringSchema.optional(),
   schoolName: z.string().max(50).optional(),
   gradeLevel: z.string().max(10).optional(),
+  gradeOverride: z.string().max(20).nullable().optional(),
   phone: phoneSchema,
   email: emailSchema,
   address: z.string().max(200).optional(),

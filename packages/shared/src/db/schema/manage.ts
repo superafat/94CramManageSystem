@@ -32,6 +32,7 @@ export const manageStudents = pgTable('manage_students', {
   phone: varchar('phone', { length: 20 }),
   email: varchar('email', { length: 255 }),
   grade: varchar('grade', { length: 20 }),
+  gradeOverride: varchar('grade_override', { length: 20 }),  // 手動校正年級
   dateOfBirth: date('date_of_birth'),  // 出生日期（nullable，雙軌並行）
   school: varchar('school', { length: 255 }),
   guardianName: varchar('guardian_name', { length: 100 }),

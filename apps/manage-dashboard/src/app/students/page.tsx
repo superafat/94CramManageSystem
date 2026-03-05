@@ -51,6 +51,7 @@ interface Student {
   notes?: string
   date_of_birth?: string
   computed_grade?: string | null
+  grade_override?: string | null
   enrollment_date?: string
   enrollments?: StudentEnrollment[]
 }
@@ -61,7 +62,7 @@ const GRADE_OPTIONS = [
   '高一', '高二', '高三',
 ]
 
-const emptyForm = { fullName: '', gradeLevel: '', phone: '', email: '', schoolName: '', notes: '', dateOfBirth: '' }
+const emptyForm = { fullName: '', gradeLevel: '', phone: '', email: '', schoolName: '', notes: '', dateOfBirth: '', gradeOverride: '' }
 
 export default function StudentsPage() {
   const router = useRouter()
@@ -133,6 +134,7 @@ export default function StudentsPage() {
       schoolName: student.school_name || '',
       notes: student.notes || '',
       dateOfBirth: student.date_of_birth || '',
+      gradeOverride: student.grade_override || '',
     })
     setShowModal(true)
   }
@@ -152,6 +154,7 @@ export default function StudentsPage() {
         body: JSON.stringify({
           fullName: form.fullName,
           gradeLevel: form.gradeLevel || null,
+          gradeOverride: form.gradeOverride || null,
           phone: form.phone || null,
           email: form.email || null,
           schoolName: form.schoolName || null,
@@ -268,13 +271,10 @@ export default function StudentsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-medium text-text">{student.full_name}</span>
-                    {(student.computed_grade || student.grade_level) && (
+                    {(student.grade_override || student.computed_grade || student.grade_level) && (
                       <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
-                        {student.computed_grade ? (
-                          <>{student.computed_grade} <span className="text-xs text-[#6B9BD2]">自動</span></>
-                        ) : (
-                          student.grade_level
-                        )}
+                        {student.grade_override || computeGrade(student.date_of_birth || '') || student.grade_level}
+                        {student.grade_override && <span className="ml-1 text-[10px] text-[#C4956A]">校正</span>}
                       </span>
                     )}
                   </div>
@@ -324,7 +324,9 @@ export default function StudentsPage() {
                 <tr key={student.id} className="hover:bg-surface-hover transition-colors">
                   <td className="px-6 py-4 text-sm font-medium text-text">{student.full_name}</td>
                   <td className="px-6 py-4 text-sm text-text-muted">
-                    {student.computed_grade ? (
+                    {student.grade_override ? (
+                      <span>{student.grade_override} <span className="text-xs text-[#C4956A]">校正</span></span>
+                    ) : student.computed_grade ? (
                       <span>{student.computed_grade} <span className="text-xs text-[#6B9BD2]">自動</span></span>
                     ) : (
                       <span>{student.grade_level || '—'}</span>
@@ -390,25 +392,36 @@ export default function StudentsPage() {
                   </p>
                 )}
               </div>
-              {/* 年級 */}
+              {/* Grade — auto computed from DOB */}
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1">年級</label>
-                {form.dateOfBirth && computeGrade(form.dateOfBirth) ? (
-                  <div className="flex items-center gap-2">
-                    <span className="px-3 py-2 bg-gray-50 border border-border rounded-lg text-text w-full">
-                      {computeGrade(form.dateOfBirth)}
-                    </span>
-                    <span className="text-xs text-[#6B9BD2] whitespace-nowrap">自動</span>
+                <label className="block text-sm font-medium text-text-muted mb-1">年級</label>
+                {form.dateOfBirth ? (
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm text-text font-medium">
+                        {form.gradeOverride || computeGrade(form.dateOfBirth) || '無法計算'}
+                      </span>
+                      {form.gradeOverride ? (
+                        <>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-[#C4956A]/10 text-[#C4956A] rounded-full">已手動校正</span>
+                          <button type="button" onClick={() => setForm(f => ({ ...f, gradeOverride: '' }))}
+                            className="text-xs text-text-muted hover:underline">恢復自動</button>
+                        </>
+                      ) : (
+                        <button type="button" onClick={() => setForm(f => ({ ...f, gradeOverride: computeGrade(f.dateOfBirth) || '' }))}
+                          className="text-xs text-primary hover:underline">校正</button>
+                      )}
+                    </div>
+                    {form.gradeOverride && (
+                      <select value={form.gradeOverride} onChange={e => setForm(f => ({ ...f, gradeOverride: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-xl border border-border text-sm bg-white">
+                        <option value="">自動計算</option>
+                        {GRADE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
+                      </select>
+                    )}
                   </div>
                 ) : (
-                  <select
-                    value={form.gradeLevel}
-                    onChange={e => setForm(prev => ({ ...prev, gradeLevel: e.target.value }))}
-                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  >
-                    <option value="">選擇年級</option>
-                    {GRADE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
+                  <p className="text-sm text-text-muted">請先填寫出生日期</p>
                 )}
               </div>
               <div>
