@@ -10,6 +10,7 @@ import { generateInvoices, getInvoices, markPaid } from '../../ai/billing'
 import { invoicesToMd } from '../../utils/markdown'
 import { db, sql, success, badRequest, notFound, internalError, rows, wantsMd, mdResponse } from './_helpers'
 import type { QueryResult } from './_helpers'
+import { notifyBillingPaid, notifyBillingCreated } from '../../services/notify-helper'
 
 const billingRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -277,6 +278,22 @@ billingRoutes.post('/billing/payment-records/batch',
             ${rec.periodMonth}, 'paid', ${rec.notes || null}, ${user.id}, NOW()
           )
         `)
+      }
+
+      // Fire-and-forget: notify parents about payment
+      for (const rec of records) {
+        void (async () => {
+          try {
+            const [info] = await db.execute(sql`
+              SELECT s.full_name, c.name as course_name
+              FROM students s LEFT JOIN courses c ON c.id = ${rec.courseId}
+              WHERE s.id = ${rec.studentId} LIMIT 1
+            `) as any[]
+            if (info) {
+              await notifyBillingPaid(user.tenant_id, rec.studentId, info.full_name || '', info.course_name || '', rec.amount)
+            }
+          } catch { /* fire-and-forget */ }
+        })()
       }
 
       return success(c, { created: records.length })

@@ -11,6 +11,7 @@ import {
   sanitizeString,
 } from '../../utils/validation'
 import { db, sql, logger, success, notFound, badRequest, internalError, conflict, rows, first } from './_helpers'
+import { notifySalaryPaid } from '../../services/notify-helper'
 
 export const salaryRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -240,6 +241,30 @@ salaryRoutes.put('/salary/records/:id/pay', requireRole(Role.ADMIN),
       const record = first(result)
       if (!record) {
         return badRequest(c, 'Record not found or not confirmed yet')
+      }
+
+      // Notify teacher via Telegram
+      if (record) {
+        const teacherResult = await db.execute(sql`
+          SELECT t.id as teacher_id, t.full_name, t.tenant_id
+          FROM manage_teachers t
+          JOIN salary_records sr ON sr.teacher_id = t.id
+          WHERE sr.id = ${id}
+          LIMIT 1
+        `)
+        const teacher = first(teacherResult)
+        if (teacher) {
+          const period = record.period_start && record.period_end
+            ? `${String(record.period_start).slice(0, 7)}`
+            : ''
+          void notifySalaryPaid(
+            String(teacher.tenant_id),
+            String(teacher.teacher_id),
+            String(teacher.full_name),
+            period,
+            Number(record.total_amount || 0)
+          )
+        }
       }
 
       return success(c, { record })

@@ -5,6 +5,7 @@ import type { RBACVariables } from '../../middleware/rbac'
 import { requirePermission, Permission } from '../../middleware/rbac'
 import { db, sql, success, successWithPagination, notFound, badRequest, internalError, rows, first } from './_helpers'
 import { generateMakeupNoticeHTML } from '../../templates/makeup-notice'
+import { notifyScheduleChange } from '../../services/notify-helper'
 
 const makeupClassesRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -370,6 +371,16 @@ makeupClassesRoutes.post('/makeup-classes/:id/notify',
           message: `${studentName} 同學的補課已安排：${makeupDate} ${makeupTime}，${teacherName}老師，教室 ${room}`,
         }),
       }).catch(() => {}) // fire-and-forget
+
+      // Notify parent via LINE + Telegram
+      void notifyScheduleChange(tenantId, mc.student_id as string, studentName, 'makeup', {
+        courseName: (mc.original_course_name as string) || '',
+        originalDate: makeupDate,
+        newDate: makeupDate,
+        newTime: makeupTime,
+        teacherName: teacherName,
+        room: room,
+      })
 
       return success(c, { message: '通知已發送' })
     } catch (err) {

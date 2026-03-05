@@ -610,6 +610,102 @@ async function processContactBookPushQueue(): Promise<void> {
   }
 }
 
+// ─── 任務五：每週一五催繳通知（家長端）──────────────────────────────────────
+
+/**
+ * 每週一、五催繳通知
+ * 透過 manage-backend 內部 API 查詢欠繳清單，按學生分組後呼叫通知 API
+ * 執行時間：每週一、五 10:00
+ */
+export async function scheduleOverdueParentReminder(): Promise<void> {
+  logger.info('[Scheduler] 開始執行週一五家長催繳通知');
+
+  try {
+    const res = await callInternalApi('manage', '/billing/overdue-by-student');
+
+    if (!res.success || !res.data) {
+      logger.warn('[Scheduler][催繳] 無法取得欠繳資料，跳過');
+      return;
+    }
+
+    const items = (res.data as unknown as unknown[]) || [];
+    if (items.length === 0) {
+      logger.info('[Scheduler][催繳] 無欠繳學生，略過');
+      return;
+    }
+
+    // 按學生分組
+    const byStudent = new Map<string, { tenantId: string; studentName: string; unpaidItems: Array<{ courseName: string; amount: number }> }>();
+
+    for (const row of items as any[]) {
+      const key = row.student_id;
+      if (!byStudent.has(key)) {
+        byStudent.set(key, {
+          tenantId: row.tenant_id,
+          studentName: row.student_name || '',
+          unpaidItems: [],
+        });
+      }
+      byStudent.get(key)!.unpaidItems.push({
+        courseName: row.course_name || '',
+        amount: Number(row.amount) || 0,
+      });
+    }
+
+    let dispatched = 0;
+    for (const [studentId, data] of byStudent) {
+      await callInternalApi('manage', '/notify/billing-overdue', data.tenantId, {
+        method: 'POST',
+        body: {
+          tenantId: data.tenantId,
+          studentId,
+          studentName: data.studentName,
+          unpaidItems: data.unpaidItems,
+        },
+      });
+      dispatched++;
+    }
+
+    logger.info({ dispatched }, '[Scheduler][催繳] 任務完成');
+  } catch (error: unknown) {
+    logger.error(
+      { err: error instanceof Error ? error : new Error(String(error)) },
+      '[Scheduler][催繳] 任務執行失敗'
+    );
+  }
+}
+
+// ─── 任務六：月底 AI 學習總結 ─────────────────────────────────────────────────
+
+/**
+ * 每月最後一天 18:00 觸發 AI 月度學習總結
+ * 呼叫 manage-backend /notify/monthly-summary
+ */
+export async function scheduleMonthlyAISummary(): Promise<void> {
+  logger.info('[Scheduler] 開始執行月度 AI 學習總結');
+
+  try {
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+    const month = now.toISOString().slice(0, 7);
+
+    const res = await callInternalApi('manage', '/notify/monthly-summary', undefined, {
+      method: 'POST',
+      body: { month },
+    });
+
+    if (res.success) {
+      logger.info({ month }, '[Scheduler][月度總結] 任務完成');
+    } else {
+      logger.warn({ month, error: res.message }, '[Scheduler][月度總結] 任務回傳失敗');
+    }
+  } catch (error: unknown) {
+    logger.error(
+      { err: error instanceof Error ? error : new Error(String(error)) },
+      '[Scheduler][月度總結] 任務執行失敗'
+    );
+  }
+}
+
 // ─── 時間工具 ─────────────────────────────────────────────────────────────────
 
 /** 取得台灣當地時間的小時（0–23） */
@@ -704,6 +800,33 @@ export function initScheduler(): void {
         );
       });
     }
+
+    // ── 每週一、五 10:00：家長催繳通知 ──
+    const overdueKey = `overdue-parent-${todayKey}`;
+    if ((dayOfWeek === 1 || dayOfWeek === 5) && hour === 10 && lastRunDate[overdueKey] !== todayKey) {
+      lastRunDate[overdueKey] = todayKey;
+      scheduleOverdueParentReminder().catch((err: unknown) => {
+        logger.error(
+          { err: err instanceof Error ? err : new Error(String(err)) },
+          '[Scheduler] 週一五催繳通知執行錯誤'
+        );
+      });
+    }
+
+    // ── 每月最後一天 18:00：AI 月度學習總結 ──
+    const tomorrow = new Date(taiwanDate);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const isLastDayOfMonth = tomorrow.getMonth() !== taiwanDate.getMonth();
+    const monthlySummaryKey = `monthly-summary-${todayKey}`;
+    if (isLastDayOfMonth && hour === 18 && lastRunDate[monthlySummaryKey] !== todayKey) {
+      lastRunDate[monthlySummaryKey] = todayKey;
+      scheduleMonthlyAISummary().catch((err: unknown) => {
+        logger.error(
+          { err: err instanceof Error ? err : new Error(String(err)) },
+          '[Scheduler] 月度 AI 學習總結執行錯誤'
+        );
+      });
+    }
   }, CHECK_INTERVAL_MS);
 
   _timers.push(timer);
@@ -712,8 +835,10 @@ export function initScheduler(): void {
     {
       tasks: [
         '每日 09:00 繳費提醒（分校行政人員）',
-        '每週一 10:00 繳費提醒（家長）',
+        '每週一 10:00 繳費提醒（家長 Flex）',
         '每小時整點 聯絡簿 AI 推薦佇列掃描',
+        '每週一五 10:00 欠繳催繳通知（家長 LINE+Telegram）',
+        '每月最後一天 18:00 AI 月度學習總結（家長 LINE+Telegram）',
       ],
     },
     '[Scheduler] 所有排程已啟動'

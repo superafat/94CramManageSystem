@@ -27,6 +27,7 @@ import { analyzeStudentWeakness } from '../../services/ai-analysis'
 import { uploadContactBookPhoto } from '../../services/gcs'
 import { pushContactBookNotification } from '../../services/line-notify'
 import type { ContactBookSummary } from '../../services/line-notify'
+import { notifyContactBook } from '../../services/notify-helper'
 import { logger } from '../../utils/logger'
 
 export const contactBookRoutes = new Hono<{ Variables: RBACVariables }>()
@@ -513,6 +514,11 @@ contactBookRoutes.post('/contact-book/entries/:id/send', async (c) => {
             entryId: parsed.data,
           }
           await pushContactBookNotification(lineUserId, summary)
+        }
+
+        // Also send via Telegram (unified helper covers all channels)
+        if (student) {
+          await notifyContactBook(tenantId, existing.studentId, student?.name ?? '', existing.entryDate, parsed.data)
         }
       } catch (pushErr) {
         // LINE 推送失敗不影響主流程

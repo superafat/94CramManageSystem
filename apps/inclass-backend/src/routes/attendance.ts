@@ -85,6 +85,21 @@ attendanceRouter.post('/checkin', zValidator('json', checkinSchema), async (c) =
       checkInMethod: body.method,
     }).returning()
 
+    // Fire-and-forget: notify parent via manage-backend
+    const manageUrl = process.env.MANAGE_BACKEND_URL || 'http://localhost:3100'
+    const statusLabel = body.status === 'arrived' ? 'present' : body.status
+    fetch(`${manageUrl}/api/internal/notify/attendance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenantId: schoolId,
+        studentId: student.id,
+        studentName: student.name ?? '',
+        status: statusLabel,
+        time: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }),
+      }),
+    }).catch(() => {}) // fire-and-forget
+
     return c.json({ success: true, record })
   } catch (e) {
     logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Checkin error`)

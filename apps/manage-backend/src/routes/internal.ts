@@ -7,6 +7,14 @@ import { Hono } from 'hono';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { logger } from '../utils/logger'
+import {
+  notifyAttendance,
+  notifyCheckout,
+  notifyBillingOverdue,
+  notifyScheduleChange,
+  notifyMonthlyAiSummary,
+  notifyParent,
+} from '../services/notify-helper'
 
 const app = new Hono();
 
@@ -218,6 +226,201 @@ app.post('/contact-book/mark-pushed', async (c) => {
     return c.json({ success: true, count: body.messageIds.length })
   } catch (error) {
     logger.error({ error }, 'POST /contact-book/mark-pushed failed')
+    return c.json({ success: false, error: String(error) }, 500)
+  }
+})
+
+// ─── 通知相關 ────────────────────────────────────────────────────────────────
+
+// POST /notify/attendance — 學生出缺勤通知（inclass-backend 呼叫）
+app.post('/notify/attendance', async (c) => {
+  try {
+    const body = await c.req.json<{
+      tenantId: string
+      studentId: string
+      studentName: string
+      status: 'present' | 'late' | 'absent' | 'leave'
+      time?: string
+    }>()
+
+    if (!body.tenantId || !body.studentId || !body.status) {
+      return c.json({ success: false, error: 'tenantId, studentId, status are required' }, 400)
+    }
+
+    void notifyAttendance(body.tenantId, body.studentId, body.studentName, body.status, body.time)
+    return c.json({ success: true, message: 'Notification dispatched' })
+  } catch (error) {
+    logger.error({ error }, 'POST /notify/attendance failed')
+    return c.json({ success: false, error: String(error) }, 500)
+  }
+})
+
+// POST /notify/checkout — 學生簽退通知
+app.post('/notify/checkout', async (c) => {
+  try {
+    const body = await c.req.json<{
+      tenantId: string; studentId: string; studentName: string; time: string
+    }>()
+
+    if (!body.tenantId || !body.studentId) {
+      return c.json({ success: false, error: 'tenantId, studentId are required' }, 400)
+    }
+
+    void notifyCheckout(body.tenantId, body.studentId, body.studentName, body.time)
+    return c.json({ success: true, message: 'Notification dispatched' })
+  } catch (error) {
+    logger.error({ error }, 'POST /notify/checkout failed')
+    return c.json({ success: false, error: String(error) }, 500)
+  }
+})
+
+// POST /notify/billing-overdue — 催繳通知（bot-gateway scheduler 呼叫）
+app.post('/notify/billing-overdue', async (c) => {
+  try {
+    const body = await c.req.json<{
+      tenantId: string
+      studentId: string
+      studentName: string
+      unpaidItems: Array<{ courseName: string; amount: number }>
+    }>()
+
+    if (!body.tenantId || !body.studentId || !body.unpaidItems?.length) {
+      return c.json({ success: false, error: 'tenantId, studentId, unpaidItems required' }, 400)
+    }
+
+    void notifyBillingOverdue(body.tenantId, body.studentId, body.studentName, body.unpaidItems)
+    return c.json({ success: true, message: 'Notification dispatched' })
+  } catch (error) {
+    logger.error({ error }, 'POST /notify/billing-overdue failed')
+    return c.json({ success: false, error: String(error) }, 500)
+  }
+})
+
+// POST /notify/schedule-change — 調課/補課/停課通知
+app.post('/notify/schedule-change', async (c) => {
+  try {
+    const body = await c.req.json<{
+      tenantId: string
+      studentId: string
+      studentName: string
+      changeType: 'reschedule' | 'makeup' | 'cancel'
+      details: {
+        courseName: string
+        originalDate?: string
+        originalTime?: string
+        newDate?: string
+        newTime?: string
+        teacherName?: string
+        room?: string
+        reason?: string
+      }
+    }>()
+
+    if (!body.tenantId || !body.studentId || !body.changeType) {
+      return c.json({ success: false, error: 'tenantId, studentId, changeType required' }, 400)
+    }
+
+    void notifyScheduleChange(body.tenantId, body.studentId, body.studentName, body.changeType, body.details)
+    return c.json({ success: true, message: 'Notification dispatched' })
+  } catch (error) {
+    logger.error({ error }, 'POST /notify/schedule-change failed')
+    return c.json({ success: false, error: String(error) }, 500)
+  }
+})
+
+// POST /notify/monthly-summary — 月度 AI 學習總結（bot-gateway scheduler 呼叫）
+app.post('/notify/monthly-summary', async (c) => {
+  try {
+    const body = await c.req.json<{ tenantId?: string; month?: string }>()
+    const month = body.month || new Date().toISOString().slice(0, 7)
+    const tenantFilter = body.tenantId ? sql`AND s.tenant_id = ${body.tenantId}` : sql``
+
+    // 取得所有在當月有上課紀錄的學生
+    const studentsResult = await db.execute(sql`
+      SELECT DISTINCT s.id, s.full_name, s.tenant_id
+      FROM manage_students s
+      JOIN manage_enrollments e ON e.student_id = s.id AND e.status = 'active'
+      WHERE s.deleted_at IS NULL ${tenantFilter}
+      ORDER BY s.tenant_id, s.full_name
+    `)
+    const students = rows(studentsResult)
+
+    let dispatched = 0
+    for (const student of students as any[]) {
+      // 取得該學生當月所有成績
+      const scoresResult = await db.execute(sql`
+        SELECT cs.subject, cs.score, cs.full_score, c.name as course_name
+        FROM manage_contact_book_scores cs
+        JOIN manage_contact_book_entries ce ON cs.entry_id = ce.id
+        LEFT JOIN manage_courses c ON ce.course_id = c.id
+        WHERE ce.student_id = ${student.id}
+          AND ce.entry_date >= ${month + '-01'}
+          AND ce.entry_date < (${month + '-01'}::date + INTERVAL '1 month')
+          AND ce.status = 'sent'
+        ORDER BY ce.entry_date
+      `)
+      const scores = rows(scoresResult) as any[]
+
+      if (scores.length === 0) continue
+
+      // 簡易分析：計算各科平均分數 + 辨別弱科
+      const subjectMap: Record<string, { total: number; count: number; full: number }> = {}
+      for (const s of scores) {
+        const key = s.subject || s.course_name || '未知'
+        if (!subjectMap[key]) subjectMap[key] = { total: 0, count: 0, full: Number(s.full_score) || 100 }
+        subjectMap[key].total += Number(s.score) || 0
+        subjectMap[key].count++
+      }
+
+      const lines: string[] = []
+      const weakSubjects: string[] = []
+      for (const [subject, data] of Object.entries(subjectMap)) {
+        const avg = Math.round(data.total / data.count)
+        const pct = Math.round((avg / data.full) * 100)
+        lines.push(`${subject}：平均 ${avg} 分（${data.count} 次測驗）`)
+        if (pct < 70) weakSubjects.push(subject)
+      }
+
+      let summary = lines.join('\n')
+      if (weakSubjects.length > 0) {
+        summary += `\n\n需加強科目：${weakSubjects.join('、')}，建議增加練習頻率或考慮補強課程。`
+      } else {
+        summary += '\n\n整體表現良好，請繼續保持！'
+      }
+
+      void notifyMonthlyAiSummary(student.tenant_id, student.id, student.full_name, month, summary)
+      dispatched++
+
+      // Rate limit
+      await new Promise(r => setTimeout(r, 200))
+    }
+
+    return c.json({ success: true, dispatched })
+  } catch (error) {
+    logger.error({ error }, 'POST /notify/monthly-summary failed')
+    return c.json({ success: false, error: String(error) }, 500)
+  }
+})
+
+// GET /billing/overdue-by-student — 按學生分組的欠繳清單（bot-gateway 催繳用）
+app.get('/billing/overdue-by-student', async (c) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        s.id AS student_id, s.full_name AS student_name, s.tenant_id,
+        c.name AS course_name,
+        pr.amount,
+        pr.period_month
+      FROM payment_records pr
+      JOIN students s ON pr.student_id = s.id
+      JOIN courses c ON pr.course_id = c.id
+      WHERE pr.status IN ('pending', 'overdue')
+        AND s.deleted_at IS NULL
+      ORDER BY s.tenant_id, s.full_name
+    `)
+    return c.json({ success: true, data: rows(result) })
+  } catch (error) {
+    logger.error({ error }, 'GET /billing/overdue-by-student failed')
     return c.json({ success: false, error: String(error) }, 500)
   }
 })
