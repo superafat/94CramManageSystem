@@ -51,7 +51,7 @@ jobs:
             --max-instances 2 \
             --revision-suffix="portal-$(echo ${{ github.sha }} | cut -c1-7)" \
             --no-traffic \
-            --set-env-vars "NODE_ENV=production,MANAGE_URL=https://cram94-manage-dashboard-1015149159553.asia-east1.run.app,INCLASS_URL=https://cram94-inclass-dashboard-1015149159553.asia-east1.run.app,STOCK_URL=https://cram94-stock-dashboard-1015149159553.asia-east1.run.app,BOT_DASHBOARD_URL=https://cram94-bot-dashboard-1015149159553.asia-east1.run.app"
+            --set-env-vars "NODE_ENV=production,PORTAL_BACKEND_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,MANAGE_URL=https://cram94-manage-dashboard-1015149159553.asia-east1.run.app,INCLASS_URL=https://cram94-inclass-dashboard-1015149159553.asia-east1.run.app,STOCK_URL=https://cram94-stock-dashboard-1015149159553.asia-east1.run.app,BOT_DASHBOARD_URL=https://cram94-bot-dashboard-1015149159553.asia-east1.run.app"
 
       - name: Safe deploy (verify + route + cleanup)
         uses: ./.github/actions/cloud-run-safe-deploy
