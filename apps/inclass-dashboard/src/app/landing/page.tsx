@@ -70,12 +70,17 @@ export default function LandingPage() {
               title="AI 臉部辨識"
               desc="蜂神榜獨家視覺辨識系統，免購買硬體。拍照即可點名，防止代簽，提升管理效率。"
             />
-            <FeatureCard 
+            <FeatureCard
               emoji="📱"
               title="LINE 家長通知"
               desc="學生到校/遲到/缺席，家長即時收到 LINE 通知。提升家長滿意度，減少客訴。"
             />
-            <FeatureCard 
+            <FeatureCard
+              emoji="📊"
+              title="成績管理"
+              desc="輸入考試成績，自動生成成績單。班級排名、進步追蹤、學期報表一鍵產出。"
+            />
+            <FeatureCard
               emoji="☁️"
               title="雲端部署"
               desc="資料儲存在雲端，自動備份，隨時隨地查看。手機、平板、電腦都能用。"
@@ -109,7 +114,7 @@ export default function LandingPage() {
             <IntegrationCard 
               title="蜂神榜 Ai 點名系統 🐝"
               subtitle="教學前線"
-              items={['NFC 點名', '臉部辨識', '成績輸入', '出勤報表']}
+              items={['NFC 點名', '臉部辨識', '成績管理', '出勤報表']}
               color="#8FA9B8"
             />
             <div style={{ display: 'flex', alignItems: 'center', fontSize: '40px', color: 'var(--primary)' }}>

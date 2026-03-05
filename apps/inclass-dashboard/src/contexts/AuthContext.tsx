@@ -24,7 +24,7 @@ interface AuthContextType {
   school: School | null
   login: (email: string, password: string) => Promise<void>
   register: (schoolName: string, email: string, password: string, name: string) => Promise<void>
-  demoLogin: () => Promise<void>
+  demoLogin: (username?: string) => Promise<void>
   logout: () => void
   loading: boolean
 }
@@ -143,11 +143,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/')
   }
 
-  const demoLogin = async () => {
+  const demoLogin = async (username?: string) => {
     const res = await fetch(`${API_BASE}/api/auth/demo`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include'
+      credentials: 'include',
+      body: JSON.stringify({ username: username || 'boss' }),
     })
 
     const text = await res.text()

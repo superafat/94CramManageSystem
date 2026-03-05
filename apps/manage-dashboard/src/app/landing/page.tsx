@@ -25,7 +25,7 @@ export default function LandingPage() {
           補習班管理系統
         </p>
         <p className="text-sm text-text-muted mb-6 max-w-3xl mx-auto">
-          出勤管理 · 成績追蹤 · 帳務管理 · 薪資計算 · AI 分析<br/>
+          出勤管理 · 帳務管理 · 薪資計算 · 排課管理 · AI 分析<br/>
           一站式解決補習班營運難題 ✨
         </p>
         
@@ -68,12 +68,7 @@ export default function LandingPage() {
               title="出勤管理"
               desc="整合點名資料，自動彙整出勤記錄。遲到、缺席一目瞭然，家長端同步推送。"
             />
-            <FeatureCard 
-              emoji="📊"
-              title="成績管理"
-              desc="輸入考試成績，自動生成成績單。班級排名、進步追蹤、學期報表一鍵產出。"
-            />
-            <FeatureCard 
+            <FeatureCard
               emoji="💰"
               title="帳務管理"
               desc="學費帳單自動開立，繳費狀態追蹤。支援分期付款、減免設定，帳務清晰透明。"
@@ -105,7 +100,7 @@ export default function LandingPage() {
             🔗 與 蜂神榜 補習班 Ai 點名系統 完美整合
           </h2>
           <p className="text-base text-text-muted mb-6 max-w-3xl mx-auto">
-            蜂神榜 補習班 Ai 管理系統 專注於<strong className="text-text">營運後台</strong>（財務、成績、薪資），<br/>
+            蜂神榜 補習班 Ai 管理系統 專注於<strong className="text-text">營運後台</strong>（財務、排課、薪資），<br/>
             蜂神榜 補習班 Ai 點名系統 負責<strong className="text-text">教學前線</strong>（NFC 點名、臉部辨識）。<br/>
             兩個系統<strong className="text-primary">無縫整合</strong>，資料自動同步。
           </p>
@@ -123,7 +118,7 @@ export default function LandingPage() {
             <IntegrationCard 
               title="蜂神榜 Ai 管理系統 📊"
               subtitle="營運後台"
-              items={['帳務管理', '成績管理', '薪資計算', 'AI 分析']}
+              items={['帳務管理', '排課管理', '薪資計算', 'AI 分析']}
               color="#A8B5A2"
             />
           </div>
@@ -154,7 +149,7 @@ export default function LandingPage() {
               name="基礎版"
               price="999"
               yearPrice="11,988"
-              features={['最多 100 位學生', '出勤管理', '成績管理', '基本報表', 'Email 支援']}
+              features={['最多 100 位學生', '出勤管理', '排課管理', '基本報表', 'Email 支援']}
               desc="適合小型補習班"
             />
             <PricingCard 
@@ -207,9 +202,9 @@ export default function LandingPage() {
                     <td className="p-2 text-center text-success bg-primary/5 text-xs">✓</td>
                   </tr>
                   <tr className="border-t border-border">
-                    <td className="p-2 text-text font-medium text-xs">成績管理</td>
-                    <td className="p-2 text-center text-success text-xs">✓</td>
-                    <td className="p-2 text-center text-success text-xs">✓</td>
+                    <td className="p-2 text-text font-medium text-xs">排課管理</td>
+                    <td className="p-2 text-center text-text-muted text-xs">基本</td>
+                    <td className="p-2 text-center text-text-muted text-xs">—</td>
                     <td className="p-2 text-center text-success bg-primary/5 text-xs">✓</td>
                   </tr>
                   <tr className="border-t border-border">

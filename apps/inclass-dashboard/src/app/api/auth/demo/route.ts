@@ -1,71 +1,111 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import * as jose from 'jose'
 
-export async function POST() {
+const DEMO_TENANT_1 = '11111111-1111-1111-1111-111111111111'
+const DEMO_TENANT_2 = '22222222-2222-2222-2222-222222222222'
+const BRANCH_1 = 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d'
+const BRANCH_2 = 'b2c3d4e5-f6a7-2b3c-9d4e-5f6a7b8c9d0e'
+
+// 94inClass = 教學與學員服務端，六種角色
+type Role = 'admin' | 'staff' | 'teacher' | 'student' | 'parent'
+
+const ROLE_PERMISSIONS: Record<Role, string[]> = {
+  admin: ['manage_users', 'manage_settings', 'view_reports', 'manage_attendance', 'manage_grades', 'manage_schedules', 'manage_students'],
+  staff: ['manage_students', 'manage_attendance', 'manage_grades', 'manage_schedules'],
+  teacher: ['manage_attendance', 'manage_grades', 'view_schedules'],
+  student: ['view_attendance', 'view_grades', 'view_schedules'],
+  parent: ['view_attendance', 'view_grades', 'view_schedules', 'view_payments'],
+}
+
+const DEMO_ACCOUNTS: Record<string, { id: string; name: string; role: Role; tenantId: string; branchId: string }> = {
+  boss:     { id: 'demo-boss',     name: 'Demo 館長',   role: 'admin',   tenantId: DEMO_TENANT_1, branchId: BRANCH_1 },
+  staff:    { id: 'demo-staff',    name: 'Demo 行政',   role: 'staff',   tenantId: DEMO_TENANT_1, branchId: BRANCH_1 },
+  teacher:  { id: 'demo-teacher',  name: 'Demo 教師',   role: 'teacher', tenantId: DEMO_TENANT_1, branchId: BRANCH_1 },
+  student:  { id: 'demo-student',  name: 'Demo 學生',   role: 'student', tenantId: DEMO_TENANT_1, branchId: BRANCH_1 },
+  parent:   { id: 'demo-parent',   name: 'Demo 家長',   role: 'parent',  tenantId: DEMO_TENANT_1, branchId: BRANCH_1 },
+  boss2:    { id: 'demo-boss2',    name: 'Demo 館長2',  role: 'admin',   tenantId: DEMO_TENANT_2, branchId: BRANCH_2 },
+}
+
+const SCHOOL_NAMES: Record<string, string> = {
+  [DEMO_TENANT_1]: '蜂神榜示範補習班',
+  [DEMO_TENANT_2]: '蜂神榜2示範補習班',
+}
+
+export async function POST(request: NextRequest) {
   const jwtSecret = process.env.JWT_SECRET
   if (!jwtSecret) {
-    return NextResponse.json({ error: 'Missing server configuration' }, { status: 500 })
+    return NextResponse.json(
+      { success: false, error: { code: 'SERVER_ERROR', message: 'JWT_SECRET is not configured' } },
+      { status: 500 }
+    )
   }
 
-  const demoUser = {
-    id: 'demo-inclass-user',
-    email: 'demo@94cram.com',
-    name: 'Demo 管理員',
-    role: 'admin',
+  try {
+    const body = await request.json().catch(() => ({}))
+    const username = (body as { username?: string }).username || 'boss'
+    const account = DEMO_ACCOUNTS[username]
+
+    if (!account) {
+      return NextResponse.json(
+        { success: false, error: { code: 'BAD_REQUEST', message: `Unknown demo account: ${username}` } },
+        { status: 400 }
+      )
+    }
+
+    const secret = new TextEncoder().encode(jwtSecret)
+    const permissions = ROLE_PERMISSIONS[account.role] || []
+
+    const token = await new jose.SignJWT({
+      sub: account.id,
+      userId: account.id,
+      name: account.name,
+      email: `${username}@demo.94cram.com`,
+      role: account.role,
+      tenantId: account.tenantId,
+      branchId: account.branchId,
+      systems: ['inclass'],
+      type: 'access',
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('7d')
+      .sign(secret)
+
+    const schoolName = SCHOOL_NAMES[account.tenantId] || '蜂神榜示範補習班'
+
+    const response = NextResponse.json({
+      success: true,
+      token,
+      user: {
+        id: account.id,
+        name: account.name,
+        email: `${username}@demo.94cram.com`,
+        role: account.role,
+        tenant_id: account.tenantId,
+        branch_id: account.branchId,
+        permissions,
+        isDemo: true,
+      },
+      school: {
+        id: account.tenantId,
+        name: schoolName,
+      },
+    })
+
+    response.cookies.set('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60,
+    })
+
+    return response
+  } catch (error) {
+    console.error('Demo login error:', error)
+    return NextResponse.json(
+      { success: false, error: { code: 'SERVER_ERROR', message: 'Internal server error' } },
+      { status: 500 }
+    )
   }
-  const demoSchool = {
-    id: '11111111-1111-1111-1111-111111111111',
-    name: '蜂神榜示範補習班',
-    code: 'demo',
-  }
-
-  const secret = new TextEncoder().encode(jwtSecret)
-  const token = await new jose.SignJWT({
-    sub: demoUser.id,
-    userId: demoUser.id,
-    name: demoUser.name,
-    email: demoUser.email,
-    role: demoUser.role,
-    tenantId: demoSchool.id,
-    systems: ['inclass'],
-    type: 'access',
-  })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('1h')
-    .sign(secret)
-
-  const refreshToken = await new jose.SignJWT({
-    sub: demoUser.id,
-    userId: demoUser.id,
-    tenantId: demoSchool.id,
-    type: 'refresh',
-  })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('7d')
-    .sign(secret)
-
-  const response = NextResponse.json({
-    token,
-    user: demoUser,
-    school: demoSchool,
-  })
-
-  response.cookies.set('token', token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 60 * 60,
-  })
-  response.cookies.set('refreshToken', refreshToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 7 * 24 * 60 * 60,
-  })
-
-  return response
 }
