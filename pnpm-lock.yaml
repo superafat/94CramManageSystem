@@ -124,6 +124,12 @@ importers:
       '@94cram/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@google-cloud/storage':
+        specifier: ^7.19.0
+        version: 7.19.0
+      '@google/generative-ai':
+        specifier: ^0.24.1
+        version: 0.24.1
       '@hono/node-server':
         specifier: ^1.0.0
         version: 1.19.9(hono@4.12.1)
