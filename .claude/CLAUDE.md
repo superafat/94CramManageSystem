@@ -77,6 +77,28 @@ pnpm --filter @94cram/shared drizzle-kit push
 docker build --platform linux/amd64 -t [image-name] .
 ```
 
+## 環境與前置檢查
+
+- 新工作階段或依賴變更後，先跑 `pnpm install` 再執行 build/test/deploy
+- 修改後一律跑 `pnpm typecheck`，確保零錯誤才提交
+
+## 除錯準則
+
+- 診斷 bug 時，先列出 3 個可能根因並依可能性排序
+- 優先檢查最簡單的原因（設定值、環境變數、模型名稱）再修改程式碼邏輯
+- 不要鎖定第一個假設就開始修，先驗證再動手
+
+## 測試與驗證
+
+- 修改認證、登入、安全相關程式碼後，務必驗證 demo 登入流程仍正常運作
+- 修復任何 bug 後，檢查下游影響（其他系統、CI/CD、demo 流程）再提交
+
+## Git 安全
+
+- 推送前確保沒有密碼、secret 或敏感資料被提交
+- 不 commit seed 檔案中的真實密碼
+- 環境變數異動時，同步確認 CI/CD workflow 和 `.env.example` 都有對應更新
+
 ## Workflow Orchestration
 
 ### 1. Plan Node Default

@@ -1,8 +1,12 @@
 import type { MetadataRoute } from 'next'
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://94cram.com'
+  const now = new Date()
   return [
-    { url: baseUrl, lastModified: new Date(), changeFrequency: 'weekly', priority: 1.0 },
+    { url: 'https://94cram.com', lastModified: now, changeFrequency: 'weekly', priority: 1.0 },
+    { url: 'https://manage.94cram.com', lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
+    { url: 'https://inclass.94cram.com', lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
+    { url: 'https://stock.94cram.com', lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
+    { url: 'https://bot.94cram.com', lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
   ]
 }
