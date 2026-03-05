@@ -80,7 +80,7 @@ auth.post('/register', zValidator('json', registerSchema), async (c) => {
       return c.json({ error: 'Email already registered' }, 409)
     }
 
-    const passwordHash = await bcrypt.hash(password, 10)
+    const passwordHash = await bcrypt.hash(password, 12)
     const [user] = await db
       .insert(users)
       .values({

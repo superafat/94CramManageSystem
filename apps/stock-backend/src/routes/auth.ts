@@ -85,45 +85,8 @@ app.post('/register', async (c) => {
   }
   const { tenantName, slug, email, password, name } = parsed.data;
 
-  const passwordHash = await bcrypt.hash(password, 10);
-
-  try {
-    await db.transaction(async (tx) => {
-      // Check slug uniqueness
-      const [existingTenant] = await tx.select().from(tenants).where(eq(tenants.slug, slug));
-      if (existingTenant) {
-        throw Object.assign(new Error('Slug already taken'), { statusCode: 400 });
-      }
-
-      // Check email uniqueness
-      const [existingUser] = await tx.select().from(users).where(eq(users.email, email));
-      if (existingUser) {
-        throw Object.assign(new Error('Email already registered'), { statusCode: 400 });
-      }
-
-      const [tenant] = await tx.insert(tenants).values({
-        name: tenantName,
-        slug,
-      }).returning();
-
-      await tx.insert(users).values({
-        tenantId: tenant.id,
-        email,
-        passwordHash,
-        name,
-        role: 'admin',
-        isActive: true,
-      });
-    });
-  } catch (err) {
-    const e = err as Error & { statusCode?: number };
-    if (e.statusCode === 400) {
-      return c.json({ error: e.message }, 400);
-    }
-    throw err;
-  }
-
-  return c.json({ message: 'Registration successful' }, 201);
+  // Registration disabled — new tenants must be created by platform admin
+  return c.json({ error: 'Registration is disabled. Contact platform admin to create a new tenant.' }, 403);
 });
 
 app.use('/me', authMiddleware, tenantMiddleware);
@@ -191,7 +154,7 @@ app.post('/users', async (c) => {
     return c.json({ error: 'Email already exists' }, 400);
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, 12);
   const [user] = await db.insert(users).values({
     tenantId,
     email,

@@ -157,8 +157,8 @@ app.route('/api/line', lineRoutes)
 // Public binding routes (no auth required)
 app.route('/api', bindRoutes)
 
-// Bot routes — require bot API key in production
-if (process.env.NODE_ENV === 'production') {
+// Bot routes — require bot API key when BOT_API_KEY is set (all environments)
+if (process.env.BOT_API_KEY) {
   app.use('/api/bot/*', async (c, next) => {
     const key = c.req.header('X-Bot-Key')
     if (!key || !process.env.BOT_API_KEY || !safeCompare(key, process.env.BOT_API_KEY)) {

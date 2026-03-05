@@ -588,12 +588,7 @@ export function getDemoResponse(
   }
   if (m === 'POST' && cleanPath === '/api/platform/auth/seed') {
     return ok({
-      message: 'Superadmin 帳號建立成功',
-      credentials: {
-        email: 'admin@94cram.com',
-        password: 'Admin@94cram',
-        note: '請登入後立即修改密碼',
-      },
+      message: 'Superadmin 帳號建立成功，臨時密碼已記錄於 server log',
     })
   }
   if (m === 'POST' && cleanPath === '/api/platform/auth/logout') {

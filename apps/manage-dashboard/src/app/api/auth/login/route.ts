@@ -3,6 +3,22 @@ import * as jose from 'jose'
 import pg from 'pg'
 import bcrypt from 'bcryptjs'
 
+// Simple in-memory rate limiter for login attempts
+const loginAttempts = new Map<string, { count: number; resetAt: number }>()
+const MAX_LOGIN_ATTEMPTS = 10
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
+
+function checkLoginRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const entry = loginAttempts.get(ip)
+  if (!entry || now >= entry.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
+    return true
+  }
+  entry.count++
+  return entry.count <= MAX_LOGIN_ATTEMPTS
+}
+
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   superadmin: ['manage_users', 'manage_settings', 'view_reports', 'manage_billing', 'manage_schedules', 'manage_students', 'view_attendance', 'manage_grades'],
   admin: ['manage_users', 'manage_settings', 'view_reports', 'manage_billing', 'manage_schedules', 'manage_students', 'view_attendance', 'manage_grades'],
@@ -21,6 +37,15 @@ function getPool() {
 }
 
 export async function POST(request: NextRequest) {
+  // Rate limiting
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  if (!checkLoginRateLimit(ip)) {
+    return NextResponse.json(
+      { success: false, error: { code: 'RATE_LIMITED', message: '登入嘗試次數過多，請 15 分鐘後再試' } },
+      { status: 429 }
+    )
+  }
+
   const jwtSecret = process.env.JWT_SECRET
   const dbUrl = process.env.DATABASE_URL
   if (!jwtSecret || !dbUrl) {
@@ -85,13 +110,12 @@ export async function POST(request: NextRequest) {
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
-      .setExpirationTime('7d')
+      .setExpirationTime('1h')
       .sign(secret)
 
     const response = NextResponse.json({
       success: true,
       data: {
-        token: jwt,
         user: {
           id: user.id,
           name: user.name,
@@ -110,7 +134,7 @@ export async function POST(request: NextRequest) {
       secure: true,
       sameSite: 'lax',
       path: '/',
-      maxAge: 7 * 24 * 60 * 60,
+      maxAge: 60 * 60,
     })
 
     return response

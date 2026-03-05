@@ -3,6 +3,22 @@ import * as jose from 'jose'
 import pg from 'pg'
 import bcrypt from 'bcryptjs'
 
+// Simple in-memory rate limiter for login attempts
+const loginAttempts = new Map<string, { count: number; resetAt: number }>()
+const MAX_LOGIN_ATTEMPTS = 10
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
+
+function checkLoginRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const entry = loginAttempts.get(ip)
+  if (!entry || now >= entry.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
+    return true
+  }
+  entry.count++
+  return entry.count <= MAX_LOGIN_ATTEMPTS
+}
+
 let pool: pg.Pool | null = null
 function getPool() {
   if (!pool) {
@@ -12,6 +28,12 @@ function getPool() {
 }
 
 export async function POST(request: NextRequest) {
+  // Rate limiting
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  if (!checkLoginRateLimit(ip)) {
+    return NextResponse.json({ error: '登入嘗試次數過多，請 15 分鐘後再試' }, { status: 429 })
+  }
+
   const jwtSecret = process.env.JWT_SECRET
   const dbUrl = process.env.DATABASE_URL
   if (!jwtSecret || !dbUrl) {
@@ -59,16 +81,16 @@ export async function POST(request: NextRequest) {
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
-      .setExpirationTime('7d')
+      .setExpirationTime('1h')
       .sign(secret)
 
-    const response = NextResponse.json({ token })
+    const response = NextResponse.json({ success: true })
     response.cookies.set('token', token, {
       httpOnly: true,
       secure: true,
       sameSite: 'lax',
       path: '/',
-      maxAge: 7 * 24 * 60 * 60,
+      maxAge: 60 * 60,
     })
     return response
   } catch (error) {

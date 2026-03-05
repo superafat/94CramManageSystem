@@ -10,7 +10,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import * as jose from 'jose'
 import bcrypt from 'bcryptjs'
-import { setAuthCookie, setRefreshCookie, extractToken, signRefreshToken } from '@94cram/shared/auth'
+import { setAuthCookie, setRefreshCookie, clearAuthCookie, extractToken, signRefreshToken } from '@94cram/shared/auth'
 import { config } from '../../config'
 import { db } from '../../db'
 import { sql } from 'drizzle-orm'
@@ -189,6 +189,7 @@ platformAuthRoutes.post('/login', zValidator('json', platformLoginSchema), async
 // POST /logout - Clear auth cookie
 // ========================================================================
 platformAuthRoutes.post('/logout', async (c) => {
+  clearAuthCookie(c)
   return success(c, { message: '已登出' })
 })
 
@@ -196,6 +197,11 @@ platformAuthRoutes.post('/logout', async (c) => {
 // POST /seed - Create initial superadmin account (one-time setup)
 // ========================================================================
 platformAuthRoutes.post('/seed', async (c) => {
+  // Block in production — seed is only for initial development setup
+  if (config.NODE_ENV === 'production') {
+    return forbidden(c, 'Seed endpoint is disabled in production')
+  }
+
   try {
     // 檢查是否已有 superadmin
     const existing = firstRow(await db.execute(sql`
@@ -220,10 +226,11 @@ platformAuthRoutes.post('/seed', async (c) => {
     `) as QueryResultRows<{ id: string }>)
     const finalTenantId = tenantRow?.id ?? tenantId
 
-    // 建立 superadmin 帳號
+    // Generate random password instead of hardcoded
+    const { randomBytes } = await import('crypto')
     const userId = crypto.randomUUID()
     const email = 'superafatus@gmail.com'
-    const defaultPassword = 'Smart123!?'
+    const defaultPassword = randomBytes(16).toString('hex')
     const passwordHash = await bcrypt.hash(defaultPassword, 12)
 
     await db.execute(sql`
@@ -231,15 +238,10 @@ platformAuthRoutes.post('/seed', async (c) => {
       VALUES (${userId}, ${finalTenantId}, 'superadmin', '平台管理員', ${email}, 'superadmin', ${passwordHash}, true, NOW(), NOW())
     `)
 
-    logger.info({ userId, email }, 'Platform superadmin account created')
+    logger.info({ userId, email, tempPassword: defaultPassword }, 'Platform superadmin account created — check logs for temp password')
 
     return success(c, {
-      message: 'Superadmin 帳號建立成功',
-      credentials: {
-        email,
-        password: defaultPassword,
-        note: '請登入後立即修改密碼',
-      },
+      message: 'Superadmin 帳號建立成功，臨時密碼已記錄於 server log，請登入後立即修改',
     })
   } catch (err: unknown) {
     logger.error({ err }, 'Platform seed error')

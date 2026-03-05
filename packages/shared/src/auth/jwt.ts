@@ -101,6 +101,11 @@ export async function verify(token: string, secret?: string): Promise<JWTPayload
   };
 }
 
+/**
+ * @deprecated Use verify() for any authorization decision.
+ * This function does NOT verify the JWT signature.
+ * Only use for non-security-critical display purposes.
+ */
 export function decode(token: string): JWTPayload | null {
   try {
     const parts = token.split('.');
