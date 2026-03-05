@@ -6,12 +6,12 @@ import { useRouter } from 'next/navigation'
 const API_BASE = ''
 
 // Demo 帳號列表（展示不同角色）
+// 94manage = 行政端，只提供 admin/staff/teacher 角色
+// 家長/學生請使用 94inClass
 const DEMO_ACCOUNTS = [
   { username: 'boss', password: 'demo', role: '館長', icon: '👔', desc: '完整功能、報表、設定', tenant: '11111111-1111-1111-1111-111111111111' },
   { username: 'staff', password: 'demo', role: '行政', icon: '📋', desc: '學生、帳務、排課', tenant: '11111111-1111-1111-1111-111111111111' },
-  { username: 'teacher2', password: 'demo', role: '教師', icon: '👨‍🏫', desc: '點名、成績', tenant: '11111111-1111-1111-1111-111111111111' },
-  { username: 'parent2', password: 'demo', role: '家長', icon: '👨‍👩‍👧', desc: '查看孩子資料', tenant: '11111111-1111-1111-1111-111111111111' },
-  { username: 'student', password: 'demo', role: '學生', icon: '🎒', desc: '查看自己課表', tenant: '11111111-1111-1111-1111-111111111111' },
+  { username: 'teacher2', password: 'demo', role: '教師', icon: '👨‍🏫', desc: '課表、薪資', tenant: '11111111-1111-1111-1111-111111111111' },
   { username: 'boss2', password: 'demo', role: '館長', icon: '👔', desc: '蜂神榜2（資料隔離）', tenant: '22222222-2222-2222-2222-222222222222' },
 ]
 
@@ -67,8 +67,6 @@ export default function DemoPage() {
         admin: '/dashboard',
         staff: '/students',
         teacher: '/schedules',
-        parent: '/my-children',
-        student: '/my-schedule',
       }
       router.push(homePages[role] || '/dashboard')
     } catch (err) {

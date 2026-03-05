@@ -6,8 +6,6 @@ import { usePathname, useRouter } from 'next/navigation'
 // 頁面標題對照
 const pageTitles: Record<string, string> = {
   '/dashboard': '首頁',
-  '/dashboard/knowledge': '知識庫',
-  '/dashboard/conversations': '對話紀錄',
   '/dashboard/settings': '系統設定',
   '/students': '學生管理',
   '/schedules': '課表管理',
@@ -15,11 +13,6 @@ const pageTitles: Record<string, string> = {
   '/grades': '成績管理',
   '/billing': '帳務管理',
   '/reports': '報表中心',
-  '/my-children': '我的孩子',
-  '/my-children/grades': '孩子成績',
-  '/my-children/billing': '繳費查詢',
-  '/my-schedule': '我的課表',
-  '/my-grades': '我的成績',
   '/teachers': '講師管理',
   '/salary': '薪資管理',
   '/dashboard/trials': '試用管理',

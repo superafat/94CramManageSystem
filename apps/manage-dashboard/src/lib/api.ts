@@ -77,11 +77,7 @@ export interface AIQueryResult {
   latencyMs: number
 }
 
-export interface RAGSource {
-  content: string
-  score: number
-  metadata: Record<string, unknown>
-}
+// RAGSource, ragSearch, ingestKnowledge — 已移至總後台/94BOT
 
 // Tenant context stored in localStorage
 export function getCurrentTenantId(): string {
@@ -235,34 +231,6 @@ export async function aiQuery(query: string, userId = 'dashboard-test'): Promise
   )
 }
 
-export async function ragSearch(query: string, topK = 5): Promise<{ sources: RAGSource[]; count: number }> {
-  return enhancedFetch<{ sources: RAGSource[]; count: number }>(
-    `${API_BASE}/api/bot/rag-search`,
-    {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({
-        query,
-        branchId: getCurrentBranchId(),
-        topK,
-      }),
-    }
-  )
-}
-
-export async function ingestKnowledge(content: string, title?: string): Promise<{ ok: boolean; stored: number }> {
-  return enhancedFetch<{ ok: boolean; stored: number }>(
-    `${API_BASE}/api/admin/knowledge/ingest`,
-    {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({
-        branchId: getCurrentBranchId(),
-        chunks: [{ content, metadata: title ? { title } : {} }],
-      }),
-    }
-  )
-}
 
 export async function healthCheck(): Promise<{ status: string }> {
   return enhancedFetch<{ status: string }>(

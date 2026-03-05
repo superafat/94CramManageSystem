@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
-type Role = 'superadmin' | 'admin' | 'staff' | 'teacher' | 'parent' | 'student'
+type Role = 'superadmin' | 'admin' | 'staff' | 'teacher'
 
 interface NavItem {
   href: string
@@ -15,21 +15,6 @@ interface NavItem {
 
 // 底部導航項目（最多 5 個）
 const getBottomNavItems = (role: Role): NavItem[] => {
-  if (role === 'parent') {
-    return [
-      { href: '/my-children', icon: '👶', label: '孩子', roles: ['parent'] },
-      { href: '/my-children/grades', icon: '📊', label: '成績', roles: ['parent'] },
-      { href: '/my-children/billing', icon: '💰', label: '繳費', roles: ['parent'] },
-      { href: '/my-children/notifications', icon: '📬', label: '聯絡簿', roles: ['parent'] },
-      { href: '/my-children/recommendations', icon: '🎯', label: '推薦', roles: ['parent'] },
-    ]
-  }
-  if (role === 'student') {
-    return [
-      { href: '/my-schedule', icon: '📅', label: '課表', roles: ['student'] },
-      { href: '/my-grades', icon: '📊', label: '成績', roles: ['student'] },
-    ]
-  }
   if (role === 'teacher') {
     return [
       { href: '/schedules', icon: '📅', label: '課表', roles: ['teacher'] },
@@ -49,10 +34,6 @@ const getBottomNavItems = (role: Role): NavItem[] => {
 const getMoreMenuItems = (role: Role): NavItem[] => {
   const items: NavItem[] = []
   
-  if (['superadmin', 'admin'].includes(role)) {
-    items.push({ href: '/dashboard/knowledge', icon: '📚', label: '知識庫', roles: ['superadmin', 'admin'] })
-    items.push({ href: '/dashboard/conversations', icon: '💬', label: '對話紀錄', roles: ['superadmin', 'admin'] })
-  }
   if (['superadmin', 'admin'].includes(role)) {
     items.push({ href: '/reports', icon: '📈', label: '報表中心', roles: ['superadmin', 'admin'] })
   }
@@ -88,7 +69,7 @@ export function MobileNav() {
     }
   }, [])
 
-  const role = (user?.role as Role) || 'student'
+  const role = (user?.role as Role) || 'staff'
   const bottomItems = getBottomNavItems(role)
   const moreItems = getMoreMenuItems(role)
 

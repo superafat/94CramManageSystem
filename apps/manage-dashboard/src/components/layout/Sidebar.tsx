@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 
 // 角色權限定義
 // superadmin = 系統管理員（您）, admin = 館長（業者）
-type Role = 'superadmin' | 'admin' | 'staff' | 'teacher' | 'parent' | 'student'
+type Role = 'superadmin' | 'admin' | 'staff' | 'teacher'
 
 interface NavItem {
   href?: string
@@ -18,17 +18,18 @@ interface NavItem {
 }
 
 // 選單項目與權限對照
+// 知識庫 → 已移至總後台 (Portal)
+// 對話紀錄 → 已移至 94BOT (bot-gateway)
+// 家長/學生專區 → 已移至 94inClass
 const navItems: NavItem[] = [
-  // AI 客服區塊 - 館長、行政
+  // 行政總覽
   { href: '/dashboard', icon: '📊', label: '總覽', roles: ['superadmin', 'admin', 'staff'] },
-  { href: '/dashboard/knowledge', icon: '📚', label: '知識庫', roles: ['superadmin', 'admin'] },
-  { href: '/dashboard/conversations', icon: '💬', label: '對話紀錄', roles: ['superadmin', 'admin', 'staff'] },
   { href: '/headquarters', icon: '🏢', label: '總部管理', roles: ['superadmin'] },
   { href: '/dashboard/audit', icon: '📋', label: '異動日誌', roles: ['superadmin', 'admin'] },
   { href: '/dashboard/settings', icon: '⚙️', label: '系統設定', roles: ['superadmin'] },
 
   // 班務管理區塊
-  { type: 'separator', separator: '班務管理', roles: ['superadmin', 'admin', 'staff', 'teacher'] },
+  { type: 'separator', separator: '班務管理', roles: ['superadmin', 'admin', 'staff'] },
   { href: '/students', icon: '👥', label: '學生管理', roles: ['superadmin', 'admin', 'staff'] },
   { href: '/finance', icon: '💰', label: '帳務管理', roles: ['superadmin', 'admin', 'staff'] },
   { href: '/reports', icon: '📈', label: '報表中心', roles: ['superadmin', 'admin'] },
@@ -41,19 +42,6 @@ const navItems: NavItem[] = [
   { href: '/schedules', icon: '📅', label: '課表管理', roles: ['superadmin', 'admin'] },
   { href: '/teacher-attendance', icon: '🕐', label: '師資出缺勤', roles: ['superadmin', 'admin'] },
   { href: '/my-salary', icon: '💵', label: '我的薪資條', roles: ['staff', 'teacher'] },
-
-  // 家長專區
-  { type: 'separator', separator: '我的孩子', roles: ['parent'] },
-  { href: '/my-children', icon: '👶', label: '孩子資料', roles: ['parent'] },
-  { href: '/my-children/grades', icon: '📊', label: '成績查詢', roles: ['parent'] },
-  { href: '/my-children/billing', icon: '💰', label: '繳費查詢', roles: ['parent'] },
-  { href: '/my-children/notifications', icon: '📬', label: '聯絡簿', roles: ['parent'] },
-  { href: '/my-children/recommendations', icon: '🎯', label: '推薦課程', roles: ['parent'] },
-  
-  // 學生專區
-  { type: 'separator', separator: '我的學習', roles: ['student'] },
-  { href: '/my-schedule', icon: '📅', label: '我的課表', roles: ['student'] },
-  { href: '/my-grades', icon: '📊', label: '我的成績', roles: ['student'] },
 ]
 
 // 角色名稱對照
@@ -62,8 +50,6 @@ const roleLabels: Record<Role, string> = {
   admin: '館長',
   staff: '行政',
   teacher: '教師',
-  parent: '家長',
-  student: '學生',
 }
 
 interface User {
@@ -90,7 +76,7 @@ export function Sidebar() {
     }
   }, [])
 
-  const userRole = (user?.role as Role) || 'student'
+  const userRole = (user?.role as Role) || 'staff'
   
   // 過濾出當前角色可見的選單項目
   const visibleItems = navItems.filter(item => item.roles.includes(userRole))

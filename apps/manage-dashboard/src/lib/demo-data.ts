@@ -11,9 +11,9 @@ const TENANTS = [
   { id: DEMO_TENANT_1, name: '蜂神榜示範補習班', slug: 'demo-cram', plan: 'ai', active: true },
 ]
 
-const TENANT_STATS: Record<string, { conversations: number; knowledgeChunks: number; branches: number }> = {
-  [DEMO_TENANT_1]: { conversations: 128, knowledgeChunks: 45, branches: 1 },
-  [DEMO_TENANT_2]: { conversations: 32, knowledgeChunks: 12, branches: 1 },
+const TENANT_STATS: Record<string, { branches: number }> = {
+  [DEMO_TENANT_1]: { branches: 1 },
+  [DEMO_TENANT_2]: { branches: 1 },
 }
 
 // ===== Students =====
@@ -156,20 +156,6 @@ const AUDIT_LOGS = [
   { id: 'log-8', user_name: '系統', user_role: 'system', action: 'update', table_name: 'students', record_id: 's8', change_summary: '吳承恩風險等級升高為「高風險」（出席率 65%，2 筆未繳費）', old_value: { risk_level: 'medium' }, new_value: { risk_level: 'high' }, needs_alert: true, alert_sent: true, parent_notified: true, alert_confirmed_at: null, ip_address: '10.0.0.1', created_at: '2026-02-26T08:00:00Z' },
   { id: 'log-9', user_name: 'Demo 館長', user_role: 'admin', action: 'create', table_name: 'courses', record_id: 'c3', change_summary: '新增課程：國小先修班（王老師，週四 16:00-18:00）', old_value: null, new_value: { name: '國小先修班', teacher: '王老師' }, needs_alert: false, alert_sent: false, parent_notified: false, alert_confirmed_at: null, ip_address: '203.69.115.42', created_at: '2026-02-10T09:30:00Z' },
   { id: 'log-10', user_name: 'Demo 行政', user_role: 'staff', action: 'delete', table_name: 'attendance', record_id: 'att-dup', change_summary: '刪除重複出勤紀錄（陳小利 2/25 重複打卡）', old_value: { student: '陳小利', date: '2026-02-25' }, new_value: null, needs_alert: false, alert_sent: false, parent_notified: false, alert_confirmed_at: null, ip_address: '192.168.1.105', created_at: '2026-02-25T17:45:00Z' },
-]
-
-// ===== Conversations (AI 對話紀錄) =====
-const CONVERSATIONS = [
-  { id: 'conv-1', channel: 'telegram', intent: 'schedule', query: '請問這週六有上課嗎？', answer: '有的！本週六（3/1）國中英文菁英班照常上課，時間為 10:00-12:00，教室 202。請準時出席！', model: 'gpt-4o-mini', latency_ms: 320, tokens_used: 185, created_at: '2026-03-01T08:15:00Z', branch_id: 'b1', branch_name: '蜂神榜示範校' },
-  { id: 'conv-2', channel: 'telegram', intent: 'billing', query: '我兒子王大明這個月學費多少？', answer: '王大明同學目前就讀國中數學 A 班，本月（3月）學費為 NT$3,500，已於 3/2 繳費完成。如有疑問請洽行政老師。', model: 'gpt-4o-mini', latency_ms: 450, tokens_used: 210, created_at: '2026-03-01T09:30:00Z', branch_id: 'b1', branch_name: '蜂神榜示範校' },
-  { id: 'conv-3', channel: 'line', intent: 'enrollment', query: '請問還有沒有國小先修班的名額？', answer: '國小先修班目前還有 5 個名額喔！上課時間為每週四 16:00-18:00，月費 NT$2,800。歡迎來電預約試聽！', model: 'gpt-4o-mini', latency_ms: 380, tokens_used: 195, created_at: '2026-02-28T14:20:00Z', branch_id: 'b1', branch_name: '蜂神榜示範校' },
-  { id: 'conv-4', channel: 'telegram', intent: 'FAQ', query: '補習班地址在哪裡？', answer: '蜂神榜示範補習班地址：台北市大安區忠孝東路四段 100 號 3 樓。捷運忠孝敦化站 2 號出口步行約 3 分鐘。', model: 'gpt-4o-mini', latency_ms: 280, tokens_used: 160, created_at: '2026-02-28T11:05:00Z', branch_id: 'b1', branch_name: '蜂神榜示範校' },
-  { id: 'conv-5', channel: 'web', intent: 'greeting', query: '你好', answer: '您好！歡迎來到蜂神榜補習班 🐝 我是 AI 助理，可以幫您查詢課程、學費、上課時間等資訊，請問有什麼需要幫忙的嗎？', model: 'gpt-4o-mini', latency_ms: 220, tokens_used: 140, created_at: '2026-02-27T16:00:00Z', branch_id: 'b1', branch_name: '蜂神榜示範校' },
-  { id: 'conv-6', channel: 'telegram', intent: 'schedule', query: '下週的課表是什麼？', answer: '下週課表如下：\n週二 18:00-20:00 國中數學 A 班（王老師）\n週三 18:00-20:00 國中英文菁英班（李老師）\n週四 16:00-18:00 國小先修班（王老師）\n週五 18:00-20:00 國中數學 A 班（王老師）\n週六 10:00-12:00 國中英文菁英班（李老師）', model: 'gpt-4o-mini', latency_ms: 510, tokens_used: 280, created_at: '2026-02-27T10:30:00Z', branch_id: 'b1', branch_name: '蜂神榜示範校' },
-  { id: 'conv-7', channel: 'line', intent: 'billing', query: '吳承恩的繳費狀況如何？', answer: '吳承恩同學（國中英文菁英班）目前有 2 筆未繳費用：\n- 2026年2月 NT$4,000（逾期）\n- 2026年3月 NT$4,000（未繳）\n建議盡快繳費，如有困難可聯繫行政老師討論分期方案。', model: 'gpt-4o-mini', latency_ms: 420, tokens_used: 230, created_at: '2026-02-26T15:45:00Z', branch_id: 'b1', branch_name: '蜂神榜示範校' },
-  { id: 'conv-8', channel: 'telegram', intent: 'FAQ', query: '考試成績什麼時候出來？', answer: '第一次段考成績已於 2/21 公布，您可以在 94Manage 系統的「成績管理」中查看完整成績。如需紙本成績單，請洽行政老師。', model: 'gpt-4o-mini', latency_ms: 350, tokens_used: 175, created_at: '2026-02-25T09:20:00Z', branch_id: 'b1', branch_name: '蜂神榜示範校' },
-  { id: 'conv-9', channel: 'web', intent: 'enrollment', query: '國中數學 A 班還能報名嗎？上課方式是什麼？', answer: '國中數學 A 班目前還有名額！上課資訊：\n- 時間：週二、週五 18:00-20:00\n- 教室：201\n- 師資：王老師（資深講師）\n- 月費：NT$3,500\n\n採小班制教學（最多15人），歡迎預約試聽！', model: 'gpt-4o-mini', latency_ms: 480, tokens_used: 250, created_at: '2026-02-24T13:10:00Z', branch_id: 'b1', branch_name: '蜂神榜示範校' },
-  { id: 'conv-10', channel: 'telegram', intent: 'schedule', query: '張志豪的出席狀況怎麼樣？', answer: '張志豪同學近期出席率約 80%，屬於中等風險。建議關注其到課情況，必要時可與家長溝通了解原因。', model: 'gpt-4o-mini', latency_ms: 390, tokens_used: 200, created_at: '2026-02-23T17:30:00Z', branch_id: 'b1', branch_name: '蜂神榜示範校' },
 ]
 
 // ===== Course-Student enrollment (帳務管理用) =====
@@ -569,7 +555,7 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     const tenantStatsMatch = path.match(/^\/api\/admin\/tenants\/([\w-]+)\/stats$/)
     if (tenantStatsMatch) {
       const tid = tenantStatsMatch[1]
-      return { status: 200, body: TENANT_STATS[tid] || { conversations: 0, knowledgeChunks: 0, branches: 0 } }
+      return { status: 200, body: TENANT_STATS[tid] || { branches: 0 } }
     }
 
     // Student APIs — grade-upgrade-preview (must be before generic students handler)
@@ -919,10 +905,8 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
       return { status: 200, body: { success: true, data: { logs: filtered } } }
     }
 
-    // Knowledge
-    if (path.startsWith('/api/admin/knowledge')) {
-      return { status: 200, body: { chunks: [], count: 0 } }
-    }
+    // Knowledge — 已移至總後台
+    // Conversations — 已移至 94BOT
 
     // Notifications — 電子聯絡簿
     if (path === '/api/w8/notifications') {
@@ -1147,19 +1131,6 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
       return { status: 200, body: { success: true, data: { logs, total: 47 } } }
     }
 
-    // Conversations — AI 對話紀錄
-    if (path.startsWith('/api/admin/conversations') || path.startsWith('/api/bot/conversations')) {
-      const limit = parseInt(searchParams.get('limit') || '20')
-      const offset = parseInt(searchParams.get('offset') || '0')
-      const platform = searchParams.get('platform')
-      let filtered = CONVERSATIONS
-      if (platform) {
-        filtered = filtered.filter(c => c.channel === platform)
-      }
-      const paged = filtered.slice(offset, offset + limit)
-      return { status: 200, body: { success: true, data: { conversations: paged, pagination: { total: filtered.length, limit, offset } } } }
-    }
-
     // ===== 招生管理 =====
     if (path === '/api/admin/enrollment/funnel') {
       return { status: 200, body: { success: true, data: {
@@ -1194,12 +1165,7 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     if (path === '/api/bot/ai-query') {
       return { status: 200, body: { answer: '您好！這是 Demo 模式，AI 功能在正式版中可用。目前補習班共有 8 位學生，3 個班級。', model: 'demo', intent: 'general_query', latencyMs: 150 } }
     }
-    if (path === '/api/bot/rag-search') {
-      return { status: 200, body: { sources: [], count: 0 } }
-    }
-    if (path.includes('/knowledge/ingest')) {
-      return { status: 200, body: { ok: true, stored: 1 } }
-    }
+    // rag-search and knowledge/ingest — 已移至總後台/94BOT
     // Contact Book v2 POST handlers
     if (path === '/api/admin/contact-book/entries') {
       return { status: 201, body: { success: true, data: [{ id: 'cb-demo-new', message: '已建立聯絡簿' }] } }
