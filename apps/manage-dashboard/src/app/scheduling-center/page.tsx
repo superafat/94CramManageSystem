@@ -11,6 +11,7 @@ import MonthView from './components/MonthView'
 import DetailDrawer from './components/DetailDrawer'
 import RosterModal from './components/RosterModal'
 import EditScheduleModal from './components/EditScheduleModal'
+import CreateScheduleModal from './components/CreateScheduleModal'
 
 const API_BASE = ''
 
@@ -62,6 +63,9 @@ export default function SchedulingCenterPage() {
   const [rosterCourseId, setRosterCourseId] = useState<string | null>(null)
   const [rosterCourseName, setRosterCourseName] = useState('')
   const [rosterMaxStudents, setRosterMaxStudents] = useState<number | undefined>(undefined)
+
+  // Create schedule modal state
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   // Edit schedule modal state
   const [editScheduleId, setEditScheduleId] = useState<string | null>(null)
@@ -371,7 +375,7 @@ export default function SchedulingCenterPage() {
           </div>
         </div>
 
-        {/* Legend */}
+        {/* Legend + Create button */}
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1 text-xs text-text-muted">
             <span className="w-2 h-2 rounded-sm bg-[#9DAEBB] inline-block" />團班
@@ -382,6 +386,12 @@ export default function SchedulingCenterPage() {
           <span className="flex items-center gap-1 text-xs text-text-muted">
             <span className="w-2 h-2 rounded-sm bg-[#A8B5A2] inline-block" />安親
           </span>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            + 新增排課
+          </button>
         </div>
       </div>
 
@@ -481,6 +491,13 @@ export default function SchedulingCenterPage() {
           }}
         />
       )}
+
+      {/* Create Schedule Modal */}
+      <CreateScheduleModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={() => { setShowCreateModal(false); fetchSchedules(); fetchCourses() }}
+      />
 
       {/* Edit Schedule Modal */}
       {editScheduleId && (
