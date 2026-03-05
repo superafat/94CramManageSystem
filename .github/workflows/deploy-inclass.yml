@@ -47,13 +47,13 @@ jobs:
             --platform=managed \
             --no-allow-unauthenticated \
             --port=3102 \
-            --memory=256Mi \
+            --memory=512Mi \
             --min-instances=0 \
             --max-instances=2 \
-            --revision-suffix="icls-be-$(echo ${{ github.sha }} | cut -c1-7)" \
+            --revision-suffix="icls-be-${{ github.run_number }}" \
             --no-traffic \
-            --set-env-vars="NODE_ENV=production,BACKEND_URL=https://cram94-inclass-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_BASE=https://cram94-inclass-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_URL=https://cram94-inclass-backend-1015149159553.asia-east1.run.app,IMSTUDY_API_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app" \
-            --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,INTERNAL_API_KEY=INTERNAL_API_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest" \
+            --set-env-vars="NODE_ENV=production,BACKEND_URL=https://cram94-inclass-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_BASE=https://cram94-inclass-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_URL=https://cram94-inclass-backend-1015149159553.asia-east1.run.app,IMSTUDY_API_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,GCS_BUCKET_NAME=cram94-contact-book-photos" \
+            --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,INTERNAL_API_KEY=INTERNAL_API_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,LINE_CHANNEL_ACCESS_TOKEN=LINE_CHANNEL_ACCESS_TOKEN:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest" \
             --add-cloudsql-instances=cram94-manage-system:asia-east1:platform94-db
 
       - name: Safe deploy (verify + route + cleanup)
@@ -98,7 +98,7 @@ jobs:
             --memory=256Mi \
             --min-instances=0 \
             --max-instances=2 \
-            --revision-suffix="icls-dash-$(echo ${{ github.sha }} | cut -c1-7)" \
+            --revision-suffix="icls-dash-${{ github.run_number }}" \
             --no-traffic \
             --set-env-vars="NODE_ENV=production,BACKEND_URL=https://cram94-inclass-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_BASE=https://cram94-inclass-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_URL=https://cram94-inclass-backend-1015149159553.asia-east1.run.app"
 
