@@ -7,13 +7,15 @@ import { platformFetch } from '@/lib/api'
 
 interface ProvidersResponse {
   data: {
-    providers: ProviderInfo[]
+    providers: Record<string, { available: boolean; health: number; rateLimit: unknown }>
     available: string[]
   }
 }
 
 interface ProviderInfo {
   name: string
+  available: boolean
+  health: number
   [key: string]: unknown
 }
 
@@ -171,8 +173,14 @@ export default function AiPage() {
       setProvidersLoading(true)
       setProvidersError(null)
       const res = await platformFetch<ProvidersResponse>('/ai/providers')
-      setProviders(res.data.providers)
-      setAvailableProviders(res.data.available)
+      // providers is a Record<name, status>, convert to array
+      const providersObj = res.data.providers ?? {}
+      const providersList = Object.entries(providersObj).map(([name, info]) => ({
+        name,
+        ...info,
+      }))
+      setProviders(providersList)
+      setAvailableProviders(res.data.available ?? [])
     } catch (err) {
       setProvidersError(err instanceof Error ? err.message : '載入失敗')
     } finally {
@@ -198,7 +206,14 @@ export default function AiPage() {
       setSubsLoading(true)
       setSubsError(null)
       const res = await platformFetch<SubscriptionsResponse>('/ai/subscriptions')
-      setSubscriptions(res.data)
+      // bot_enabled comes as string "true"/"false" from JSONB, convert to boolean
+      const subs = (res.data ?? []).map((s) => ({
+        ...s,
+        aiUsage: Number(s.aiUsage) || 0,
+        aiQuota: Number(s.aiQuota) || 0,
+        botEnabled: s.botEnabled === true || s.botEnabled === ('true' as unknown),
+      }))
+      setSubscriptions(subs)
     } catch (err) {
       setSubsError(err instanceof Error ? err.message : '載入失敗')
     } finally {
@@ -263,7 +278,7 @@ export default function AiPage() {
               </div>
             ) : (
               providers.map((p) => {
-                const isAvailable = availableProviders.includes(p.name)
+                const isAvailable = p.available ?? availableProviders.includes(p.name)
                 return (
                   <div key={p.name} className="rounded-2xl bg-white shadow-sm p-4 flex items-center justify-between">
                     <span className="font-medium text-gray-800">{p.name}</span>
