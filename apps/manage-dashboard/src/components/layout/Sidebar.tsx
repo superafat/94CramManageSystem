@@ -30,9 +30,6 @@ const navItems: NavItem[] = [
   // 班務管理區塊
   { type: 'separator', separator: '班務管理', roles: ['superadmin', 'admin', 'staff', 'teacher'] },
   { href: '/students', icon: '👥', label: '學生管理', roles: ['superadmin', 'admin', 'staff'] },
-  { href: '/attendance', icon: '✅', label: '出席管理', roles: ['superadmin', 'admin', 'staff', 'teacher'] },
-  { href: '/makeup-classes', icon: '📝', label: '補課管理', roles: ['superadmin', 'admin', 'staff'] },
-  { href: '/grades', icon: '📊', label: '成績管理', roles: ['superadmin', 'admin', 'staff', 'teacher'] },
   { href: '/finance', icon: '💰', label: '帳務管理', roles: ['superadmin', 'admin', 'staff'] },
   { href: '/reports', icon: '📈', label: '報表中心', roles: ['superadmin', 'admin'] },
   { href: '/enrollment', icon: '🎪', label: '招生管理', roles: ['superadmin', 'admin'] },
@@ -45,10 +42,6 @@ const navItems: NavItem[] = [
   { href: '/teacher-attendance', icon: '🕐', label: '師資出缺勤', roles: ['superadmin', 'admin'] },
   { href: '/my-salary', icon: '💵', label: '我的薪資條', roles: ['staff', 'teacher'] },
 
-  // 教學互動
-  { type: 'separator', separator: '教學互動', roles: ['superadmin', 'admin', 'staff', 'teacher'] },
-  { href: '/contact-book', icon: '📒', label: '電子聯絡簿', roles: ['superadmin', 'admin', 'staff', 'teacher'] },
-  
   // 家長專區
   { type: 'separator', separator: '我的孩子', roles: ['parent'] },
   { href: '/my-children', icon: '👶', label: '孩子資料', roles: ['parent'] },

@@ -30,6 +30,11 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
     if (demoResult) {
       return NextResponse.json(demoResult.body, { status: demoResult.status })
     }
+    // Fallback: demo 用戶的未定義路由不轉發到 backend（避免 403）
+    if (request.method === 'GET') {
+      return NextResponse.json({ data: [], message: 'Demo 模式：此功能尚未提供範例資料' }, { status: 200 })
+    }
+    return NextResponse.json({ success: true, message: 'Demo 模式：操作已模擬成功' }, { status: 200 })
   }
 
   const url = new URL(targetPath, BACKEND_URL)

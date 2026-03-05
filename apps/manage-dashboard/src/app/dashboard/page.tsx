@@ -29,17 +29,10 @@ export default function DashboardPage() {
   const [authorized, setAuthorized] = useState(false)
   const [alerts, setAlerts] = useState<Alert[]>([])
 
-  const API_BASE = ''
-
-  const getAuthHeaders = () => {
-    return { 'Content-Type': 'application/json' }
-  }
-
   // Fetch alerts
   const fetchAlerts = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/admin/alerts`, {
-        headers: getAuthHeaders(),
+      const res = await fetch('/api/admin/alerts', {
         credentials: 'include',
       })
       const data = await res.json()

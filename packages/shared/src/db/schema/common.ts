@@ -43,6 +43,9 @@ export const users = pgTable('users', {
   passwordHash: varchar('password_hash', { length: 255 }).notNull(),
   name: varchar('name', { length: 100 }).notNull(),
   role: varchar('role', { length: 20 }).notNull().default('staff'), // admin, teacher, staff, parent, student
+  phone: varchar('phone', { length: 20 }),
+  lineUserId: varchar('line_user_id', { length: 255 }),
+  telegramId: varchar('telegram_id', { length: 255 }),
   permissions: text('permissions').array(),
   isActive: boolean('is_active').default(true),
   lastLoginAt: timestamp('last_login_at'),

@@ -33,15 +33,13 @@ const getBottomNavItems = (role: Role): NavItem[] => {
   if (role === 'teacher') {
     return [
       { href: '/schedules', icon: '📅', label: '課表', roles: ['teacher'] },
-      { href: '/attendance', icon: '✅', label: '點名', roles: ['teacher'] },
-      { href: '/grades', icon: '📊', label: '成績', roles: ['teacher'] },
+      { href: '/my-salary', icon: '💵', label: '薪資', roles: ['teacher'] },
     ]
   }
   // admin, staff, superadmin
   return [
     { href: '/dashboard', icon: '🏠', label: '首頁', roles: ['superadmin', 'admin', 'staff'] },
     { href: '/students', icon: '👥', label: '學生', roles: ['superadmin', 'admin', 'staff'] },
-    { href: '/attendance', icon: '✅', label: '點名', roles: ['superadmin', 'admin', 'staff'] },
     { href: '/finance', icon: '💰', label: '帳務', roles: ['superadmin', 'admin', 'staff'] },
     { href: '/more', icon: '☰', label: '更多', roles: ['superadmin', 'admin', 'staff'] },
   ]
@@ -55,9 +53,6 @@ const getMoreMenuItems = (role: Role): NavItem[] => {
     items.push({ href: '/dashboard/knowledge', icon: '📚', label: '知識庫', roles: ['superadmin', 'admin'] })
     items.push({ href: '/dashboard/conversations', icon: '💬', label: '對話紀錄', roles: ['superadmin', 'admin'] })
   }
-  if (['superadmin', 'admin', 'staff'].includes(role)) {
-    items.push({ href: '/grades', icon: '📊', label: '成績管理', roles: ['superadmin', 'admin', 'staff'] })
-  }
   if (['superadmin', 'admin'].includes(role)) {
     items.push({ href: '/reports', icon: '📈', label: '報表中心', roles: ['superadmin', 'admin'] })
   }
@@ -68,10 +63,6 @@ const getMoreMenuItems = (role: Role): NavItem[] => {
     items.push({ href: '/schedules', icon: '📅', label: '課表管理', roles: ['superadmin', 'admin'] })
     items.push({ href: '/teacher-attendance', icon: '🕐', label: '師資出缺勤', roles: ['superadmin', 'admin'] })
     items.push({ href: '/my-salary', icon: '💵', label: '我的薪資條', roles: ['superadmin', 'admin'] })
-  }
-  // 教學互動
-  if (['superadmin', 'admin', 'staff', 'teacher'].includes(role)) {
-    items.push({ href: '/contact-book', icon: '📒', label: '電子聯絡簿', roles: ['superadmin', 'admin', 'staff', 'teacher'] })
   }
   if (role === 'superadmin') {
     items.push({ href: '/dashboard/settings', icon: '⚙️', label: '系統設定', roles: ['superadmin'] })

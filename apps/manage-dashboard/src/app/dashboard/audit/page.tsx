@@ -65,7 +65,7 @@ const THREE_MONTHS_AGO = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const getAuthHeaders = () => ({ 'Content-Type': 'application/json' })
+const JSON_HEADERS = { 'Content-Type': 'application/json' } as const
 
 const getActionColor = (action: string) => {
   switch (action) {
@@ -195,7 +195,7 @@ function ReviewModal({
       // 嘗試呼叫後端 API，若失敗則用前端模擬
       const res = await fetch(`${API_BASE}/api/admin/audit-logs/${logId}/review`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: JSON_HEADERS,
         credentials: 'include',
         body: JSON.stringify({ action, comment: comment.trim() }),
       })
@@ -323,7 +323,7 @@ function LogCard({
     try {
       const res = await fetch(`${API_BASE}/api/admin/audit-logs/${log.id}/restore`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: JSON_HEADERS,
         credentials: 'include',
       })
       const data = await res.json()
@@ -612,7 +612,7 @@ export default function AuditLogsPage() {
       if (tab === 'archived') query.set('archived', 'true')
 
       const res = await fetch(`${API_BASE}/api/admin/audit-logs?${query}`, {
-        headers: getAuthHeaders(),
+        headers: JSON_HEADERS,
         credentials: 'include',
       })
       const data = await res.json()
@@ -634,7 +634,7 @@ export default function AuditLogsPage() {
     try {
       const res = await fetch(`${API_BASE}/api/admin/audit-logs/archive`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: JSON_HEADERS,
         credentials: 'include',
         body: JSON.stringify({ before: THREE_MONTHS_AGO.toISOString() }),
       })

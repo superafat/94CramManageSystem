@@ -159,7 +159,7 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     // AuthContext expects { user: {...}, school: {...} }
     if (path === '/api/auth/me') return { status: 200, body: {
       user: { id: 'demo-admin', email: 'demo@94cram.com', name: 'Demo 管理員', role: 'admin', isDemo: true },
-      school: { id: 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d', name: '蜂神榜示範校' },
+      school: { id: DEMO_TENANT_ID, name: '蜂神榜示範補習班' },
     } }
     if (path === '/api/students') return { status: 200, body: { students: STUDENTS } }
     if (path === '/api/classes') return { status: 200, body: { classes: CLASSES } }
