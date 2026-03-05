@@ -15,7 +15,8 @@ import { w8Routes } from './routes/w8/index'
 import { teacherAttendanceRoutes } from './routes/teacher-attendance'
 import notificationRoutes from './routes/notifications'
 import lineRoutes from './routes/line'
-import liffContactBookRoutes from './routes/line/contact-book'
+// [2026-03-05] Migrated to 94inClass — keeping code for rollback
+// import liffContactBookRoutes from './routes/line/contact-book'
 import { errorTestRoutes } from './routes/error-test'
 import { healthRoutes } from './routes/health'
 import internalRoutes from './routes/internal'
@@ -156,7 +157,8 @@ app.route('/api/parent-ext', parentExtRoutes)
 app.route('/api/line', lineRoutes)
 
 // LINE LIFF API (LINE token auth via middleware inside the router)
-app.route('/api/line/contact-book', liffContactBookRoutes)
+// [2026-03-05] Migrated to 94inClass — keeping code for rollback
+// app.route('/api/line/contact-book', liffContactBookRoutes)
 
 // Public binding routes (no auth required)
 app.route('/api', bindRoutes)
