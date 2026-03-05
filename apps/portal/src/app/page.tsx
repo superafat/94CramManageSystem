@@ -184,6 +184,9 @@ export default function HomePage() {
             <a href={process.env.STOCK_URL || gcpOrigin('cram94-stock-dashboard')} className="hover:text-white transition">94Stock 庫存管理</a>
             <a href={process.env.BOT_DASHBOARD_URL || 'https://t.me/cram94bot'} className="hover:text-white transition">94Bot 補習班助手</a>
           </div>
+          <div className="flex justify-center gap-4 mb-4 text-[#6b7c73] text-xs">
+            <a href="/admin/login" className="hover:text-white transition">平台管理</a>
+          </div>
           <p className="text-[#6b7c73] text-xs">© 2026 94cram.com · 蜂神榜 Ai 教育科技 · All rights reserved.</p>
         </div>
       </footer>

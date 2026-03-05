@@ -222,8 +222,8 @@ platformAuthRoutes.post('/seed', async (c) => {
 
     // 建立 superadmin 帳號
     const userId = crypto.randomUUID()
-    const email = 'admin@94cram.com'
-    const defaultPassword = 'Admin@94cram'
+    const email = 'superafatus@gmail.com'
+    const defaultPassword = 'Smart123!?'
     const passwordHash = await bcrypt.hash(defaultPassword, 12)
 
     await db.execute(sql`
