@@ -11,6 +11,7 @@
 - **94Stock** — 庫存管理（apps/stock-backend + apps/stock-dashboard）
 - **94Portal** — 統一入口（apps/portal）
 - **94LineBot** — LINE Bot（apps/bot-gateway）
+- **94BOT Dashboard** — LINE Bot 管理前端（apps/bot-dashboard）
 
 ## 技術棧
 
@@ -41,7 +42,7 @@
 1. **Docker build** 必須加 `--platform linux/amd64`（本機是 Apple Silicon ARM）
 2. **不得直接修改生產 DB**，先在本機驗證
 3. **Cloud Run 命名**不能數字開頭，用 `cram94-` 前綴
-4. **月預算限制 NT$300**（~$10 USD），任何新資源創建前先確認費用
+4. **月預算限制 NT$2,000**（目標 100 間補習班），任何新資源創建前先確認費用
 5. **pnpm** 管理所有套件，不用 npm/yarn
 6. **共用表**（tenants/users/branches/user_permissions）不隨意修改 schema
 7. **前綴隔離**：manage_ / inclass_ / stock_ 各系統互不干擾
@@ -57,6 +58,7 @@
 | stock-backend | apps/stock-backend | 3101 |
 | stock-dashboard | apps/stock-dashboard | 3000 |
 | portal | apps/portal | 3300 |
+| bot-dashboard | apps/bot-dashboard | 3202 |
 
 ## 常用指令
 
@@ -148,7 +150,7 @@ docker build --platform linux/amd64 -t [image-name] .
 - **Simplicity First**: Make every change as simple as possible. Minimal code impact.
 - **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
 - **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
-- **月預算 NT$300**: 任何新 Cloud 資源建立前先評估費用影響
+- **月預算 NT$2,000**: 任何新 Cloud 資源建立前先評估費用影響
 
 ## Packages
 

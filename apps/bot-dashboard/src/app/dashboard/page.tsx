@@ -1,80 +1,129 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+
+interface Stats {
+  aiReplies: number
+  aiLimit: number
+  boundParents: number
+  pushUsed: number
+  pushLimit: number
+  botActive: boolean
+}
+
 export default function DashboardPage() {
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/usage', { credentials: 'include' }).then(r => r.json()),
+      fetch('/api/parent-bindings', { credentials: 'include' }).then(r => r.json()),
+      fetch('/api/subscriptions', { credentials: 'include' }).then(r => r.json()),
+    ]).then(([usage, bindings, sub]) => {
+      setStats({
+        aiReplies: usage.ai_calls || 0,
+        aiLimit: sub.ai_reply_limit || 500,
+        boundParents: bindings.data?.length || bindings.length || 0,
+        pushUsed: usage.push_calls || 0,
+        pushLimit: sub.push_limit || 200,
+        botActive: sub.parent_bot_active ?? true,
+      })
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  const s = stats!
+
   return (
     <div>
-      {/* Welcome */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[#4b4355]">歡迎回來 👋</h1>
-        <p className="text-sm text-[#7b7387] mt-1">蜂神榜 補習班 Ai 助手系統 管理面板 — 查看 Bot 狀態與用量統計</p>
+      <h1 className="text-2xl font-bold text-text mb-6">94BOT 總覽</h1>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <StatCard
+          icon="🤖"
+          label="本月 AI 回覆"
+          value={`${s.aiReplies}`}
+          sub={`/ ${s.aiLimit} 則`}
+          percent={Math.round((s.aiReplies / s.aiLimit) * 100)}
+        />
+        <StatCard
+          icon="🔗"
+          label="已綁定家長"
+          value={`${s.boundParents}`}
+          sub="位"
+        />
+        <StatCard
+          icon="📤"
+          label="LINE Push 用量"
+          value={`${s.pushUsed}`}
+          sub={`/ ${s.pushLimit} 則`}
+          percent={Math.round((s.pushUsed / s.pushLimit) * 100)}
+        />
+        <StatCard
+          icon={s.botActive ? '✅' : '⏸️'}
+          label="機器人狀態"
+          value={s.botActive ? '運作中' : '已暫停'}
+          sub={s.botActive ? '正常回覆家長訊息' : '暫停回覆'}
+          color={s.botActive ? 'text-success' : 'text-warning'}
+        />
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: '本月 AI Calls', icon: '🤖', color: '#A89BB5' },
-          { label: '千里眼用戶', icon: '🏫', color: '#7B8FA1' },
-          { label: '順風耳家長', icon: '👨‍👩‍👧', color: '#C4A9A1' },
-          { label: '今日訊息', icon: '💬', color: '#A8B5A2' },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="bg-white rounded-xl border border-[#d8d3de] p-4 shadow-sm"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-2xl">{stat.icon}</span>
-            </div>
-            <div className="text-2xl font-bold" style={{ color: stat.color }}>
-              —
-            </div>
-            <div className="text-xs text-[#7b7387] mt-1">{stat.label}</div>
-            <div className="text-xs text-[#b0a8bc] mt-0.5">待接入 API</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Bot Status */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border border-[#d8d3de] p-5 shadow-sm">
-          <h3 className="font-semibold text-[#4b4355] mb-3 flex items-center gap-2">
-            🏫 千里眼狀態
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-[#7b7387]">Bot 狀態</span>
-              <span className="text-[#b0a8bc] font-medium">—</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-[#7b7387]">已綁定帳號</span>
-              <span className="text-[#b0a8bc] font-medium">—</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-[#7b7387]">本週操作</span>
-              <span className="text-[#b0a8bc] font-medium">—</span>
-            </div>
-          </div>
-          <p className="text-xs text-[#b0a8bc] mt-3">待接入 API</p>
-        </div>
-
-        <div className="bg-white rounded-xl border border-[#d8d3de] p-5 shadow-sm">
-          <h3 className="font-semibold text-[#4b4355] mb-3 flex items-center gap-2">
-            👨‍👩‍👧 順風耳狀態
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-[#7b7387]">Bot 狀態</span>
-              <span className="text-[#b0a8bc] font-medium">—</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-[#7b7387]">已綁定家長</span>
-              <span className="text-[#b0a8bc] font-medium">—</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-[#7b7387]">今日推播</span>
-              <span className="text-[#b0a8bc] font-medium">—</span>
-            </div>
-          </div>
-          <p className="text-xs text-[#b0a8bc] mt-3">待接入 API</p>
+      <div className="bg-surface rounded-2xl border border-border p-6">
+        <h2 className="text-lg font-semibold text-text mb-4">快速操作</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <QuickAction href="/dashboard/conversations" icon="💬" label="查看對話紀錄" />
+          <QuickAction href="/dashboard/bindings" icon="🔗" label="管理家長綁定" />
+          <QuickAction href="/dashboard/line-bot" icon="🤖" label="聞太師設定" />
         </div>
       </div>
     </div>
+  )
+}
+
+function StatCard({ icon, label, value, sub, percent, color }: {
+  icon: string; label: string; value: string; sub: string; percent?: number; color?: string
+}) {
+  return (
+    <div className="bg-surface rounded-2xl border border-border p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xl">{icon}</span>
+        <span className="text-sm text-text-muted">{label}</span>
+      </div>
+      <p className={`text-2xl font-bold ${color || 'text-text'}`}>
+        {value} <span className="text-sm font-normal text-text-muted">{sub}</span>
+      </p>
+      {percent !== undefined && (
+        <div className="mt-3">
+          <div className="w-full bg-border rounded-full h-2">
+            <div
+              className={`h-2 rounded-full transition-all ${percent > 80 ? 'bg-danger' : 'bg-primary'}`}
+              style={{ width: `${Math.min(percent, 100)}%` }}
+            />
+          </div>
+          <p className="text-xs text-text-muted mt-1">{percent}% 已使用</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function QuickAction({ href, icon, label }: { href: string; icon: string; label: string }) {
+  return (
+    <a
+      href={href}
+      className="flex items-center gap-3 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all"
+    >
+      <span className="text-xl">{icon}</span>
+      <span className="text-sm font-medium text-text">{label}</span>
+    </a>
   )
 }

@@ -1,15 +1,7 @@
 @import '../../../../packages/shared/src/styles/morandi-tokens.css';
 @import "tailwindcss";
 
-/* 94CramBot 莫蘭迪紫色調 */
 @theme {
-  --color-bot-purple: #A89BB5;
-  --color-bot-purple-hover: #9688A3;
-  --color-bot-purple-light: #F5F0F7;
-  --color-bot-blue-gray: #7B8FA1;
-  --color-bot-warm-pink: #C4A9A1;
-  --color-bot-bg: #F5F0F7;
-
   --color-morandi-sage: #A8B5A2;
   --color-morandi-rose: #C4A4A0;
   --color-morandi-blue: #9DAEBB;
@@ -22,14 +14,14 @@
   --color-morandi-text: #4A4540;
   --color-morandi-muted: #8A857F;
 
-  --color-primary: #A89BB5;
-  --color-primary-hover: #9688A3;
-  --color-secondary: #7B8FA1;
-  --color-accent: #C4A9A1;
-  --color-background: #F5F0F7;
+  --color-primary: #B5A4B8;
+  --color-primary-hover: #A494A8;
+  --color-secondary: #9DAEBB;
+  --color-accent: #C4A4A0;
+  --color-background: #F5F0EB;
   --color-surface: #FFFFFF;
-  --color-surface-hover: #EDE8F0;
-  --color-border: #DDD8E2;
+  --color-surface-hover: #F0EBE6;
+  --color-border: #E0DBD5;
   --color-text: #4A4540;
   --color-text-muted: #8A857F;
   --color-success: #A8B5A2;
@@ -44,42 +36,18 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Safe area for iPhone notch/home indicator */
-.safe-area-top {
-  padding-top: env(safe-area-inset-top);
-}
+.safe-area-top { padding-top: env(safe-area-inset-top); }
+.safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
 
-.safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-/* Mobile-first touch targets */
 @media (max-width: 1023px) {
-  button, a {
-    min-height: 44px;
-  }
+  button, a { min-height: 44px; }
 }
 
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+@keyframes slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
+.animate-slide-up { animation: slide-up 0.2s ease-out; }
 
-.animate-float {
-  animation: float 3s ease-in-out infinite;
-}
-
-@keyframes fadeSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }

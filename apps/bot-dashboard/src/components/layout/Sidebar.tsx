@@ -2,74 +2,143 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 
-const navItems = [
-  { icon: '🏠', label: '首頁', href: '/dashboard' },
-  { icon: '🏫', label: '千里眼管理', href: '/dashboard/clairvoyant' },
-  { icon: '👨‍👩‍👧', label: '順風耳管理', href: '/dashboard/parent-bot' },
-  { icon: '📊', label: '用量統計', href: '/dashboard/usage' },
-  { icon: '⚙️', label: '設定', href: '/dashboard/settings' },
-  { icon: '📚', label: '使用說明', href: '/dashboard/guide' },
+type Role = 'admin' | 'staff'
+
+interface NavItem {
+  href?: string
+  icon?: string
+  label?: string
+  type?: 'separator'
+  separator?: string
+  roles: Role[]
+}
+
+const navItems: NavItem[] = [
+  { href: '/dashboard', icon: '📊', label: '總覽', roles: ['admin', 'staff'] },
+  { type: 'separator', separator: 'LINE Bot 管理', roles: ['admin', 'staff'] },
+  { href: '/dashboard/conversations', icon: '💬', label: '對話紀錄', roles: ['admin', 'staff'] },
+  { href: '/dashboard/bindings', icon: '🔗', label: '綁定管理', roles: ['admin', 'staff'] },
+  { type: 'separator', separator: '系統設定', roles: ['admin'] },
+  { href: '/dashboard/line-bot', icon: '🤖', label: '聞太師設定', roles: ['admin'] },
+  { href: '/dashboard/plans', icon: '💎', label: '方案加購', roles: ['admin'] },
 ]
+
+const roleLabels: Record<Role, string> = {
+  admin: '館長',
+  staff: '行政',
+}
+
+interface User {
+  id: string
+  name: string
+  role: Role
+  tenant_id: string
+}
 
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
 
-  function handleLogout() {
-    document.cookie = 'token=; path=/; max-age=0'
+  useEffect(() => {
+    const userStr = localStorage.getItem('user')
+    if (userStr) {
+      try {
+        setUser(JSON.parse(userStr))
+      } catch {
+        localStorage.removeItem('user')
+      }
+    }
+  }, [])
+
+  const userRole = (user?.role as Role) || 'staff'
+  const visibleItems = navItems.filter(item => item.roles.includes(userRole))
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    } catch { /* ignore */ }
+    localStorage.removeItem('user')
+    localStorage.removeItem('tenantId')
+    localStorage.removeItem('token')
     router.push('/login')
   }
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-[#d8d3de] flex flex-col z-50">
-      {/* Brand */}
-      <div className="px-5 py-5 border-b border-[#d8d3de]">
+    <aside className="fixed left-0 top-0 w-64 bg-surface border-r border-border h-screen flex flex-col z-30">
+      <div className="p-6 border-b border-border">
         <div className="flex items-center gap-3">
-          <span className="text-2xl">🤖</span>
-          <div>
-            <div className="font-bold text-[#4b4355] text-sm">蜂神榜 補習班 Ai 助手系統</div>
-            <div className="text-[10px] text-[#7b7387]">AI 助手管理面板</div>
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-lg">
+            🤖
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="font-semibold text-text text-sm truncate">
+              {user?.name || '載入中...'}
+            </h1>
+            <p className="text-xs text-text-muted">
+              {roleLabels[userRole] || userRole}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        {visibleItems.map((item, index) => {
+          if (item.type === 'separator') {
+            return (
+              <div key={`separator-${index}`} className="py-2">
+                <div className="border-t border-border" />
+                <div className="text-xs text-text-muted px-4 pt-3 pb-1 font-medium">
+                  {item.separator}
+                </div>
+              </div>
+            )
+          }
+
+          const href = item.href!
+          const isActive = pathname === href ||
+            (href !== '/dashboard' && pathname?.startsWith(href))
+
           return (
             <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition ${
+              key={href}
+              href={href}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all ${
                 isActive
-                  ? 'bg-[#A89BB5]/10 text-[#A89BB5] font-medium'
-                  : 'text-[#5d5468] hover:bg-[#F5F0F7] hover:text-[#4b4355]'
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'text-text-muted hover:bg-surface-hover hover:text-text'
               }`}
             >
               <span className="text-lg">{item.icon}</span>
-              {item.label}
+              <span>{item.label}</span>
             </Link>
           )
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="px-3 py-4 border-t border-[#d8d3de] space-y-1">
+      <div className="p-4 border-t border-border space-y-2">
+        <div className="px-4 py-2 bg-primary/5 rounded-xl">
+          <p className="text-xs text-text-muted">
+            目前身份：<span className="font-medium text-primary">{roleLabels[userRole]}</span>
+          </p>
+        </div>
+
         <a
           href="https://94cram.com"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[#5d5468] hover:bg-[#F5F0F7] hover:text-[#4b4355] transition w-full"
+          className="w-full flex items-center gap-3 px-4 py-2 text-text-muted hover:text-text transition-colors rounded-xl hover:bg-surface-hover"
         >
-          <span className="text-lg">🏠</span>
-          返回首頁
+          <span>🏠</span>
+          <span className="text-sm">返回首頁</span>
         </a>
+
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[#7b7387] hover:bg-red-50 hover:text-red-500 transition w-full"
+          className="w-full flex items-center gap-3 px-4 py-2 text-text-muted hover:text-text transition-colors rounded-xl hover:bg-surface-hover"
         >
-          <span className="text-lg">🚪</span>
-          登出
+          <span>🚪</span>
+          <span className="text-sm">切換帳號</span>
         </button>
       </div>
     </aside>

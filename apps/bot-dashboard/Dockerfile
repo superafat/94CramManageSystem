@@ -25,6 +25,6 @@ COPY --from=builder /app/apps/bot-dashboard/.next/standalone ./
 COPY --from=builder /app/apps/bot-dashboard/.next/static ./apps/bot-dashboard/.next/static
 
 USER nextjs
-EXPOSE 3400
-ENV PORT=3400
+EXPOSE 3202
+ENV PORT=3202
 CMD ["node", "apps/bot-dashboard/server.js"]

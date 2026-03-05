@@ -2,116 +2,124 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+
+const API_BASE = ''
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
     setLoading(true)
+    setError('')
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: email, password }),
+        credentials: 'include',
+        body: JSON.stringify({ username, password })
       })
 
-      const data = await res.json()
+      const data = await res.json().catch(() => {
+        throw new Error('API 回應格式錯誤')
+      })
 
       if (!res.ok) {
-        const msg = typeof data.error === 'string'
-          ? data.error
-          : (data.error?.message || data.message || '帳號或密碼錯誤')
-        setError(msg)
+        setError(data.error?.message || data.error || '登入失敗')
+        setLoading(false)
         return
       }
 
-      // Store token in cookie
-      document.cookie = `token=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
+      const responseData = data.data || data
+      const userData = responseData.user
+
+      if (!userData) {
+        setError('登入回應格式錯誤')
+        setLoading(false)
+        return
+      }
+
+      localStorage.setItem('user', JSON.stringify(userData))
+      localStorage.setItem('tenantId', userData.tenant_id)
+      if (responseData.token) localStorage.setItem('token', responseData.token)
       router.push('/dashboard')
-    } catch {
-      setError('網路連線錯誤，請稍後再試')
-    } finally {
+    } catch (err) {
+      console.error('Login error:', err)
+      setError(err instanceof Error ? err.message : '無法連接伺服器')
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-bot-bg flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-3">🤖</div>
-          <h1 className="text-2xl font-bold text-[#4b4355]">蜂神榜 補習班 Ai 助手系統</h1>
-          <p className="text-sm text-[#7b7387] mt-1">登入您的帳號</p>
-        </div>
-
-        {/* Login Form */}
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-2xl border border-[#d8d3de] shadow-sm p-6 space-y-5"
-        >
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3">
-              {error}
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="w-full max-w-sm">
+        <div className="bg-surface rounded-3xl p-6 border border-border shadow-sm">
+          <div className="text-center mb-6">
+            <button
+              onClick={() => router.push('/')}
+              className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-text mb-4"
+            >
+              ← 返回首頁
+            </button>
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-purple-50 flex items-center justify-center text-2xl mb-3">
+              🤖
             </div>
-          )}
-
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-[#4b4355] mb-1.5">
-              電子信箱
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              className="w-full px-4 py-2.5 rounded-xl border border-[#d8d3de] bg-[#F5F0F7]/50 text-[#4b4355] placeholder-[#b0a8b8] focus:outline-none focus:ring-2 focus:ring-[#A89BB5]/40 focus:border-[#A89BB5] transition text-sm"
-            />
+            <h1 className="text-xl font-semibold text-text">94BOT 登入</h1>
+            <p className="text-sm text-text-muted mt-1">LINE Bot 聞太師管理平台</p>
           </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-[#4b4355] mb-1.5">
-              密碼
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="請輸入密碼"
-              className="w-full px-4 py-2.5 rounded-xl border border-[#d8d3de] bg-[#F5F0F7]/50 text-[#4b4355] placeholder-[#b0a8b8] focus:outline-none focus:ring-2 focus:ring-[#A89BB5]/40 focus:border-[#A89BB5] transition text-sm"
-            />
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-text mb-1">帳號</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-xl bg-surface text-text focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="請輸入帳號"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text mb-1">密碼</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-xl bg-surface text-text focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="請輸入密碼"
+                required
+              />
+            </div>
+
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary-hover transition-colors disabled:opacity-50"
+            >
+              {loading ? '登入中...' : '登入'}
+            </button>
+          </form>
+
+          <div className="text-center pt-4 mt-4 border-t border-border">
+            <button
+              onClick={() => router.push('/demo')}
+              className="text-sm text-primary hover:underline"
+            >
+              免費體驗 Demo →
+            </button>
           </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-[#A89BB5] hover:bg-[#9688A3] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition text-sm"
-          >
-            {loading ? '登入中...' : '登入'}
-          </button>
-
-          <p className="text-center text-xs text-[#7b7387]">
-            使用您的 94Manage 帳號即可登入
-          </p>
-        </form>
-
-        {/* Back to home */}
-        <div className="text-center mt-6">
-          <Link href="/" className="text-sm text-[#A89BB5] hover:text-[#9688A3] transition">
-            ← 返回首頁
-          </Link>
         </div>
       </div>
     </div>
