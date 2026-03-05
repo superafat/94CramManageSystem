@@ -88,10 +88,6 @@ app.use('*', cors({
     'https://manage.94cram.com',
     'https://inclass.94cram.com',
     'https://stock.94cram.com',
-    // Custom domains (94cram.com)
-    'https://manage.94cram.com',
-    'https://inclass.94cram.com',
-    'https://stock.94cram.com',
     'https://94cram.com',
   ],
   maxAge: 86400,

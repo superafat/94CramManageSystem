@@ -411,9 +411,9 @@ app.get('/billing/overdue-by-student', async (c) => {
         c.name AS course_name,
         pr.amount,
         pr.period_month
-      FROM payment_records pr
-      JOIN students s ON pr.student_id = s.id
-      JOIN courses c ON pr.course_id = c.id
+      FROM manage_payments pr
+      JOIN manage_students s ON pr.student_id = s.id
+      JOIN manage_courses c ON pr.course_id = c.id
       WHERE pr.status IN ('pending', 'overdue')
         AND s.deleted_at IS NULL
       ORDER BY s.tenant_id, s.full_name
