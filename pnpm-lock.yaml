@@ -6,6 +6,7 @@ settings:
 
 overrides:
   drizzle-orm: 0.45.1
+  pg: 8.19.0
 
 importers:
 
@@ -36,7 +37,7 @@ importers:
         specifier: ^16.1.6
         version: 16.1.6(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       pg:
-        specifier: ^8.19.0
+        specifier: 8.19.0
         version: 8.19.0
       react:
         specifier: ^19.2.4
@@ -156,7 +157,7 @@ importers:
         version: 3.2.1
       drizzle-orm:
         specifier: 0.45.1
-        version: 0.45.1(@neondatabase/serverless@0.10.4)(@opentelemetry/api@1.9.0)(@types/pg@8.16.0)(@upstash/redis@1.36.2)(pg@8.18.0)(postgres@3.4.8)
+        version: 0.45.1(@neondatabase/serverless@0.10.4)(@opentelemetry/api@1.9.0)(@types/pg@8.16.0)(@upstash/redis@1.36.2)(pg@8.19.0)(postgres@3.4.8)
       google-auth-library:
         specifier: ^10.5.0
         version: 10.5.0
@@ -167,8 +168,8 @@ importers:
         specifier: ^6.1.3
         version: 6.1.3
       pg:
-        specifier: ^8.11.0
-        version: 8.18.0
+        specifier: 8.19.0
+        version: 8.19.0
       pino:
         specifier: ^10.3.1
         version: 10.3.1
@@ -216,7 +217,7 @@ importers:
         specifier: ^16.1.6
         version: 16.1.6(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       pg:
-        specifier: ^8.19.0
+        specifier: 8.19.0
         version: 8.19.0
       react:
         specifier: ^19.2.4
@@ -368,8 +369,8 @@ importers:
         specifier: ^16.1.6
         version: 16.1.6(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       pg:
-        specifier: ^8.18.0
-        version: 8.18.0
+        specifier: 8.19.0
+        version: 8.19.0
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
@@ -484,8 +485,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       jose:
-        specifier: ^5.0.0
-        version: 5.10.0
+        specifier: ^6.0.0
+        version: 6.1.3
       next:
         specifier: ^15.0.0
         version: 15.5.12(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -3478,7 +3479,7 @@ packages:
       knex: '*'
       kysely: '*'
       mysql2: '>=2'
-      pg: '>=8'
+      pg: 8.19.0
       postgres: '>=3'
       prisma: '*'
       sql.js: '>=1'
@@ -4333,9 +4334,6 @@ packages:
     resolution: {integrity: sha512-ekilCSN1jwRvIbgeg/57YFh8qQDNbwDb9xT/qu2DAHbFFZUicIl4ygVaAvzveMhMVr3LnpSKTNnwt8PoOfmKhQ==}
     hasBin: true
 
-  jose@5.10.0:
-    resolution: {integrity: sha512-s+3Al/p9g32Iq+oqXxkW//7jk2Vig6FF1CFqzVXoTUXt2qz89YWbL+OwS17NFYEvxC35n0FKeGO2LGYSxeM2Gg==}
-
   jose@6.1.3:
     resolution: {integrity: sha512-0TpaTfihd4QMNwrz/ob2Bp7X04yuxJkjRGi4aKmOqwhov54i6u79oCv7T+C7lo70MKH6BesI3vscD1yb/yzKXQ==}
 
@@ -4907,15 +4905,10 @@ packages:
     resolution: {integrity: sha512-BM/Thnrw5jm2kKLE5uJkXqqExRUY/toLHda65XgFTBTFYZyopbKjBe29Ii3RbkvlsMoFwD+tHeGaCjjv0gHlyw==}
     engines: {node: '>=4'}
 
-  pg-pool@3.11.0:
-    resolution: {integrity: sha512-MJYfvHwtGp870aeusDh+hg9apvOe2zmpZJpyt+BMtzUWlVqbhFmMK6bOBXLBUPd7iRtIF9fZplDc7KrPN3PN7w==}
-    peerDependencies:
-      pg: '>=8.0'
-
   pg-pool@3.12.0:
     resolution: {integrity: sha512-eIJ0DES8BLaziFHW7VgJEBPi5hg3Nyng5iKpYtj3wbcAUV9A1wLgWiY7ajf/f/oO1wfxt83phXPY8Emztg7ITg==}
     peerDependencies:
-      pg: '>=8.0'
+      pg: 8.19.0
 
   pg-protocol@1.11.0:
     resolution: {integrity: sha512-pfsxk2M9M3BuGgDOfuy37VNRRX3jmKgMjcvAcWqNDpZSf4cUmv8HSOl5ViRQFsfARFn0KuUQTgLxVMbNq5NW3g==}
@@ -4930,15 +4923,6 @@ packages:
   pg-types@4.1.0:
     resolution: {integrity: sha512-o2XFanIMy/3+mThw69O8d4n1E5zsLhdO+OPqswezu7Z5ekP4hYDqlDjlmOpYMbzY2Br0ufCwJLdDIXeNVwcWFg==}
     engines: {node: '>=10'}
-
-  pg@8.18.0:
-    resolution: {integrity: sha512-xqrUDL1b9MbkydY/s+VZ6v+xiMUmOUk7SS9d/1kpyQxoJ6U9AO1oIJyUWVZojbfe5Cc/oluutcgFG4L9RDP1iQ==}
-    engines: {node: '>= 16.0.0'}
-    peerDependencies:
-      pg-native: '>=3.0.1'
-    peerDependenciesMeta:
-      pg-native:
-        optional: true
 
   pg@8.19.0:
     resolution: {integrity: sha512-QIcLGi508BAHkQ3pJNptsFz5WQMlpGbuBGBaIaXsWK8mel2kQ/rThYI+DbgjUvZrIr7MiuEuc9LcChJoEZK1xQ==}
@@ -8843,15 +8827,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.45.1(@neondatabase/serverless@0.10.4)(@opentelemetry/api@1.9.0)(@types/pg@8.16.0)(@upstash/redis@1.36.2)(pg@8.18.0)(postgres@3.4.8):
-    optionalDependencies:
-      '@neondatabase/serverless': 0.10.4
-      '@opentelemetry/api': 1.9.0
-      '@types/pg': 8.16.0
-      '@upstash/redis': 1.36.2
-      pg: 8.18.0
-      postgres: 3.4.8
-
   drizzle-orm@0.45.1(@neondatabase/serverless@0.10.4)(@opentelemetry/api@1.9.0)(@types/pg@8.16.0)(@upstash/redis@1.36.2)(pg@8.19.0)(postgres@3.4.8):
     optionalDependencies:
       '@neondatabase/serverless': 0.10.4
@@ -9851,8 +9826,6 @@ snapshots:
 
   jiti@2.6.1: {}
 
-  jose@5.10.0: {}
-
   jose@6.1.3: {}
 
   joycon@3.1.1: {}
@@ -10353,10 +10326,6 @@ snapshots:
 
   pg-numeric@1.0.2: {}
 
-  pg-pool@3.11.0(pg@8.18.0):
-    dependencies:
-      pg: 8.18.0
-
   pg-pool@3.12.0(pg@8.19.0):
     dependencies:
       pg: 8.19.0
@@ -10382,16 +10351,6 @@ snapshots:
       postgres-date: 2.1.0
       postgres-interval: 3.0.0
       postgres-range: 1.1.4
-
-  pg@8.18.0:
-    dependencies:
-      pg-connection-string: 2.11.0
-      pg-pool: 3.11.0(pg@8.18.0)
-      pg-protocol: 1.11.0
-      pg-types: 2.2.0
-      pgpass: 1.0.5
-    optionalDependencies:
-      pg-cloudflare: 1.3.0
 
   pg@8.19.0:
     dependencies:

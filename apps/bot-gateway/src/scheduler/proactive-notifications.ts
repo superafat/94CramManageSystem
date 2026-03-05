@@ -131,7 +131,7 @@ function dispatchTextNotification(chatId: string, text: string, channel: 'admin'
     { chatId, channel, textPreview: text.slice(0, 80) },
     '[Scheduler][TODO] 模擬發送文字通知'
   );
-  console.log(`\n[推播模擬][${channel.toUpperCase()}] -> chat_id=${chatId}\n${text}\n${'─'.repeat(40)}`);
+  logger.info({ chatId, channel }, `[推播模擬][${channel.toUpperCase()}] -> chat_id=${chatId}\n${text}`);
 }
 
 /**
@@ -151,7 +151,7 @@ function dispatchFlexNotification(
     { chatId, channel, altText },
     '[Scheduler][TODO] 模擬發送 Flex Message'
   );
-  console.log(`\n[推播模擬][${channel.toUpperCase()}][FLEX] -> chat_id=${chatId}\n${altText}\n${'─'.repeat(40)}`);
+  logger.info({ chatId, channel }, `[推播模擬][${channel.toUpperCase()}][FLEX] -> chat_id=${chatId}\n${altText}`);
 }
 
 // ─── 輔助：AI 弱科分析 ────────────────────────────────────────────────────────

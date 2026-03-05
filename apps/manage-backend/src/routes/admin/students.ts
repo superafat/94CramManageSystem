@@ -63,7 +63,7 @@ studentsRoutes.get('/students', requirePermission(Permission.STUDENTS_READ), zVa
 
     const where = sql.join(conditions, sql` AND `)
 
-    const [countResult] = await db.execute(sql`SELECT COUNT(*)::int as total FROM students s WHERE ${where}`) as any[]
+    const [countResult] = await db.execute(sql`SELECT COUNT(*)::int as total FROM manage_students s WHERE ${where}`) as any[]
     const total = countResult?.total ?? 0
 
     const studentRows = await db.execute(sql`
@@ -73,8 +73,8 @@ studentsRoutes.get('/students', requirePermission(Permission.STUDENTS_READ), zVa
         (SELECT json_agg(json_build_object(
           'id', e.id, 'course_id', e.course_id, 'status', e.status,
           'tuition', e.tuition_amount, 'start_date', e.start_date))
-         FROM enrollments e WHERE e.student_id = s.id AND e.status = 'active') as enrollments
-      FROM students s
+         FROM manage_enrollments e WHERE e.student_id = s.id AND e.status = 'active') as enrollments
+      FROM manage_students s
       WHERE ${where}
       ORDER BY s.full_name
       LIMIT ${query.limit} OFFSET ${offset}
@@ -105,7 +105,7 @@ studentsRoutes.get('/students/:id',
 
     try {
       const [student] = await db.execute(sql`
-        SELECT s.* FROM students s
+        SELECT s.* FROM manage_students s
         WHERE s.id = ${studentId} AND s.tenant_id = ${tenantId} AND s.deleted_at IS NULL
       `) as any[]
 
@@ -122,7 +122,7 @@ studentsRoutes.get('/students/:id',
         const [link] = await db.execute(sql`
           SELECT 1
           FROM parent_students ps
-          JOIN students s ON s.id = ps.student_id
+          JOIN manage_students s ON s.id = ps.student_id
           WHERE ps.student_id = ${studentId}
             AND ps.parent_id = ${user.id}
             AND s.tenant_id = ${tenantId}
@@ -136,33 +136,19 @@ studentsRoutes.get('/students/:id',
 
       const enrollments = await db.execute(sql`
         SELECT e.*
-        FROM enrollments e
-        JOIN students s ON s.id = e.student_id
+        FROM manage_enrollments e
+        JOIN manage_students s ON s.id = e.student_id
         WHERE e.student_id = ${studentId}
           AND s.tenant_id = ${tenantId}
           AND s.deleted_at IS NULL
         ORDER BY e.status, e.start_date DESC
       `)
-      const attendance = await db.execute(sql`
-        SELECT a.*
-        FROM attendance a
-        JOIN students s ON s.id = a.student_id
-        WHERE a.student_id = ${studentId}
-          AND s.tenant_id = ${tenantId}
-          AND s.deleted_at IS NULL
-        ORDER BY a.date DESC
-        LIMIT 30
-      `)
-      const grades = await db.execute(sql`
-        SELECT g.*
-        FROM grades g
-        JOIN students s ON s.id = g.student_id
-        WHERE g.student_id = ${studentId}
-          AND s.tenant_id = ${tenantId}
-          AND s.deleted_at IS NULL
-        ORDER BY g.date DESC
-        LIMIT 20
-      `)
+      // NOTE: attendance table migrated to inClass system — returning empty array.
+      // To retrieve attendance data, call inclass-backend API instead.
+      const attendance = { rows: [] }
+      // NOTE: grades table migrated to inClass system — returning empty array.
+      // To retrieve grades data, call inclass-backend API instead.
+      const grades = { rows: [] }
 
       const studentWithGrade = {
         ...student,
@@ -197,7 +183,7 @@ studentsRoutes.post('/students',
         ?? null
 
       const [result] = await db.execute(sql`
-        INSERT INTO students (tenant_id, branch_id, student_code, full_name, nickname, gender,
+        INSERT INTO manage_students (tenant_id, branch_id, student_code, full_name, nickname, gender,
           date_of_birth, school_name, grade_level, phone, email, address, notes)
         VALUES (${tenantId}, ${body.branchId ?? null}, ${studentCode},
           ${body.fullName}, ${body.nickname ?? null}, ${body.gender ?? null},
@@ -234,7 +220,7 @@ studentsRoutes.put('/students/:id',
         : (body.gradeLevel ?? null)
 
       const result = await db.execute(sql`
-        UPDATE students SET
+        UPDATE manage_students SET
           full_name = COALESCE(${body.fullName ?? null}, full_name),
           nickname = COALESCE(${body.nickname ?? null}, nickname),
           branch_id = COALESCE(${body.branchId ?? null}, branch_id),
@@ -273,7 +259,7 @@ studentsRoutes.delete('/students/:id',
     try {
       // Soft delete
       const result = await db.execute(sql`
-        UPDATE students
+        UPDATE manage_students
         SET deleted_at = NOW(), status = 'dropped'
         WHERE id = ${studentId} AND tenant_id = ${tenantId} AND deleted_at IS NULL
         RETURNING id

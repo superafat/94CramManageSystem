@@ -4,6 +4,7 @@
  */
 import { Hono } from 'hono';
 import { timingSafeEqual } from 'crypto';
+import { logger } from '../utils/logger';
 import { db } from '../db';
 import { manageStudents, managePayments, manageEnrollments } from '@94cram/shared/db';
 import { eq, and, sql, desc } from 'drizzle-orm';
@@ -49,7 +50,7 @@ app.get('/student/:studentId', async (c) => {
 
     return c.json({ success: true, data: student });
   } catch (error) {
-    console.error('parent-ext /student error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, 'parent-ext /student error');
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });
@@ -96,7 +97,7 @@ app.get('/payments/:studentId', async (c) => {
       },
     });
   } catch (error) {
-    console.error('parent-ext /payments error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, 'parent-ext /payments error');
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });
@@ -169,7 +170,7 @@ app.get('/payments/:studentId/status', async (c) => {
       },
     });
   } catch (error) {
-    console.error('parent-ext /payments/status error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, 'parent-ext /payments/status error');
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });

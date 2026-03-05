@@ -45,7 +45,7 @@ reportsRoutes.get('/reports/trend',
           date_trunc('month', NOW()),
           '1 month'::interval
         ) AS generate_series
-        LEFT JOIN students s
+        LEFT JOIN manage_students s
           ON s.tenant_id = ${tenantId}
           AND s.status = 'active'
           AND s.created_at <= (generate_series + interval '1 month' - interval '1 second')
@@ -54,34 +54,13 @@ reportsRoutes.get('/reports/trend',
         ORDER BY 1
       `)
 
-      // Attendance rate per month
-      const attRows = await db.execute(sql`
-        SELECT
-          TO_CHAR(date_trunc('month', a.date), 'YYYY-MM') as month,
-          COUNT(*)::int as total,
-          SUM(CASE WHEN a.present THEN 1 ELSE 0 END)::int as present_count
-        FROM attendance a
-        JOIN students s ON a.student_id = s.id
-        WHERE s.tenant_id = ${tenantId}
-          AND a.date >= date_trunc('month', NOW()) - (${months - 1} || ' months')::interval
-          AND a.date < date_trunc('month', NOW()) + interval '1 month'
-        GROUP BY 1
-        ORDER BY 1
-      `)
+      // NOTE: attendance table migrated to inClass system — query removed.
+      // To retrieve attendance data, call inclass-backend API instead.
+      const attRows = { rows: [] }
 
-      // Average grade score per month
-      const gradeRows = await db.execute(sql`
-        SELECT
-          TO_CHAR(date_trunc('month', COALESCE(g.date, g.exam_date)), 'YYYY-MM') as month,
-          ROUND(AVG(g.score)::numeric, 1)::float as avg_score
-        FROM grades g
-        JOIN students s ON g.student_id = s.id
-        WHERE g.tenant_id = ${tenantId}
-          AND COALESCE(g.date, g.exam_date) >= date_trunc('month', NOW()) - (${months - 1} || ' months')::interval
-          AND COALESCE(g.date, g.exam_date) < date_trunc('month', NOW()) + interval '1 month'
-        GROUP BY 1
-        ORDER BY 1
-      `)
+      // NOTE: grades table migrated to inClass system — query removed.
+      // To retrieve grades data, call inclass-backend API instead.
+      const gradeRows = { rows: [] }
 
       // Build lookup maps
       const studentMap = new Map<string, number>()
