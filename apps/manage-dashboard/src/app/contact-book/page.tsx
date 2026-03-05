@@ -613,6 +613,123 @@ export default function ContactBookPage() {
     }
   }
 
+  // ── Print ──
+
+  function handlePrint() {
+    if (!selectedStudent) return
+    const courseName = courses.find((c) => c.id === selectedCourseId)?.name ?? ''
+
+    // Build score rows
+    const scoreRows = examScores
+      .map(
+        (sc) =>
+          `<tr><td style="padding:8px 12px;border-bottom:1px solid #e8e4df">${sc.subject}</td><td style="padding:8px 12px;border-bottom:1px solid #e8e4df;text-align:center;font-weight:600;color:#6B8CAE">${sc.score}</td><td style="padding:8px 12px;border-bottom:1px solid #e8e4df;text-align:center;color:#999">${sc.classAvg}</td></tr>`
+      )
+      .join('')
+
+    const photoImgs = photos
+      .map(
+        (p) =>
+          `<img src="${p.url}" alt="" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #e8e4df" />`
+      )
+      .join('')
+
+    const aiHtml = aiAnalysis
+      ? `<div style="background:#f0f4f1;border-radius:12px;padding:16px;margin-top:12px">
+          <h3 style="margin:0 0 8px;font-size:14px;color:#7B9E89">🤖 AI 學習建議</h3>
+          <p style="margin:0 0 8px;font-size:13px;color:#333">${aiAnalysis.weakSummary}</p>
+          ${aiAnalysis.recommendations.length > 0 ? `<ul style="margin:0;padding-left:18px">${aiAnalysis.recommendations.map((r) => `<li style="font-size:13px;color:#333;margin-bottom:4px">${r}</li>`).join('')}</ul>` : ''}
+        </div>`
+      : ''
+
+    const html = `<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>${selectedStudent.name} — 聯絡簿 ${selectedDate}</title>
+<style>
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .no-print { display: none !important; }
+  }
+  body { font-family: "Noto Sans TC","Microsoft JhengHei","PingFang TC",sans-serif; margin:0; padding:0; background:#fff; color:#333; }
+  .page { max-width:680px; margin:0 auto; padding:32px 24px; }
+  .header { text-align:center; padding:24px; background:linear-gradient(135deg,#e8f0e4,#dde8f0); border-radius:16px; margin-bottom:24px; }
+  .avatar { width:64px; height:64px; border-radius:50%; background:#9DAEBB; color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:28px; font-weight:700; margin-bottom:8px; }
+  .student-name { font-size:22px; font-weight:700; margin:4px 0 0; }
+  .sub-info { font-size:13px; color:#888; margin-top:4px; }
+  .section { background:#fafaf8; border:1px solid #e8e4df; border-radius:12px; padding:16px; margin-bottom:16px; }
+  .section h3 { font-size:14px; font-weight:600; margin:0 0 10px; color:#555; }
+  .section p, .section li { font-size:13px; line-height:1.7; }
+  .label { font-size:11px; color:#999; margin-bottom:4px; }
+  table { width:100%; border-collapse:collapse; }
+  th { padding:8px 12px; text-align:left; font-size:12px; color:#888; border-bottom:2px solid #e8e4df; }
+  .tip-box { background:#fdf6ed; border-radius:12px; padding:16px; border-left:4px solid #C4956A; }
+  .tip-box h3 { color:#C4956A; }
+  .footer { text-align:center; margin-top:32px; padding-top:16px; border-top:1px solid #e8e4df; font-size:11px; color:#bbb; }
+  .print-btn { display:block; margin:0 auto 24px; padding:12px 32px; font-size:16px; font-weight:600; background:#6B8CAE; color:#fff; border:none; border-radius:12px; cursor:pointer; }
+  .print-btn:hover { background:#5a7a9e; }
+</style>
+</head>
+<body>
+<div class="page">
+  <button class="print-btn no-print" onclick="window.print()">🖨️ 列印此頁</button>
+
+  <div class="header">
+    <div class="avatar">${selectedStudent.name.charAt(0)}</div>
+    <p class="student-name">${selectedStudent.name}</p>
+    <p class="sub-info">${selectedDate} 學習日報${courseName ? ` ・ ${courseName}` : ''}</p>
+  </div>
+
+  ${examScores.length > 0 ? `
+  <div class="section">
+    <h3>📊 今日考試成績</h3>
+    <table>
+      <thead><tr><th>科目</th><th style="text-align:center">成績</th><th style="text-align:center">班級平均</th></tr></thead>
+      <tbody>${scoreRows}</tbody>
+    </table>
+  </div>` : ''}
+
+  ${groupProgress || individualProgress ? `
+  <div class="section">
+    <h3>📈 今日課程進度</h3>
+    ${groupProgress ? `<div><p class="label">全班課程進度</p><p style="white-space:pre-wrap">${groupProgress}</p></div>` : ''}
+    ${individualProgress ? `<div style="margin-top:10px"><p class="label">個別學習說明</p><p style="white-space:pre-wrap">${individualProgress}</p></div>` : ''}
+  </div>` : ''}
+
+  ${groupHomework || individualHomework ? `
+  <div class="section">
+    <h3>📝 今日作業</h3>
+    ${groupHomework ? `<div><p class="label">共同作業</p><p style="white-space:pre-wrap">${groupHomework}</p></div>` : ''}
+    ${individualHomework ? `<div style="margin-top:10px"><p class="label">個別作業</p><p style="white-space:pre-wrap">${individualHomework}</p></div>` : ''}
+  </div>` : ''}
+
+  ${photos.length > 0 ? `
+  <div class="section">
+    <h3>📸 學習剪影</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${photoImgs}</div>
+  </div>` : ''}
+
+  ${teacherNote ? `
+  <div class="tip-box">
+    <h3>💡 老師的小叮嚀</h3>
+    <p style="white-space:pre-wrap">${teacherNote}</p>
+  </div>` : ''}
+
+  ${aiHtml}
+
+  <div class="footer">94 補習班管理系統 — 電子聯絡簿</div>
+</div>
+</body>
+</html>`
+
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(html)
+      printWindow.document.close()
+    }
+  }
+
   // ── Computed ──
 
   const selectedStudent = students.find((s) => s.id === selectedStudentId) ?? null
@@ -822,6 +939,13 @@ export default function ContactBookPage() {
                 {savingEntry && <span className="text-xs text-text-muted">儲存中...</span>}
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handlePrint}
+                >
+                  🖨 列印
+                </Button>
                 <Button
                   variant="secondary"
                   size="sm"
