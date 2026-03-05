@@ -39,11 +39,10 @@ import internalRoutes from './routes/internal.js'
 import webhookRoutes from './routes/webhooks.js'
 import botRoutes from './routes/bot/index.js'
 import parentExtRoutes from './routes/parent-ext.js'
-import faceRoutes from './routes/face.js'
+// faceRoutes loaded dynamically to avoid tensorflow crash at import time
 import { contactBookRoutes } from './routes/contact-book.js'
 import { contactBookParentRoutes } from './routes/contact-book-parent.js'
 import { makeupClassRoutes } from './routes/makeup-classes.js'
-import { loadModels } from './services/faceRecognition.js'
 type Variables = {
   schoolId: string
   userId: string
@@ -188,8 +187,7 @@ app.route('/api/parent-ext', parentExtRoutes)
 app.route('/api/webhooks', webhookRoutes)
 // Internal API (own auth via INTERNAL_API_TOKEN, NOT JWT)
 app.route('/internal', internalRoutes)
-// Face recognition routes (image-based, requires increased body limit)
-app.route('/api/face', faceRoutes)
+// Face recognition routes registered dynamically in serve() to avoid tensorflow crash
 // Contact book routes (migrated from manage-backend)
 app.route('/api/contact-book', contactBookRoutes)
 app.route('/api/parent/contact-book', contactBookParentRoutes)
@@ -223,8 +221,16 @@ export default app
 const port = parseInt(process.env.PORT || '3102')
 logger.info(`🐝 BeeClass Backend starting on port ${port}...`)
 const serve = async () => {
-  // Preload face recognition models at startup (avoids cold-start delay)
-  await loadModels().catch(err => logger.warn({ err }, 'Face model preload failed (non-fatal)'))
+  // Dynamically load face recognition (tensorflow) to avoid crash if native module missing
+  try {
+    const faceModule = await import('./routes/face.js')
+    app.route('/api/face', faceModule.default)
+    const { loadModels } = await import('./services/faceRecognition.js')
+    await loadModels()
+    logger.info('Face recognition routes and models loaded')
+  } catch (err) {
+    logger.warn({ err: err instanceof Error ? err : new Error(String(err)) }, 'Face recognition disabled (non-fatal)')
+  }
   const { serve } = await import('@hono/node-server')
   const server = serve({ port, fetch: app.fetch })
   logger.info(`✅ BeeClass Backend running at http://localhost:${port}`)
