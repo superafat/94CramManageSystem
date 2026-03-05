@@ -46,13 +46,14 @@ platformSecurityRoutes.get(
     try {
       const since = new Date()
       since.setDate(since.getDate() - days)
+      const sinceStr = since.toISOString()
 
       // 總數
       const countResult = await db.execute(sql`
         SELECT COUNT(*)::text AS total
         FROM audit_logs
         WHERE action LIKE '%login_failed%'
-          AND created_at >= ${since}
+          AND created_at >= ${sinceStr}
       `)
       const total = parseInt(getRows(countResult)[0]?.total as string ?? '0', 10)
 
@@ -66,7 +67,7 @@ platformSecurityRoutes.get(
         LEFT JOIN tenants t ON t.id = al.tenant_id
         LEFT JOIN users u ON u.id = al.user_id
         WHERE al.action LIKE '%login_failed%'
-          AND al.created_at >= ${since}
+          AND al.created_at >= ${sinceStr}
         ORDER BY al.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `)

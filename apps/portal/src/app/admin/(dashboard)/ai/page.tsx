@@ -216,7 +216,7 @@ export default function AiPage() {
 
   function openEdit(sub: Subscription) {
     setEditTarget(sub)
-    setEditForm({ plan: sub.plan, aiQuota: String(sub.aiQuota), botEnabled: sub.botEnabled })
+    setEditForm({ plan: sub.plan, aiQuota: String(sub.aiQuota ?? 0), botEnabled: sub.botEnabled ?? false })
     setEditError(null)
   }
 
@@ -340,12 +340,12 @@ export default function AiPage() {
                         <td className="px-4 py-3"><PlanTag plan={sub.plan} /></td>
                         <td className="px-4 py-3 text-gray-700">
                           <div className="flex items-center gap-2">
-                            <span>{sub.aiUsage.toLocaleString()} / {sub.aiQuota.toLocaleString()}</span>
+                            <span>{(sub.aiUsage ?? 0).toLocaleString()} / {(sub.aiQuota ?? 0).toLocaleString()}</span>
                             <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                               <div
                                 className="h-full rounded-full"
                                 style={{
-                                  width: `${Math.min(100, sub.aiQuota > 0 ? (sub.aiUsage / sub.aiQuota) * 100 : 0)}%`,
+                                  width: `${Math.min(100, (sub.aiQuota ?? 0) > 0 ? ((sub.aiUsage ?? 0) / (sub.aiQuota ?? 1)) * 100 : 0)}%`,
                                   backgroundColor: '#8FA895',
                                 }}
                               />
