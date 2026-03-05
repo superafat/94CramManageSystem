@@ -42,7 +42,7 @@ const getBottomNavItems = (role: Role): NavItem[] => {
     { href: '/dashboard', icon: '🏠', label: '首頁', roles: ['superadmin', 'admin', 'staff'] },
     { href: '/students', icon: '👥', label: '學生', roles: ['superadmin', 'admin', 'staff'] },
     { href: '/attendance', icon: '✅', label: '點名', roles: ['superadmin', 'admin', 'staff'] },
-    { href: '/billing', icon: '💰', label: '帳務', roles: ['superadmin', 'admin', 'staff'] },
+    { href: '/finance', icon: '💰', label: '帳務', roles: ['superadmin', 'admin', 'staff'] },
     { href: '/more', icon: '☰', label: '更多', roles: ['superadmin', 'admin', 'staff'] },
   ]
 }
@@ -67,8 +67,7 @@ const getMoreMenuItems = (role: Role): NavItem[] => {
     items.push({ href: '/scheduling-center', icon: '📅', label: '排課中心', roles: ['superadmin', 'admin'] })
     items.push({ href: '/schedules', icon: '📅', label: '課表管理', roles: ['superadmin', 'admin'] })
     items.push({ href: '/teacher-attendance', icon: '🕐', label: '師資出缺勤', roles: ['superadmin', 'admin'] })
-    items.push({ href: '/salary', icon: '💵', label: '薪資管理', roles: ['superadmin', 'admin'] })
-    items.push({ href: '/expenses', icon: '🧾', label: '支出管理', roles: ['superadmin', 'admin'] })
+    items.push({ href: '/my-salary', icon: '💵', label: '我的薪資條', roles: ['superadmin', 'admin'] })
   }
   // 教學互動
   if (['superadmin', 'admin', 'staff', 'teacher'].includes(role)) {

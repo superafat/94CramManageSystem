@@ -84,7 +84,8 @@ export default function SalaryPage() {
       )
       if (res.ok) {
         const result = await res.json()
-        const items: ScheduleItem[] = result.data ?? result ?? []
+        const raw = result.data ?? result
+        const items: ScheduleItem[] = Array.isArray(raw) ? raw : []
         setTeacherSchedules(prev => ({ ...prev, [teacherId]: items }))
       } else {
         setTeacherSchedules(prev => ({ ...prev, [teacherId]: [] }))
@@ -106,7 +107,8 @@ export default function SalaryPage() {
       )
       if (res.ok) {
         const result = await res.json()
-        const stats: AttendanceStats = result.data ?? result
+        const raw = result.data ?? result
+        const stats: AttendanceStats = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : { late_count: 0, absent_days: 0, personal_leave_days: 0 }
         setAttendanceMap(prev => ({ ...prev, [teacherId]: stats }))
       }
     } catch {
@@ -284,6 +286,7 @@ export default function SalaryPage() {
                   onFetchAttendance={fetchAttendance}
                   onFetchSchedules={fetchTeacherSchedules}
                   getSalaryBreakdown={getSalaryBreakdown}
+                  onRefresh={fetchSalary}
                 />
               ))}
             </div>

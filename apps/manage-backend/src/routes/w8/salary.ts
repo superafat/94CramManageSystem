@@ -59,7 +59,7 @@ salaryRoutes.get('/salary/calculate', requireRole(Role.ADMIN, Role.MANAGER),
       // 查詢薪資調整（獎金/扣薪）
       const user = c.get('user')
       const adjResult = await db.execute(sql`
-        SELECT teacher_id, type, name, amount
+        SELECT id, teacher_id, type, name, amount, notes
         FROM manage_salary_adjustments
         WHERE tenant_id = ${user?.tenant_id}
           AND period_start >= ${query.startDate}::date

@@ -1,9 +1,11 @@
 // ───────────── Types ─────────────
 
 export interface SalaryAdjustment {
+  id: string
   type: string
   name: string
   amount: string
+  notes?: string
 }
 
 export interface TeacherSalary {
