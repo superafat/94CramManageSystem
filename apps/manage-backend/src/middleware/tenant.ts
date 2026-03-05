@@ -16,6 +16,12 @@ const tenantCache = new Map<string, number>()
 const TENANT_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 export async function tenantMiddleware(c: Context, next: Next) {
+  // Platform routes handle their own auth/tenant — skip tenant middleware
+  if (c.req.path.startsWith('/api/platform/')) {
+    await next()
+    return
+  }
+
   let tenantId: string | undefined
 
   // 1. From JWT — authoritative source, cannot be overridden
