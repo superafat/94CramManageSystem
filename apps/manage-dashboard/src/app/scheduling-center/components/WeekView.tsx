@@ -115,65 +115,67 @@ export default function WeekView({ events, weekStartDate, onEventClick }: WeekVi
 
       {/* Time grid */}
       <div className="flex-1 overflow-y-auto">
-        <div className="flex relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
-          {/* Time labels */}
-          <div className="w-12 shrink-0 relative">
-            {HOURS.map(h => (
-              <div
-                key={h}
-                className="absolute left-0 right-0 text-right pr-2"
-                style={{ top: (h - 8) * HOUR_HEIGHT - 6 }}
-              >
-                <span className="text-[10px] text-text-muted">
-                  {String(h).padStart(2, '0')}:00
-                </span>
-              </div>
-            ))}
+        <div className="relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
+          {/* Horizontal hour grid lines — span full width */}
+          {HOURS.map(h => (
+            <div
+              key={`line-${h}`}
+              className="absolute left-0 right-0 border-t border-border/60"
+              style={{ top: (h - 8) * HOUR_HEIGHT }}
+            />
+          ))}
+
+          <div className="flex h-full relative">
+            {/* Time labels */}
+            <div className="w-12 shrink-0 relative z-10">
+              {HOURS.map(h => (
+                <div
+                  key={h}
+                  className="absolute left-0 right-0 text-right pr-2"
+                  style={{ top: (h - 8) * HOUR_HEIGHT - 6 }}
+                >
+                  <span className="text-[10px] text-text-muted bg-white px-0.5">
+                    {String(h).padStart(2, '0')}:00
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Day columns with events */}
+            {weekDates.map((date, colIdx) => {
+              const dateStr = formatDateStr(date)
+              const dayEvents = eventsByDate[dateStr] ?? []
+              const positioned = groupOverlapping(dayEvents)
+              const today = isToday(date)
+
+              return (
+                <div
+                  key={colIdx}
+                  className={`flex-1 relative border-l border-border ${today ? 'bg-primary/5' : ''}`}
+                >
+                  {/* Events */}
+                  {positioned.map(({ event, column, totalColumns }) => {
+                    const startMin = timeToMinutes(event.startTime)
+                    const endMin = timeToMinutes(event.endTime)
+                    const top = (startMin - 8 * 60) * (HOUR_HEIGHT / 60)
+                    const height = Math.max(20, (endMin - startMin) * (HOUR_HEIGHT / 60) - 2)
+                    const width = `${100 / totalColumns}%`
+                    const left = `${(column / totalColumns) * 100}%`
+
+                    return (
+                      <div
+                        key={event.id}
+                        className="absolute px-0.5"
+                        style={{ top, height, width, left }}
+                      >
+                        <ScheduleBlock event={event} onClick={onEventClick} />
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
           </div>
-
-          {/* Day columns with events */}
-          {weekDates.map((date, colIdx) => {
-            const dateStr = formatDateStr(date)
-            const dayEvents = eventsByDate[dateStr] ?? []
-            const positioned = groupOverlapping(dayEvents)
-            const today = isToday(date)
-
-            return (
-              <div
-                key={colIdx}
-                className={`flex-1 relative border-l border-border ${today ? 'bg-primary/5' : ''}`}
-              >
-                {/* Hour grid lines */}
-                {HOURS.map(h => (
-                  <div
-                    key={h}
-                    className="absolute left-0 right-0 border-t border-border/40"
-                    style={{ top: (h - 8) * HOUR_HEIGHT }}
-                  />
-                ))}
-
-                {/* Events */}
-                {positioned.map(({ event, column, totalColumns }) => {
-                  const startMin = timeToMinutes(event.startTime)
-                  const endMin = timeToMinutes(event.endTime)
-                  const top = (startMin - 8 * 60) * (HOUR_HEIGHT / 60)
-                  const height = Math.max(20, (endMin - startMin) * (HOUR_HEIGHT / 60) - 2)
-                  const width = `${100 / totalColumns}%`
-                  const left = `${(column / totalColumns) * 100}%`
-
-                  return (
-                    <div
-                      key={event.id}
-                      className="absolute px-0.5"
-                      style={{ top, height, width, left }}
-                    >
-                      <ScheduleBlock event={event} onClick={onEventClick} />
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          })}
         </div>
       </div>
     </div>

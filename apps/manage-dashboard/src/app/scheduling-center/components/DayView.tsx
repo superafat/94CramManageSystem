@@ -88,7 +88,7 @@ export default function DayView({ events, date, onEventClick }: DayViewProps) {
           {HOURS.map(h => (
             <div
               key={h}
-              className="absolute left-0 right-0 border-t border-border/40 flex"
+              className="absolute left-0 right-0 border-t border-border/60 flex"
               style={{ top: (h - 8) * HOUR_HEIGHT }}
             >
               <span className="text-[10px] text-text-muted w-12 text-right pr-2 leading-none -mt-2 shrink-0">

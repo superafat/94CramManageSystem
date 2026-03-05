@@ -30,7 +30,6 @@ const navItems: NavItem[] = [
   // 班務管理區塊
   { type: 'separator', separator: '班務管理', roles: ['superadmin', 'admin', 'staff', 'teacher'] },
   { href: '/students', icon: '👥', label: '學生管理', roles: ['superadmin', 'admin', 'staff'] },
-  { href: '/scheduling-center', icon: '📅', label: '排課中心', roles: ['superadmin', 'admin', 'staff', 'teacher', 'student'] },
   { href: '/attendance', icon: '✅', label: '出席管理', roles: ['superadmin', 'admin', 'staff', 'teacher'] },
   { href: '/makeup-classes', icon: '📝', label: '補課管理', roles: ['superadmin', 'admin', 'staff'] },
   { href: '/grades', icon: '📊', label: '成績管理', roles: ['superadmin', 'admin', 'staff', 'teacher'] },
@@ -41,6 +40,7 @@ const navItems: NavItem[] = [
   // 講師管理區塊 (W8)
   { type: 'separator', separator: '講師管理', roles: ['superadmin', 'admin'] },
   { href: '/teachers', icon: '👨‍🏫', label: '講師名單', roles: ['superadmin', 'admin'] },
+  { href: '/scheduling-center', icon: '📅', label: '排課中心', roles: ['superadmin', 'admin'] },
   { href: '/schedules', icon: '📅', label: '課表管理', roles: ['superadmin', 'admin'] },
   { href: '/teacher-attendance', icon: '🕐', label: '師資出缺勤', roles: ['superadmin', 'admin'] },
   { href: '/salary', icon: '💵', label: '薪資管理', roles: ['superadmin', 'admin'] },

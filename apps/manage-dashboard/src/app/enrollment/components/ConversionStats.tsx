@@ -28,6 +28,7 @@ export function ConversionStats({
   const cards = [
     {
       label: '新諮詢數',
+      hint: '期間內新增的諮詢人數',
       value: totalLeads,
       unit: '人',
       color: 'text-[#6B8CAE]',
@@ -36,6 +37,7 @@ export function ConversionStats({
     },
     {
       label: '轉換率',
+      hint: '從諮詢到正式報名的比例',
       value: `${conversionRate}`,
       unit: '%',
       color: 'text-[#7B9E89]',
@@ -44,6 +46,7 @@ export function ConversionStats({
     },
     {
       label: '預約試聽',
+      hint: '已安排免費試聽的人數',
       value: trialsScheduled,
       unit: '人',
       color: 'text-[#C4956A]',
@@ -52,6 +55,7 @@ export function ConversionStats({
     },
     {
       label: '已報名',
+      hint: '確認繳費完成報名',
       value: enrolledCount,
       unit: '人',
       color: 'text-[#9B7FB6]',
@@ -72,6 +76,7 @@ export function ConversionStats({
             <span className="text-sm font-normal ml-0.5">{card.unit}</span>
           </div>
           <div className="text-xs md:text-sm text-text-muted mt-0.5">{card.label}</div>
+          <div className="text-[10px] text-text-muted/70 mt-0.5">{card.hint}</div>
         </div>
       ))}
     </div>

@@ -20,6 +20,14 @@ const STAGE_COLORS: Record<string, { bar: string; bg: string; text: string }> = 
   enrolled: { bar: 'bg-[#7B9E89]', bg: 'bg-[#7B9E89]/10', text: 'text-[#7B9E89]' },
 }
 
+const STAGE_HINTS: Record<string, string> = {
+  new: '初次來電或網路諮詢的家長',
+  contacted: '已回電或回訊聯繫過',
+  trial_scheduled: '已預約免費試聽課',
+  trial_completed: '已實際到班試聽',
+  enrolled: '確認繳費正式報名',
+}
+
 const DEFAULT_STAGES: FunnelStage[] = [
   { stage: 'new', label: '新諮詢', count: 0, percentage: 100 },
   { stage: 'contacted', label: '已聯絡', count: 0, percentage: 0 },
@@ -47,17 +55,27 @@ export function FunnelChart({ stages, loading }: FunnelChartProps) {
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-border p-4 md:p-6">
-      <h3 className="text-base md:text-lg font-semibold text-text mb-4">招生漏斗</h3>
+      <div className="flex items-center gap-2 mb-1">
+        <h3 className="text-base md:text-lg font-semibold text-text">招生漏斗</h3>
+        <span className="text-xs text-text-muted bg-surface-hover px-2 py-0.5 rounded-full">
+          從諮詢到報名的轉換流程
+        </span>
+      </div>
+      <p className="text-xs text-text-muted mb-4">每一階段顯示人數與佔首階段的百分比，越往下代表越接近正式報名</p>
       <div className="space-y-3">
         {displayStages.map((stage, idx) => {
           const colors = STAGE_COLORS[stage.stage] ?? STAGE_COLORS['new']
           const barWidth = maxCount > 0 ? Math.round((stage.count / maxCount) * 100) : 0
           // Funnel visual: decrease width per stage
           const funnelWidth = 100 - idx * 8
+          const hint = STAGE_HINTS[stage.stage]
           return (
             <div key={stage.stage}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-text font-medium">{stage.label}</span>
+                <span className="text-sm text-text font-medium">
+                  {stage.label}
+                  {hint && <span className="ml-1.5 text-[10px] text-text-muted font-normal">({hint})</span>}
+                </span>
                 <div className="flex items-center gap-2">
                   <span className={`text-sm font-bold ${colors.text}`}>{stage.count}</span>
                   <span className="text-xs text-text-muted">{stage.percentage}%</span>
