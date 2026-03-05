@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { BackButton } from '@/components/ui/BackButton'
+import MakeupScheduleModal from '../scheduling-center/components/MakeupScheduleModal'
 
 interface AttendanceRecord {
   id: string
@@ -61,6 +62,11 @@ export default function AttendancePage() {
   const [leaveSubmitting, setLeaveSubmitting] = useState(false)
   const [leaveSuccess, setLeaveSuccess] = useState<string | null>(null)
   const [notifyingParent, setNotifyingParent] = useState<string | null>(null)
+  const [makeupTarget, setMakeupTarget] = useState<{
+    studentId: string
+    studentName: string
+    date: string
+  } | null>(null)
 
   const API_BASE = ''
 
@@ -470,6 +476,14 @@ export default function AttendancePage() {
                           {notifyingParent === record.student_id ? '發送中...' : '📩 通知家長'}
                         </button>
                       )}
+                      {(record.status === 'absent' || record.status === 'leave') && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setMakeupTarget({ studentId: record.student_id, studentName: record.student_name, date: record.date }) }}
+                          className="text-xs px-2 py-1 rounded-lg border border-[#C4956A] text-[#C4956A] hover:bg-[#C4956A]/10 transition-colors"
+                        >
+                          安排補課
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -483,6 +497,16 @@ export default function AttendancePage() {
           </div>
         )}
       </div>
+
+      {/* 補課 Modal */}
+      <MakeupScheduleModal
+        isOpen={makeupTarget !== null}
+        onClose={() => setMakeupTarget(null)}
+        onCreated={() => { setMakeupTarget(null); loadData() }}
+        studentId={makeupTarget?.studentId}
+        studentName={makeupTarget?.studentName}
+        originalDate={makeupTarget?.date}
+      />
 
       {/* 請假 Modal */}
       {leaveModalOpen && (

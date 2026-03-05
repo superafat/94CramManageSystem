@@ -12,6 +12,7 @@ import DetailDrawer from './components/DetailDrawer'
 import RosterModal from './components/RosterModal'
 import EditScheduleModal from './components/EditScheduleModal'
 import CreateScheduleModal from './components/CreateScheduleModal'
+import MakeupScheduleModal from './components/MakeupScheduleModal'
 
 const API_BASE = ''
 
@@ -66,6 +67,13 @@ export default function SchedulingCenterPage() {
 
   // Create schedule modal state
   const [showCreateModal, setShowCreateModal] = useState(false)
+
+  // Makeup schedule modal state
+  const [makeupContext, setMakeupContext] = useState<{
+    courseId: string
+    courseName: string
+    date: string
+  } | null>(null)
 
   // Edit schedule modal state
   const [editScheduleId, setEditScheduleId] = useState<string | null>(null)
@@ -489,6 +497,16 @@ export default function SchedulingCenterPage() {
             }
             setSelectedEvent(null)
           }}
+          onMakeupClick={() => {
+            if (selectedEvent) {
+              setMakeupContext({
+                courseId: selectedEvent.courseId,
+                courseName: selectedEvent.courseName,
+                date: selectedEvent.date || '',
+              })
+              setSelectedEvent(null)
+            }
+          }}
         />
       )}
 
@@ -509,6 +527,18 @@ export default function SchedulingCenterPage() {
           courseType={editCourseType}
           onClose={() => setEditScheduleId(null)}
           onUpdated={() => { setEditScheduleId(null); fetchSchedules() }}
+        />
+      )}
+
+      {/* Makeup Schedule Modal */}
+      {makeupContext && (
+        <MakeupScheduleModal
+          isOpen={true}
+          onClose={() => setMakeupContext(null)}
+          onCreated={() => { setMakeupContext(null); fetchSchedules() }}
+          originalCourseId={makeupContext.courseId}
+          originalCourseName={makeupContext.courseName}
+          originalDate={makeupContext.date}
         />
       )}
 

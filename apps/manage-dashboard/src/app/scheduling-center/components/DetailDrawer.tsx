@@ -8,6 +8,7 @@ interface DetailDrawerProps {
   onClose: () => void
   onEditClick: () => void
   onRosterClick: () => void
+  onMakeupClick: () => void
 }
 
 const COURSE_TYPE_LABEL: Record<string, string> = {
@@ -26,7 +27,7 @@ function formatTime(time: string): string {
   return time.slice(0, 5)
 }
 
-export default function DetailDrawer({ event, students, onClose, onEditClick, onRosterClick }: DetailDrawerProps) {
+export default function DetailDrawer({ event, students, onClose, onEditClick, onRosterClick, onMakeupClick }: DetailDrawerProps) {
   return (
     <>
       {/* Overlay */}
@@ -115,6 +116,12 @@ export default function DetailDrawer({ event, students, onClose, onEditClick, on
 
         {/* Footer actions */}
         <div className="px-5 py-4 border-t border-border flex gap-3">
+          <button
+            onClick={onMakeupClick}
+            className="flex-1 px-4 py-2 text-sm font-medium rounded-lg border border-[#C4956A] text-[#C4956A] hover:bg-[#C4956A]/10 transition-colors"
+          >
+            安排補課
+          </button>
           <button
             onClick={onEditClick}
             className="flex-1 px-4 py-2 text-sm font-medium rounded-lg border border-border text-text hover:bg-border/30 transition-colors"
