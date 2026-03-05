@@ -25,6 +25,8 @@ RUN apt-get update && apt-get install -y \
     libcairo2 libpango-1.0-0 libpangocairo-1.0-0 \
     libjpeg62-turbo libgif7 librsvg2-2 \
     --no-install-recommends && rm -rf /var/lib/apt/lists/*
+# Install tsx globally for loading shared package .ts files
+RUN npm install -g tsx
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 --ingroup nodejs appuser
 COPY --from=builder --chown=appuser:nodejs /app/apps/inclass-backend/dist ./apps/inclass-backend/dist
@@ -37,4 +39,4 @@ WORKDIR /app/apps/inclass-backend
 ENV NODE_ENV=production
 USER appuser
 EXPOSE 3102
-CMD ["node", "dist/index.js"]
+CMD ["tsx", "dist/index.js"]
