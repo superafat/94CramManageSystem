@@ -10,6 +10,7 @@ import DayView from './components/DayView'
 import MonthView from './components/MonthView'
 import DetailDrawer from './components/DetailDrawer'
 import RosterModal from './components/RosterModal'
+import EditScheduleModal from './components/EditScheduleModal'
 
 const API_BASE = ''
 
@@ -61,6 +62,12 @@ export default function SchedulingCenterPage() {
   const [rosterCourseId, setRosterCourseId] = useState<string | null>(null)
   const [rosterCourseName, setRosterCourseName] = useState('')
   const [rosterMaxStudents, setRosterMaxStudents] = useState<number | undefined>(undefined)
+
+  // Edit schedule modal state
+  const [editScheduleId, setEditScheduleId] = useState<string | null>(null)
+  const [editCourseId, setEditCourseId] = useState('')
+  const [editCourseName, setEditCourseName] = useState('')
+  const [editCourseType, setEditCourseType] = useState<'group' | 'individual' | 'daycare'>('group')
 
   // Computed dates for API range
   const { startDate, endDate, weekStartDate, selectedDate, monthDate } = useMemo(() => {
@@ -454,8 +461,15 @@ export default function SchedulingCenterPage() {
           students={detailStudents}
           onClose={() => { setSelectedEvent(null); setDetailStudents([]) }}
           onEditClick={() => {
-            // TODO: navigate to edit page
-            setSelectedEvent(null)
+            if (selectedEvent) {
+              const baseId = selectedEvent.id.includes('-') ? selectedEvent.id.split('-').slice(0, -1).join('-') : selectedEvent.id
+              const sid = /^[0-9a-f-]{36}$/i.test(selectedEvent.id) ? selectedEvent.id : baseId
+              setEditScheduleId(sid)
+              setEditCourseId(selectedEvent.courseId)
+              setEditCourseName(selectedEvent.courseName)
+              setEditCourseType(selectedEvent.courseType)
+              setSelectedEvent(null)
+            }
           }}
           onRosterClick={() => {
             if (selectedEvent) {
@@ -465,6 +479,19 @@ export default function SchedulingCenterPage() {
             }
             setSelectedEvent(null)
           }}
+        />
+      )}
+
+      {/* Edit Schedule Modal */}
+      {editScheduleId && (
+        <EditScheduleModal
+          isOpen={true}
+          scheduleId={editScheduleId}
+          courseId={editCourseId}
+          courseName={editCourseName}
+          courseType={editCourseType}
+          onClose={() => setEditScheduleId(null)}
+          onUpdated={() => { setEditScheduleId(null); fetchSchedules() }}
         />
       )}
 
