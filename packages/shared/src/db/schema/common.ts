@@ -14,6 +14,11 @@ export const tenants = pgTable('tenants', {
   trialApprovedBy: uuid('trial_approved_by'),
   trialApprovedAt: timestamp('trial_approved_at'),
   trialNotes: text('trial_notes'),
+  plan: varchar('plan', { length: 20 }).default('free'),
+  deletedAt: timestamp('deleted_at'),
+  suspendedReason: text('suspended_reason'),
+  lastPaymentAt: timestamp('last_payment_at'),
+  paymentDueAt: timestamp('payment_due_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -105,3 +110,53 @@ export const manageBotVisits = pgTable('manage_bot_visits', {
   index('idx_bot_visits_name').on(table.botName, table.createdAt),
   index('idx_bot_visits_category').on(table.botCategory, table.createdAt),
 ])
+
+// ===== Platform Admin =====
+
+export const platformPlanPricing = pgTable('platform_plan_pricing', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  planKey: varchar('plan_key', { length: 20 }).notNull().unique(),
+  name: varchar('name', { length: 50 }).notNull(),
+  monthlyPrice: integer('monthly_price').notNull().default(0),
+  features: jsonb('features').default({}),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+})
+
+export const platformPayments = pgTable('platform_payments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  amount: integer('amount').notNull(),
+  paidAt: timestamp('paid_at', { mode: 'date' }).notNull(),
+  method: varchar('method', { length: 20 }).notNull().default('transfer'),
+  invoiceNo: varchar('invoice_no', { length: 50 }),
+  periodStart: timestamp('period_start', { mode: 'date' }),
+  periodEnd: timestamp('period_end', { mode: 'date' }),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  tenantIdx: index('idx_platform_payments_tenant').on(table.tenantId),
+  paidAtIdx: index('idx_platform_payments_paid_at').on(table.paidAt),
+}))
+
+export const platformCosts = pgTable('platform_costs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  category: varchar('category', { length: 20 }).notNull(),
+  subcategory: varchar('subcategory', { length: 50 }),
+  amount: integer('amount').notNull(),
+  date: timestamp('date', { mode: 'date' }).notNull(),
+  description: text('description'),
+  isRecurring: boolean('is_recurring').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  dateIdx: index('idx_platform_costs_date').on(table.date),
+  categoryIdx: index('idx_platform_costs_category').on(table.category),
+}))
+
+export const platformSettings = pgTable('platform_settings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  key: varchar('key', { length: 100 }).notNull().unique(),
+  value: jsonb('value').default({}),
+  updatedAt: timestamp('updated_at').defaultNow(),
+})

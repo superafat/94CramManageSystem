@@ -8,6 +8,7 @@ import { botRoutes } from './routes/bot'
 import { authRoutes, handleDemoLogin } from './routes/auth'
 import { adminRoutes } from './routes/admin'
 import { headquartersRoutes } from './routes/headquarters'
+import { platformRoutes } from './routes/platform'
 import usersRoutes from './routes/users'
 import { demoRoutes } from './routes/demo'
 import { w8Routes } from './routes/w8/index'
@@ -187,6 +188,9 @@ app.route('/api/admin', adminRoutes)
 
 // Headquarters management routes (superadmin only)
 app.route('/api/admin/headquarters', headquartersRoutes)
+
+// Platform admin routes (superadmin only, auth handled inside)
+app.route('/api/platform', platformRoutes)
 
 // User management routes (JWT + RBAC inside)
 app.route('/api', usersRoutes)

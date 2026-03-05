@@ -23,11 +23,9 @@ const navItems: NavItem[] = [
   { href: '/dashboard', icon: '📊', label: '總覽', roles: ['superadmin', 'admin', 'staff'] },
   { href: '/dashboard/knowledge', icon: '📚', label: '知識庫', roles: ['superadmin', 'admin'] },
   { href: '/dashboard/conversations', icon: '💬', label: '對話紀錄', roles: ['superadmin', 'admin', 'staff'] },
-  { href: '/dashboard/trials', icon: '🎯', label: '試用審核', roles: ['superadmin'] }, // 只有系統管理員可見
   { href: '/headquarters', icon: '🏢', label: '總部管理', roles: ['superadmin'] },
   { href: '/dashboard/audit', icon: '📋', label: '異動日誌', roles: ['superadmin', 'admin'] },
-  { href: '/dashboard/settings', icon: '⚙️', label: '系統設定', roles: ['superadmin'] }, // 只有系統管理員可見
-  { href: '/dashboard/analytics', icon: '📡', label: '網站監控', roles: ['superadmin'] },
+  { href: '/dashboard/settings', icon: '⚙️', label: '系統設定', roles: ['superadmin'] },
 
   // 班務管理區塊
   { type: 'separator', separator: '班務管理', roles: ['superadmin', 'admin', 'staff', 'teacher'] },

@@ -8,7 +8,7 @@ import { db, sql, success, notFound, internalError, rows } from './_helpers'
 
 const tenantsRoutes = new Hono<{ Variables: RBACVariables }>()
 
-tenantsRoutes.get('/tenants', requireRole(Role.ADMIN), async (c) => {
+tenantsRoutes.get('/tenants', requireRole(Role.SUPERADMIN), async (c) => {
   try {
     const result = await db.execute(sql`
       SELECT id, name, slug, plan, active, created_at
@@ -22,7 +22,7 @@ tenantsRoutes.get('/tenants', requireRole(Role.ADMIN), async (c) => {
 })
 
 tenantsRoutes.get('/tenants/:tenantId/stats',
-  requireRole(Role.ADMIN),
+  requireRole(Role.SUPERADMIN),
   zValidator('param', z.object({ tenantId: uuidSchema })),
   async (c) => {
     const { tenantId } = c.req.valid('param')
@@ -41,7 +41,7 @@ tenantsRoutes.get('/tenants/:tenantId/stats',
   }
 )
 
-tenantsRoutes.get('/trials', requireRole(Role.ADMIN), async (c) => {
+tenantsRoutes.get('/trials', requireRole(Role.SUPERADMIN), async (c) => {
   try {
     const result = await db.execute(sql`
       SELECT
@@ -70,7 +70,7 @@ tenantsRoutes.get('/trials', requireRole(Role.ADMIN), async (c) => {
 })
 
 tenantsRoutes.get('/trials/:tenantId',
-  requireRole(Role.ADMIN),
+  requireRole(Role.SUPERADMIN),
   zValidator('param', z.object({ tenantId: uuidSchema })),
   async (c) => {
     const { tenantId } = c.req.valid('param')
@@ -96,7 +96,7 @@ tenantsRoutes.get('/trials/:tenantId',
   })
 
 tenantsRoutes.post('/trials/:tenantId/approve',
-  requireRole(Role.ADMIN),
+  requireRole(Role.SUPERADMIN),
   zValidator('param', z.object({ tenantId: uuidSchema })),
   zValidator('json', z.object({
     notes: z.string().max(500).optional(),
@@ -130,7 +130,7 @@ tenantsRoutes.post('/trials/:tenantId/approve',
   })
 
 tenantsRoutes.post('/trials/:tenantId/reject',
-  requireRole(Role.ADMIN),
+  requireRole(Role.SUPERADMIN),
   zValidator('param', z.object({ tenantId: uuidSchema })),
   zValidator('json', z.object({
     notes: z.string().max(500),
@@ -158,7 +158,7 @@ tenantsRoutes.post('/trials/:tenantId/reject',
   })
 
 tenantsRoutes.post('/trials/:tenantId/revoke',
-  requireRole(Role.ADMIN),
+  requireRole(Role.SUPERADMIN),
   zValidator('param', z.object({ tenantId: uuidSchema })),
   zValidator('json', z.object({
     notes: z.string().max(500).optional(),
