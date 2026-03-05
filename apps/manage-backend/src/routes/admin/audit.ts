@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
 import type { RBACVariables } from '../../middleware/rbac'
 import { requirePermission, Permission } from '../../middleware/rbac'
-import { db, sql, success, successWithPagination, notFound, internalError, rows, logger } from './_helpers'
+import { db, sql, success, successWithPagination, notFound, internalError, rows, first, logger } from './_helpers'
 
 const auditRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -102,9 +102,9 @@ auditRoutes.get('/audit-logs',
 
       const where = sql.join(conditions, sql` AND `)
 
-      const [countResult] = await db.execute(sql`
+      const countResult = first(await db.execute(sql`
         SELECT COUNT(*)::int as total FROM audit_logs al WHERE ${where}
-      `) as any[]
+      `))
 
       const rowsData = await db.execute(sql`
         SELECT al.*, u.name as user_name
@@ -118,7 +118,7 @@ auditRoutes.get('/audit-logs',
       return successWithPagination(c, { logs: rows(rowsData) }, {
         page,
         limit,
-        total: countResult?.total ?? 0,
+        total: Number(countResult?.total) || 0,
       })
     } catch (err) {
       return internalError(c, err)
@@ -173,9 +173,9 @@ auditRoutes.post('/alerts/:id/revert', requirePermission(Permission.STUDENTS_WRI
 
   try {
     // Get original change
-    const [original] = await db.execute(sql`
+    const original = first(await db.execute(sql`
       SELECT * FROM audit_logs WHERE id = ${alertId}
-    `) as any[]
+    `))
 
     if (!original) {
       return notFound(c, 'Alert not found')
@@ -189,11 +189,11 @@ auditRoutes.post('/alerts/:id/revert', requirePermission(Permission.STUDENTS_WRI
       user.name,
       user.role,
       'revert',
-      original.table_name,
-      original.record_id,
+      String(original.table_name),
+      String(original.record_id),
       original.new_value,
       original.old_value,
-      `Reverted: ${original.change_summary}`,
+      `Reverted: ${String(original.change_summary)}`,
       false,
       ip
     )

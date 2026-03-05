@@ -4,6 +4,7 @@
  */
 import { db } from '../db/index'
 import { sql } from 'drizzle-orm'
+import { rows, first } from '../db/helpers'
 
 export interface ScheduleConflict {
   type: 'student' | 'teacher' | 'classroom'
@@ -36,7 +37,7 @@ export async function checkConflicts(input: TimeSlotInput): Promise<ScheduleConf
   const effFrom = input.effectiveFrom ?? new Date().toISOString().slice(0, 10)
 
   // Check student conflict
-  const studentConflicts = await db.execute(sql`
+  const studentConflicts = rows(await db.execute(sql`
     SELECT ts.subject, ts.start_time::text, ts.end_time::text, s.name as entity_name
     FROM time_slots ts
     JOIN students s ON ts.student_id = s.id
@@ -47,9 +48,10 @@ export async function checkConflicts(input: TimeSlotInput): Promise<ScheduleConf
       AND (ts.effective_until IS NULL OR ts.effective_until >= ${effFrom}::date)
       AND ts.start_time < ${input.endTime}::time
       AND ts.end_time > ${input.startTime}::time
-  `) as unknown as any[]
+  `))
 
-  for (const c of studentConflicts) {
+  for (const _c of studentConflicts) {
+    const c = _c as { subject: string; start_time: string; end_time: string; entity_name: string }
     conflicts.push({
       type: 'student',
       entityName: c.entity_name,
@@ -58,7 +60,7 @@ export async function checkConflicts(input: TimeSlotInput): Promise<ScheduleConf
   }
 
   // Check teacher conflict
-  const teacherConflicts = await db.execute(sql`
+  const teacherConflicts = rows(await db.execute(sql`
     SELECT ts.subject, ts.start_time::text, ts.end_time::text, t.name as entity_name
     FROM time_slots ts
     JOIN teachers t ON ts.teacher_id = t.id
@@ -69,9 +71,10 @@ export async function checkConflicts(input: TimeSlotInput): Promise<ScheduleConf
       AND (ts.effective_until IS NULL OR ts.effective_until >= ${effFrom}::date)
       AND ts.start_time < ${input.endTime}::time
       AND ts.end_time > ${input.startTime}::time
-  `) as unknown as any[]
+  `))
 
-  for (const c of teacherConflicts) {
+  for (const _c of teacherConflicts) {
+    const c = _c as { subject: string; start_time: string; end_time: string; entity_name: string }
     conflicts.push({
       type: 'teacher',
       entityName: c.entity_name,
@@ -81,7 +84,7 @@ export async function checkConflicts(input: TimeSlotInput): Promise<ScheduleConf
 
   // Check classroom conflict
   if (input.classroomId) {
-    const roomConflicts = await db.execute(sql`
+    const roomConflicts = rows(await db.execute(sql`
       SELECT ts.subject, ts.start_time::text, ts.end_time::text, cr.name as entity_name
       FROM time_slots ts
       JOIN classrooms cr ON ts.classroom_id = cr.id
@@ -92,9 +95,10 @@ export async function checkConflicts(input: TimeSlotInput): Promise<ScheduleConf
         AND (ts.effective_until IS NULL OR ts.effective_until >= ${effFrom}::date)
         AND ts.start_time < ${input.endTime}::time
         AND ts.end_time > ${input.startTime}::time
-    `) as unknown as any[]
+    `))
 
-    for (const c of roomConflicts) {
+    for (const _c of roomConflicts) {
+      const c = _c as { subject: string; start_time: string; end_time: string; entity_name: string }
       conflicts.push({
         type: 'classroom',
         entityName: c.entity_name,
@@ -116,13 +120,13 @@ export async function createTimeSlot(input: TimeSlotInput): Promise<{ id: string
   const effFrom = input.effectiveFrom ?? new Date().toISOString().slice(0, 10)
   const durationMin = timeDiffMinutes(input.startTime, input.endTime)
 
-  const result = await db.execute(sql`
+  const slotRow = first(await db.execute(sql`
     INSERT INTO time_slots (tenant_id, branch_id, student_id, teacher_id, classroom_id, subject, day_of_week, start_time, end_time, duration_min, effective_from)
     VALUES (${input.tenantId}, ${input.branchId}, ${input.studentId}, ${input.teacherId}, ${input.classroomId ?? null}, ${input.subject}, ${input.dayOfWeek}, ${input.startTime}::time, ${input.endTime}::time, ${durationMin}, ${effFrom}::date)
     RETURNING id
-  `) as unknown as { id: string }[]
+  `)) as { id: string } | undefined
 
-  return { id: result[0].id }
+  return { id: slotRow!.id }
 }
 
 /**

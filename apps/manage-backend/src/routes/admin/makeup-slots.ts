@@ -178,13 +178,13 @@ makeupSlotsRoutes.delete('/makeup-slots/:id',
 
     try {
       // Check for active makeup classes linked to this slot
-      const [cnt] = await db.execute(sql`
+      const cnt = first(await db.execute(sql`
         SELECT COUNT(*)::int as total
         FROM manage_makeup_classes
         WHERE slot_id = ${id} AND status != 'cancelled'
-      `) as any[]
+      `))
 
-      if (cnt?.total > 0) {
+      if (Number(cnt?.total) > 0) {
         return badRequest(c, '此時段尚有學生，無法刪除')
       }
 
@@ -216,11 +216,11 @@ makeupSlotsRoutes.get('/makeup-slots/:slotId/students',
 
     try {
       // Verify slot belongs to tenant
-      const [slot] = await db.execute(sql`
+      const slot = first(await db.execute(sql`
         SELECT id FROM manage_makeup_slots
         WHERE id = ${slotId} AND tenant_id = ${tenantId}
         LIMIT 1
-      `) as any[]
+      `))
 
       if (!slot) {
         return notFound(c, '找不到此補課時段')

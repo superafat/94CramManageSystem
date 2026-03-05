@@ -8,7 +8,7 @@ import { requirePermission, Permission } from '../../middleware/rbac'
 import { uuidSchema } from '../../utils/validation'
 import { generateInvoices, getInvoices, markPaid } from '../../ai/billing'
 import { invoicesToMd } from '../../utils/markdown'
-import { db, sql, success, badRequest, notFound, internalError, rows, wantsMd, mdResponse } from './_helpers'
+import { db, sql, success, badRequest, notFound, internalError, rows, first, wantsMd, mdResponse } from './_helpers'
 import type { QueryResult } from './_helpers'
 import { notifyBillingPaid, notifyBillingCreated } from '../../services/notify-helper'
 
@@ -147,11 +147,11 @@ billingRoutes.get('/courses/:id/fees', requirePermission(Permission.SCHEDULE_REA
   const courseId = c.req.param('id')
 
   try {
-    const [result] = await db.execute(sql`
+    const result = first(await db.execute(sql`
       SELECT id, name, fee_monthly, fee_quarterly, fee_semester, fee_yearly
       FROM manage_courses
       WHERE id = ${courseId} AND tenant_id = ${user.tenant_id}
-    `) as any[]
+    `))
 
     if (!result) return notFound(c, 'Course not found')
     return success(c, { course: result })
@@ -205,10 +205,10 @@ billingRoutes.get('/billing/course/:courseId',
 
     try {
       // Get course info with fees
-      const [course] = await db.execute(sql`
+      const course = first(await db.execute(sql`
         SELECT id, name, fee_monthly, fee_quarterly, fee_semester, fee_yearly
         FROM manage_courses WHERE id = ${courseId} AND tenant_id = ${user.tenant_id}
-      `) as any[]
+      `))
 
       if (!course) return notFound(c, 'Course not found')
 
@@ -292,13 +292,13 @@ billingRoutes.post('/billing/payment-records/batch',
       for (const rec of records) {
         void (async () => {
           try {
-            const [info] = await db.execute(sql`
+            const info = first(await db.execute(sql`
               SELECT s.name, c.name as course_name
               FROM manage_students s LEFT JOIN manage_courses c ON c.id = ${rec.courseId}
               WHERE s.id = ${rec.studentId} LIMIT 1
-            `) as any[]
+            `))
             if (info) {
-              await notifyBillingPaid(user.tenant_id, rec.studentId, info.name || '', info.course_name || '', rec.amount)
+              await notifyBillingPaid(user.tenant_id, rec.studentId, String(info.name || ''), String(info.course_name || ''), rec.amount)
             }
           } catch { /* fire-and-forget */ }
         })()

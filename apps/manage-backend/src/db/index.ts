@@ -419,7 +419,6 @@ export async function closeDatabaseConnection() {
 export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
   get(_target, prop) {
     const instance = initializeDatabase()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (instance as any)[prop] // TODO: Proxy dynamic property access requires any cast
+    return (instance as unknown as Record<string | symbol, unknown>)[prop]
   }
 })

@@ -63,8 +63,8 @@ studentsRoutes.get('/students', requirePermission(Permission.STUDENTS_READ), zVa
 
     const where = sql.join(conditions, sql` AND `)
 
-    const [countResult] = await db.execute(sql`SELECT COUNT(*)::int as total FROM manage_students s WHERE ${where}`) as any[]
-    const total = countResult?.total ?? 0
+    const countResult = first(await db.execute(sql`SELECT COUNT(*)::int as total FROM manage_students s WHERE ${where}`))
+    const total = Number(countResult?.total) || 0
 
     const studentRows = await db.execute(sql`
       SELECT s.id, s.student_code, s.full_name, s.nickname, s.gender,
@@ -80,7 +80,7 @@ studentsRoutes.get('/students', requirePermission(Permission.STUDENTS_READ), zVa
       LIMIT ${query.limit} OFFSET ${offset}
     `)
 
-    const studentsWithGrade = (rows(studentRows) as any[]).map((s) => ({
+    const studentsWithGrade = rows(studentRows).map((s: any) => ({
       ...s,
       computed_grade: s.date_of_birth ? computeGrade(s.date_of_birth) : null,
     }))
@@ -104,10 +104,10 @@ studentsRoutes.get('/students/:id',
     const { id: studentId } = c.req.valid('param')
 
     try {
-      const [student] = await db.execute(sql`
+      const student = first(await db.execute(sql`
         SELECT s.* FROM manage_students s
         WHERE s.id = ${studentId} AND s.tenant_id = ${tenantId} AND s.deleted_at IS NULL
-      `) as any[]
+      `))
 
       if (!student) {
         return notFound(c, 'Student')
@@ -119,7 +119,7 @@ studentsRoutes.get('/students/:id',
         return forbidden(c, 'Access denied')
       }
       if (user.role === Role.PARENT && isUUID(user.id)) {
-        const [link] = await db.execute(sql`
+        const link = first(await db.execute(sql`
           SELECT 1
           FROM parent_students ps
           JOIN manage_students s ON s.id = ps.student_id
@@ -128,7 +128,7 @@ studentsRoutes.get('/students/:id',
             AND s.tenant_id = ${tenantId}
             AND s.deleted_at IS NULL
           LIMIT 1
-        `) as any[]
+        `))
         if (!link) {
           return forbidden(c, 'Access denied')
         }
@@ -152,7 +152,7 @@ studentsRoutes.get('/students/:id',
 
       const studentWithGrade = {
         ...student,
-        computed_grade: student.date_of_birth ? computeGrade(student.date_of_birth) : null,
+        computed_grade: student.date_of_birth ? computeGrade(student.date_of_birth as string) : null,
       }
 
       return success(c, { student: studentWithGrade, enrollments: rows(enrollments), attendance: rows(attendance), grades: rows(grades) })
@@ -182,7 +182,7 @@ studentsRoutes.post('/students',
         ?? (body.dateOfBirth ? computeGrade(body.dateOfBirth) : null)
         ?? null
 
-      const [result] = await db.execute(sql`
+      const result = first(await db.execute(sql`
         INSERT INTO manage_students (tenant_id, branch_id, student_code, full_name, nickname, gender,
           date_of_birth, school_name, grade_level, phone, email, address, notes)
         VALUES (${tenantId}, ${body.branchId ?? null}, ${studentCode},
@@ -190,7 +190,7 @@ studentsRoutes.post('/students',
           ${body.dateOfBirth ?? null}::date, ${body.schoolName ?? null}, ${gradeLevel},
           ${body.phone ?? null}, ${body.email ?? null}, ${body.address ?? null}, ${body.notes ?? null})
         RETURNING id
-      `) as any[]
+      `))
 
       return success(c, { id: result?.id }, 201)
     } catch (err) {

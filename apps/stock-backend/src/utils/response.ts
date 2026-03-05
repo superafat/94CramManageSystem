@@ -1,5 +1,5 @@
 /**
- * Unified API Response Utilities for inclass-backend
+ * Unified API Response Utilities for stock-backend
  * Mirrors manage-backend/src/utils/response.ts for consistency across backends.
  */
 import type { Context } from 'hono'
@@ -141,8 +141,3 @@ export function validationError(c: Context, zodError: ZodError): Response {
 
   return error(c, ErrorCode.VALIDATION_ERROR, 'Validation failed', 400, { issues })
 }
-
-// Legacy aliases for backward compatibility during migration
-export const apiSuccess = success
-export const apiError = (c: Context, message: string, status = 400) =>
-  error(c, ErrorCode.VALIDATION_ERROR, message, status as ContentfulStatusCode)

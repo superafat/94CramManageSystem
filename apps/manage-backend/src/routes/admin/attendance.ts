@@ -8,7 +8,7 @@ import {
   createAttendanceSchema,
   bulkAttendanceSchema,
 } from '../../utils/validation'
-import { db, sql, success, successWithPagination, internalError, rows, isUUID } from './_helpers'
+import { db, sql, success, successWithPagination, internalError, rows, first, isUUID, getUserBranchId } from './_helpers'
 
 const attendanceRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -36,19 +36,20 @@ attendanceRoutes.get('/attendance',
       if (query.from) conditions.push(sql`a.date >= ${query.from}::date`)
       if (query.to) conditions.push(sql`a.date <= ${query.to}::date`)
 
-      if (user.role === Role.TEACHER && (user as any).branch_id) {
-        conditions.push(sql`s.branch_id = ${(user as any).branch_id}`)
+      const branchId = getUserBranchId(user)
+      if (user.role === Role.TEACHER && branchId) {
+        conditions.push(sql`s.branch_id = ${branchId}`)
       } else if (user.role === Role.PARENT && isUUID(user.id)) {
         conditions.push(sql`s.id IN (SELECT student_id FROM parent_students WHERE parent_id = ${user.id})`)
       }
 
       const where = sql.join(conditions, sql` AND `)
 
-      const [cnt] = await db.execute(sql`
+      const cnt = first(await db.execute(sql`
         SELECT COUNT(*)::int as total
         FROM attendance a JOIN students s ON a.student_id = s.id
         WHERE ${where}
-      `) as any[]
+      `))
 
       const attendanceRows = await db.execute(sql`
         SELECT a.id, a.student_id, a.lesson_id, a.date, a.present, a.notes, a.created_at,
@@ -62,7 +63,7 @@ attendanceRoutes.get('/attendance',
       return successWithPagination(c, { attendance: rows(attendanceRows) }, {
         page: query.page,
         limit: query.limit,
-        total: cnt?.total ?? 0,
+        total: Number(cnt?.total) || 0,
       })
     } catch (err) {
       return internalError(c, err)

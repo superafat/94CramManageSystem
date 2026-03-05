@@ -459,7 +459,7 @@ async function handleFollowUp(ctx: Context, conv: ConversationContext, userMessa
  */
 export async function handleEnrollmentConversation(ctx: Context) {
   const chatId = ctx.chat?.id;
-  const userMessage = (ctx.message as any)?.text;
+  const userMessage = (ctx.message as { text?: string })?.text;
   
   if (!chatId || !userMessage) return;
   

@@ -2,6 +2,7 @@ import type { Context, Next } from 'hono'
 import { eq } from 'drizzle-orm'
 import { tenants } from '@94cram/shared/db'
 import { db } from '../db'
+import { notFound } from '../utils/response'
 
 const DEFAULT_TENANT_ID = '38068f5a-6bad-4edc-b26b-66bc6ac90fb3'
 
@@ -27,7 +28,7 @@ export async function tenantMiddleware(c: Context, next: Next) {
   if (!DEMO_TENANT_IDS.has(tenantId)) {
     const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId))
     if (!tenant) {
-      return c.json({ error: 'Tenant not found' }, 404)
+      return notFound(c, 'Tenant')
     }
   }
 

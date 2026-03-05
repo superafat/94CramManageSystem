@@ -16,23 +16,8 @@ import {
 
 export { db, sql, logger, success, successWithPagination, badRequest, notFound, forbidden, internalError }
 
-export type QueryResult = Record<string, unknown>
-
-/** Check if string is a valid UUID (guest tokens like tg-xxx are not) */
-export const isUUID = (s: string) =>
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
-
-export const getUserBranchId = (user: unknown): string | null => {
-  if (!user || typeof user !== 'object') return null
-  const branchId = (user as { branch_id?: unknown }).branch_id
-  return typeof branchId === 'string' && isUUID(branchId) ? branchId : null
-}
-
-/** Convert result to array */
-export const rows = (result: unknown): QueryResult[] =>
-  Array.isArray(result) ? (result as QueryResult[]) : ((result as { rows?: QueryResult[] })?.rows ?? [])
-
-export const first = (result: unknown): QueryResult | undefined => rows(result)[0]
+export { type QueryResult, rows, first, isUUID, getUserBranchId } from '../../db/helpers'
+import { first as _first } from '../../db/helpers'
 
 export const isBranchInTenant = async (branchId: string, tenantId: string): Promise<boolean> => {
   const result = await db.execute(sql`
@@ -41,7 +26,7 @@ export const isBranchInTenant = async (branchId: string, tenantId: string): Prom
     WHERE id = ${branchId} AND tenant_id = ${tenantId}
     LIMIT 1
   `)
-  return Boolean(first(result))
+  return Boolean(_first(result))
 }
 
 /** Check if request wants markdown response */

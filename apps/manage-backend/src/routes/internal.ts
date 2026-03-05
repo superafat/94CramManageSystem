@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { logger } from '../utils/logger'
+import { rows, first } from '../db/helpers'
 import {
   notifyAttendance,
   notifyCheckout,
@@ -54,9 +55,8 @@ app.post('/seed', async (c) => {
     // Create default tenant if not exists
     let tenantId: string | null = null
     
-    const tenantResult = await db.execute(sql`SELECT id FROM tenants LIMIT 1`)
-    const tenants = Array.isArray(tenantResult) ? tenantResult : (tenantResult as any).rows || []
-    
+    const tenants = rows(await db.execute(sql`SELECT id FROM tenants LIMIT 1`))
+
     if (tenants.length === 0) {
       tenantId = crypto.randomUUID()
       await db.execute(sql`
@@ -64,13 +64,12 @@ app.post('/seed', async (c) => {
         VALUES (${tenantId}, 'Default Tenant', 'active', NOW())
       `)
     } else {
-      tenantId = tenants[0].id
+      tenantId = (tenants[0] as { id: string }).id
     }
     
     // Create admin user if not exists
-    const userResult = await db.execute(sql`SELECT id FROM users WHERE username = 'admin' LIMIT 1`)
-    const users = Array.isArray(userResult) ? userResult : (userResult as any).rows || []
-    
+    const users = rows(await db.execute(sql`SELECT id FROM users WHERE username = 'admin' LIMIT 1`))
+
     if (users.length === 0) {
       const userId = crypto.randomUUID()
       const { randomBytes } = await import('crypto')
@@ -91,10 +90,6 @@ app.post('/seed', async (c) => {
     return c.json({ success: false, error: String(error) }, 500)
   }
 })
-
-// Helper：統一取得 query 結果列
-const rows = (result: unknown): unknown[] =>
-  Array.isArray(result) ? result : ((result as any)?.rows ?? [])
 
 // ─── 帳款相關 ────────────────────────────────────────────────────────────────
 
@@ -371,7 +366,7 @@ app.post('/notify/monthly-summary', async (c) => {
     }
 
     let dispatched = 0
-    for (const student of students as any[]) {
+    for (const student of students as Array<{ id: string; tenant_id: string; full_name: string }>) {
       const scores = scoresByStudent.get(student.id) || []
 
       if (scores.length === 0) continue

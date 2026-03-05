@@ -4,6 +4,7 @@
  */
 import { db } from '../db/index'
 import { sql } from 'drizzle-orm'
+import { rows, first } from '../db/helpers'
 import { analyzeChurnRisk } from '../ai/churn'
 import { generateBranchReport } from '../ai/reports'
 import { generateInvoices } from '../ai/billing'
@@ -123,7 +124,7 @@ async function cmdAttendanceReport(ctx: CmdContext): Promise<string> {
   const startStr = weekAgo.toISOString().slice(0, 10)
   const endStr = today.toISOString().slice(0, 10)
 
-  const rows = await db.execute(sql`
+  const attendanceRows = rows(await db.execute(sql`
     SELECT s.name,
       COUNT(*) FILTER (WHERE a.status = 'present')::int as present,
       COUNT(*) FILTER (WHERE a.status = 'absent')::int as absent,
@@ -134,13 +135,14 @@ async function cmdAttendanceReport(ctx: CmdContext): Promise<string> {
     WHERE a.tenant_id = ${ctx.tenantId}
       AND a.date >= ${startStr}::date AND a.date <= ${endStr}::date
     GROUP BY s.name ORDER BY s.name
-  `) as unknown as any[]
+  `))
 
-  if (!rows.length) return '📊 本週無出席紀錄'
+  if (!attendanceRows.length) return '📊 本週無出席紀錄'
 
   let msg = `📊 *本週出席報告*\n${startStr} ~ ${endStr}\n\n`
   let totalPresent = 0, totalAbsent = 0, totalAll = 0
-  for (const r of rows) {
+  for (const _r of attendanceRows) {
+    const r = _r as { name: string; present: number; absent: number; late: number; total: number }
     const rate = r.total > 0 ? Math.round(r.present / r.total * 100) : 0
     const emoji = rate >= 80 ? '✅' : rate >= 60 ? '⚠️' : '🔴'
     msg += `${emoji} ${r.name}：${rate}%（到${r.present}/缺${r.absent}/遲${r.late}）\n`
@@ -207,13 +209,11 @@ async function cmdAddStudent(ctx: CmdContext, params: Record<string, string>): P
   // Parse grade: '三年級'→'小3', '國二'→'國2', '高一'→'高1', or direct
   const gradeNorm = normalizeGrade(grade)
 
-  const result = await db.execute(sql`
+  const studentId = (first(await db.execute(sql`
     INSERT INTO students (tenant_id, branch_id, name, grade, status, enrolled_at)
     VALUES (${ctx.tenantId}, ${ctx.branchId}, ${name}, ${gradeNorm}, 'active', NOW())
     RETURNING id
-  `) as unknown as { id: string }[]
-
-  const studentId = result[0].id
+  `)) as { id: string } | undefined)?.id
   let msg = `✅ 已新增學生 *${name}*（${gradeNorm}）\n`
 
   // Auto-create enrollments if courses specified
@@ -235,7 +235,7 @@ async function cmdAddStudent(ctx: CmdContext, params: Record<string, string>): P
 
 // --- 學生列表 ---
 async function cmdListStudents(ctx: CmdContext): Promise<string> {
-  const rows = await db.execute(sql`
+  const studentList = rows(await db.execute(sql`
     SELECT s.name, s.grade, s.status, s.risk_score,
       (SELECT string_agg(e.course_name, '、')
        FROM enrollments e WHERE e.student_id = s.id AND e.status = 'active') as courses
@@ -245,12 +245,13 @@ async function cmdListStudents(ctx: CmdContext): Promise<string> {
       AND s.status = 'active'
       AND s.deleted_at IS NULL
     ORDER BY s.name
-  `) as unknown as any[]
+  `))
 
-  if (!rows.length) return '📭 目前沒有學生'
+  if (!studentList.length) return '📭 目前沒有學生'
 
-  let msg = `👨‍🎓 *學生列表*（${rows.length}人）\n\n`
-  for (const r of rows) {
+  let msg = `👨‍🎓 *學生列表*（${studentList.length}人）\n\n`
+  for (const _r of studentList) {
+    const r = _r as { name: string; grade: string; risk_score: number; courses: string | null }
     const riskEmoji = r.risk_score >= 60 ? '🔴' : r.risk_score >= 30 ? '🟡' : ''
     msg += `• ${r.name}（${r.grade}）${riskEmoji}\n  📚 ${r.courses || '未選課'}\n`
   }
@@ -260,18 +261,18 @@ async function cmdListStudents(ctx: CmdContext): Promise<string> {
 // --- 查詢學生 ---
 async function cmdStudentInfo(ctx: CmdContext, params: Record<string, string>): Promise<string> {
   const { name } = params
-  const rows = await db.execute(sql`
-    SELECT s.*, 
+  const studentRows = rows(await db.execute(sql`
+    SELECT s.*,
       (SELECT json_agg(json_build_object('course', e.course_name, 'fee', e.fee_monthly))
        FROM enrollments e WHERE e.student_id = s.id AND e.status = 'active') as courses
     FROM students s
     WHERE s.tenant_id = ${ctx.tenantId} AND s.name LIKE ${'%' + name + '%'}
     LIMIT 1
-  `) as unknown as any[]
+  `))
 
-  if (!rows.length) return `❌ 找不到學生「${name}」`
+  if (!studentRows.length) return `❌ 找不到學生「${name}」`
 
-  const s = rows[0]
+  const s = studentRows[0] as { id: string; name: string; grade: string; phone: string | null; parent_name: string | null; school: string | null; courses: Array<{ course: string; fee: number }> | null }
   let msg = `👤 *${s.name}*（${s.grade}）\n`
   msg += `📱 ${s.phone || '未設定'} | 家長：${s.parent_name || '未設定'}\n`
   msg += `🏫 ${s.school || '未設定'}\n`
@@ -284,29 +285,30 @@ async function cmdStudentInfo(ctx: CmdContext, params: Record<string, string>): 
   }
 
   // Recent attendance
-  const att = await db.execute(sql`
+  const att = rows(await db.execute(sql`
     SELECT status, COUNT(*)::int as cnt FROM attendance
     WHERE student_id = ${s.id} AND date >= NOW() - INTERVAL '30 days'
     GROUP BY status
-  `) as unknown as any[]
+  `))
 
   if (att.length > 0) {
     const attMap: Record<string, number> = {}
     let total = 0
-    for (const a of att) { attMap[a.status] = a.cnt; total += a.cnt }
+    for (const _a of att) { const a = _a as { status: string; cnt: number }; attMap[a.status] = a.cnt; total += a.cnt }
     const rate = total > 0 ? Math.round(((attMap['present'] ?? 0) + (attMap['late'] ?? 0)) / total * 100) : 0
     msg += `\n📊 近30天出席率：${rate}%（到${attMap['present'] ?? 0}/缺${attMap['absent'] ?? 0}/遲${attMap['late'] ?? 0}）`
   }
 
   // Recent grades
-  const grades = await db.execute(sql`
+  const grades = rows(await db.execute(sql`
     SELECT exam_name, score, date::text FROM grades
     WHERE student_id = ${s.id} ORDER BY date DESC LIMIT 3
-  `) as unknown as any[]
+  `))
 
   if (grades.length > 0) {
     msg += `\n\n📝 *最近成績：*\n`
-    for (const g of grades) {
+    for (const _g of grades) {
+      const g = _g as { exam_name: string; score: number; date: string }
       msg += `• ${g.exam_name}：${g.score}分（${g.date}）\n`
     }
   }
@@ -316,7 +318,7 @@ async function cmdStudentInfo(ctx: CmdContext, params: Record<string, string>): 
 
 // --- 課表 ---
 async function cmdSchedule(ctx: CmdContext): Promise<string> {
-  const rows = await db.execute(sql`
+  const scheduleRows = rows(await db.execute(sql`
     SELECT ts.day_of_week, ts.start_time::text, ts.end_time::text, ts.subject,
            s.name as student_name, t.name as teacher_name
     FROM time_slots ts
@@ -325,15 +327,16 @@ async function cmdSchedule(ctx: CmdContext): Promise<string> {
     WHERE ts.tenant_id = ${ctx.tenantId} AND ts.branch_id = ${ctx.branchId}
       AND ts.status = 'active'
     ORDER BY ts.day_of_week, ts.start_time
-  `) as unknown as any[]
+  `))
 
-  if (!rows.length) return '📅 目前無排課紀錄'
+  if (!scheduleRows.length) return '📅 目前無排課紀錄'
 
   const dayNames = ['', '一', '二', '三', '四', '五', '六', '日']
   let msg = `📅 *本週課表*\n\n`
   let currentDay = 0
 
-  for (const r of rows) {
+  for (const _r of scheduleRows) {
+    const r = _r as { day_of_week: number; start_time: string; end_time: string; student_name: string; subject: string; teacher_name: string | null }
     if (r.day_of_week !== currentDay) {
       currentDay = r.day_of_week
       msg += `\n*週${dayNames[currentDay]}*\n`
@@ -353,20 +356,21 @@ async function cmdBilling(ctx: CmdContext): Promise<string> {
   const result = await generateInvoices(ctx.tenantId, ctx.branchId, period)
 
   // Fetch all invoices
-  const rows = await db.execute(sql`
+  const invoiceRows = rows(await db.execute(sql`
     SELECT i.*, s.name as student_name FROM invoices i
     JOIN students s ON i.student_id = s.id
     WHERE i.tenant_id = ${ctx.tenantId} AND i.branch_id = ${ctx.branchId} AND i.period = ${period}
     ORDER BY s.name
-  `) as unknown as any[]
+  `))
 
-  if (!rows.length) return `💰 ${period} 無帳單`
+  if (!invoiceRows.length) return `💰 ${period} 無帳單`
 
   let totalAmount = 0
   let paidCount = 0
   let msg = `💰 *${period} 學費帳單*\n\n`
 
-  for (const r of rows) {
+  for (const _r of invoiceRows) {
+    const r = _r as { status: string; student_name: string; total: number }
     const statusEmoji = r.status === 'paid' ? '✅' : r.status === 'overdue' ? '🔴' : '⏳'
     msg += `${statusEmoji} ${r.student_name}：$${Number(r.total).toLocaleString()}\n`
     totalAmount += Number(r.total)
@@ -374,7 +378,7 @@ async function cmdBilling(ctx: CmdContext): Promise<string> {
   }
 
   msg += `\n💵 總額：$${totalAmount.toLocaleString()}`
-  msg += `\n📊 已繳：${paidCount}/${rows.length}`
+  msg += `\n📊 已繳：${paidCount}/${invoiceRows.length}`
 
   if (result.generated > 0) {
     msg += `\n\n🆕 本次新生成 ${result.generated} 張帳單`
@@ -385,19 +389,20 @@ async function cmdBilling(ctx: CmdContext): Promise<string> {
 
 // --- 未繳 ---
 async function cmdUnpaid(ctx: CmdContext): Promise<string> {
-  const rows = await db.execute(sql`
+  const unpaidRows = rows(await db.execute(sql`
     SELECT i.period, i.total, s.name, s.phone
     FROM invoices i
     JOIN students s ON i.student_id = s.id
     WHERE i.tenant_id = ${ctx.tenantId} AND i.status IN ('pending', 'overdue')
     ORDER BY i.period, s.name
-  `) as unknown as any[]
+  `))
 
-  if (!rows.length) return '✅ 全部已繳清！'
+  if (!unpaidRows.length) return '✅ 全部已繳清！'
 
   let msg = `🔴 *未繳學費列表*\n\n`
   let total = 0
-  for (const r of rows) {
+  for (const _r of unpaidRows) {
+    const r = _r as { name: string; period: string; total: number; phone: string | null }
     msg += `• ${r.name}（${r.period}）：$${Number(r.total).toLocaleString()}\n`
     if (r.phone) msg += `  📱 ${r.phone}\n`
     total += Number(r.total)
@@ -422,20 +427,21 @@ async function cmdAddLead(ctx: CmdContext, params: Record<string, string>): Prom
 
 // --- 招生列表 ---
 async function cmdLeads(ctx: CmdContext): Promise<string> {
-  const rows = await db.execute(sql`
+  const leadsRows = rows(await db.execute(sql`
     SELECT * FROM leads
     WHERE tenant_id = ${ctx.tenantId}
       AND status IN ('inquiry', 'scheduled', 'trial')
     ORDER BY created_at DESC LIMIT 10
-  `) as unknown as any[]
+  `))
 
-  if (!rows.length) return '📭 目前無招生追蹤紀錄'
+  if (!leadsRows.length) return '📭 目前無招生追蹤紀錄'
 
-  let msg = `🎯 *招生追蹤*（${rows.length}筆）\n\n`
+  let msg = `🎯 *招生追蹤*（${leadsRows.length}筆）\n\n`
   const statusMap: Record<string, string> = {
     inquiry: '📞 問班', scheduled: '📅 已約', trial: '🎓 試聽中',
   }
-  for (const r of rows) {
+  for (const _r of leadsRows) {
+    const r = _r as { status: string; student_name: string; grade: string; parent_name: string | null; next_follow_up: string | null }
     msg += `${statusMap[r.status] ?? r.status} ${r.student_name}（${r.grade}）\n`
     msg += `  👤 ${r.parent_name || '未知'}`
     if (r.next_follow_up) msg += ` | 📅 追蹤：${r.next_follow_up}`
@@ -446,17 +452,18 @@ async function cmdLeads(ctx: CmdContext): Promise<string> {
 
 // --- 教練列表 ---
 async function cmdListTeachers(ctx: CmdContext): Promise<string> {
-  const rows = await db.execute(sql`
+  const teacherRows = rows(await db.execute(sql`
     SELECT name, phone, school, department, specialty, status
     FROM teachers
     WHERE tenant_id = ${ctx.tenantId} AND deleted_at IS NULL
     ORDER BY name
-  `) as unknown as any[]
+  `))
 
-  if (!rows.length) return '📭 目前無教練紀錄'
+  if (!teacherRows.length) return '📭 目前無教練紀錄'
 
-  let msg = `👩‍🏫 *教練列表*（${rows.length}人）\n\n`
-  for (const r of rows) {
+  let msg = `👩‍🏫 *教練列表*（${teacherRows.length}人）\n\n`
+  for (const _r of teacherRows) {
+    const r = _r as { name: string; phone: string | null; school: string | null; department: string | null; specialty: string }
     const spec = r.specialty === 'arts' ? '文' : r.specialty === 'science' ? '理' : '文理'
     msg += `• ${r.name}（${spec}）— ${r.school ?? ''} ${r.department ?? ''}\n`
     if (r.phone) msg += `  📱 ${r.phone}\n`

@@ -8,7 +8,7 @@ import {
   createGradeSchema,
   bulkGradeSchema,
 } from '../../utils/validation'
-import { db, sql, success, successWithPagination, internalError, rows, isUUID } from './_helpers'
+import { db, sql, success, successWithPagination, internalError, rows, first, isUUID, getUserBranchId } from './_helpers'
 
 const gradesRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -38,19 +38,20 @@ gradesRoutes.get('/grades',
       if (query.from) conditions.push(sql`g.date >= ${query.from}::date`)
       if (query.to) conditions.push(sql`g.date <= ${query.to}::date`)
 
-      if (user.role === Role.TEACHER && (user as any).branch_id) {
-        conditions.push(sql`s.branch_id = ${(user as any).branch_id}`)
+      const branchId = getUserBranchId(user)
+      if (user.role === Role.TEACHER && branchId) {
+        conditions.push(sql`s.branch_id = ${branchId}`)
       } else if (user.role === Role.PARENT && isUUID(user.id)) {
         conditions.push(sql`s.id IN (SELECT student_id FROM parent_students WHERE parent_id = ${user.id})`)
       }
 
       const where = sql.join(conditions, sql` AND `)
 
-      const [cnt] = await db.execute(sql`
+      const cnt = first(await db.execute(sql`
         SELECT COUNT(*)::int as total
         FROM grades g JOIN students s ON g.student_id = s.id
         WHERE ${where}
-      `) as any[]
+      `))
 
       const gradeRows = await db.execute(sql`
         SELECT g.id, g.student_id, g.exam_type, g.exam_name, g.subject,
@@ -76,7 +77,7 @@ gradesRoutes.get('/grades',
       return successWithPagination(c, { grades: rows(gradeRows) }, {
         page: query.page,
         limit: query.limit,
-        total: cnt?.total ?? 0,
+        total: Number(cnt?.total) || 0,
       })
     } catch (err) {
       return internalError(c, err)

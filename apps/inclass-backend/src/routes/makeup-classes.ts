@@ -26,6 +26,7 @@ import { generateMakeupNoticeHTML } from '../templates/makeup-notice.js'
 import { notifyParent } from '../services/notify-helper.js'
 import { logger } from '../utils/logger.js'
 import type { Variables } from '../middleware/auth.js'
+import { rows, first } from '../db/helpers.js'
 
 const makeupClassRoutes = new Hono<{ Variables: Variables }>()
 
@@ -50,15 +51,6 @@ function badRequest(c: any, message: string) {
 function internalError(c: any, err: unknown) {
   logger.error({ err }, '[MakeupClasses] Internal error')
   return c.json({ success: false, error: 'internal_error', message: 'Internal server error' }, 500)
-}
-
-function rows(result: any): any[] {
-  return Array.isArray(result) ? result : result?.rows ?? []
-}
-
-function first(result: any): any {
-  const r = rows(result)
-  return r[0] ?? null
 }
 
 // ── Zod schemas ──
@@ -148,11 +140,11 @@ makeupClassRoutes.get('/',
 
       const where = sql.join(conditions, sql` AND `)
 
-      const [cnt] = await db.execute(sql`
+      const cnt = first<{ total: number }>(await db.execute(sql`
         SELECT COUNT(*)::int as total
         FROM inclass_makeup_classes mc
         WHERE ${where}
-      `) as unknown as any[]
+      `))
 
       const makeupRows = await db.execute(sql`
         SELECT mc.id, mc.student_id, mc.original_date, mc.original_course_id,
@@ -188,11 +180,11 @@ makeupClassRoutes.post('/',
 
     try {
       // Verify student belongs to tenant
-      const [student] = await db.execute(sql`
+      const student = first(await db.execute(sql`
         SELECT id FROM manage_students
         WHERE id = ${body.studentId} AND tenant_id = ${tenantId}
         LIMIT 1
-      `) as unknown as any[]
+      `))
 
       if (!student) {
         return badRequest(c, 'Student not found in this tenant')
@@ -227,12 +219,12 @@ makeupClassRoutes.put('/:id',
     try {
       if (body.slotId) {
         // 使用補課時段排課
-        const [slot] = await db.execute(sql`
+        const slot = first(await db.execute(sql`
           SELECT id, makeup_date, start_time, end_time, teacher_id, room
           FROM inclass_makeup_slots
           WHERE id = ${body.slotId} AND tenant_id = ${tenantId}
           LIMIT 1
-        `) as unknown as any[]
+        `))
 
         if (!slot) {
           return badRequest(c, '補課時段不存在')
@@ -330,23 +322,23 @@ makeupClassRoutes.post('/batch-assign',
 
     try {
       // 1. 驗證 slot 存在且屬於同 tenant
-      const [slot] = await db.execute(sql`
+      const slot = first<{ id: string; makeup_date: string; start_time: string; end_time: string; teacher_id: string | null; room: string | null; max_students: number | null }>(await db.execute(sql`
         SELECT id, makeup_date, start_time, end_time, teacher_id, room, max_students
         FROM inclass_makeup_slots
         WHERE id = ${body.slotId} AND tenant_id = ${tenantId}
         LIMIT 1
-      `) as unknown as any[]
+      `))
 
       if (!slot) {
         return badRequest(c, '補課時段不存在')
       }
 
       // 2. 查詢目前已安排的學生數
-      const [countResult] = await db.execute(sql`
+      const countResult = first<{ current_students: number }>(await db.execute(sql`
         SELECT COUNT(*)::int as current_students
         FROM inclass_makeup_classes
         WHERE slot_id = ${body.slotId} AND status != 'cancelled'
-      `) as unknown as any[]
+      `))
 
       const currentStudents = countResult?.current_students ?? 0
 
@@ -371,7 +363,7 @@ makeupClassRoutes.post('/batch-assign',
           AND status = 'pending'
       `)
 
-      return success(c, { updated: (result as any).rowCount || body.makeupClassIds.length })
+      return success(c, { updated: (result as { rowCount?: number }).rowCount || body.makeupClassIds.length })
     } catch (err) {
       return internalError(c, err)
     }
@@ -414,7 +406,7 @@ makeupClassRoutes.post('/:id/notify',
     const id = c.req.param('id')
 
     try {
-      const [mc] = await db.execute(sql`
+      const mc = first(await db.execute(sql`
         SELECT mc.id, mc.student_id, mc.status, mc.makeup_date, mc.makeup_time,
           mc.makeup_end_time, mc.makeup_room, mc.makeup_teacher_id,
           mc.original_course_name,
@@ -425,7 +417,7 @@ makeupClassRoutes.post('/:id/notify',
         LEFT JOIN manage_teachers t ON mc.makeup_teacher_id = t.id
         WHERE mc.id = ${id} AND mc.tenant_id = ${tenantId}
         LIMIT 1
-      `) as unknown as any[]
+      `))
 
       if (!mc) {
         return notFound(c, '找不到此補課紀錄')
@@ -464,7 +456,7 @@ makeupClassRoutes.get('/:id/notice-pdf',
     const id = c.req.param('id')
 
     try {
-      const [mc] = await db.execute(sql`
+      const mc = first(await db.execute(sql`
         SELECT mc.id, mc.original_date, mc.original_course_name,
           mc.makeup_date, mc.makeup_time, mc.makeup_end_time,
           mc.makeup_room, mc.notes,
@@ -475,7 +467,7 @@ makeupClassRoutes.get('/:id/notice-pdf',
         LEFT JOIN manage_teachers t ON mc.makeup_teacher_id = t.id
         WHERE mc.id = ${id} AND mc.tenant_id = ${tenantId}
         LIMIT 1
-      `) as unknown as any[]
+      `))
 
       if (!mc) {
         return notFound(c, '找不到此補課紀錄')
@@ -638,13 +630,13 @@ makeupClassRoutes.delete('/slots/:id',
 
     try {
       // Check for active makeup classes linked to this slot
-      const [cnt] = await db.execute(sql`
+      const cnt = first<{ total: number }>(await db.execute(sql`
         SELECT COUNT(*)::int as total
         FROM inclass_makeup_classes
         WHERE slot_id = ${id} AND status != 'cancelled'
-      `) as unknown as any[]
+      `))
 
-      if (cnt?.total > 0) {
+      if ((cnt?.total ?? 0) > 0) {
         return badRequest(c, '此時段尚有學生，無法刪除')
       }
 
@@ -675,11 +667,11 @@ makeupClassRoutes.get('/slots/:slotId/students',
 
     try {
       // Verify slot belongs to tenant
-      const [slot] = await db.execute(sql`
+      const slot = first(await db.execute(sql`
         SELECT id FROM inclass_makeup_slots
         WHERE id = ${slotId} AND tenant_id = ${tenantId}
         LIMIT 1
-      `) as unknown as any[]
+      `))
 
       if (!slot) {
         return notFound(c, '找不到此補課時段')

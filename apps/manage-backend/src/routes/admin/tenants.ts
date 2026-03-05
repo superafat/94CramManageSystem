@@ -4,7 +4,7 @@ import { zValidator } from '@hono/zod-validator'
 import type { RBACVariables } from '../../middleware/rbac'
 import { requireRole, Role } from '../../middleware/rbac'
 import { uuidSchema } from '../../utils/validation'
-import { db, sql, success, notFound, internalError, rows } from './_helpers'
+import { db, sql, success, notFound, internalError, rows, first } from './_helpers'
 
 const tenantsRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -27,9 +27,9 @@ tenantsRoutes.get('/tenants/:tenantId/stats',
   async (c) => {
     const { tenantId } = c.req.valid('param')
     try {
-      const [conv] = await db.execute(sql`SELECT COUNT(*)::int as count FROM conversations WHERE tenant_id = ${tenantId}`) as any[]
-      const [chunk] = await db.execute(sql`SELECT COUNT(*)::int as count FROM knowledge_chunks WHERE tenant_id = ${tenantId}`) as any[]
-      const [branch] = await db.execute(sql`SELECT COUNT(*)::int as count FROM branches WHERE tenant_id = ${tenantId}`) as any[]
+      const conv = first(await db.execute(sql`SELECT COUNT(*)::int as count FROM conversations WHERE tenant_id = ${tenantId}`))
+      const chunk = first(await db.execute(sql`SELECT COUNT(*)::int as count FROM knowledge_chunks WHERE tenant_id = ${tenantId}`))
+      const branch = first(await db.execute(sql`SELECT COUNT(*)::int as count FROM branches WHERE tenant_id = ${tenantId}`))
       return success(c, {
         conversations: conv?.count ?? 0,
         knowledgeChunks: chunk?.count ?? 0,
@@ -75,7 +75,7 @@ tenantsRoutes.get('/trials/:tenantId',
   async (c) => {
     const { tenantId } = c.req.valid('param')
     try {
-      const [tenant] = await db.execute(sql`
+      const tenant = first(await db.execute(sql`
         SELECT
           t.*,
           u.name as approver_name,
@@ -84,7 +84,7 @@ tenantsRoutes.get('/trials/:tenantId',
         FROM tenants t
         LEFT JOIN users u ON t.trial_approved_by = u.id
         WHERE t.id = ${tenantId}
-      `) as any[]
+      `))
 
       if (!tenant) {
         return notFound(c, 'Tenant not found')

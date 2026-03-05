@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
 import type { RBACVariables } from '../../middleware/rbac'
 import { requirePermission, Permission } from '../../middleware/rbac'
-import { db, sql, success, internalError } from './_helpers'
+import { db, sql, success, internalError, first, rows } from './_helpers'
 
 const financeRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -45,41 +45,41 @@ financeRoutes.get('/finance/summary',
 
     try {
       // Revenue: sum of paid billing amounts in period
-      const [revenue] = await db.execute(sql`
+      const revenue = first(await db.execute(sql`
         SELECT COALESCE(SUM(amount), 0)::numeric AS total
         FROM manage_payments
         WHERE tenant_id = ${tenantId}
           AND status = 'paid'
           AND paid_at >= ${startDate}::date
           AND paid_at <= ${endDate}::date
-      `) as any[]
+      `))
 
       // Expenses: sum from manage_expenses in period
-      const [expenses] = await db.execute(sql`
+      const expenses = first(await db.execute(sql`
         SELECT COALESCE(SUM(amount), 0)::numeric AS total
         FROM manage_expenses
         WHERE tenant_id = ${tenantId}
           AND deleted_at IS NULL
           AND expense_date >= ${startDate}::date
           AND expense_date <= ${endDate}::date
-      `) as any[]
+      `))
 
       // Course count: distinct active courses with schedules in period
-      const [courses] = await db.execute(sql`
+      const courses = first(await db.execute(sql`
         SELECT COUNT(DISTINCT course_id)::int AS total
         FROM inclass_schedules
         WHERE tenant_id = ${tenantId}
           AND start_time >= ${startDate}::date
           AND start_time <= (${endDate}::date + interval '1 day')
-      `) as any[]
+      `))
 
       // Teacher count: active teachers
-      const [teachers] = await db.execute(sql`
+      const teachers = first(await db.execute(sql`
         SELECT COUNT(*)::int AS total
         FROM manage_teachers
         WHERE tenant_id = ${tenantId}
           AND deleted_at IS NULL
-      `) as any[]
+      `))
 
       // Monthly breakdown for chart (when mode is year or quarter)
       let breakdown: { month: string; revenue: number; expenses: number }[] = []
@@ -104,7 +104,7 @@ financeRoutes.get('/finance/summary',
           ) e ON true
           ORDER BY d.month
         `)
-        breakdown = (Array.isArray(bdRows) ? bdRows : []).map((row: any) => ({
+        breakdown = rows(bdRows).map((row: any) => ({
           month: row.month,
           revenue: Number(row.revenue) || 0,
           expenses: Number(row.expenses) || 0,
@@ -155,19 +155,19 @@ financeRoutes.post('/finance/ai-analysis',
 
     try {
       // Gather financial data for AI analysis
-      const [revData] = await db.execute(sql`
+      const revData = first(await db.execute(sql`
         SELECT COALESCE(SUM(amount), 0)::numeric AS total, COUNT(*)::int AS count
         FROM manage_payments
         WHERE tenant_id = ${tenantId} AND status = 'paid'
           AND paid_at >= ${startDate}::date AND paid_at <= ${endDate}::date
-      `) as any[]
+      `))
 
-      const [expData] = await db.execute(sql`
+      const expData = first(await db.execute(sql`
         SELECT COALESCE(SUM(amount), 0)::numeric AS total, COUNT(*)::int AS count
         FROM manage_expenses
         WHERE tenant_id = ${tenantId} AND deleted_at IS NULL
           AND expense_date >= ${startDate}::date AND expense_date <= ${endDate}::date
-      `) as any[]
+      `))
 
       const expByCategory = await db.execute(sql`
         SELECT category, SUM(amount)::numeric AS total
@@ -177,7 +177,7 @@ financeRoutes.post('/finance/ai-analysis',
         GROUP BY category ORDER BY total DESC
       `)
 
-      const [salaryData] = await db.execute(sql`
+      const salaryData = first(await db.execute(sql`
         SELECT COALESCE(SUM(
           CASE WHEN sa.type = 'bonus' THEN sa.amount ELSE -sa.amount END
         ), 0)::numeric AS net_adjustments
@@ -185,12 +185,12 @@ financeRoutes.post('/finance/ai-analysis',
         WHERE sa.tenant_id = ${tenantId}
           AND sa.period_start >= ${startDate}::date
           AND sa.period_end <= ${endDate}::date
-      `) as any[]
+      `))
 
       const revenue = Number(revData?.total) || 0
       const expenseTotal = Number(expData?.total) || 0
       const netProfit = revenue - expenseTotal
-      const categoryBreakdown = (Array.isArray(expByCategory) ? expByCategory : [])
+      const categoryBreakdown = rows(expByCategory)
         .map((r: any) => `${r.category}: $${Number(r.total).toLocaleString()}`)
         .join(', ')
 

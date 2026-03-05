@@ -4,6 +4,7 @@
  */
 import { db } from '../db/index'
 import { sql } from 'drizzle-orm'
+import { rows } from '../db/helpers'
 
 export interface PayrollSummary {
   teacherId: string
@@ -33,7 +34,7 @@ export async function calculatePayroll(
   const endDate = new Date(year, month, 0).toISOString().slice(0, 10)
 
   // Count lessons per teacher (attendance = present)
-  const lessonCounts = await db.execute(sql`
+  const lessonCounts = rows(await db.execute(sql`
     SELECT
       l.teacher_id,
       t.name as teacher_name,
@@ -46,11 +47,12 @@ export async function calculatePayroll(
       AND l.date <= ${endDate}::date
       AND l.teacher_id IS NOT NULL
     GROUP BY l.teacher_id, t.name, t.hourly_rates
-  `) as unknown as any[]
+  `))
 
   const records: PayrollSummary[] = []
 
-  for (const row of lessonCounts) {
+  for (const _row of lessonCounts) {
+    const row = _row as { teacher_id: string; teacher_name: string; hourly_rates: { tutoring?: number; private?: number; assistant?: number } | null; sessions: number }
     const rates = row.hourly_rates ?? { tutoring: 250, private: 350, assistant: 88 }
     const sessions = row.sessions
 
@@ -58,10 +60,10 @@ export async function calculatePayroll(
     const tutoringAmount = sessions * (rates.tutoring ?? 250)
 
     // Check if record exists
-    const existing = await db.execute(sql`
+    const existing = rows(await db.execute(sql`
       SELECT id FROM payroll_records
       WHERE tenant_id = ${tenantId} AND teacher_id = ${row.teacher_id} AND period = ${period}
-    `) as unknown as any[]
+    `))
 
     if (existing.length > 0) continue
 

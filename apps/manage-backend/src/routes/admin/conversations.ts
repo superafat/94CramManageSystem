@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
 import type { RBACVariables } from '../../middleware/rbac'
 import { requirePermission, Permission } from '../../middleware/rbac'
-import { db, sql, success, internalError, rows } from './_helpers'
+import { db, sql, success, internalError, rows, first } from './_helpers'
 
 const conversationsRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -42,9 +42,9 @@ conversationsRoutes.get('/conversations',
 
       const where = sql.join(conditions, sql` AND `)
 
-      const [countResult] = await db.execute(sql`
+      const countResult = first(await db.execute(sql`
         SELECT COUNT(*)::int as total FROM conversations c WHERE ${where}
-      `) as any[]
+      `))
 
       const convRows = await db.execute(sql`
         SELECT

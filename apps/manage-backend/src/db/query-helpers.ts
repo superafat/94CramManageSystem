@@ -179,24 +179,26 @@ export async function batchLoadRelated<T extends PgTable>(
   foreignKeyColumn: string,
   foreignKeyValues: string[],
   groupByKey: string = foreignKeyColumn
-): Promise<Map<string, any[]>> {
+): Promise<Map<string, Record<string, unknown>[]>> {
   if (foreignKeyValues.length === 0) return new Map()
-  
-  // @ts-ignore - Dynamic column access
+
+  // Dynamic column access on Drizzle table — no way to statically type this
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const column = (table as any)[foreignKeyColumn]
+  // @ts-expect-error — Drizzle generic constraint mismatch with PgTable<TableConfig>
   const records = await db.select().from(table).where(
-    inArray((table as any)[foreignKeyColumn], foreignKeyValues)
+    inArray(column, foreignKeyValues)
   )
-  
-  // 按外键分组
-  const grouped = new Map<string, any[]>()
+
+  const grouped = new Map<string, Record<string, unknown>[]>()
   for (const record of records) {
-    const key = (record as any)[groupByKey]
+    const key = String((record as Record<string, unknown>)[groupByKey])
     if (!grouped.has(key)) {
       grouped.set(key, [])
     }
-    grouped.get(key)!.push(record)
+    grouped.get(key)!.push(record as Record<string, unknown>)
   }
-  
+
   return grouped
 }
 
@@ -229,7 +231,7 @@ export async function eagerLoad<T, R>(
   const relatedRecords = await loadFn(keys)
   
   // 建立索引
-  const relatedMap = new Map<any, R[]>()
+  const relatedMap = new Map<unknown, R[]>()
   for (const related of relatedRecords) {
     const key = related[foreignKey]
     if (!relatedMap.has(key)) {

@@ -9,6 +9,7 @@ import { verify, type JWTPayload, extractToken } from '@94cram/shared/auth';
 import { db } from '../db/index.js';
 import { users } from '@94cram/shared/db';
 import { eq } from 'drizzle-orm';
+import { unauthorized, forbidden } from '../utils/response.js';
 
 export type Variables = {
   schoolId: string;
@@ -43,7 +44,7 @@ export function jwtAuth() {
 
     const token = extractToken(c);
     if (!token) {
-      return c.json({ error: 'Unauthorized' }, 401);
+      return unauthorized(c);
     }
 
     try {
@@ -54,7 +55,7 @@ export function jwtAuth() {
       c.set('userId', payload.userId || payload.sub || '');
       await next();
     } catch {
-      return c.json({ error: 'Invalid token' }, 401);
+      return unauthorized(c, 'Invalid token');
     }
   };
 }
@@ -68,10 +69,10 @@ export function adminOnly() {
     const schoolId = c.get('schoolId');
     const [adminUser] = await db.select().from(users).where(eq(users.id, userId));
     if (!adminUser || adminUser.role !== 'admin' || !adminUser.isActive) {
-      return c.json({ error: 'Admin access required' }, 403);
+      return forbidden(c, 'Admin access required');
     }
     if (schoolId && adminUser.tenantId !== schoolId) {
-      return c.json({ error: 'Tenant mismatch' }, 403);
+      return forbidden(c, 'Tenant mismatch');
     }
     c.set('adminUser', adminUser);
     await next();

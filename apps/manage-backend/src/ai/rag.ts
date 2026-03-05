@@ -2,6 +2,7 @@ import { embed } from './embedding'
 import { db } from '../db/index'
 import { sql } from 'drizzle-orm'
 import type { RAGSearchRequest, RAGSource } from './types'
+import { rows } from '../db/helpers'
 
 export async function ragSearch(req: RAGSearchRequest): Promise<RAGSource[]> {
   const topK = req.topK ?? 5
@@ -22,11 +23,14 @@ export async function ragSearch(req: RAGSearchRequest): Promise<RAGSource[]> {
     LIMIT ${topK}
   `)
 
-  return (results as any[]).map(row => ({
-    content: row.content,
-    score: Number(row.score),
-    metadata: row.metadata ?? {},
-  }))
+  return rows(results).map(_row => {
+    const row = _row as { content: string; score: number; metadata: Record<string, unknown> | null }
+    return {
+      content: row.content,
+      score: Number(row.score),
+      metadata: row.metadata ?? {},
+    }
+  })
 }
 
 /** Insert knowledge chunk with embedding */

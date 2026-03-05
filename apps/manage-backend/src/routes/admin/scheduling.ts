@@ -6,7 +6,7 @@ import { requirePermission, Permission } from '../../middleware/rbac'
 import { uuidSchema } from '../../utils/validation'
 import { checkConflicts, createTimeSlot, getWeeklySchedule } from '../../ai/scheduling'
 import { scheduleToMd } from '../../utils/markdown'
-import { success, badRequest, internalError, wantsMd, mdResponse } from './_helpers'
+import { success, badRequest, internalError, wantsMd, mdResponse, getUserBranchId, rows } from './_helpers'
 
 const schedulingRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -20,7 +20,7 @@ schedulingRoutes.get('/scheduling/week',
   async (c) => {
     const user = c.get('user')
     const query = c.req.valid('query')
-    const branchId = query.branchId ?? (user as any).branch_id
+    const branchId = query.branchId ?? getUserBranchId(user)
 
     if (!branchId) {
       return badRequest(c, 'branchId required')
@@ -28,7 +28,7 @@ schedulingRoutes.get('/scheduling/week',
 
     try {
       const schedule = await getWeeklySchedule(user.tenant_id, branchId)
-      if (wantsMd(c)) return mdResponse(c, scheduleToMd(schedule as any[]))
+      if (wantsMd(c)) return mdResponse(c, scheduleToMd(rows(schedule)))
       return success(c, { schedule })
     } catch (err) {
       return internalError(c, err)
@@ -45,7 +45,7 @@ schedulingRoutes.get('/schedule/:branchId',
 
     try {
       const schedule = await getWeeklySchedule(user.tenant_id, branchId)
-      if (wantsMd(c)) return mdResponse(c, scheduleToMd(schedule as any[]))
+      if (wantsMd(c)) return mdResponse(c, scheduleToMd(rows(schedule)))
       return success(c, { schedule })
     } catch (err) {
       return internalError(c, err)

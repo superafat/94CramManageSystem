@@ -17,18 +17,12 @@ import { authMiddleware } from '../middleware/auth'
 import { requireRole, Role, type RBACVariables } from '../middleware/rbac'
 import { success, badRequest, notFound, internalError } from '../utils/response'
 import { logger } from '../utils/logger'
+import { rows, first } from '../db/helpers'
 
 export const teacherAttendanceRoutes = new Hono<{ Variables: RBACVariables }>()
 
 // Apply auth middleware to all routes
 teacherAttendanceRoutes.use('*', authMiddleware)
-
-// Helper to extract rows from drizzle result
-const rows = <T = Record<string, unknown>>(result: unknown): T[] =>
-  Array.isArray(result) ? (result as T[]) : (((result as { rows?: T[] })?.rows) ?? [])
-
-const first = <T = Record<string, unknown>>(result: unknown): T | undefined =>
-  rows<T>(result)[0]
 
 // ============================================================
 // Schemas

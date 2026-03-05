@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
 import type { RBACVariables } from '../../middleware/rbac'
 import { requirePermission, Permission } from '../../middleware/rbac'
-import { db, sql, success, internalError } from './_helpers'
+import { db, sql, success, internalError, first } from './_helpers'
 
 const settingsRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -23,9 +23,9 @@ settingsRoutes.get('/settings',
     const tenantId = user.tenant_id
 
     try {
-      const [row] = await db.execute(sql`
+      const row = first(await db.execute(sql`
         SELECT settings FROM manage_settings WHERE tenant_id = ${tenantId}
-      `) as any[]
+      `))
 
       return success(c, { settings: row?.settings ?? {} })
     } catch (err) {

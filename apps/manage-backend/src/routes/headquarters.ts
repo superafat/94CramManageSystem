@@ -20,16 +20,11 @@ import { requireRole, Role } from '../middleware/rbac'
 import { success, badRequest, notFound, internalError } from '../utils/response'
 import { logger } from '../utils/logger'
 import type { RBACVariables } from '../middleware/rbac'
+import { rows } from '../db/helpers'
 
 type AppVariables = RBACVariables & { tenantId: string }
 
 const app = new Hono<{ Variables: AppVariables }>()
-
-// Helper: normalise drizzle result rows
-const rows = (result: unknown): Record<string, unknown>[] => {
-  if (Array.isArray(result)) return result as Record<string, unknown>[]
-  return ((result as { rows?: unknown[] })?.rows ?? []) as Record<string, unknown>[]
-}
 
 // All routes require valid JWT + superadmin role
 app.use('*', authMiddleware)

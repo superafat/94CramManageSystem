@@ -4,6 +4,7 @@
  */
 import { db } from '../db/index'
 import { sql } from 'drizzle-orm'
+import { rows, first } from '../db/helpers'
 
 export interface Invoice {
   id: string
@@ -33,7 +34,7 @@ export async function generateInvoices(
   period: string  // '2026-02'
 ): Promise<{ generated: number; invoices: Invoice[] }> {
   // Get all active enrollments grouped by student
-  const rows = await db.execute(sql`
+  const enrollmentRows = rows(await db.execute(sql`
     SELECT
       s.id as student_id, s.name as student_name,
       e.course_name as subject,
@@ -47,11 +48,12 @@ export async function generateInvoices(
       AND e.status = 'active'
       AND s.status = 'active'
     ORDER BY s.name, e.course_name
-  `) as unknown as any[]
+  `))
 
   // Group by student
   const studentMap = new Map<string, { name: string; items: InvoiceItem[] }>()
-  for (const r of rows) {
+  for (const _r of enrollmentRows) {
+    const r = _r as { student_id: string; student_name: string; subject: string; monthly_fee: number; textbook_fee: number; platform_fee: number }
     if (!studentMap.has(r.student_id)) {
       studentMap.set(r.student_id, { name: r.student_name, items: [] })
     }
@@ -72,23 +74,23 @@ export async function generateInvoices(
     const total = subtotal // no discount by default
 
     // Check if invoice already exists
-    const existing = await db.execute(sql`
+    const existing = rows(await db.execute(sql`
       SELECT id FROM invoices
       WHERE tenant_id = ${tenantId} AND student_id = ${studentId} AND period = ${period}
-    `) as unknown as any[]
+    `))
 
     if (existing.length > 0) continue // skip duplicates
 
-    const result = await db.execute(sql`
+    const invoiceRow = first(await db.execute(sql`
       INSERT INTO invoices (tenant_id, student_id, branch_id, period, items, subtotal, discount, total, due_date)
       VALUES (${tenantId}, ${studentId}, ${branchId}, ${period},
               ${JSON.stringify(data.items)}::jsonb, ${subtotal}, 0, ${total},
               ${period + '-10'}::date)
       RETURNING id
-    `) as unknown as { id: string }[]
+    `)) as { id: string } | undefined
 
     invoices.push({
-      id: result[0].id,
+      id: invoiceRow!.id,
       studentName: data.name,
       period,
       items: data.items,

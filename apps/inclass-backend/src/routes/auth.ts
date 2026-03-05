@@ -8,6 +8,7 @@ import { sign, signRefreshToken, verifyRefreshToken, setAuthCookie, setRefreshCo
 import bcrypt from 'bcryptjs'
 import type { Variables } from '../middleware/auth.js'
 import { logger } from '../utils/logger.js'
+import { success, unauthorized, notFound, internalError, conflict } from '../utils/response.js'
 
 const auth = new Hono<{ Variables: Variables }>()
 
@@ -36,12 +37,12 @@ auth.post('/login', zValidator('json', loginSchema), async (c) => {
 
     const [user] = await db.select().from(users).where(eq(users.email, email))
     if (!user || !user.isActive) {
-      return c.json({ error: 'Invalid email or password' }, 401)
+      return unauthorized(c, 'Invalid email or password')
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) {
-      return c.json({ error: 'Invalid email or password' }, 401)
+      return unauthorized(c, 'Invalid email or password')
     }
 
     let school = null
@@ -67,7 +68,7 @@ auth.post('/login', zValidator('json', loginSchema), async (c) => {
     })
   } catch (e) {
     logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Login error`)
-    return c.json({ error: 'Failed to login' }, 500)
+    return internalError(c, e)
   }
 })
 
@@ -77,7 +78,7 @@ auth.post('/register', zValidator('json', registerSchema), async (c) => {
 
     const [existing] = await db.select().from(users).where(eq(users.email, email))
     if (existing) {
-      return c.json({ error: 'Email already registered' }, 409)
+      return conflict(c, 'Email already registered')
     }
 
     const passwordHash = await bcrypt.hash(password, 12)
@@ -93,7 +94,7 @@ auth.post('/register', zValidator('json', registerSchema), async (c) => {
       .returning()
 
     if (!user) {
-      return c.json({ error: 'Failed to create user' }, 500)
+      return internalError(c, new Error('Failed to create user'))
     }
 
     const token = await sign({
@@ -112,7 +113,7 @@ auth.post('/register', zValidator('json', registerSchema), async (c) => {
     }, 201)
   } catch (e) {
     logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Register error`)
-    return c.json({ error: 'Failed to register' }, 500)
+    return internalError(c, e)
   }
 })
 
@@ -120,7 +121,7 @@ auth.get('/me', async (c) => {
   try {
     const userId = c.get('userId')
     const schoolId = c.get('schoolId')
-    if (!userId || !schoolId) return c.json({ error: 'Invalid authentication state' }, 401)
+    if (!userId || !schoolId) return unauthorized(c, 'Invalid authentication state')
 
     const [userResult, tenantResult] = await Promise.all([
       db.select().from(users).where(eq(users.id, userId)),
@@ -129,9 +130,9 @@ auth.get('/me', async (c) => {
 
     const [user] = userResult
     const [tenant] = tenantResult
-    if (!user || !user.isActive) return c.json({ error: 'User not found' }, 404)
-    if (!tenant) return c.json({ error: 'Invalid account state' }, 500)
-    if (user.tenantId !== schoolId) return c.json({ error: 'Invalid authentication' }, 401)
+    if (!user || !user.isActive) return notFound(c, 'User')
+    if (!tenant) return internalError(c, new Error('Invalid account state'))
+    if (user.tenantId !== schoolId) return unauthorized(c, 'Invalid authentication')
 
     return c.json({
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
@@ -139,7 +140,7 @@ auth.get('/me', async (c) => {
     })
   } catch (e) {
     logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Get me error`)
-    return c.json({ error: 'Failed to get user' }, 500)
+    return internalError(c, e)
   }
 })
 
@@ -170,14 +171,14 @@ auth.post('/demo', async (c) => {
     return c.json({ token, user: demoUser, school: demoSchool })
   } catch (e) {
     logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Demo login error`)
-    return c.json({ error: 'Failed to create demo session' }, 500)
+    return internalError(c, e)
   }
 })
 
 auth.post('/refresh', async (c) => {
   const refreshToken = extractRefreshToken(c)
   if (!refreshToken) {
-    return c.json({ error: 'No refresh token' }, 401)
+    return unauthorized(c, 'No refresh token')
   }
 
   try {
@@ -186,7 +187,7 @@ auth.post('/refresh', async (c) => {
     const [user] = await db.select().from(users).where(eq(users.id, userId))
     if (!user || !user.isActive) {
       clearAuthCookie(c)
-      return c.json({ error: 'User not found or inactive' }, 401)
+      return unauthorized(c, 'User not found or inactive')
     }
 
     const token = await sign({
@@ -206,7 +207,7 @@ auth.post('/refresh', async (c) => {
     })
   } catch {
     clearAuthCookie(c)
-    return c.json({ error: 'Invalid or expired refresh token' }, 401)
+    return unauthorized(c, 'Invalid or expired refresh token')
   }
 })
 

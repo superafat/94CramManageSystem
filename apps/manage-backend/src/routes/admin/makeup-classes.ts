@@ -63,11 +63,11 @@ makeupClassesRoutes.get('/makeup-classes',
 
       const where = sql.join(conditions, sql` AND `)
 
-      const [cnt] = await db.execute(sql`
+      const cnt = first(await db.execute(sql`
         SELECT COUNT(*)::int as total
         FROM manage_makeup_classes mc
         WHERE ${where}
-      `) as any[]
+      `))
 
       const makeupRows = await db.execute(sql`
         SELECT mc.id, mc.student_id, mc.original_date, mc.original_course_id,
@@ -85,7 +85,7 @@ makeupClassesRoutes.get('/makeup-classes',
       return successWithPagination(c, { makeupClasses: rows(makeupRows) }, {
         page: query.page,
         limit: query.limit,
-        total: cnt?.total ?? 0,
+        total: Number(cnt?.total) || 0,
       })
     } catch (err) {
       return internalError(c, err)
@@ -104,11 +104,11 @@ makeupClassesRoutes.post('/makeup-classes',
 
     try {
       // Verify student belongs to tenant
-      const [student] = await db.execute(sql`
+      const student = first(await db.execute(sql`
         SELECT id FROM manage_students
         WHERE id = ${body.studentId} AND tenant_id = ${tenantId}
         LIMIT 1
-      `) as any[]
+      `))
 
       if (!student) {
         return badRequest(c, 'Student not found in this tenant')
@@ -144,12 +144,12 @@ makeupClassesRoutes.put('/makeup-classes/:id',
     try {
       if (body.slotId) {
         // 使用補課時段排課
-        const [slot] = await db.execute(sql`
+        const slot = first(await db.execute(sql`
           SELECT id, makeup_date, start_time, end_time, teacher_id, room
           FROM manage_makeup_slots
           WHERE id = ${body.slotId} AND tenant_id = ${tenantId}
           LIMIT 1
-        `) as any[]
+        `))
 
         if (!slot) {
           return badRequest(c, '補課時段不存在')
@@ -249,28 +249,28 @@ makeupClassesRoutes.post('/makeup-classes/batch-assign',
 
     try {
       // 1. 驗證 slot 存在且屬於同 tenant
-      const [slot] = await db.execute(sql`
+      const slot = first(await db.execute(sql`
         SELECT id, makeup_date, start_time, end_time, teacher_id, room, max_students
         FROM manage_makeup_slots
         WHERE id = ${body.slotId} AND tenant_id = ${tenantId}
         LIMIT 1
-      `) as any[]
+      `))
 
       if (!slot) {
         return badRequest(c, '補課時段不存在')
       }
 
       // 2. 查詢目前已安排的學生數
-      const [countResult] = await db.execute(sql`
+      const countResult = first(await db.execute(sql`
         SELECT COUNT(*)::int as current_students
         FROM manage_makeup_classes
         WHERE slot_id = ${body.slotId} AND status != 'cancelled'
-      `) as any[]
+      `))
 
-      const currentStudents = countResult?.current_students ?? 0
+      const currentStudents = Number(countResult?.current_students) || 0
 
       // 3. 檢查是否超過最大人數
-      if (currentStudents + body.makeupClassIds.length > (slot.max_students ?? 10)) {
+      if (currentStudents + body.makeupClassIds.length > (Number(slot.max_students) || 10)) {
         return badRequest(c, '超過時段最大人數')
       }
 
@@ -290,7 +290,7 @@ makeupClassesRoutes.post('/makeup-classes/batch-assign',
           AND status = 'pending'
       `)
 
-      return success(c, { updated: (result as any).rowCount || body.makeupClassIds.length })
+      return success(c, { updated: (result as { rowCount?: number }).rowCount || body.makeupClassIds.length })
     } catch (err) {
       return internalError(c, err)
     }
@@ -335,7 +335,7 @@ makeupClassesRoutes.post('/makeup-classes/:id/notify',
     const id = c.req.param('id')
 
     try {
-      const [mc] = await db.execute(sql`
+      const mc = first(await db.execute(sql`
         SELECT mc.id, mc.student_id, mc.status, mc.makeup_date, mc.makeup_time,
           mc.makeup_end_time, mc.makeup_room, mc.makeup_teacher_id,
           s.full_name as student_name,
@@ -345,7 +345,7 @@ makeupClassesRoutes.post('/makeup-classes/:id/notify',
         LEFT JOIN manage_teachers t ON mc.makeup_teacher_id = t.id
         WHERE mc.id = ${id} AND mc.tenant_id = ${tenantId}
         LIMIT 1
-      `) as any[]
+      `))
 
       if (!mc) {
         return notFound(c, '找不到此補課紀錄')
@@ -398,7 +398,7 @@ makeupClassesRoutes.get('/makeup-classes/:id/notice-pdf',
     const id = c.req.param('id')
 
     try {
-      const [mc] = await db.execute(sql`
+      const mc = first(await db.execute(sql`
         SELECT mc.id, mc.original_date, mc.original_course_name,
           mc.makeup_date, mc.makeup_time, mc.makeup_end_time,
           mc.makeup_room, mc.notes,
@@ -409,7 +409,7 @@ makeupClassesRoutes.get('/makeup-classes/:id/notice-pdf',
         LEFT JOIN manage_teachers t ON mc.makeup_teacher_id = t.id
         WHERE mc.id = ${id} AND mc.tenant_id = ${tenantId}
         LIMIT 1
-      `) as any[]
+      `))
 
       if (!mc) {
         return notFound(c, '找不到此補課紀錄')

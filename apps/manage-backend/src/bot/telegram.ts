@@ -221,7 +221,7 @@ export function createBot(token: string, defaultBranchId: string) {
         } catch {
           await ctx.reply(result)
         }
-        logConversation(ctx.session.branchId, 'telegram', query, { answer: result, model: 'command', intent: 'general' as any, latencyMs: 0 }, userId)
+        logConversation(ctx.session.branchId, 'telegram', query, { answer: result, model: 'command', intent: 'general' as const, latencyMs: 0 }, userId)
         return
       }
 
@@ -317,7 +317,7 @@ export async function startBot(bot: Bot<BotContext>, mode: 'polling' | 'webhook'
         })
         return // success
       } catch (err) {
-        if (err instanceof Error && (err as any).error_code === 409 && i < maxRetries - 1) {
+        if (err instanceof Error && (err as Error & { error_code?: number }).error_code === 409 && i < maxRetries - 1) {
           const delay = (i + 1) * 3000
           logger.warn(`⚠️ Bot polling conflict (409), retrying in ${delay/1000}s... (${i+1}/${maxRetries})`)
           await new Promise(r => setTimeout(r, delay))

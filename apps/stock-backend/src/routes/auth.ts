@@ -7,6 +7,7 @@ import { sign, signRefreshToken, verifyRefreshToken, setAuthCookie, setRefreshCo
 import { authMiddleware, getAuthUser } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { z } from 'zod';
+import { badRequest, unauthorized, forbidden, notFound, conflict, internalError } from '../utils/response';
 
 const app = new Hono();
 
@@ -39,18 +40,18 @@ const createUserSchema = z.object({
 app.post('/login', async (c) => {
   const parsed = loginSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) {
-    return c.json({ error: 'Invalid request body', details: parsed.error.flatten().fieldErrors }, 400);
+    return badRequest(c, 'Invalid request body', parsed.error.flatten().fieldErrors);
   }
   const { email, password } = parsed.data;
 
   const [user] = await db.select().from(users).where(eq(users.email, email));
   if (!user || user.isActive === false) {
-    return c.json({ error: 'Invalid email or password' }, 401);
+    return unauthorized(c, 'Invalid email or password');
   }
 
   const passwordValid = await bcrypt.compare(password, user.passwordHash);
   if (!passwordValid) {
-    return c.json({ error: 'Invalid email or password' }, 401);
+    return unauthorized(c, 'Invalid email or password');
   }
 
   // Update last login timestamp
@@ -81,12 +82,12 @@ app.post('/login', async (c) => {
 app.post('/register', async (c) => {
   const parsed = registerSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) {
-    return c.json({ error: 'Invalid request body', details: parsed.error.flatten().fieldErrors }, 400);
+    return badRequest(c, 'Invalid request body', parsed.error.flatten().fieldErrors);
   }
   const { tenantName, slug, email, password, name } = parsed.data;
 
   // Registration disabled — new tenants must be created by platform admin
-  return c.json({ error: 'Registration is disabled. Contact platform admin to create a new tenant.' }, 403);
+  return forbidden(c, 'Registration is disabled. Contact platform admin to create a new tenant.');
 });
 
 app.use('/me', authMiddleware, tenantMiddleware);
@@ -98,7 +99,7 @@ app.get('/me', async (c) => {
   ));
 
   if (!user) {
-    return c.json({ error: 'User not found' }, 404);
+    return notFound(c, 'User');
   }
 
   return c.json({
@@ -116,7 +117,7 @@ app.use('/setup-tenant', authMiddleware);
 app.post('/setup-tenant', async (c) => {
   const authUser = getAuthUser(c);
   if (authUser.role !== 'admin' && authUser.role !== 'superadmin') {
-    return c.json({ error: 'Forbidden: admin role required' }, 403);
+    return forbidden(c, 'Admin role required');
   }
   const body = await c.req.json().catch(() => ({}));
   const [existing] = await db.select().from(tenants).where(eq(tenants.id, authUser.tenantId));
@@ -139,19 +140,19 @@ app.use('/users', authMiddleware, tenantMiddleware);
 app.post('/users', async (c) => {
   const authUser = getAuthUser(c);
   if (authUser.role !== 'admin') {
-    return c.json({ error: 'Forbidden' }, 403);
+    return forbidden(c);
   }
 
   const tenantId = getTenantId(c);
   const parsedBody = createUserSchema.safeParse(await c.req.json());
   if (!parsedBody.success) {
-    return c.json({ error: 'Missing required fields' }, 400);
+    return badRequest(c, 'Missing required fields');
   }
   const { email, password, name, role } = parsedBody.data;
 
   const [existingUser] = await db.select().from(users).where(and(eq(users.email, email), eq(users.tenantId, tenantId)));
   if (existingUser) {
-    return c.json({ error: 'Email already exists' }, 400);
+    return conflict(c, 'Email already exists');
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -170,7 +171,7 @@ app.post('/users', async (c) => {
 app.get('/users', async (c) => {
   const authUser = getAuthUser(c);
   if (authUser.role !== 'admin') {
-    return c.json({ error: 'Forbidden' }, 403);
+    return forbidden(c);
   }
 
   const tenantId = getTenantId(c);
@@ -191,7 +192,7 @@ app.get('/users', async (c) => {
 app.post('/refresh', async (c) => {
   const refreshToken = extractRefreshToken(c);
   if (!refreshToken) {
-    return c.json({ error: 'No refresh token' }, 401);
+    return unauthorized(c, 'No refresh token');
   }
 
   try {
@@ -200,7 +201,7 @@ app.post('/refresh', async (c) => {
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     if (!user || !user.isActive) {
       clearAuthCookie(c);
-      return c.json({ error: 'User not found or inactive' }, 401);
+      return unauthorized(c, 'User not found or inactive');
     }
 
     const token = await sign({
@@ -220,7 +221,7 @@ app.post('/refresh', async (c) => {
     });
   } catch {
     clearAuthCookie(c);
-    return c.json({ error: 'Invalid or expired refresh token' }, 401);
+    return unauthorized(c, 'Invalid or expired refresh token');
   }
 });
 
