@@ -586,6 +586,16 @@ export function getDemoResponse(
       user: { id: DEMO_SUPERADMIN_ID, name: '平台管理員', email: 'admin@94cram.com', role: 'superadmin' },
     })
   }
+  if (m === 'POST' && cleanPath === '/api/platform/auth/seed') {
+    return ok({
+      message: 'Superadmin 帳號建立成功',
+      credentials: {
+        email: 'admin@94cram.com',
+        password: 'Admin@94cram',
+        note: '請登入後立即修改密碼',
+      },
+    })
+  }
   if (m === 'POST' && cleanPath === '/api/platform/auth/logout') {
     return { body: { success: true }, status: 200 }
   }

@@ -193,6 +193,61 @@ platformAuthRoutes.post('/logout', async (c) => {
 })
 
 // ========================================================================
+// POST /seed - Create initial superadmin account (one-time setup)
+// ========================================================================
+platformAuthRoutes.post('/seed', async (c) => {
+  try {
+    // 檢查是否已有 superadmin
+    const existing = firstRow(await db.execute(sql`
+      SELECT id FROM users WHERE role = 'superadmin' AND deleted_at IS NULL LIMIT 1
+    `) as QueryResultRows<{ id: string }>)
+
+    if (existing) {
+      return success(c, { message: 'Superadmin 帳號已存在，無需重複建立' })
+    }
+
+    // 建立平台 tenant
+    const tenantId = crypto.randomUUID()
+    await db.execute(sql`
+      INSERT INTO tenants (id, name, slug, plan, active, created_at, updated_at)
+      VALUES (${tenantId}, '94cram 平台', 'platform', 'enterprise', true, NOW(), NOW())
+      ON CONFLICT (slug) DO UPDATE SET name = '94cram 平台'
+    `)
+
+    // 取得 platform tenant id（可能已存在）
+    const tenantRow = firstRow(await db.execute(sql`
+      SELECT id FROM tenants WHERE slug = 'platform' LIMIT 1
+    `) as QueryResultRows<{ id: string }>)
+    const finalTenantId = tenantRow?.id ?? tenantId
+
+    // 建立 superadmin 帳號
+    const userId = crypto.randomUUID()
+    const email = 'admin@94cram.com'
+    const defaultPassword = 'Admin@94cram'
+    const passwordHash = await bcrypt.hash(defaultPassword, 12)
+
+    await db.execute(sql`
+      INSERT INTO users (id, tenant_id, username, full_name, email, role, password_hash, is_active, created_at, updated_at)
+      VALUES (${userId}, ${finalTenantId}, 'superadmin', '平台管理員', ${email}, 'superadmin', ${passwordHash}, true, NOW(), NOW())
+    `)
+
+    logger.info({ userId, email }, 'Platform superadmin account created')
+
+    return success(c, {
+      message: 'Superadmin 帳號建立成功',
+      credentials: {
+        email,
+        password: defaultPassword,
+        note: '請登入後立即修改密碼',
+      },
+    })
+  } catch (err: unknown) {
+    logger.error({ err }, 'Platform seed error')
+    return internalError(c, err instanceof Error ? err : undefined)
+  }
+})
+
+// ========================================================================
 // GET /me - Get Current Superadmin User Info (requires auth + SUPERADMIN)
 // ========================================================================
 platformAuthRoutes.get('/me', authMiddleware, requireRole(Role.SUPERADMIN), async (c) => {
