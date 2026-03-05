@@ -221,15 +221,18 @@ export default app
 const port = parseInt(process.env.PORT || '3102')
 logger.info(`🐝 BeeClass Backend starting on port ${port}...`)
 const serve = async () => {
-  // Dynamically load face recognition (tensorflow) to avoid crash if native module missing
-  try {
-    const faceModule = await import('./routes/face.js')
-    app.route('/api/face', faceModule.default)
-    const { loadModels } = await import('./services/faceRecognition.js')
-    await loadModels()
-    logger.info('Face recognition routes and models loaded')
-  } catch (err) {
-    logger.warn({ err: err instanceof Error ? err : new Error(String(err)) }, 'Face recognition disabled (non-fatal)')
+  // Face recognition requires @tensorflow/tfjs-node native binary which is
+  // unavailable in Cloud Run slim images. Only load when explicitly enabled.
+  if (process.env.ENABLE_FACE_RECOGNITION === 'true') {
+    try {
+      const faceModule = await import('./routes/face.js')
+      app.route('/api/face', faceModule.default)
+      const { loadModels } = await import('./services/faceRecognition.js')
+      await loadModels()
+      logger.info('Face recognition routes and models loaded')
+    } catch (err) {
+      logger.warn({ err: err instanceof Error ? err : new Error(String(err)) }, 'Face recognition disabled (non-fatal)')
+    }
   }
   const { serve } = await import('@hono/node-server')
   const server = serve({ port, fetch: app.fetch })
