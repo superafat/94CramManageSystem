@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { platformFetch } from '@/lib/api'
+import { formatDate } from '@/lib/format'
 
 // ---------- 型別 ----------
 
@@ -112,11 +113,6 @@ function ConfirmDialog({
       </div>
     </div>
   )
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 const EMPTY_FORM: FormState = {

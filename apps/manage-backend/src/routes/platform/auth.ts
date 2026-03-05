@@ -9,6 +9,7 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import * as jose from 'jose'
+import bcrypt from 'bcryptjs'
 import { setAuthCookie, setRefreshCookie, extractToken, signRefreshToken } from '@94cram/shared/auth'
 import { config } from '../../config'
 import { db } from '../../db'
@@ -57,8 +58,7 @@ const secret = new TextEncoder().encode(config.JWT_SECRET)
 async function verifyPassword(password: string, stored: string): Promise<{ valid: boolean; isLegacy: boolean }> {
   if (!stored) return { valid: false, isLegacy: false }
   if (stored.startsWith('$2a$') || stored.startsWith('$2b$')) {
-    const bcrypt = await import('bcryptjs')
-    const valid = await bcrypt.default.compare(password, stored)
+    const valid = await bcrypt.compare(password, stored)
     return { valid, isLegacy: false }
   }
   if (!stored.includes(':')) return { valid: false, isLegacy: false }
@@ -148,7 +148,7 @@ platformAuthRoutes.post('/login', zValidator('json', platformLoginSchema), async
     }
 
     // 額外檢查：必須是 superadmin
-    if (dbUser.role !== 'superadmin') {
+    if (dbUser.role !== Role.SUPERADMIN) {
       return forbidden(c, '權限不足，此入口僅供超級管理員使用')
     }
 

@@ -15,15 +15,9 @@ import { sql } from 'drizzle-orm'
 import { success, badRequest, notFound, internalError } from '../../utils/response'
 import { logger } from '../../utils/logger'
 import type { RBACVariables } from '../../middleware/rbac'
+import { getRows } from './_helpers'
 
 export const platformAccountsRoutes = new Hono<{ Variables: RBACVariables }>()
-
-// Helper: normalise drizzle result rows
-type AnyRow = Record<string, unknown>
-function getRows(result: unknown): AnyRow[] {
-  if (Array.isArray(result)) return result as AnyRow[]
-  return ((result as { rows?: unknown[] })?.rows ?? []) as AnyRow[]
-}
 
 // ─────────────────────────────────────────────
 // Zod Schemas
@@ -140,6 +134,7 @@ platformAccountsRoutes.post(
             deleted_at = NOW(),
             updated_at = NOW()
         WHERE id = ${id}
+          AND deleted_at IS NULL
         RETURNING id
       `)
 

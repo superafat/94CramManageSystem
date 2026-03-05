@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { platformFetch } from '@/lib/api'
+import { formatNTD } from '@/lib/format'
 import {
   AreaChart,
   Area,
@@ -26,10 +27,6 @@ interface DashboardPayload {
 }
 
 // ---------- 工具 ----------
-
-function formatNTD(value: number): string {
-  return `NT$ ${value.toLocaleString('zh-TW')}`
-}
 
 function profitRate(revenue: number, cost: number): string {
   if (revenue === 0) return '0%'

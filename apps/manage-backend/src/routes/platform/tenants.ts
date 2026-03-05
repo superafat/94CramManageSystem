@@ -20,15 +20,9 @@ import { sql } from 'drizzle-orm'
 import { success, successWithPagination, badRequest, notFound, internalError } from '../../utils/response'
 import { logger } from '../../utils/logger'
 import type { RBACVariables } from '../../middleware/rbac'
+import { getRows } from './_helpers'
 
 export const platformTenantsRoutes = new Hono<{ Variables: RBACVariables }>()
-
-// Helper: normalise drizzle result rows
-type AnyRow = Record<string, unknown>
-function getRows(result: unknown): AnyRow[] {
-  if (Array.isArray(result)) return result as AnyRow[]
-  return ((result as { rows?: unknown[] })?.rows ?? []) as AnyRow[]
-}
 
 // ─────────────────────────────────────────────
 // Zod Schemas
@@ -227,14 +221,8 @@ platformTenantsRoutes.get(
                 WHERE tenant_id = t.id AND deleted_at IS NULL) AS user_count,
                (SELECT COUNT(*) FROM manage_students
                 WHERE tenant_id = t.id AND deleted_at IS NULL) AS student_count,
-               (SELECT COALESCE(SUM(
-                  CASE WHEN (settings->>'ai_usage') IS NOT NULL
-                  THEN (settings->>'ai_usage')::int ELSE 0 END
-               ), 0) FROM tenants WHERE id = t.id) AS ai_usage,
-               (SELECT COALESCE(SUM(
-                  CASE WHEN (settings->>'conversation_count') IS NOT NULL
-                  THEN (settings->>'conversation_count')::int ELSE 0 END
-               ), 0) FROM tenants WHERE id = t.id) AS conversation_count,
+               COALESCE((t.settings->>'ai_usage')::int, 0) AS ai_usage,
+               COALESCE((t.settings->>'conversation_count')::int, 0) AS conversation_count,
                (SELECT name FROM users
                 WHERE tenant_id = t.id AND role = 'admin' AND deleted_at IS NULL
                 LIMIT 1) AS admin_name

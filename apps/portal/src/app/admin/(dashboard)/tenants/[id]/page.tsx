@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { platformFetch } from '@/lib/api'
+import { formatNTD, formatDate } from '@/lib/format'
 
 // ---------- 型別 ----------
 
@@ -71,17 +72,6 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 
 // ---------- 工具 ----------
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-function formatNTD(value: number): string {
-  return `NT$ ${value.toLocaleString('zh-TW')}`
-}
 
 // ---------- 子元件 ----------
 

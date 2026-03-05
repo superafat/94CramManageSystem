@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { formatNTD } from '@/lib/format'
 import {
   BarChart,
   Bar,
@@ -68,10 +69,6 @@ interface ReceivablesResponse {
 }
 
 // ---------- 工具函式 ----------
-
-function formatNTD(value: number): string {
-  return `NT$ ${value.toLocaleString('zh-TW')}`
-}
 
 function formatK(value: number): string {
   if (value >= 1000) return `${(value / 1000).toFixed(1)}K`

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { formatNTD } from '@/lib/format'
 import {
   BarChart,
   Bar,
@@ -44,14 +45,6 @@ interface PricingResponse {
 }
 
 // ---------- 工具函式 ----------
-
-function formatNTD(value: number): string {
-  return `NT$ ${value.toLocaleString('zh-TW')}`
-}
-
-function formatDate(_dateStr: string): string {
-  return _dateStr
-}
 
 // 合併 revenueTrend + costTrend 成為同月份的資料
 function mergeTrends(

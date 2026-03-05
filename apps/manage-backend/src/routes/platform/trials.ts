@@ -17,15 +17,9 @@ import { sql } from 'drizzle-orm'
 import { success, notFound, internalError } from '../../utils/response'
 import { logger } from '../../utils/logger'
 import type { RBACVariables } from '../../middleware/rbac'
+import { getRows } from './_helpers'
 
 export const platformTrialsRoutes = new Hono<{ Variables: RBACVariables }>()
-
-// Helper: normalise drizzle result rows
-type AnyRow = Record<string, unknown>
-function getRows(result: unknown): AnyRow[] {
-  if (Array.isArray(result)) return result as AnyRow[]
-  return ((result as { rows?: unknown[] })?.rows ?? []) as AnyRow[]
-}
 
 // ─────────────────────────────────────────────
 // Zod Schemas

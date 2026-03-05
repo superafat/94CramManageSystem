@@ -36,36 +36,26 @@ import { sql } from 'drizzle-orm'
 import { success, successWithPagination, badRequest, notFound, internalError } from '../../utils/response'
 import { logger } from '../../utils/logger'
 import type { RBACVariables } from '../../middleware/rbac'
+import { getRows, type AnyRow } from './_helpers'
+import { uuidSchema, paginationSchema } from '../../utils/validation'
 
 export const platformFinanceRoutes = new Hono<{ Variables: RBACVariables }>()
-
-// Helper: normalise drizzle result rows
-type AnyRow = Record<string, unknown>
-function getRows(result: unknown): AnyRow[] {
-  if (Array.isArray(result)) return result as AnyRow[]
-  return ((result as { rows?: unknown[] })?.rows ?? []) as AnyRow[]
-}
 
 // ─────────────────────────────────────────────
 // Zod Schemas
 // ─────────────────────────────────────────────
 
 const uuidParamSchema = z.object({
-  id: z.string().uuid({ message: 'Invalid ID' }),
+  id: uuidSchema,
 })
 
-const paginationQuerySchema = z.object({
-  page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
-})
-
-const paymentListQuerySchema = paginationQuerySchema.extend({
+const paymentListQuerySchema = paginationSchema.extend({
   tenantId: z.string().uuid().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
 })
 
-const costListQuerySchema = paginationQuerySchema.extend({
+const costListQuerySchema = paginationSchema.extend({
   category: z.enum(['infra', 'ai', 'domain', 'labor', 'other']).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
@@ -133,39 +123,39 @@ const exportQuerySchema = z.object({
 // ─────────────────────────────────────────────
 platformFinanceRoutes.get('/overview', async (c) => {
   try {
-    // 本月收入
-    const revenueResult = await db.execute(sql`
-      SELECT COALESCE(SUM(amount), 0)::text AS total
-      FROM platform_payments
-      WHERE paid_at >= date_trunc('month', NOW())
-    `)
+    const [revenueResult, costResult, revenueTrend, costTrend] = await Promise.all([
+      // 本月收入
+      db.execute(sql`
+        SELECT COALESCE(SUM(amount), 0)::text AS total
+        FROM platform_payments
+        WHERE paid_at >= date_trunc('month', NOW())
+      `),
+      // 本月支出
+      db.execute(sql`
+        SELECT COALESCE(SUM(amount), 0)::text AS total
+        FROM platform_costs
+        WHERE date >= date_trunc('month', NOW())
+      `),
+      // 近 12 月收入趨勢
+      db.execute(sql`
+        SELECT date_trunc('month', paid_at) AS month, SUM(amount)::text AS revenue
+        FROM platform_payments
+        WHERE paid_at >= NOW() - INTERVAL '12 months'
+        GROUP BY month
+        ORDER BY month
+      `),
+      // 近 12 月支出趨勢
+      db.execute(sql`
+        SELECT date_trunc('month', date) AS month, SUM(amount)::text AS cost
+        FROM platform_costs
+        WHERE date >= NOW() - INTERVAL '12 months'
+        GROUP BY month
+        ORDER BY month
+      `),
+    ])
+
     const monthlyRevenue = parseInt(getRows(revenueResult)[0]?.total as string ?? '0', 10)
-
-    // 本月支出
-    const costResult = await db.execute(sql`
-      SELECT COALESCE(SUM(amount), 0)::text AS total
-      FROM platform_costs
-      WHERE date >= date_trunc('month', NOW())
-    `)
     const monthlyCost = parseInt(getRows(costResult)[0]?.total as string ?? '0', 10)
-
-    // 近 12 月收入趨勢
-    const revenueTrend = await db.execute(sql`
-      SELECT date_trunc('month', paid_at) AS month, SUM(amount)::text AS revenue
-      FROM platform_payments
-      WHERE paid_at >= NOW() - INTERVAL '12 months'
-      GROUP BY month
-      ORDER BY month
-    `)
-
-    // 近 12 月支出趨勢
-    const costTrend = await db.execute(sql`
-      SELECT date_trunc('month', date) AS month, SUM(amount)::text AS cost
-      FROM platform_costs
-      WHERE date >= NOW() - INTERVAL '12 months'
-      GROUP BY month
-      ORDER BY month
-    `)
 
     return success(c, {
       currentMonth: {
@@ -632,23 +622,24 @@ platformFinanceRoutes.get(
     try {
       const truncUnit = period === 'quarterly' ? 'quarter' : 'month'
 
-      const revenueResult = await db.execute(sql`
-        SELECT date_trunc(${truncUnit}, paid_at) AS period,
-               SUM(amount)::text AS revenue
-        FROM platform_payments
-        WHERE paid_at >= NOW() - INTERVAL '12 months'
-        GROUP BY period
-        ORDER BY period
-      `)
-
-      const costResult = await db.execute(sql`
-        SELECT date_trunc(${truncUnit}, date) AS period,
-               SUM(amount)::text AS cost
-        FROM platform_costs
-        WHERE date >= NOW() - INTERVAL '12 months'
-        GROUP BY period
-        ORDER BY period
-      `)
+      const [revenueResult, costResult] = await Promise.all([
+        db.execute(sql`
+          SELECT date_trunc(${truncUnit}, paid_at) AS period,
+                 SUM(amount)::text AS revenue
+          FROM platform_payments
+          WHERE paid_at >= NOW() - INTERVAL '12 months'
+          GROUP BY period
+          ORDER BY period
+        `),
+        db.execute(sql`
+          SELECT date_trunc(${truncUnit}, date) AS period,
+                 SUM(amount)::text AS cost
+          FROM platform_costs
+          WHERE date >= NOW() - INTERVAL '12 months'
+          GROUP BY period
+          ORDER BY period
+        `),
+      ])
 
       // 合併收入與支出成損益表
       const revenueMap = new Map<string, number>()
