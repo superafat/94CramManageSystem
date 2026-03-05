@@ -32,29 +32,30 @@ billingRoutes.get('/billing',
     try {
       // If parentId, get billing for parent's children
       if (query.parentId) {
+        // NOTE: parent_students table does not exist in manage schema.
+        // Query students directly by tenantId and return their payment records.
         const students = await db.execute(sql`
-          SELECT s.id, s.full_name
-          FROM students s
-          JOIN parent_students ps ON ps.student_id = s.id
-          WHERE ps.parent_id = ${query.parentId} AND s.tenant_id = ${tenantId} AND s.deleted_at IS NULL
+          SELECT s.id, s.name
+          FROM manage_students s
+          WHERE s.tenant_id = ${tenantId} AND s.deleted_at IS NULL
         `)
 
         const result = []
         for (const s of rows(students)) {
           const fees = await db.execute(sql`
-            SELECT p.id, p.description as item, p.amount, p.due_date,
-              p.status as paid, p.paid_amount,
-              (p.amount - COALESCE(p.paid_amount, 0)) as remaining
-            FROM payments p
-            WHERE p.student_id = ${s.id} AND p.tenant_id = ${tenantId}
-            ORDER BY p.due_date DESC
+            SELECT p.id, p.amount, p.payment_method,
+              p.status as paid, p.paid_at
+            FROM manage_payments p
+            JOIN manage_enrollments me ON p.enrollment_id = me.id
+            WHERE me.student_id = ${s.id} AND p.tenant_id = ${tenantId}
+            ORDER BY p.created_at DESC
           `)
           const feeList = rows(fees)
           const totalDue = feeList.reduce((sum: number, f: QueryResult) => sum + Number(f.amount || 0), 0)
-          const totalPaid = feeList.reduce((sum: number, f: QueryResult) => sum + Number(f.paid_amount || 0), 0)
+          const totalPaid = feeList.filter((f: QueryResult) => f.paid === 'paid').reduce((sum: number, f: QueryResult) => sum + Number(f.amount || 0), 0)
           result.push({
             studentId: s.id,
-            name: s.full_name,
+            name: s.name,
             fees: feeList,
             totalDue,
             totalPaid,
@@ -148,7 +149,7 @@ billingRoutes.get('/courses/:id/fees', requirePermission(Permission.SCHEDULE_REA
   try {
     const [result] = await db.execute(sql`
       SELECT id, name, fee_monthly, fee_quarterly, fee_semester, fee_yearly
-      FROM courses
+      FROM manage_courses
       WHERE id = ${courseId} AND tenant_id = ${user.tenant_id}
     `) as any[]
 
@@ -176,12 +177,11 @@ billingRoutes.put('/courses/:id/fees',
 
     try {
       await db.execute(sql`
-        UPDATE courses SET
+        UPDATE manage_courses SET
           fee_monthly = ${body.feeMonthly},
           fee_quarterly = ${body.feeQuarterly},
           fee_semester = ${body.feeSemester},
-          fee_yearly = ${body.feeYearly},
-          updated_at = NOW()
+          fee_yearly = ${body.feeYearly}
         WHERE id = ${courseId} AND tenant_id = ${user.tenant_id}
       `)
       return success(c, { message: 'Fees updated' })
@@ -207,7 +207,7 @@ billingRoutes.get('/billing/course/:courseId',
       // Get course info with fees
       const [course] = await db.execute(sql`
         SELECT id, name, fee_monthly, fee_quarterly, fee_semester, fee_yearly
-        FROM courses WHERE id = ${courseId} AND tenant_id = ${user.tenant_id}
+        FROM manage_courses WHERE id = ${courseId} AND tenant_id = ${user.tenant_id}
       `) as any[]
 
       if (!course) return notFound(c, 'Course not found')
@@ -215,17 +215,15 @@ billingRoutes.get('/billing/course/:courseId',
       // Get students in this course with payment records
       const studentRows = await db.execute(sql`
         SELECT
-          s.id, s.full_name, s.grade_level,
-          pr.id as payment_id, pr.amount as paid_amount, pr.payment_type, pr.payment_date
-        FROM students s
-        LEFT JOIN course_enrollments ce ON ce.student_id = s.id AND ce.course_id = ${courseId} AND ce.status = 'active'
-        LEFT JOIN payment_records pr ON pr.student_id = s.id
-          AND pr.course_id = ${courseId}
-          AND pr.period_month = ${periodMonth}
+          s.id, s.name, s.grade,
+          pr.id as payment_id, pr.amount as paid_amount, pr.payment_method
+        FROM manage_students s
+        LEFT JOIN manage_enrollments ce ON ce.student_id = s.id AND ce.course_id = ${courseId} AND ce.status = 'active'
+        LEFT JOIN manage_payments pr ON pr.enrollment_id = ce.id
           AND pr.status = 'paid'
         WHERE s.tenant_id = ${user.tenant_id} AND s.deleted_at IS NULL
           AND ce.student_id IS NOT NULL
-        ORDER BY s.full_name
+        ORDER BY s.name
       `)
 
       const students = rows(studentRows)
@@ -269,14 +267,24 @@ billingRoutes.post('/billing/payment-records/batch',
     try {
       for (const rec of records) {
         await db.execute(sql`
-          INSERT INTO payment_records (
-            tenant_id, student_id, course_id, payment_type, amount,
-            payment_date, period_month, status, notes, created_by, created_at
-          ) VALUES (
-            ${user.tenant_id}, ${rec.studentId}, ${rec.courseId}, ${rec.paymentType},
-            ${rec.amount}, ${rec.paymentDate || new Date().toISOString().split('T')[0]},
-            ${rec.periodMonth}, 'paid', ${rec.notes || null}, ${user.id}, NOW()
+          INSERT INTO manage_payments (
+            tenant_id, enrollment_id, amount, payment_method,
+            paid_at, status, created_at
           )
+          SELECT
+            ${user.tenant_id},
+            me.id,
+            ${rec.amount},
+            ${rec.paymentType || 'cash'},
+            ${rec.paymentDate ? rec.paymentDate + 'T00:00:00Z' : new Date().toISOString()}::timestamptz,
+            'paid',
+            NOW()
+          FROM manage_enrollments me
+          WHERE me.student_id = ${rec.studentId}
+            AND me.course_id = ${rec.courseId}
+            AND me.tenant_id = ${user.tenant_id}
+            AND me.status = 'active'
+          LIMIT 1
         `)
       }
 
@@ -285,12 +293,12 @@ billingRoutes.post('/billing/payment-records/batch',
         void (async () => {
           try {
             const [info] = await db.execute(sql`
-              SELECT s.full_name, c.name as course_name
-              FROM students s LEFT JOIN courses c ON c.id = ${rec.courseId}
+              SELECT s.name, c.name as course_name
+              FROM manage_students s LEFT JOIN manage_courses c ON c.id = ${rec.courseId}
               WHERE s.id = ${rec.studentId} LIMIT 1
             `) as any[]
             if (info) {
-              await notifyBillingPaid(user.tenant_id, rec.studentId, info.full_name || '', info.course_name || '', rec.amount)
+              await notifyBillingPaid(user.tenant_id, rec.studentId, info.name || '', info.course_name || '', rec.amount)
             }
           } catch { /* fire-and-forget */ }
         })()
@@ -312,17 +320,18 @@ billingRoutes.get('/billing/payment-records', requirePermission(Permission.BILLI
 
   try {
     const conditions = [sql`pr.tenant_id = ${user.tenant_id}`]
-    if (courseId) conditions.push(sql`pr.course_id = ${courseId}`)
-    if (periodMonth) conditions.push(sql`pr.period_month = ${periodMonth}`)
-    if (studentId) conditions.push(sql`pr.student_id = ${studentId}`)
+    if (courseId) conditions.push(sql`me.course_id = ${courseId}`)
+    // periodMonth filter removed — manage_payments no longer has period_month column
+    if (studentId) conditions.push(sql`me.student_id = ${studentId}`)
 
     const where = sql.join(conditions, sql` AND `)
 
     const rowsData = await db.execute(sql`
-      SELECT pr.*, s.full_name as student_name, c.name as course_name
-      FROM payment_records pr
-      LEFT JOIN students s ON pr.student_id = s.id
-      LEFT JOIN courses c ON pr.course_id = c.id
+      SELECT pr.*, s.name as student_name, c.name as course_name
+      FROM manage_payments pr
+      LEFT JOIN manage_enrollments me ON pr.enrollment_id = me.id
+      LEFT JOIN manage_students s ON me.student_id = s.id
+      LEFT JOIN manage_courses c ON me.course_id = c.id
       WHERE ${where}
       ORDER BY pr.created_at DESC
       LIMIT 100

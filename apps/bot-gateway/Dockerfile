@@ -22,9 +22,6 @@ RUN pnpm build
 FROM node:20-slim
 WORKDIR /app
 
-# Install tsx globally for loading shared package .ts files
-RUN npm install -g tsx
-
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 appuser
 
 COPY --from=builder --chown=appuser:nodejs /app/apps/bot-gateway/dist ./apps/bot-gateway/dist
@@ -37,4 +34,4 @@ WORKDIR /app/apps/bot-gateway
 ENV NODE_ENV=production
 USER appuser
 EXPOSE 3300
-CMD ["tsx", "dist/index.js"]
+CMD ["node", "dist/index.js"]

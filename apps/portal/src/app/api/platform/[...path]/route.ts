@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDemoResponse, DEMO_SUPERADMIN_ID } from '@/lib/demo-data'
 
-const BACKEND_URL = process.env.PORTAL_BACKEND_URL || 'http://localhost:3103'
+const BACKEND_URL = process.env.PORTAL_BACKEND_URL || 'http://localhost:3100'
 
 function isDemoToken(request: NextRequest): boolean {
   try {

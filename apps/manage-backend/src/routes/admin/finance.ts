@@ -47,7 +47,7 @@ financeRoutes.get('/finance/summary',
       // Revenue: sum of paid billing amounts in period
       const [revenue] = await db.execute(sql`
         SELECT COALESCE(SUM(amount), 0)::numeric AS total
-        FROM manage_billing_records
+        FROM manage_payments
         WHERE tenant_id = ${tenantId}
           AND status = 'paid'
           AND paid_at >= ${startDate}::date
@@ -78,7 +78,7 @@ financeRoutes.get('/finance/summary',
         SELECT COUNT(*)::int AS total
         FROM manage_teachers
         WHERE tenant_id = ${tenantId}
-          AND is_active = true
+          AND deleted_at IS NULL
       `) as any[]
 
       // Monthly breakdown for chart (when mode is year or quarter)
@@ -92,7 +92,7 @@ financeRoutes.get('/finance/summary',
           FROM generate_series(${startDate}::date, ${endDate}::date, '1 month') AS d(month)
           LEFT JOIN LATERAL (
             SELECT SUM(amount) AS total
-            FROM manage_billing_records
+            FROM manage_payments
             WHERE tenant_id = ${tenantId} AND status = 'paid'
               AND paid_at >= d.month AND paid_at < d.month + interval '1 month'
           ) r ON true
@@ -157,7 +157,7 @@ financeRoutes.post('/finance/ai-analysis',
       // Gather financial data for AI analysis
       const [revData] = await db.execute(sql`
         SELECT COALESCE(SUM(amount), 0)::numeric AS total, COUNT(*)::int AS count
-        FROM manage_billing_records
+        FROM manage_payments
         WHERE tenant_id = ${tenantId} AND status = 'paid'
           AND paid_at >= ${startDate}::date AND paid_at <= ${endDate}::date
       `) as any[]

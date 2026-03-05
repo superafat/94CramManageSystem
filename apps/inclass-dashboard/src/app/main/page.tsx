@@ -513,7 +513,7 @@ export default function Home() {
                     {a.status !== 'absent' && (
                       <button
                         onClick={() => {
-                          const student = students.find((s: Student) => s.name === a.studentName)
+                          const student = students.find((s: Student) => s.id === a.studentId)
                           if (student) openPaymentModal(student)
                         }}
                         style={{ padding: '4px 10px', borderRadius: '8px', fontSize: '11px', background: 'var(--accent)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}

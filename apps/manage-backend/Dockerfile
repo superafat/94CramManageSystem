@@ -31,5 +31,5 @@ COPY --from=builder --chown=appuser:nodejs /app/package.json ./package.json
 WORKDIR /app/apps/manage-backend
 ENV NODE_ENV=production
 USER appuser
-EXPOSE 8080
+EXPOSE 3100
 CMD ["node", "dist/index.js"]

@@ -13,7 +13,7 @@
     "@94cram/shared": "workspace:*",
     "next": "^15.0.0",
     "react": "^19.0.0",
-    "jose": "^5.0.0",
+    "jose": "^6.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.12.0"
   },

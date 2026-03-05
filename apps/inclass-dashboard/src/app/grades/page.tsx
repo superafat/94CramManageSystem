@@ -82,6 +82,7 @@ export default function GradesPage() {
   const [scoreInputs, setScoreInputs] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
 
   // Stats
   const [examStats, setExamStats] = useState<ExamStats | null>(null)
@@ -111,6 +112,7 @@ export default function GradesPage() {
       setExams(data.exams || [])
     } catch (e) {
       console.error(e)
+      setError('讀取考試列表失敗')
     }
   }
 
@@ -120,6 +122,7 @@ export default function GradesPage() {
       setStudents(data.students || [])
     } catch (e) {
       console.error(e)
+      setError('讀取學生列表失敗')
     }
   }
 
@@ -231,6 +234,14 @@ export default function GradesPage() {
     return (
       <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
         載入中...
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center', color: 'var(--error)' }}>
+        {error}
       </div>
     )
   }

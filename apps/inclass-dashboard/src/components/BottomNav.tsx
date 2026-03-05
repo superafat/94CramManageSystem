@@ -11,8 +11,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { emoji: '📸', label: '刷臉', path: '/main' },
-  { emoji: '📋', label: '名單', path: '/main' },
+  { emoji: '📸', label: '點名', path: '/main' },
   { emoji: '📊', label: '儀表板', path: '/dashboard' },
   { emoji: '📝', label: '成績', path: '/grades' },
   { emoji: '📅', label: '出勤', path: '/attendance' },

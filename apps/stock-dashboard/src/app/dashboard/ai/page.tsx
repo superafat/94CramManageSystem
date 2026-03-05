@@ -23,7 +23,7 @@ export default function AiPage() {
 
   const load = async () => {
     const res = await api.get<Prediction[]>('/ai/predictions');
-    setPredictions(res.data);
+    setPredictions(res.data ?? []);
   };
 
   useEffect(() => {

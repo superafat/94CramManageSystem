@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Package, AlertTriangle, Search, Warehouse, ShoppingCart, ChevronDown, ChevronRight } from 'lucide-react';
 import api from '@/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
@@ -478,9 +478,8 @@ export default function InventoryPage() {
                 const isBatchLoading = batchLoading === item.id;
 
                 return (
-                  <>
+                  <React.Fragment key={item.id}>
                     <tr
-                      key={item.id}
                       className={`transition-colors cursor-pointer ${isLowStock ? 'bg-yellow-50 hover:bg-yellow-100' : 'hover:bg-gray-50'}`}
                       onClick={() => toggleRow(item)}
                       title="點擊查看批次資料"
@@ -585,7 +584,7 @@ export default function InventoryPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 );
               })
             )}
