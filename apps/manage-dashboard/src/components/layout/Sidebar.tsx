@@ -41,6 +41,7 @@ const navItems: NavItem[] = [
   // 講師管理區塊 (W8)
   { type: 'separator', separator: '講師管理', roles: ['superadmin', 'admin'] },
   { href: '/teachers', icon: '👨‍🏫', label: '講師名單', roles: ['superadmin', 'admin'] },
+  { href: '/schedules', icon: '📅', label: '課表管理', roles: ['superadmin', 'admin'] },
   { href: '/teacher-attendance', icon: '🕐', label: '師資出缺勤', roles: ['superadmin', 'admin'] },
   { href: '/salary', icon: '💵', label: '薪資管理', roles: ['superadmin', 'admin'] },
   { href: '/expenses', icon: '🧾', label: '支出管理', roles: ['superadmin', 'admin'] },

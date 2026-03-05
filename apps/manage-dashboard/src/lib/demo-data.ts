@@ -1159,6 +1159,34 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
       const paged = filtered.slice(offset, offset + limit)
       return { status: 200, body: { success: true, data: { conversations: paged, pagination: { total: filtered.length, limit, offset } } } }
     }
+
+    // ===== 招生管理 =====
+    if (path === '/api/admin/enrollment/funnel') {
+      return { status: 200, body: { success: true, data: {
+        stages: [
+          { stage: 'inquiry', label: '諮詢', count: 28, percentage: 100 },
+          { stage: 'trial', label: '試聽', count: 18, percentage: 64 },
+          { stage: 'follow_up', label: '跟進中', count: 12, percentage: 43 },
+          { stage: 'enrolled', label: '已報名', count: 8, percentage: 29 },
+        ],
+        leads: [
+          { id: 'lead-1', name: '張小明', phone: '0912-111-222', source: 'LINE', status: 'trial', grade: '國中二年級', subject: '數學', created_at: '2026-02-28T10:00:00Z', follow_up_date: '2026-03-07', note: '對數學加強班有興趣' },
+          { id: 'lead-2', name: '李美玲', phone: '0923-333-444', source: '電話', status: 'inquiry', grade: '國小六年級', subject: '英文', created_at: '2026-03-01T14:30:00Z', follow_up_date: null, note: '詢問暑期先修班' },
+          { id: 'lead-3', name: '王大維', phone: '0934-555-666', source: '現場', status: 'enrolled', grade: '國中一年級', subject: '數學、英文', created_at: '2026-02-20T09:00:00Z', follow_up_date: null, note: '已完成報名繳費' },
+          { id: 'lead-4', name: '陳小華', phone: '0945-777-888', source: 'LINE', status: 'follow_up', grade: '國中三年級', subject: '理化', created_at: '2026-02-25T16:00:00Z', follow_up_date: '2026-03-05', note: '考慮會考衝刺班' },
+          { id: 'lead-5', name: '林芳如', phone: '0956-999-000', source: '網站', status: 'trial', grade: '國小五年級', subject: '國文', created_at: '2026-03-02T11:00:00Z', follow_up_date: '2026-03-08', note: '預約 3/8 試聽作文班' },
+          { id: 'lead-6', name: '黃志豪', phone: '0967-111-333', source: '轉介紹', status: 'enrolled', grade: '國中二年級', subject: '英文', created_at: '2026-02-18T13:00:00Z', follow_up_date: null, note: '王大維同學推薦' },
+        ],
+      } } }
+    }
+    if (path === '/api/admin/enrollment/conversion') {
+      return { status: 200, body: { success: true, data: {
+        total_leads: 28,
+        conversion_rate: 28.6,
+        trials_scheduled: 18,
+        enrolled_count: 8,
+      } } }
+    }
   }
 
   // Write operations — return success
@@ -1267,6 +1295,10 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
   }
 
   if (method === 'PUT' || method === 'PATCH') {
+    // 招生管理 — Lead status change
+    if (path.match(/\/api\/admin\/enrollment\/lead\/[\w-]+\/status$/)) {
+      return { status: 200, body: { success: true, data: { message: '狀態已更新' } } }
+    }
     // Makeup Slots — 補課時段 PUT
     const makeupSlotPutMatch = path.match(/^\/api\/admin\/makeup-slots\/([\w-]+)$/)
     if (makeupSlotPutMatch) {
