@@ -16,8 +16,8 @@ interface FailedLoginLog {
 }
 
 interface FailedLoginsResponse {
-  data: FailedLoginLog[]
-  meta: {
+  data: {
+    logs: FailedLoginLog[]
     pagination: {
       page: number
       limit: number
@@ -108,8 +108,8 @@ export default function SecurityPage() {
         days: String(days),
       })
       const res = await platformFetch<FailedLoginsResponse>(`/security/failed-logins?${params}`)
-      setLogs(res.data)
-      setPagination(res.meta.pagination)
+      setLogs(res.data.logs ?? [])
+      setPagination(res.data.pagination)
     } catch (err) {
       setLogsError(err instanceof Error ? err.message : '載入失敗')
     } finally {
