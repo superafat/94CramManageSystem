@@ -16,9 +16,11 @@ const NAV_ITEMS: NavItem[] = [
   { emoji: '📊', label: '儀表板', path: '/dashboard' },
   { emoji: '📝', label: '成績', path: '/grades' },
   { emoji: '📅', label: '出勤', path: '/attendance' },
+  { emoji: '📓', label: '聯絡簿', path: '/contact-book' },
   { emoji: '📈', label: '報表', path: '/reports' },
   { emoji: '💰', label: '繳費', path: '/billing' },
   { emoji: '📚', label: '說明', path: '/guide' },
+  { emoji: '🔄', label: '補課', path: '/makeup-classes' },
   { emoji: '⚙️', label: '管理', path: '/admin', adminOnly: true },
 ]
 

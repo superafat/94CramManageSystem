@@ -42,6 +42,7 @@ import parentExtRoutes from './routes/parent-ext.js'
 import faceRoutes from './routes/face.js'
 import { contactBookRoutes } from './routes/contact-book.js'
 import { contactBookParentRoutes } from './routes/contact-book-parent.js'
+import { makeupClassRoutes } from './routes/makeup-classes.js'
 import { loadModels } from './services/faceRecognition.js'
 type Variables = {
   schoolId: string
@@ -192,6 +193,8 @@ app.route('/api/face', faceRoutes)
 // Contact book routes (migrated from manage-backend)
 app.route('/api/contact-book', contactBookRoutes)
 app.route('/api/parent/contact-book', contactBookParentRoutes)
+// Makeup class routes (migrated from manage-backend)
+app.route('/api/makeup-classes', makeupClassRoutes)
 // ===== Global Error Handler =====
 app.onError((err, c) => {
   logger.error({ err }, `[Global Error Handler] ${c.req.path}`)
