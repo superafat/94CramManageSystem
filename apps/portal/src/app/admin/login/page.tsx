@@ -51,8 +51,9 @@ export default function AdminLoginPage() {
         return
       }
 
-      const data = await res.json()
-      setToken(data.token)
+      const result = await res.json()
+      const token = result.data?.token || result.token
+      setToken(token)
       router.push('/admin')
     } catch {
       setError('網路錯誤，請確認連線狀態')
