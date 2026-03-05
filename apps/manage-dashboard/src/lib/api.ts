@@ -109,6 +109,19 @@ function headers(): Record<string, string> {
   }
 }
 
+// Guard against multiple simultaneous 401 redirects
+let isRedirecting = false
+function handleAuthFailure(): never {
+  if (!isRedirecting && typeof window !== 'undefined') {
+    isRedirecting = true
+    localStorage.removeItem('user')
+    localStorage.removeItem('tenantId')
+    localStorage.removeItem('branchId')
+    window.location.href = '/login'
+  }
+  return undefined as never
+}
+
 // Enhanced fetch with error handling, retry, and caching
 interface FetchOptions extends Omit<RequestInit, 'cache'> {
   useCache?: boolean
@@ -139,13 +152,8 @@ async function enhancedFetch<T>(
         const res = await fetch(url, { ...fetchOptions, credentials: 'include' })
         
         if (!res.ok) {
-          // 401 = token expired or invalid → redirect to login
-          if (res.status === 401 && typeof window !== 'undefined') {
-            localStorage.removeItem('user')
-            localStorage.removeItem('tenantId')
-            localStorage.removeItem('branchId')
-            window.location.href = '/login'
-            return undefined as never
+          if (res.status === 401) {
+            return handleAuthFailure()
           }
           const errorText = await res.text().catch(() => res.statusText)
           throw new APIError(
@@ -302,12 +310,8 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
     },
   })
   if (!res.ok) {
-    if (res.status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('user')
-      localStorage.removeItem('tenantId')
-      localStorage.removeItem('branchId')
-      window.location.href = '/login'
-      return undefined as never
+    if (res.status === 401) {
+      return handleAuthFailure()
     }
     throw new Error(`API ${res.status}: ${res.statusText}`)
   }

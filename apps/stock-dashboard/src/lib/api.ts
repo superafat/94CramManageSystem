@@ -5,11 +5,13 @@ const api = axios.create({
   withCredentials: true,
 });
 
+let isRedirecting = false;
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error?.response?.status === 401) {
-      if (typeof window !== 'undefined') {
+      if (!isRedirecting && typeof window !== 'undefined') {
+        isRedirecting = true;
         window.location.href = '/login';
       }
     }

@@ -344,22 +344,35 @@ app.post('/notify/monthly-summary', async (c) => {
       ORDER BY s.tenant_id, s.full_name
     `)
     const students = rows(studentsResult)
+    if (students.length === 0) return c.json({ success: true, dispatched: 0 })
+
+    const studentIds = (students as Array<{ id: string }>).map(s => s.id)
+
+    // Batch: 一次取得所有學生當月成績（避免 N+1）
+    const allScoresResult = await db.execute(sql`
+      SELECT ce.student_id, cs.subject, cs.score, cs.full_score, c.name as course_name
+      FROM manage_contact_book_scores cs
+      JOIN manage_contact_book_entries ce ON cs.entry_id = ce.id
+      LEFT JOIN manage_courses c ON ce.course_id = c.id
+      WHERE ce.student_id = ANY(${studentIds})
+        AND ce.entry_date >= ${month + '-01'}
+        AND ce.entry_date < (${month + '-01'}::date + INTERVAL '1 month')
+        AND ce.status = 'sent'
+      ORDER BY ce.entry_date
+    `)
+    const allScores = rows(allScoresResult) as Array<{ student_id: string; subject: string; score: string; full_score: string; course_name: string }>
+
+    // Group scores by student
+    const scoresByStudent = new Map<string, typeof allScores>()
+    for (const score of allScores) {
+      const list = scoresByStudent.get(score.student_id) || []
+      list.push(score)
+      scoresByStudent.set(score.student_id, list)
+    }
 
     let dispatched = 0
     for (const student of students as any[]) {
-      // 取得該學生當月所有成績
-      const scoresResult = await db.execute(sql`
-        SELECT cs.subject, cs.score, cs.full_score, c.name as course_name
-        FROM manage_contact_book_scores cs
-        JOIN manage_contact_book_entries ce ON cs.entry_id = ce.id
-        LEFT JOIN manage_courses c ON ce.course_id = c.id
-        WHERE ce.student_id = ${student.id}
-          AND ce.entry_date >= ${month + '-01'}
-          AND ce.entry_date < (${month + '-01'}::date + INTERVAL '1 month')
-          AND ce.status = 'sent'
-        ORDER BY ce.entry_date
-      `)
-      const scores = rows(scoresResult) as any[]
+      const scores = scoresByStudent.get(student.id) || []
 
       if (scores.length === 0) continue
 

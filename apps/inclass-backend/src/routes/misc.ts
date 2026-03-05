@@ -31,7 +31,7 @@ const teacherSchema = z.object({
 miscRouter.get('/teachers', async (c) => {
   try {
     const schoolId = c.get('schoolId')
-    const teachers = await db.select().from(manageTeachers).where(eq(manageTeachers.tenantId, schoolId))
+    const teachers = await db.select().from(manageTeachers).where(eq(manageTeachers.tenantId, schoolId)).limit(500)
     return c.json({ teachers })
   } catch (e) {
     logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching teachers`)
@@ -61,7 +61,7 @@ miscRouter.post('/teachers', zValidator('json', teacherSchema), async (c) => {
 miscRouter.get('/schedules', async (c) => {
   try {
     const schoolId = c.get('schoolId')
-    const schedules = await db.select().from(inclassSchedules).where(eq(inclassSchedules.tenantId, schoolId))
+    const schedules = await db.select().from(inclassSchedules).where(eq(inclassSchedules.tenantId, schoolId)).limit(500)
     return c.json({ schedules })
   } catch (e) {
     logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching schedules`)
@@ -134,7 +134,7 @@ miscRouter.get('/reports/attendance', async (c) => {
       eq(inclassAttendances.tenantId, schoolId),
       gte(inclassAttendances.date, startDate),
       lt(inclassAttendances.date, endDate),
-    ))
+    )).limit(5000)
 
     const present = records.filter(r => r.status === 'present').length
     const late = records.filter(r => r.status === 'late').length
@@ -167,7 +167,7 @@ miscRouter.get('/payment-records', async (c) => {
     if (classId) conditions.push(eq(inclassPaymentRecords.courseId, classId))
     if (periodMonth) conditions.push(eq(inclassPaymentRecords.periodMonth, periodMonth))
 
-    const records = await db.select().from(inclassPaymentRecords).where(and(...conditions))
+    const records = await db.select().from(inclassPaymentRecords).where(and(...conditions)).limit(1000)
     return c.json({ records })
   } catch (e) {
     logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Error fetching payment records`)

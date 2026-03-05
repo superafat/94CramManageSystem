@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { getAuthHeaders } from '@/lib/api'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -67,13 +68,6 @@ interface Student {
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10)
-}
-
-function getAuthHeaders(): HeadersInit {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
-  const headers: HeadersInit = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  return headers
 }
 
 function avatarBg(name: string): string {

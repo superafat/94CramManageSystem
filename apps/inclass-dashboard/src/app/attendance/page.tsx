@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { getAuthHeaders } from '@/lib/api'
 
 // --- Types ---
 interface AttendanceStats {
@@ -45,13 +46,6 @@ interface Student {
 }
 
 // --- Helpers ---
-function getAuthHeaders(): HeadersInit {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
-  const headers: HeadersInit = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  return headers
-}
-
 function formatTime(timeStr: string | null | undefined): string {
   if (!timeStr) return '—'
   try {

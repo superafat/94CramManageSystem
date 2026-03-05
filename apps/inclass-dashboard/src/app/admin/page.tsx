@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { getAuthHeaders } from '@/lib/api'
 import AdminHeader from './components/AdminHeader'
 import PendingUsersSection from './components/PendingUsersSection'
 import ClassManagementSection from './components/ClassManagementSection'
@@ -48,10 +49,6 @@ function isUser(value: unknown): value is User {
 }
 
 const API_BASE = ''
-
-function getAuthHeaders() {
-  return { 'Content-Type': 'application/json' }
-}
 
 export default function AdminPage() {
   const router = useRouter()

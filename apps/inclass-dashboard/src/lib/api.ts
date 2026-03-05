@@ -77,7 +77,7 @@ interface NotificationInput {
   message: string
 }
 
-function getAuthHeaders(): HeadersInit {
+export function getAuthHeaders(): HeadersInit {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   }
@@ -116,6 +116,7 @@ async function fetchWithRetry<T>(
 }
 
 export const api = {
+  _isRedirecting: false,
   // Generic fetch wrapper with retry
   async fetch(endpoint: string, options: RequestInit = {}) {
     return fetchWithRetry(async () => {
@@ -128,9 +129,12 @@ export const api = {
         },
       })
 
-      // Handle 401 - cookie expired or missing
+      // Handle 401 - cookie expired or missing (guard prevents multiple redirects)
       if (response.status === 401) {
-        window.location.href = '/login'
+        if (!api._isRedirecting && typeof window !== 'undefined') {
+          api._isRedirecting = true
+          window.location.href = '/login'
+        }
         throw new Error('Session expired')
       }
 
