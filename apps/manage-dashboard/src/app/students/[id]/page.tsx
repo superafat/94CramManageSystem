@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import QRCode from 'qrcode'
 import { apiFetch, type Student } from '@/lib/api'
 
 interface AttendanceRecord {
@@ -32,6 +33,13 @@ export default function StudentDetailPage() {
   const [grades, setGrades] = useState<GradeRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [bindingToken, setBindingToken] = useState<{
+    token: string; expiresAt: string | null; createdAt: string; usedAt: string | null; usedByLineId: string | null; qrUrl: string
+  } | null>(null)
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+  const [tokenLoading, setTokenLoading] = useState(false)
+  const [showGenerateModal, setShowGenerateModal] = useState(false)
+  const [selectedExpiry, setSelectedExpiry] = useState<'7d' | '30d' | 'forever'>('7d')
 
   useEffect(() => {
     if (!studentId) return
@@ -66,6 +74,18 @@ export default function StudentDetailPage() {
           // Grades API may not exist yet
           setGrades([])
         }
+
+        // Load existing binding token
+        try {
+          const tokenData = await apiFetch<{ success: boolean; data: { token: string; expiresAt: string | null; createdAt: string; usedAt: string | null; usedByLineId: string | null; qrUrl: string } }>(`/api/admin/students/${studentId}/binding-token`)
+          if (tokenData?.data) {
+            setBindingToken(tokenData.data)
+            const qr = await QRCode.toDataURL(tokenData.data.qrUrl, { width: 200, margin: 2 })
+            setQrDataUrl(qr)
+          }
+        } catch {
+          // Token API may not exist yet, ignore
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : '載入學生資料失敗')
       } finally {
@@ -75,6 +95,56 @@ export default function StudentDetailPage() {
 
     loadData()
   }, [studentId])
+
+  const generateToken = async () => {
+    setTokenLoading(true)
+    try {
+      const result = await apiFetch<{ success: boolean; data: { token: string; expiresAt: string | null; createdAt: string; usedAt: string | null; usedByLineId: string | null; qrUrl: string } }>(`/api/admin/students/${studentId}/binding-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expiresIn: selectedExpiry }),
+      })
+      if (result?.data) {
+        setBindingToken(result.data)
+        const qr = await QRCode.toDataURL(result.data.qrUrl, { width: 200, margin: 2 })
+        setQrDataUrl(qr)
+      }
+      setShowGenerateModal(false)
+    } catch {
+      // handle error
+    } finally {
+      setTokenLoading(false)
+    }
+  }
+
+  const revokeToken = async () => {
+    if (!confirm('確定要作廢此 QR Code？')) return
+    try {
+      await apiFetch(`/api/admin/students/${studentId}/binding-token`, { method: 'DELETE' })
+      setBindingToken(null)
+      setQrDataUrl(null)
+    } catch {
+      // handle error
+    }
+  }
+
+  const printQR = () => {
+    if (!qrDataUrl || !student) return
+    const w = window.open('', '_blank')
+    if (!w) return
+    w.document.write(`
+      <html><head><title>QR Code - ${student.name}</title>
+      <style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;}</style>
+      </head><body>
+      <h2 style="color:#8FA895;">家長綁定 QR Code</h2>
+      <img src="${qrDataUrl}" width="300" height="300" />
+      <h3>${student.name}</h3>
+      <p style="color:#666;">請使用 LINE 掃描此 QR Code 完成綁定</p>
+      <script>setTimeout(()=>window.print(),500)</script>
+      </body></html>
+    `)
+    w.document.close()
+  }
 
   if (loading) {
     return (
@@ -181,6 +251,101 @@ export default function StudentDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* 家長綁定 QR Code */}
+      <div className="bg-white rounded-2xl shadow-sm border border-border p-6">
+        <h2 className="text-lg font-semibold text-text mb-4">家長綁定 QR Code</h2>
+
+        {bindingToken ? (
+          <div className="flex items-start gap-6">
+            {/* QR Code 圖片 */}
+            {qrDataUrl && !bindingToken.usedAt && (
+              <div className="flex-shrink-0">
+                <img src={qrDataUrl} alt="QR Code" className="w-40 h-40 rounded-lg border border-border" />
+              </div>
+            )}
+
+            {/* Token 資訊 */}
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-text-muted">狀態：</span>
+                {bindingToken.usedAt ? (
+                  <span className="px-2 py-0.5 bg-[#8FA895]/10 text-[#8FA895] text-xs rounded-full font-medium">已綁定</span>
+                ) : bindingToken.expiresAt && new Date(bindingToken.expiresAt) < new Date() ? (
+                  <span className="px-2 py-0.5 bg-[#B5706E]/10 text-[#B5706E] text-xs rounded-full font-medium">已過期</span>
+                ) : (
+                  <span className="px-2 py-0.5 bg-[#6B9BD2]/10 text-[#6B9BD2] text-xs rounded-full font-medium">有效</span>
+                )}
+              </div>
+
+              {bindingToken.expiresAt && (
+                <div className="text-sm text-text-muted">
+                  過期時間：{new Date(bindingToken.expiresAt).toLocaleDateString('zh-TW')}
+                </div>
+              )}
+              {!bindingToken.expiresAt && !bindingToken.usedAt && (
+                <div className="text-sm text-text-muted">永久有效</div>
+              )}
+
+              {bindingToken.usedAt && (
+                <div className="text-sm text-text-muted">
+                  綁定時間：{new Date(bindingToken.usedAt).toLocaleDateString('zh-TW')}
+                  {bindingToken.usedByLineId && bindingToken.usedByLineId !== 'revoked' && bindingToken.usedByLineId !== 'superseded' && (
+                    <span className="ml-2">LINE: {bindingToken.usedByLineId.slice(0, 8)}...</span>
+                  )}
+                </div>
+              )}
+
+              {/* 操作按鈕 */}
+              <div className="flex gap-2 pt-2">
+                {!bindingToken.usedAt && qrDataUrl && (
+                  <button onClick={printQR} className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[#C4956A]/40 text-[#C4956A] hover:bg-[#C4956A]/10 transition-colors">
+                    列印
+                  </button>
+                )}
+                <button onClick={revokeToken} className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[#B5706E]/40 text-[#B5706E] hover:bg-[#B5706E]/10 transition-colors">
+                  作廢
+                </button>
+                <button onClick={() => setShowGenerateModal(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[#8FA895] text-white hover:bg-[#8FA895]/90 transition-colors">
+                  重新生成
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-6">
+            <p className="text-sm text-text-muted mb-4">尚未生成綁定 QR Code</p>
+            <button onClick={() => setShowGenerateModal(true)} className="px-4 py-2 bg-[#8FA895] text-white rounded-lg hover:bg-[#8FA895]/90 transition-colors text-sm font-medium">
+              生成 QR Code
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 生成 QR Code Modal */}
+      {showGenerateModal && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setShowGenerateModal(false)}>
+          <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-text mb-4">生成綁定 QR Code</h3>
+            <div className="space-y-3">
+              {(['7d', '30d', 'forever'] as const).map(opt => (
+                <label key={opt} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${selectedExpiry === opt ? 'border-[#8FA895] bg-[#8FA895]/5' : 'border-border hover:bg-gray-50'}`}>
+                  <input type="radio" name="expiry" checked={selectedExpiry === opt} onChange={() => setSelectedExpiry(opt)} className="accent-[#8FA895]" />
+                  <span className="text-sm text-text">
+                    {opt === '7d' ? '7 天有效' : opt === '30d' ? '30 天有效' : '永久有效'}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button onClick={() => setShowGenerateModal(false)} className="flex-1 px-4 py-2 border border-border rounded-lg text-sm text-text-muted hover:bg-gray-50">取消</button>
+              <button onClick={generateToken} disabled={tokenLoading} className="flex-1 px-4 py-2 bg-[#8FA895] text-white rounded-lg text-sm font-medium hover:bg-[#8FA895]/90 disabled:opacity-50">
+                {tokenLoading ? '生成中...' : '確認生成'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Attendance Records */}
       <div className="bg-white rounded-2xl shadow-sm border border-border p-6">

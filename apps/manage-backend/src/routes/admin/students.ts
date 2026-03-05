@@ -9,6 +9,7 @@ import {
   updateStudentSchema,
   sanitizeSearchTerm,
 } from '../../utils/validation'
+import { computeGrade } from '@94cram/shared/utils'
 import {
   db, sql, success, successWithPagination, badRequest, notFound, forbidden, internalError,
   rows, first, isUUID, getUserBranchId, isBranchInTenant,
@@ -79,7 +80,12 @@ studentsRoutes.get('/students', requirePermission(Permission.STUDENTS_READ), zVa
       LIMIT ${query.limit} OFFSET ${offset}
     `)
 
-    return successWithPagination(c, { students: rows(studentRows) }, {
+    const studentsWithGrade = (rows(studentRows) as any[]).map((s) => ({
+      ...s,
+      computed_grade: s.date_of_birth ? computeGrade(s.date_of_birth) : null,
+    }))
+
+    return successWithPagination(c, { students: studentsWithGrade }, {
       page: query.page,
       limit: query.limit,
       total,
@@ -158,7 +164,12 @@ studentsRoutes.get('/students/:id',
         LIMIT 20
       `)
 
-      return success(c, { student, enrollments: rows(enrollments), attendance: rows(attendance), grades: rows(grades) })
+      const studentWithGrade = {
+        ...student,
+        computed_grade: student.date_of_birth ? computeGrade(student.date_of_birth) : null,
+      }
+
+      return success(c, { student: studentWithGrade, enrollments: rows(enrollments), attendance: rows(attendance), grades: rows(grades) })
     } catch (err) {
       return internalError(c, err)
     }
@@ -180,12 +191,17 @@ studentsRoutes.post('/students',
 
       const studentCode = body.studentCode || ('S' + Date.now().toString(36).toUpperCase())
 
+      // Auto-compute grade_level from dateOfBirth if not explicitly provided
+      const gradeLevel = body.gradeLevel
+        ?? (body.dateOfBirth ? computeGrade(body.dateOfBirth) : null)
+        ?? null
+
       const [result] = await db.execute(sql`
         INSERT INTO students (tenant_id, branch_id, student_code, full_name, nickname, gender,
           date_of_birth, school_name, grade_level, phone, email, address, notes)
         VALUES (${tenantId}, ${body.branchId ?? null}, ${studentCode},
           ${body.fullName}, ${body.nickname ?? null}, ${body.gender ?? null},
-          ${body.dateOfBirth ?? null}::date, ${body.schoolName ?? null}, ${body.gradeLevel ?? null},
+          ${body.dateOfBirth ?? null}::date, ${body.schoolName ?? null}, ${gradeLevel},
           ${body.phone ?? null}, ${body.email ?? null}, ${body.address ?? null}, ${body.notes ?? null})
         RETURNING id
       `) as any[]
@@ -212,15 +228,21 @@ studentsRoutes.put('/students/:id',
         return badRequest(c, 'Invalid branchId for current tenant')
       }
 
+      // If dateOfBirth is provided, auto-compute grade_level
+      const gradeLevel = body.dateOfBirth
+        ? (computeGrade(body.dateOfBirth) ?? body.gradeLevel ?? null)
+        : (body.gradeLevel ?? null)
+
       const result = await db.execute(sql`
         UPDATE students SET
           full_name = COALESCE(${body.fullName ?? null}, full_name),
           nickname = COALESCE(${body.nickname ?? null}, nickname),
           branch_id = COALESCE(${body.branchId ?? null}, branch_id),
-          grade_level = COALESCE(${body.gradeLevel ?? null}, grade_level),
+          grade_level = COALESCE(${gradeLevel}, grade_level),
           school_name = COALESCE(${body.schoolName ?? null}, school_name),
           phone = COALESCE(${body.phone ?? null}, phone),
           email = COALESCE(${body.email ?? null}, email),
+          date_of_birth = COALESCE(${body.dateOfBirth ?? null}::date, date_of_birth),
           status = COALESCE(${body.status ?? null}, status),
           notes = COALESCE(${body.notes ?? null}, notes),
           updated_at = NOW()

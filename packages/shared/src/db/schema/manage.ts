@@ -32,6 +32,7 @@ export const manageStudents = pgTable('manage_students', {
   phone: varchar('phone', { length: 20 }),
   email: varchar('email', { length: 255 }),
   grade: varchar('grade', { length: 20 }),
+  dateOfBirth: date('date_of_birth'),  // 出生日期（nullable，雙軌並行）
   school: varchar('school', { length: 255 }),
   guardianName: varchar('guardian_name', { length: 100 }),
   guardianPhone: varchar('guardian_phone', { length: 20 }),
@@ -40,6 +41,21 @@ export const manageStudents = pgTable('manage_students', {
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
   tenantIdx: index('manage_students_tenant_id_idx').on(table.tenantId),
+}));
+
+// QR Code 家長綁定 Token
+export const manageBindingTokens = pgTable('manage_binding_tokens', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  studentId: uuid('student_id').references(() => manageStudents.id).notNull(),
+  token: varchar('token', { length: 64 }).notNull().unique(),
+  expiresAt: timestamp('expires_at'),         // null = 永久有效
+  usedAt: timestamp('used_at'),               // null = 未使用
+  usedByLineId: varchar('used_by_line_id', { length: 255 }),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  tokenIdx: uniqueIndex('idx_binding_tokens_token').on(table.token),
+  studentIdx: index('idx_binding_tokens_student').on(table.tenantId, table.studentId),
 }));
 
 // 報名/選課

@@ -6,6 +6,26 @@ import { useRouter } from 'next/navigation'
 
 const API_BASE = ''
 
+// 台灣學制年級自動計算
+function computeGrade(dateOfBirth: string): string | null {
+  const dob = new Date(dateOfBirth)
+  if (isNaN(dob.getTime())) return null
+  const ref = new Date()
+  const academicYear = ref.getMonth() >= 8 ? ref.getFullYear() : ref.getFullYear() - 1
+  const academicStart = new Date(academicYear, 8, 1)
+  let age = academicStart.getFullYear() - dob.getFullYear()
+  const monthDiff = academicStart.getMonth() - dob.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && academicStart.getDate() < dob.getDate())) age--
+  if (age < 3) return '未就學'
+  if (age > 17) return '已畢業'
+  const labels: Record<number, string> = {
+    3: '幼兒園小班', 4: '幼兒園中班', 5: '幼兒園大班',
+    6: '小一', 7: '小二', 8: '小三', 9: '小四', 10: '小五', 11: '小六',
+    12: '國一', 13: '國二', 14: '國三', 15: '高一', 16: '高二', 17: '高三',
+  }
+  return labels[age] ?? null
+}
+
 function getTenantId() {
   return typeof window !== 'undefined' ? localStorage.getItem('tenantId') || '' : ''
 }
@@ -29,6 +49,8 @@ interface Student {
   school_name?: string
   status: string
   notes?: string
+  date_of_birth?: string
+  computed_grade?: string | null
   enrollment_date?: string
   enrollments?: StudentEnrollment[]
 }
@@ -39,7 +61,7 @@ const GRADE_OPTIONS = [
   '高一', '高二', '高三',
 ]
 
-const emptyForm = { fullName: '', gradeLevel: '', phone: '', email: '', schoolName: '', notes: '' }
+const emptyForm = { fullName: '', gradeLevel: '', phone: '', email: '', schoolName: '', notes: '', dateOfBirth: '' }
 
 export default function StudentsPage() {
   const router = useRouter()
@@ -110,6 +132,7 @@ export default function StudentsPage() {
       email: student.email || '',
       schoolName: student.school_name || '',
       notes: student.notes || '',
+      dateOfBirth: student.date_of_birth || '',
     })
     setShowModal(true)
   }
@@ -133,6 +156,7 @@ export default function StudentsPage() {
           email: form.email || null,
           schoolName: form.schoolName || null,
           notes: form.notes || null,
+          dateOfBirth: form.dateOfBirth || undefined,
           branchId: getBranchId(),
         }),
       })
@@ -244,9 +268,13 @@ export default function StudentsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-medium text-text">{student.full_name}</span>
-                    {student.grade_level && (
+                    {(student.computed_grade || student.grade_level) && (
                       <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
-                        {student.grade_level}
+                        {student.computed_grade ? (
+                          <>{student.computed_grade} <span className="text-xs text-[#6B9BD2]">自動</span></>
+                        ) : (
+                          student.grade_level
+                        )}
                       </span>
                     )}
                   </div>
@@ -295,7 +323,13 @@ export default function StudentsPage() {
               filteredStudents.map((student) => (
                 <tr key={student.id} className="hover:bg-surface-hover transition-colors">
                   <td className="px-6 py-4 text-sm font-medium text-text">{student.full_name}</td>
-                  <td className="px-6 py-4 text-sm text-text-muted">{student.grade_level || '—'}</td>
+                  <td className="px-6 py-4 text-sm text-text-muted">
+                    {student.computed_grade ? (
+                      <span>{student.computed_grade} <span className="text-xs text-[#6B9BD2]">自動</span></span>
+                    ) : (
+                      <span>{student.grade_level || '—'}</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm text-text-muted">{student.school_name || '—'}</td>
                   <td className="px-6 py-4 text-sm text-text-muted">{student.phone || '—'}</td>
                   <td className="px-6 py-4 text-center"><StatusBadge status={student.status} /></td>
@@ -333,16 +367,49 @@ export default function StudentsPage() {
                   placeholder="例：王小明"
                 />
               </div>
+              {/* 出生日期 */}
               <div>
-                <label className="block text-sm text-text-muted mb-1">年級</label>
-                <select
-                  value={form.gradeLevel}
-                  onChange={(e) => setForm({ ...form, gradeLevel: e.target.value })}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text"
-                >
-                  <option value="">未選擇</option>
-                  {GRADE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
-                </select>
+                <label className="block text-sm font-medium text-text-secondary mb-1">出生日期</label>
+                <input
+                  type="date"
+                  value={form.dateOfBirth}
+                  onChange={e => {
+                    const dob = e.target.value
+                    const computed = dob ? computeGrade(dob) : null
+                    setForm(prev => ({
+                      ...prev,
+                      dateOfBirth: dob,
+                      gradeLevel: computed || prev.gradeLevel,
+                    }))
+                  }}
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+                {form.dateOfBirth && computeGrade(form.dateOfBirth) && (
+                  <p className="mt-1 text-xs text-[#6B9BD2]">
+                    自動計算：{computeGrade(form.dateOfBirth)}
+                  </p>
+                )}
+              </div>
+              {/* 年級 */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">年級</label>
+                {form.dateOfBirth && computeGrade(form.dateOfBirth) ? (
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-2 bg-gray-50 border border-border rounded-lg text-text w-full">
+                      {computeGrade(form.dateOfBirth)}
+                    </span>
+                    <span className="text-xs text-[#6B9BD2] whitespace-nowrap">自動</span>
+                  </div>
+                ) : (
+                  <select
+                    value={form.gradeLevel}
+                    onChange={e => setForm(prev => ({ ...prev, gradeLevel: e.target.value }))}
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  >
+                    <option value="">選擇年級</option>
+                    {GRADE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-text-muted mb-1">電話</label>

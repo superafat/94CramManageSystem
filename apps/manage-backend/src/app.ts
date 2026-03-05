@@ -21,6 +21,7 @@ import internalRoutes from './routes/internal'
 import parentExtRoutes from './routes/parent-ext'
 import { parentRoutes } from './routes/parent'
 import botExtRoutes from './routes/bot-ext'
+import { bindRoutes } from './routes/bind'
 import { analyticsTrackRoutes } from './routes/analytics-track'
 import { analyticsMiddleware } from './middleware/analytics'
 import { errorHandler } from './middleware/errorHandler'
@@ -155,6 +156,9 @@ app.route('/api/line', lineRoutes)
 
 // LINE LIFF API (LINE token auth via middleware inside the router)
 app.route('/api/line/contact-book', liffContactBookRoutes)
+
+// Public binding routes (no auth required)
+app.route('/api', bindRoutes)
 
 // Bot routes — require bot API key in production
 if (process.env.NODE_ENV === 'production') {

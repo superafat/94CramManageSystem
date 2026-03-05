@@ -18,14 +18,21 @@ const TENANT_STATS: Record<string, { conversations: number; knowledgeChunks: num
 
 // ===== Students =====
 const STUDENTS = [
-  { id: 's1', name: '陳小利', grade: '國一', phone: '0912-111-001', email: 'chen@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 95, average_grade: 88, risk_level: null },
-  { id: 's2', name: '王大明', grade: '國二', phone: '0912-111-002', email: 'wang@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 90, average_grade: 76, risk_level: null },
-  { id: 's3', name: '林美琪', grade: '國一', phone: '0912-111-003', email: 'lin@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 98, average_grade: 92, risk_level: null },
-  { id: 's4', name: '張志豪', grade: '國三', phone: '0912-111-004', email: 'zhang@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 80, average_grade: 67, risk_level: 'medium' },
-  { id: 's5', name: '李宜庭', grade: '小六', phone: '0912-111-005', email: 'li@demo.com', status: 'active', joined_date: '2026-02-01', attendance_rate: 85, average_grade: 0, risk_level: null },
-  { id: 's6', name: '黃柏翰', grade: '國二', phone: '0912-111-006', email: 'huang@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 92, average_grade: 83, risk_level: null },
-  { id: 's7', name: '劉思涵', grade: '國一', phone: '0912-111-007', email: 'liu@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 88, average_grade: 79, risk_level: null },
-  { id: 's8', name: '吳承恩', grade: '國三', phone: '0912-111-008', email: 'wu@demo.com', status: 'at_risk', joined_date: '2025-09-01', attendance_rate: 65, average_grade: 58, risk_level: 'high' },
+  { id: 's1', name: '陳小利', grade: '國一', date_of_birth: '2013-05-15', computed_grade: '國一', phone: '0912-111-001', email: 'chen@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 95, average_grade: 88, risk_level: null },
+  { id: 's2', name: '王大明', grade: '國二', date_of_birth: '2012-08-20', computed_grade: '國二', phone: '0912-111-002', email: 'wang@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 90, average_grade: 76, risk_level: null },
+  { id: 's3', name: '林美琪', grade: '國一', date_of_birth: '2013-11-03', computed_grade: '國一', phone: '0912-111-003', email: 'lin@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 98, average_grade: 92, risk_level: null },
+  { id: 's4', name: '張志豪', grade: '國三', date_of_birth: '2011-03-10', computed_grade: '國三', phone: '0912-111-004', email: 'zhang@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 80, average_grade: 67, risk_level: 'medium' },
+  { id: 's5', name: '李宜庭', grade: '小六', date_of_birth: '2014-07-22', computed_grade: '小六', phone: '0912-111-005', email: 'li@demo.com', status: 'active', joined_date: '2026-02-01', attendance_rate: 85, average_grade: 0, risk_level: null },
+  { id: 's6', name: '黃柏翰', grade: '國二', date_of_birth: '2012-04-18', computed_grade: '國二', phone: '0912-111-006', email: 'huang@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 92, average_grade: 83, risk_level: null },
+  { id: 's7', name: '劉思涵', grade: '國一', date_of_birth: '2013-09-25', computed_grade: '國一', phone: '0912-111-007', email: 'liu@demo.com', status: 'active', joined_date: '2025-09-01', attendance_rate: 88, average_grade: 79, risk_level: null },
+  { id: 's8', name: '吳承恩', grade: '國三', date_of_birth: '2011-12-01', computed_grade: '國三', phone: '0912-111-008', email: 'wu@demo.com', status: 'at_risk', joined_date: '2025-09-01', attendance_rate: 65, average_grade: 58, risk_level: 'high' },
+]
+
+// ===== Binding Tokens =====
+const DEMO_BINDING_TOKENS = [
+  { id: 'bt1', student_id: 's1', student_name: '陳小利', token: 'demo-token-chen-active', expires_at: '2026-03-12T00:00:00Z', used_at: null, used_by_line_id: null, created_at: '2026-03-05T10:00:00Z', qr_url: 'https://94cram.com/bind/demo-token-chen-active' },
+  { id: 'bt2', student_id: 's2', student_name: '王大明', token: 'demo-token-wang-expired', expires_at: '2026-02-20T00:00:00Z', used_at: null, used_by_line_id: null, created_at: '2026-02-13T10:00:00Z', qr_url: 'https://94cram.com/bind/demo-token-wang-expired' },
+  { id: 'bt3', student_id: 's3', student_name: '林美琪', token: 'demo-token-lin-used', expires_at: null, used_at: '2026-02-28T10:00:00Z', used_by_line_id: 'U1234567890abcdef', created_at: '2026-02-20T10:00:00Z', qr_url: 'https://94cram.com/bind/demo-token-lin-used' },
 ]
 
 // ===== Courses/Classes =====
@@ -563,6 +570,37 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     if (tenantStatsMatch) {
       const tid = tenantStatsMatch[1]
       return { status: 200, body: TENANT_STATS[tid] || { conversations: 0, knowledgeChunks: 0, branches: 0 } }
+    }
+
+    // Student APIs — grade-upgrade-preview (must be before generic students handler)
+    if (path.includes('grade-upgrade-preview')) {
+      return { status: 200, body: { success: true, data: STUDENTS.filter(s => s.date_of_birth).map(s => ({ id: s.id, name: s.name, currentGrade: s.computed_grade, nextGrade: s.computed_grade })) } }
+    }
+
+    // Student APIs — binding-token GET (must be before generic student detail handler)
+    if (method === 'GET' && path.match(/\/students\/[^/]+\/binding-token$/)) {
+      const studentId = path.split('/')[4] // extract from /api/admin/students/:id/binding-token
+      const token = DEMO_BINDING_TOKENS.find(t => t.student_id === studentId && !t.used_at)
+      if (token) {
+        const isExpired = token.expires_at && new Date(token.expires_at) < new Date()
+        return { status: 200, body: { success: true, data: isExpired ? null : { token: token.token, expiresAt: token.expires_at, createdAt: token.created_at, usedAt: token.used_at, usedByLineId: token.used_by_line_id, qrUrl: token.qr_url } } }
+      }
+      // Check for used tokens
+      const usedToken = DEMO_BINDING_TOKENS.find(t => t.student_id === studentId)
+      if (usedToken && usedToken.used_at) {
+        return { status: 200, body: { success: true, data: { token: usedToken.token, expiresAt: usedToken.expires_at, createdAt: usedToken.created_at, usedAt: usedToken.used_at, usedByLineId: usedToken.used_by_line_id, qrUrl: usedToken.qr_url } } }
+      }
+      return { status: 200, body: { success: true, data: null } }
+    }
+
+    // Student APIs — bind/:token GET (public)
+    if (method === 'GET' && path.match(/\/bind\/[^/]+$/)) {
+      const token = path.split('/').pop()!
+      const found = DEMO_BINDING_TOKENS.find(t => t.token === token)
+      if (!found) return { status: 200, body: { valid: false, reason: 'not_found' } }
+      if (found.used_at) return { status: 200, body: { valid: false, reason: 'used' } }
+      if (found.expires_at && new Date(found.expires_at) < new Date()) return { status: 200, body: { valid: false, reason: 'expired' } }
+      return { status: 200, body: { valid: true, studentName: found.student_name, tenantName: '蜂神榜示範補習班' } }
     }
 
     // Student APIs — 加上 full_name / grade_level 給出席管理頁用
@@ -1206,6 +1244,24 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
       return { status: 200, body: { success: true, data: { message: '通知已發送（Demo模式）' } } }
     }
 
+    // POST students/:id/binding-token
+    if (path.match(/\/students\/[^/]+\/binding-token$/)) {
+      const newToken = 'demo-' + Math.random().toString(36).slice(2, 10)
+      const expiresIn = body?.expiresIn || '7d'
+      const expiresAt = expiresIn === 'forever' ? null : new Date(Date.now() + (expiresIn === '30d' ? 30 : 7) * 86400000).toISOString()
+      return { status: 200, body: { success: true, data: { token: newToken, expiresAt, createdAt: new Date().toISOString(), usedAt: null, usedByLineId: null, qrUrl: `https://94cram.com/bind/${newToken}` } } }
+    }
+
+    // POST bind/:token (public)
+    if (path.match(/\/bind\/[^/]+$/)) {
+      const token = path.split('/').pop()!
+      const found = DEMO_BINDING_TOKENS.find(t => t.token === token)
+      if (!found || found.used_at || (found.expires_at && new Date(found.expires_at) < new Date())) {
+        return { status: 400, body: { success: false, reason: 'invalid_or_expired' } }
+      }
+      return { status: 200, body: { success: true, studentName: found.student_name } }
+    }
+
     // Generic POST success
     return { status: 200, body: { success: true, message: 'Demo 操作成功' } }
   }
@@ -1232,6 +1288,11 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
   }
 
   if (method === 'DELETE') {
+    // DELETE students/:id/binding-token
+    if (path.match(/\/students\/[^/]+\/binding-token$/)) {
+      return { status: 200, body: { success: true } }
+    }
+
     // Makeup Slots — 補課時段 DELETE
     const makeupSlotDeleteMatch = path.match(/^\/api\/admin\/makeup-slots\/([\w-]+)$/)
     if (makeupSlotDeleteMatch) {
