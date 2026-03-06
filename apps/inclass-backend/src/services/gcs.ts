@@ -3,7 +3,7 @@
  * Lazy-loads @google-cloud/storage to avoid heavy import at startup
  */
 let storageInstance: any = null
-const BUCKET_NAME = process.env.GCS_BUCKET_NAME ?? 'cram94-contact-book-photos'
+const BUCKET_NAME = process.env.GCS_BUCKET_NAME ?? '94allsolve-uploads'
 
 async function getStorage() {
   if (!storageInstance) {

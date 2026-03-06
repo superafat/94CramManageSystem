@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { BackButton } from '@/components/ui/BackButton'
 import { Avatar } from '@/components/ui/Avatar'
 import {
@@ -53,6 +53,13 @@ const SUBJECT_OPTIONS = [
 ]
 
 const GRADE_LEVEL_OPTIONS = ['國小', '國中', '高中']
+const AVATAR_PREVIEW_SIZE = 220
+const AVATAR_OUTPUT_SIZE = 512
+
+interface ImageDimensions {
+  width: number
+  height: number
+}
 
 const createDefaultInsurancePlan = (enabled: boolean): TeacherInsurancePlan => ({
   enabled,
@@ -122,6 +129,93 @@ function getSupplementalHealthGuidance(config: TeacherInsuranceConfig): string[]
   return guidance
 }
 
+function getAvatarBaseSize(dimensions: ImageDimensions | null) {
+  if (!dimensions) return { width: AVATAR_PREVIEW_SIZE, height: AVATAR_PREVIEW_SIZE }
+
+  const scale = Math.max(
+    AVATAR_PREVIEW_SIZE / dimensions.width,
+    AVATAR_PREVIEW_SIZE / dimensions.height,
+  )
+
+  return {
+    width: dimensions.width * scale,
+    height: dimensions.height * scale,
+  }
+}
+
+function clampAvatarOffset(offsetX: number, offsetY: number, zoom: number, dimensions: ImageDimensions | null) {
+  const base = getAvatarBaseSize(dimensions)
+  const scaledWidth = base.width * zoom
+  const scaledHeight = base.height * zoom
+  const maxX = Math.max(0, (scaledWidth - AVATAR_PREVIEW_SIZE) / 2)
+  const maxY = Math.max(0, (scaledHeight - AVATAR_PREVIEW_SIZE) / 2)
+
+  return {
+    x: Math.min(maxX, Math.max(-maxX, offsetX)),
+    y: Math.min(maxY, Math.max(-maxY, offsetY)),
+  }
+}
+
+async function loadImageDimensions(file: File): Promise<ImageDimensions> {
+  const objectUrl = URL.createObjectURL(file)
+
+  try {
+    const dimensions = await new Promise<ImageDimensions>((resolve, reject) => {
+      const image = new Image()
+      image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight })
+      image.onerror = () => reject(new Error('無法讀取圖片尺寸'))
+      image.src = objectUrl
+    })
+    return dimensions
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
+}
+
+async function cropAvatarFile(
+  file: File,
+  dimensions: ImageDimensions,
+  zoom: number,
+  offset: { x: number; y: number }
+): Promise<File> {
+  const objectUrl = URL.createObjectURL(file)
+
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image()
+      element.onload = () => resolve(element)
+      element.onerror = () => reject(new Error('無法載入圖片進行裁切'))
+      element.src = objectUrl
+    })
+
+    const canvas = document.createElement('canvas')
+    canvas.width = AVATAR_OUTPUT_SIZE
+    canvas.height = AVATAR_OUTPUT_SIZE
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('無法建立裁切畫布')
+
+    const base = getAvatarBaseSize(dimensions)
+    const ratio = AVATAR_OUTPUT_SIZE / AVATAR_PREVIEW_SIZE
+    ctx.clearRect(0, 0, AVATAR_OUTPUT_SIZE, AVATAR_OUTPUT_SIZE)
+    ctx.translate(AVATAR_OUTPUT_SIZE / 2 + offset.x * ratio, AVATAR_OUTPUT_SIZE / 2 + offset.y * ratio)
+    ctx.scale(zoom * ratio, zoom * ratio)
+    ctx.drawImage(image, -base.width / 2, -base.height / 2, base.width, base.height)
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((value) => {
+        if (value) resolve(value)
+        else reject(new Error('裁切輸出失敗'))
+      }, 'image/jpeg', 0.92)
+    })
+
+    const croppedName = file.name.replace(/\.[^.]+$/, '') || 'avatar'
+    return new File([blob], `${croppedName}-cropped.jpg`, { type: 'image/jpeg' })
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
+}
+
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [loading, setLoading] = useState(true)
@@ -129,7 +223,30 @@ export default function TeachersPage() {
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null)
   const [form, setForm] = useState(createEmptyForm())
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [localAvatarFile, setLocalAvatarFile] = useState<File | null>(null)
+  const [localAvatarPreview, setLocalAvatarPreview] = useState<string | null>(null)
+  const [localAvatarMeta, setLocalAvatarMeta] = useState<{ name: string; sizeLabel: string } | null>(null)
+  const [localAvatarDimensions, setLocalAvatarDimensions] = useState<ImageDimensions | null>(null)
+  const [avatarZoom, setAvatarZoom] = useState(1)
+  const [avatarOffset, setAvatarOffset] = useState({ x: 0, y: 0 })
+  const dragStateRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null)
   const supplementalHealthGuidance = getSupplementalHealthGuidance(form.insurance_config)
+  const avatarPreviewSrc = useMemo(() => localAvatarPreview || form.avatar_url || undefined, [localAvatarPreview, form.avatar_url])
+  const avatarBaseSize = useMemo(() => getAvatarBaseSize(localAvatarDimensions), [localAvatarDimensions])
+
+  const updateAvatarZoom = (nextZoom: number) => {
+    const clampedZoom = Math.min(2.5, Math.max(1, nextZoom))
+    setAvatarZoom(clampedZoom)
+    setAvatarOffset((current) => clampAvatarOffset(current.x, current.y, clampedZoom, localAvatarDimensions))
+  }
+
+  useEffect(() => {
+    return () => {
+      if (localAvatarPreview) {
+        URL.revokeObjectURL(localAvatarPreview)
+      }
+    }
+  }, [localAvatarPreview])
 
   const getHeaders = () => ({
     'Content-Type': 'application/json',
@@ -156,9 +273,50 @@ export default function TeachersPage() {
     }
   }
 
-  const handleAvatarUpload = async (file: File) => {
+  const resetLocalAvatarDraft = () => {
+    if (localAvatarPreview) {
+      URL.revokeObjectURL(localAvatarPreview)
+    }
+
+    setLocalAvatarFile(null)
+    setLocalAvatarPreview(null)
+    setLocalAvatarMeta(null)
+    setLocalAvatarDimensions(null)
+    setAvatarZoom(1)
+    setAvatarOffset({ x: 0, y: 0 })
+  }
+
+  const handleAvatarSelect = async (file: File) => {
+    resetLocalAvatarDraft()
+
+    const previewUrl = URL.createObjectURL(file)
+    try {
+      const dimensions = await loadImageDimensions(file)
+      setLocalAvatarFile(file)
+      setLocalAvatarPreview(previewUrl)
+      setLocalAvatarDimensions(dimensions)
+      setLocalAvatarMeta({
+        name: file.name,
+        sizeLabel: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+      })
+      setAvatarZoom(1)
+      setAvatarOffset({ x: 0, y: 0 })
+    } catch (err) {
+      URL.revokeObjectURL(previewUrl)
+      window.alert(err instanceof Error ? err.message : '無法讀取圖片')
+    }
+  }
+
+  const handleAvatarUpload = async () => {
+    if (!localAvatarFile || !localAvatarDimensions) {
+      window.alert('請先選擇要上傳的照片')
+      return
+    }
+
+    const croppedFile = await cropAvatarFile(localAvatarFile, localAvatarDimensions, avatarZoom, avatarOffset)
+
     const formData = new FormData()
-    formData.append('file', file)
+    formData.append('file', croppedFile)
     formData.append('tenantId', getTenantId())
 
     setUploadingAvatar(true)
@@ -179,6 +337,7 @@ export default function TeachersPage() {
 
       const payload = json.data ?? json
       setForm((prev) => ({ ...prev, avatar_url: payload.url || '' }))
+      resetLocalAvatarDraft()
     } catch (err) {
       console.error('Failed to upload avatar:', err)
       window.alert(err instanceof Error ? err.message : '上傳頭像失敗')
@@ -239,6 +398,7 @@ export default function TeachersPage() {
 
   const openEdit = (teacher: Teacher) => {
     setEditingTeacher(teacher)
+    resetLocalAvatarDraft()
     setForm({
       name: teacher.name,
       title: teacher.title,
@@ -268,6 +428,7 @@ export default function TeachersPage() {
 
   const openAdd = () => {
     setEditingTeacher(null)
+    resetLocalAvatarDraft()
     setForm(createEmptyForm())
     setShowModal(true)
   }
@@ -508,14 +669,141 @@ export default function TeachersPage() {
               <fieldset className="space-y-3">
                 <legend className="text-sm font-semibold text-primary mb-2">基本資料</legend>
                 <div className="rounded-2xl border border-dashed border-border bg-background/60 p-4">
-                  <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center">
-                    <Avatar src={form.avatar_url || undefined} fallback={form.name || '教師'} size="xl" className="border border-border bg-white" />
+                  <div className="grid gap-5 md:grid-cols-[minmax(0,220px),1fr] md:items-center">
+                    <div className="space-y-3">
+                      <div
+                        className="relative mx-auto aspect-square w-full max-w-[220px] overflow-hidden rounded-[28px] border border-border bg-white shadow-sm"
+                        onWheel={(event) => {
+                          if (!localAvatarFile) return
+                          event.preventDefault()
+                          const direction = event.deltaY > 0 ? -0.08 : 0.08
+                          updateAvatarZoom(avatarZoom + direction)
+                        }}
+                      >
+                        {avatarPreviewSrc ? (
+                          <img
+                            src={avatarPreviewSrc}
+                            alt="頭像裁切預覽"
+                            className={`absolute left-1/2 top-1/2 max-w-none select-none ${localAvatarFile ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                            draggable={false}
+                            onPointerDown={(event) => {
+                              if (!localAvatarFile) return
+                              dragStateRef.current = {
+                                startX: event.clientX,
+                                startY: event.clientY,
+                                originX: avatarOffset.x,
+                                originY: avatarOffset.y,
+                              }
+                              event.currentTarget.setPointerCapture(event.pointerId)
+                            }}
+                            onPointerMove={(event) => {
+                              if (!dragStateRef.current || !localAvatarFile) return
+                              const deltaX = event.clientX - dragStateRef.current.startX
+                              const deltaY = event.clientY - dragStateRef.current.startY
+                              setAvatarOffset(clampAvatarOffset(
+                                dragStateRef.current.originX + deltaX,
+                                dragStateRef.current.originY + deltaY,
+                                avatarZoom,
+                                localAvatarDimensions,
+                              ))
+                            }}
+                            onPointerUp={() => {
+                              dragStateRef.current = null
+                            }}
+                            onPointerCancel={() => {
+                              dragStateRef.current = null
+                            }}
+                            onPointerLeave={() => {
+                              dragStateRef.current = null
+                            }}
+                            style={{
+                              width: `${avatarBaseSize.width}px`,
+                              height: `${avatarBaseSize.height}px`,
+                              transform: `translate(calc(-50% + ${avatarOffset.x}px), calc(-50% + ${avatarOffset.y}px)) scale(${avatarZoom})`,
+                            }}
+                          />
+                        ) : (
+                          <div className="flex h-full w-full flex-col items-center justify-center bg-[linear-gradient(135deg,rgba(232,223,213,0.65),rgba(216,232,240,0.45))] px-6 text-center">
+                            <div className="text-4xl">👤</div>
+                            <p className="mt-3 text-sm font-medium text-text">將大頭貼放進虛線輪廓</p>
+                            <p className="mt-1 text-xs text-text-muted">系統會以置中圓形方式顯示頭像</p>
+                          </div>
+                        )}
+
+                        <div className="pointer-events-none absolute inset-0">
+                          <div className="absolute inset-3 rounded-[24px] border border-white/60" />
+                          <div className="absolute inset-5 rounded-full border-2 border-dashed border-white shadow-[0_0_0_9999px_rgba(15,23,42,0.18)]" />
+                          <div className="absolute inset-x-0 bottom-4 flex justify-center">
+                            <span className="rounded-full bg-black/45 px-3 py-1 text-[11px] font-medium tracking-wide text-white">請讓臉部落在虛線圈內</span>
+                          </div>
+                        </div>
+
+                      </div>
+
+                      <div className="flex items-center justify-center gap-3">
+                        <div className="space-y-2 text-center">
+                          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-border bg-white shadow-sm">
+                            <Avatar src={avatarPreviewSrc} fallback={form.name || '教師'} size="lg" className="h-14 w-14 bg-white text-base" />
+                          </div>
+                          <p className="text-[11px] text-text-muted">最終頭像</p>
+                        </div>
+                        <div className="space-y-2 text-center">
+                          <div className="mx-auto h-16 w-16 overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
+                            {avatarPreviewSrc ? (
+                              <img src={avatarPreviewSrc} alt="原始預覽" className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-[11px] text-text-muted">原圖</div>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-text-muted">原圖</p>
+                        </div>
+                      </div>
+                    </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium text-text">大頭貼</p>
-                      <p className="mt-1 text-xs text-text-muted">支援 JPG、PNG、WebP，大小上限 3MB。</p>
+                      <p className="mt-1 text-xs text-text-muted">支援 JPG、PNG、WebP，大小上限 3MB。先選擇照片，再拖曳與縮放，讓臉部與肩線落在虛線圈附近，最後才會上傳裁切後結果。</p>
+                      {localAvatarMeta && (
+                        <p className="mt-2 text-xs text-text-muted">暫存檔案：{localAvatarMeta.name} · {localAvatarMeta.sizeLabel}</p>
+                      )}
+                      {localAvatarFile && (
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center justify-between gap-3 text-xs text-text-muted">
+                            <span>縮放調整</span>
+                            <span>{avatarZoom.toFixed(2)}x</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => updateAvatarZoom(avatarZoom - 0.1)}
+                              className="rounded-lg border border-border px-2 py-1 text-xs text-text-muted hover:bg-surface"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="range"
+                              min="1"
+                              max="2.5"
+                              step="0.01"
+                              value={avatarZoom}
+                              onChange={(event) => updateAvatarZoom(Number(event.target.value))}
+                              className="w-full accent-primary"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => updateAvatarZoom(avatarZoom + 0.1)}
+                              className="rounded-lg border border-border px-2 py-1 text-xs text-text-muted hover:bg-surface"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <div className="rounded-xl bg-surface px-3 py-2 text-xs text-text-muted">
+                            可直接拖曳照片微調位置，也可用滑鼠滾輪、觸控板或 +/- 按鈕縮放。上傳時會以左側虛線圈的範圍裁切成正方形頭像。
+                          </div>
+                        </div>
+                      )}
                       <div className="mt-3 flex flex-wrap gap-2">
                         <label className="inline-flex cursor-pointer items-center rounded-lg border border-border bg-white px-3 py-2 text-sm text-text hover:bg-surface">
-                          {uploadingAvatar ? '上傳中...' : '上傳照片'}
+                          {localAvatarFile ? '重新選擇照片' : '選擇照片'}
                           <input
                             type="file"
                             accept="image/png,image/jpeg,image/webp"
@@ -524,19 +812,35 @@ export default function TeachersPage() {
                             onChange={(event) => {
                               const file = event.target.files?.[0]
                               if (file) {
-                                void handleAvatarUpload(file)
+                                void handleAvatarSelect(file)
                               }
                               event.currentTarget.value = ''
                             }}
                           />
                         </label>
-                        {form.avatar_url && (
+                        {localAvatarFile && (
                           <button
                             type="button"
-                            onClick={() => setForm({ ...form, avatar_url: '' })}
+                            onClick={() => void handleAvatarUpload()}
+                            disabled={uploadingAvatar}
+                            className="rounded-lg bg-primary px-3 py-2 text-sm text-white hover:bg-primary/90 disabled:opacity-60"
+                          >
+                            {uploadingAvatar ? '上傳中...' : '套用裁切並上傳'}
+                          </button>
+                        )}
+                        {(form.avatar_url || localAvatarFile) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (localAvatarFile) {
+                                resetLocalAvatarDraft()
+                              } else {
+                                setForm({ ...form, avatar_url: '' })
+                              }
+                            }}
                             className="rounded-lg border border-border px-3 py-2 text-sm text-text-muted hover:bg-surface"
                           >
-                            移除照片
+                            {localAvatarFile ? '取消新照片' : '移除照片'}
                           </button>
                         )}
                       </div>

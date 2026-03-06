@@ -5,7 +5,7 @@ import { Storage } from '@google-cloud/storage'
 import { sanitizeFilename } from '../lib/security'
 
 const storage = new Storage()
-const BUCKET_NAME = process.env.GCS_BUCKET_NAME ?? 'cram94-contact-book-photos'
+const BUCKET_NAME = process.env.GCS_BUCKET_NAME ?? '94allsolve-uploads'
 
 async function uploadPublicAsset(
   buffer: Buffer,
@@ -28,6 +28,21 @@ async function uploadPublicAsset(
   return `https://storage.googleapis.com/${BUCKET_NAME}/${filePath}`
 }
 
+function resolveManagedFilePath(url: string): string | null {
+  const prefix = `https://storage.googleapis.com/${BUCKET_NAME}/`
+  if (!url.startsWith(prefix)) return null
+  return url.slice(prefix.length)
+}
+
+async function deletePublicAsset(url: string): Promise<void> {
+  const filePath = resolveManagedFilePath(url)
+  if (!filePath) return
+
+  const bucket = storage.bucket(BUCKET_NAME)
+  const file = bucket.file(filePath)
+  await file.delete({ ignoreNotFound: true })
+}
+
 export async function uploadContactBookPhoto(
   buffer: Buffer,
   fileName: string,
@@ -42,4 +57,8 @@ export async function uploadTeacherAvatar(
   contentType: string
 ): Promise<string> {
   return uploadPublicAsset(buffer, fileName, contentType, 'teacher-avatars')
+}
+
+export async function deleteTeacherAvatar(url: string): Promise<void> {
+  await deletePublicAsset(url)
 }

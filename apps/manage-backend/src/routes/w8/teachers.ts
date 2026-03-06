@@ -11,7 +11,7 @@ import {
 import { db, sql, logger, success, notFound, badRequest, internalError, conflict, rows, first } from './_helpers'
 import { createDefaultInsuranceConfig, normalizeTeacherInsuranceConfig } from './insurance-plan'
 import { isFileSafe } from '../../lib/security'
-import { uploadTeacherAvatar } from '../../services/gcs'
+import { deleteTeacherAvatar, uploadTeacherAvatar } from '../../services/gcs'
 
 export const teacherRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -51,10 +51,6 @@ const teacherQuerySchema = z.object({
   status: z.enum(['active', 'inactive', 'resigned']).optional(),
 })
 
-const teacherAvatarUploadSchema = z.object({
-  tenantId: uuidSchema.optional(),
-})
-
 const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
 const ALLOWED_AVATAR_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'] as const
 const MAX_AVATAR_SIZE = 3 * 1024 * 1024
@@ -67,13 +63,6 @@ teacherRoutes.post('/teachers/upload-avatar', requireRole(Role.ADMIN, Role.MANAG
     }
 
     const body = await c.req.parseBody()
-    const parsed = teacherAvatarUploadSchema.safeParse({
-      tenantId: typeof body.tenantId === 'string' ? body.tenantId : undefined,
-    })
-    if (!parsed.success) {
-      return badRequest(c, 'Invalid upload payload')
-    }
-
     const file = body.file
     if (!(file instanceof File)) return badRequest(c, 'file is required')
 
@@ -211,7 +200,7 @@ teacherRoutes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER),
       }
 
       const existingResult = await db.execute(sql`
-        SELECT salary_type, insurance_config, rate_per_class, hourly_rate, base_salary
+        SELECT salary_type, insurance_config, rate_per_class, hourly_rate, base_salary, avatar_url
         FROM teachers
         WHERE id = ${id} AND tenant_id = ${user.tenant_id}
         LIMIT 1
@@ -231,6 +220,8 @@ teacherRoutes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER),
       const insuranceConfig = body.insuranceConfig === undefined
         ? normalizeTeacherInsuranceConfig(existingTeacher.insurance_config, salaryType)
         : normalizeTeacherInsuranceConfig(body.insuranceConfig ?? createDefaultInsuranceConfig(salaryType), salaryType)
+      const previousAvatarUrl = typeof existingTeacher.avatar_url === 'string' ? existingTeacher.avatar_url : null
+      const nextAvatarUrl = body.avatarUrl === undefined ? previousAvatarUrl : body.avatarUrl
 
       const result = await db.execute(sql`
         UPDATE teachers
@@ -264,6 +255,12 @@ teacherRoutes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER),
 
       const teacher = first(result)
 
+      if (previousAvatarUrl && previousAvatarUrl !== nextAvatarUrl) {
+        deleteTeacherAvatar(previousAvatarUrl).catch((error) => {
+          logger.warn({ err: error, teacherId: id }, 'Failed to delete previous teacher avatar')
+        })
+      }
+
       return success(c, { teacher })
     } catch (error) {
       logger.error({ err: error }, 'Error updating teacher:')
@@ -290,6 +287,12 @@ teacherRoutes.delete('/teachers/:id', requireRole(Role.ADMIN), zValidator('param
     const teacher = first(result)
     if (!teacher) {
       return notFound(c, 'Teacher')
+    }
+
+    if (typeof teacher.avatar_url === 'string' && teacher.avatar_url) {
+      deleteTeacherAvatar(teacher.avatar_url).catch((error) => {
+        logger.warn({ err: error, teacherId: id }, 'Failed to delete teacher avatar during teacher removal')
+      })
     }
 
     return success(c, { message: 'Teacher deleted', teacher })

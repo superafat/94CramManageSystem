@@ -57,8 +57,8 @@ app.use('*', secureHeaders())
 // Performance: gzip compression
 app.use('*', compress())
 
-// Body size limit: 1MB default for API
-app.use('/api/*', bodyLimit({ maxSize: 1024 * 1024 }))
+// Body size limit: allow image uploads while keeping a sane cap for API requests
+app.use('/api/*', bodyLimit({ maxSize: 5 * 1024 * 1024 }))
 
 // Global error handler using onError
 app.onError((error, context) => errorHandler(error, context))
