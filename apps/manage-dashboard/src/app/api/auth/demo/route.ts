@@ -16,10 +16,10 @@ const ROLE_PERMISSIONS: Record<Role, string[]> = {
   teacher: ['view_attendance', 'manage_grades', 'view_schedules'],
 }
 
-const DEMO_ACCOUNTS: Record<string, { id: string; name: string; role: Role; tenantId: string; branchId: string }> = {
+const DEMO_ACCOUNTS: Record<string, { id: string; name: string; role: Role; tenantId: string; branchId: string; teacherId?: string }> = {
   boss:     { id: 'demo-boss',     name: 'Demo 館長',  role: 'admin',   tenantId: DEMO_TENANT_1, branchId: BRANCH_1 },
   staff:    { id: 'demo-staff',    name: 'Demo 行政',  role: 'staff',   tenantId: DEMO_TENANT_1, branchId: BRANCH_1 },
-  teacher2: { id: 'demo-teacher',  name: 'Demo 教師',  role: 'teacher', tenantId: DEMO_TENANT_1, branchId: BRANCH_1 },
+  teacher2: { id: 'demo-teacher',  name: 'Demo 教師',  role: 'teacher', tenantId: DEMO_TENANT_1, branchId: BRANCH_1, teacherId: 't2' },
   boss2:    { id: 'demo-boss2',    name: 'Demo 館長2', role: 'admin',   tenantId: DEMO_TENANT_2, branchId: BRANCH_2 },
 }
 
@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
           role: account.role,
           tenant_id: account.tenantId,
           branch_id: account.branchId,
+          teacher_id: account.teacherId,
           permissions,
         },
       },

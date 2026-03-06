@@ -10,6 +10,8 @@ import {
 } from '../../utils/validation'
 import { db, sql, logger, success, notFound, badRequest, internalError, conflict, rows, first } from './_helpers'
 import { createDefaultInsuranceConfig, normalizeTeacherInsuranceConfig } from './insurance-plan'
+import { isFileSafe } from '../../lib/security'
+import { uploadTeacherAvatar } from '../../services/gcs'
 
 export const teacherRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -47,6 +49,54 @@ const teacherQuerySchema = z.object({
   tenant_id: uuidSchema.optional(),
   branch_id: uuidSchema.optional(),
   status: z.enum(['active', 'inactive', 'resigned']).optional(),
+})
+
+const teacherAvatarUploadSchema = z.object({
+  tenantId: uuidSchema.optional(),
+})
+
+const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
+const ALLOWED_AVATAR_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'] as const
+const MAX_AVATAR_SIZE = 3 * 1024 * 1024
+
+teacherRoutes.post('/teachers/upload-avatar', requireRole(Role.ADMIN, Role.MANAGER), async (c) => {
+  try {
+    const user = c.get('user')
+    if (!user?.tenant_id) {
+      return badRequest(c, 'Missing tenant context')
+    }
+
+    const body = await c.req.parseBody()
+    const parsed = teacherAvatarUploadSchema.safeParse({
+      tenantId: typeof body.tenantId === 'string' ? body.tenantId : undefined,
+    })
+    if (!parsed.success) {
+      return badRequest(c, 'Invalid upload payload')
+    }
+
+    const file = body.file
+    if (!(file instanceof File)) return badRequest(c, 'file is required')
+
+    if (!(ALLOWED_AVATAR_TYPES as readonly string[]).includes(file.type)) {
+      return badRequest(c, `Invalid file type. Allowed: ${ALLOWED_AVATAR_TYPES.join(', ')}`)
+    }
+
+    if (!isFileSafe(file.name, [...ALLOWED_AVATAR_EXTENSIONS])) {
+      return badRequest(c, 'Invalid file name')
+    }
+
+    if (file.size > MAX_AVATAR_SIZE) {
+      return badRequest(c, 'File size exceeds 3MB limit')
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const url = await uploadTeacherAvatar(buffer, file.name, file.type)
+
+    return success(c, { url }, 201)
+  } catch (error) {
+    logger.error({ err: error }, 'Error uploading teacher avatar:')
+    return internalError(c, error)
+  }
 })
 
 teacherRoutes.get('/teachers', requirePermission(Permission.SCHEDULE_READ), zValidator('query', teacherQuerySchema), async (c) => {
@@ -119,7 +169,7 @@ teacherRoutes.post('/teachers', requireRole(Role.ADMIN, Role.MANAGER), zValidato
         hourly_rate, teacher_role, salary_type, base_salary, insurance_config,
         id_number, birthday, address, emergency_contact, emergency_phone,
         bank_name, bank_branch, bank_account, bank_account_name,
-        subjects, grade_levels
+        subjects, grade_levels, avatar_url
       )
       VALUES (
         ${body.userId || null}, ${user?.tenant_id ?? body.tenantId}, ${body.branchId},
@@ -132,7 +182,8 @@ teacherRoutes.post('/teachers', requireRole(Role.ADMIN, Role.MANAGER), zValidato
         ${body.bankName ? sanitizeString(body.bankName) : null}, ${body.bankBranch ? sanitizeString(body.bankBranch) : null},
         ${body.bankAccount || null}, ${body.bankAccountName ? sanitizeString(body.bankAccountName) : null},
         ${body.subjects ? sql`${body.subjects}::text[]` : null},
-        ${body.gradeLevels ? sql`${body.gradeLevels}::text[]` : null}
+        ${body.gradeLevels ? sql`${body.gradeLevels}::text[]` : null},
+        ${body.avatarUrl || null}
       )
       RETURNING *
     `)
@@ -187,6 +238,7 @@ teacherRoutes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER),
             title = COALESCE(${body.title != null ? sanitizeString(body.title) : null}, title),
             phone = COALESCE(${body.phone ?? null}, phone),
             email = COALESCE(${body.email ?? null}, email),
+          avatar_url = COALESCE(${body.avatarUrl ?? null}, avatar_url),
             rate_per_class = ${compensation.ratePerClass},
             hourly_rate = ${compensation.hourlyRate},
             status = COALESCE(${body.status ?? null}, status),

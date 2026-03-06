@@ -61,7 +61,7 @@ export default function LoginPage() {
         superadmin: '/dashboard',
         admin: '/dashboard',
         staff: '/students',
-        teacher: '/schedules',
+        teacher: '/teacher-home',
         parent: '/my-children',
         student: '/my-schedule',
       }
@@ -97,7 +97,7 @@ export default function LoginPage() {
       localStorage.setItem('branchId', userData.branch_id || '')
       const role = userData.role
       const homePages: Record<string, string> = {
-        superadmin: '/dashboard', admin: '/dashboard', staff: '/students', teacher: '/schedules',
+        superadmin: '/dashboard', admin: '/dashboard', staff: '/students', teacher: '/teacher-home',
       }
       router.push(homePages[role] || '/dashboard')
     } catch (err) {

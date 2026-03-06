@@ -83,6 +83,7 @@ export const manageTeachers = pgTable('manage_teachers', {
   tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
   userId: uuid('user_id').references(() => users.id), // 關聯到 users 表
   name: varchar('name', { length: 100 }).notNull(),
+  avatarUrl: varchar('avatar_url', { length: 500 }),
   phone: varchar('phone', { length: 20 }),
   email: varchar('email', { length: 255 }),
   expertise: text('expertise'), // 專長科目

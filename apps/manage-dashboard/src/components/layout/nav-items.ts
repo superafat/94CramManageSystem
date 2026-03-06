@@ -23,6 +23,7 @@ export const navItems: NavItem[] = [
   { href: '/scheduling-center', icon: '📅', label: '排課中心', roles: ['superadmin', 'admin'] },
   { href: '/teacher-attendance', icon: '🕐', label: '師資出缺勤', roles: ['superadmin', 'admin'] },
   { type: 'separator', separator: '我的資訊', roles: ['teacher'] },
+  { href: '/teacher-home', icon: '🏠', label: '教師首頁', roles: ['teacher'] },
   { href: '/schedules', icon: '📅', label: '我的課表', roles: ['teacher'] },
   { href: '/my-attendance', icon: '🕐', label: '我的出缺勤紀錄', roles: ['teacher'] },
   { href: '/my-salary', icon: '💵', label: '我的薪資條', roles: ['staff', 'teacher'] },

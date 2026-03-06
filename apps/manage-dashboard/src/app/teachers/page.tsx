@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { BackButton } from '@/components/ui/BackButton'
+import { Avatar } from '@/components/ui/Avatar'
 import {
   HEALTH_TIERS,
   LABOR_TIERS,
@@ -22,6 +23,7 @@ interface Teacher {
   id: string
   name: string
   title: string
+  avatar_url?: string
   phone: string
   email: string
   rate_per_class: string
@@ -75,6 +77,7 @@ const createDefaultInsuranceConfig = (salaryType: string): TeacherInsuranceConfi
 
 const createEmptyForm = () => ({
   name: '', title: '教師', phone: '', email: '', rate_per_class: '', hourly_rate: '',
+  avatar_url: '',
   teacher_role: '', salary_type: 'per_class', base_salary: '',
   insurance_config: createDefaultInsuranceConfig('per_class'),
   id_number: '', birthday: '', address: '',
@@ -125,6 +128,7 @@ export default function TeachersPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null)
   const [form, setForm] = useState(createEmptyForm())
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const supplementalHealthGuidance = getSupplementalHealthGuidance(form.insurance_config)
 
   const getHeaders = () => ({
@@ -152,6 +156,37 @@ export default function TeachersPage() {
     }
   }
 
+  const handleAvatarUpload = async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('tenantId', getTenantId())
+
+    setUploadingAvatar(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/w8/teachers/upload-avatar`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'X-Tenant-Id': getTenantId(),
+        },
+        body: formData,
+      })
+
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(json.error?.message || json.error || '上傳頭像失敗')
+      }
+
+      const payload = json.data ?? json
+      setForm((prev) => ({ ...prev, avatar_url: payload.url || '' }))
+    } catch (err) {
+      console.error('Failed to upload avatar:', err)
+      window.alert(err instanceof Error ? err.message : '上傳頭像失敗')
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
@@ -166,6 +201,7 @@ export default function TeachersPage() {
         body: JSON.stringify({
           name: form.name,
           title: form.title,
+          avatarUrl: form.avatar_url || undefined,
           phone: form.phone || undefined,
           email: form.email || undefined,
           ratePerClass: form.rate_per_class || undefined,
@@ -206,6 +242,7 @@ export default function TeachersPage() {
     setForm({
       name: teacher.name,
       title: teacher.title,
+      avatar_url: teacher.avatar_url || '',
       phone: teacher.phone || '',
       email: teacher.email || '',
       rate_per_class: teacher.rate_per_class || '',
@@ -337,7 +374,9 @@ export default function TeachersPage() {
               className="bg-surface rounded-xl p-4 border border-border cursor-pointer hover:border-primary transition-colors active:bg-surface-hover"
             >
               <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <Avatar src={teacher.avatar_url} fallback={teacher.name} size="lg" />
+                  <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="font-medium text-text">{teacher.name}</span>
                     <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
@@ -380,6 +419,7 @@ export default function TeachersPage() {
                       ))}
                     </div>
                   ) : null}
+                  </div>
                 </div>
                 <div className="text-right ml-3 shrink-0">
                   <p className="text-base font-semibold text-primary">
@@ -417,7 +457,12 @@ export default function TeachersPage() {
             ) : (
               teachers.map((teacher) => (
                 <tr key={teacher.id} className="hover:bg-surface-hover transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-text">{teacher.name}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-text">
+                    <div className="flex items-center gap-3">
+                      <Avatar src={teacher.avatar_url} fallback={teacher.name} size="md" />
+                      <span>{teacher.name}</span>
+                    </div>
+                  </td>
                   <td className="px-6 py-4 text-sm text-text-muted">
                     {teacher.title}{teacher.teacher_role && ` · ${teacher.teacher_role}`}
                   </td>
@@ -462,6 +507,42 @@ export default function TeachersPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <fieldset className="space-y-3">
                 <legend className="text-sm font-semibold text-primary mb-2">基本資料</legend>
+                <div className="rounded-2xl border border-dashed border-border bg-background/60 p-4">
+                  <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center">
+                    <Avatar src={form.avatar_url || undefined} fallback={form.name || '教師'} size="xl" className="border border-border bg-white" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-text">大頭貼</p>
+                      <p className="mt-1 text-xs text-text-muted">支援 JPG、PNG、WebP，大小上限 3MB。</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <label className="inline-flex cursor-pointer items-center rounded-lg border border-border bg-white px-3 py-2 text-sm text-text hover:bg-surface">
+                          {uploadingAvatar ? '上傳中...' : '上傳照片'}
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            className="hidden"
+                            disabled={uploadingAvatar}
+                            onChange={(event) => {
+                              const file = event.target.files?.[0]
+                              if (file) {
+                                void handleAvatarUpload(file)
+                              }
+                              event.currentTarget.value = ''
+                            }}
+                          />
+                        </label>
+                        {form.avatar_url && (
+                          <button
+                            type="button"
+                            onClick={() => setForm({ ...form, avatar_url: '' })}
+                            className="rounded-lg border border-border px-3 py-2 text-sm text-text-muted hover:bg-surface"
+                          >
+                            移除照片
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div>
                   <label className="block text-sm text-text-muted mb-1">姓名 *</label>
                   <input

@@ -179,6 +179,7 @@ export const createTeacherSchema = z.object({
   // 教授能力
   subjects: z.array(subjectSchema).optional(),
   gradeLevels: z.array(gradeLevelSchema).optional(),
+  avatarUrl: z.string().url().max(500).optional(),
 })
 
 export const updateTeacherSchema = z.object({
@@ -208,6 +209,7 @@ export const updateTeacherSchema = z.object({
   // 教授能力
   subjects: z.array(subjectSchema).optional().nullable(),
   gradeLevels: z.array(gradeLevelSchema).optional().nullable(),
+  avatarUrl: z.string().url().max(500).optional().nullable(),
 })
 
 // ===== Course Schemas =====

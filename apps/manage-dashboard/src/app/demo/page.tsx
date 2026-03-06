@@ -11,7 +11,7 @@ const API_BASE = ''
 const DEMO_ACCOUNTS = [
   { username: 'boss', password: 'demo', role: '館長', icon: '👔', desc: '完整功能、報表、設定', tenant: '11111111-1111-1111-1111-111111111111' },
   { username: 'staff', password: 'demo', role: '行政', icon: '📋', desc: '學生、帳務、排課', tenant: '11111111-1111-1111-1111-111111111111' },
-  { username: 'teacher2', password: 'demo', role: '教師', icon: '👨‍🏫', desc: '課表、薪資', tenant: '11111111-1111-1111-1111-111111111111' },
+  { username: 'teacher2', password: 'demo', role: '教師', icon: '👨‍🏫', desc: '首頁、課表、出勤、薪資', tenant: '11111111-1111-1111-1111-111111111111' },
   { username: 'boss2', password: 'demo', role: '館長', icon: '👔', desc: '蜂神榜2（資料隔離）', tenant: '22222222-2222-2222-2222-222222222222' },
 ]
 
@@ -66,7 +66,7 @@ export default function DemoPage() {
         superadmin: '/dashboard',
         admin: '/dashboard',
         staff: '/students',
-        teacher: '/schedules',
+        teacher: '/teacher-home',
       }
       router.push(homePages[role] || '/dashboard')
     } catch (err) {

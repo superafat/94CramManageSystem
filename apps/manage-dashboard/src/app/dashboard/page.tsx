@@ -56,7 +56,7 @@ export default function DashboardPage() {
       if (!ALLOWED_ROLES.includes(user.role)) {
         // 無權限，導向該角色的首頁
         const homePages: Record<string, string> = {
-          teacher: '/schedules',
+          teacher: '/teacher-home',
           parent: '/my-children',
           student: '/my-schedule',
         }

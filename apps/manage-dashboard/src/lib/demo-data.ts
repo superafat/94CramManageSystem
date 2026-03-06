@@ -47,10 +47,10 @@ const COURSES = [
 
 // ===== Teachers =====
 const TEACHERS = [
-  { id: 't1', name: '王老師', title: '資深講師', email: 'wang@demo.com', phone: '0912-345-678', subject: '數學', hourly_rate: 800, rate_per_class: '800', status: 'active', teacher_role: null, salary_type: 'per_class', base_salary: null, insurance_config: { labor: { enabled: false, tierLevel: 1, calculationMode: 'auto', manualPersonalAmount: null, manualEmployerAmount: null }, health: { enabled: false, tierLevel: 1, calculationMode: 'auto', manualPersonalAmount: null, manualEmployerAmount: null }, supplementalHealth: { employmentType: 'part_time', insuredThroughUnit: false, averageWeeklyHours: 6, notes: '兼職堂薪，單次達基本工資再評估補充保費' } }, subjects: ['數學'], grade_levels: ['國中', '國小'] },
-  { id: 't2', name: '李老師', title: '首席講師', email: 'lee@demo.com', phone: '0923-456-789', subject: '英文', hourly_rate: 900, rate_per_class: '900', status: 'active', teacher_role: null, salary_type: 'per_class', base_salary: null, insurance_config: { labor: { enabled: false, tierLevel: 1, calculationMode: 'auto', manualPersonalAmount: null, manualEmployerAmount: null }, health: { enabled: true, tierLevel: 2, calculationMode: 'manual', manualPersonalAmount: 420, manualEmployerAmount: 840 }, supplementalHealth: { employmentType: 'part_time', insuredThroughUnit: false, averageWeeklyHours: 10, notes: '外聘兼職，人工覆核補充保費' } }, subjects: ['英文'], grade_levels: ['國中'] },
-  { id: 't3', name: '陳主任', title: '教務主任', email: 'chen@demo.com', phone: '0934-567-890', subject: '國文', hourly_rate: 0, rate_per_class: '0', status: 'active', teacher_role: '主任', salary_type: 'monthly', base_salary: '45000', insurance_config: { labor: { enabled: true, tierLevel: 11, calculationMode: 'auto', manualPersonalAmount: null, manualEmployerAmount: null }, health: { enabled: true, tierLevel: 11, calculationMode: 'auto', manualPersonalAmount: null, manualEmployerAmount: null }, supplementalHealth: { employmentType: 'full_time', insuredThroughUnit: true, averageWeeklyHours: 40, notes: null } }, subjects: ['國文', '作文'], grade_levels: ['國中', '高中'] },
-  { id: 't4', name: '林助教', title: '助教', email: 'lin@demo.com', phone: '0945-678-901', subject: '數學', hourly_rate: 200, rate_per_class: '0', status: 'active', teacher_role: '助教', salary_type: 'hourly', base_salary: null, insurance_config: { labor: { enabled: false, tierLevel: 1, calculationMode: 'auto', manualPersonalAmount: null, manualEmployerAmount: null }, health: { enabled: false, tierLevel: 1, calculationMode: 'auto', manualPersonalAmount: null, manualEmployerAmount: null }, supplementalHealth: { employmentType: 'part_time', insuredThroughUnit: false, averageWeeklyHours: 20, notes: '每週超過 12 小時，需確認是否應改由本單位投保' } }, subjects: ['數學'], grade_levels: ['國中'] },
+  { id: 't1', name: '王老師', title: '資深講師', avatar_url: 'https://placehold.co/128x128/e8dfd5/6b5e50?text=%E7%8E%8B', email: 'wang@demo.com', phone: '0912-345-678', subject: '數學', hourly_rate: 800, rate_per_class: '800', status: 'active', teacher_role: null, salary_type: 'per_class', base_salary: null, insurance_config: { labor: { enabled: false, tierLevel: 1, calculationMode: 'auto', manualPersonalAmount: null, manualEmployerAmount: null }, health: { enabled: false, tierLevel: 1, calculationMode: 'auto', manualPersonalAmount: null, manualEmployerAmount: null }, supplementalHealth: { employmentType: 'part_time', insuredThroughUnit: false, averageWeeklyHours: 6, notes: '兼職堂薪，單次達基本工資再評估補充保費' } }, subjects: ['數學'], grade_levels: ['國中', '國小'] },
+  { id: 't2', user_id: 'demo-teacher', name: '李老師', title: '首席講師', avatar_url: 'https://placehold.co/128x128/d8e8f0/3f6c7a?text=%E6%9D%8E', email: 'lee@demo.com', phone: '0923-456-789', subject: '英文', hourly_rate: 900, rate_per_class: '900', status: 'active', teacher_role: null, salary_type: 'per_class', base_salary: null, insurance_config: { labor: { enabled: false, tierLevel: 1, calculationMode: 'auto', manualPersonalAmount: null, manualEmployerAmount: null }, health: { enabled: true, tierLevel: 2, calculationMode: 'manual', manualPersonalAmount: 420, manualEmployerAmount: 840 }, supplementalHealth: { employmentType: 'part_time', insuredThroughUnit: false, averageWeeklyHours: 10, notes: '外聘兼職，人工覆核補充保費' } }, subjects: ['英文'], grade_levels: ['國中'] },
+  { id: 't3', name: '陳主任', title: '教務主任', avatar_url: 'https://placehold.co/128x128/f0e5d8/7a5f3f?text=%E9%99%B3', email: 'chen@demo.com', phone: '0934-567-890', subject: '國文', hourly_rate: 0, rate_per_class: '0', status: 'active', teacher_role: '主任', salary_type: 'monthly', base_salary: '45000', insurance_config: { labor: { enabled: true, tierLevel: 11, calculationMode: 'auto', manualPersonalAmount: null, manualEmployerAmount: null }, health: { enabled: true, tierLevel: 11, calculationMode: 'auto', manualPersonalAmount: null, manualEmployerAmount: null }, supplementalHealth: { employmentType: 'full_time', insuredThroughUnit: true, averageWeeklyHours: 40, notes: null } }, subjects: ['國文', '作文'], grade_levels: ['國中', '高中'] },
+  { id: 't4', name: '林助教', title: '助教', avatar_url: 'https://placehold.co/128x128/e2ecd9/5e7451?text=%E6%9E%97', email: 'lin@demo.com', phone: '0945-678-901', subject: '數學', hourly_rate: 200, rate_per_class: '0', status: 'active', teacher_role: '助教', salary_type: 'hourly', base_salary: null, insurance_config: { labor: { enabled: false, tierLevel: 1, calculationMode: 'auto', manualPersonalAmount: null, manualEmployerAmount: null }, health: { enabled: false, tierLevel: 1, calculationMode: 'auto', manualPersonalAmount: null, manualEmployerAmount: null }, supplementalHealth: { employmentType: 'part_time', insuredThroughUnit: false, averageWeeklyHours: 20, notes: '每週超過 12 小時，需確認是否應改由本單位投保' } }, subjects: ['數學'], grade_levels: ['國中'] },
 ]
 
 // ===== Schedules =====
@@ -647,7 +647,10 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     if (path === '/api/w8/schedules') {
       const start = searchParams.get('start_date') || '2026-02-24'
       const end = searchParams.get('end_date') || '2026-03-02'
-      return { status: 200, body: { schedules: getWeekSchedules(start, end) } }
+      const teacherId = searchParams.get('teacher_id')
+      const schedules = getWeekSchedules(start, end)
+      const filtered = teacherId ? schedules.filter(schedule => schedule.teacher_id === teacherId) : schedules
+      return { status: 200, body: { schedules: filtered } }
     }
 
     // Makeup Slots — 補課時段
@@ -1227,6 +1230,12 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
 
   // Write operations — return success
   if (method === 'POST') {
+    if (path === '/api/w8/teachers/upload-avatar') {
+      return {
+        status: 201,
+        body: { success: true, data: { url: 'https://placehold.co/256x256/e8dfd5/6b5e50?text=%E6%96%B0%E9%A0%AD%E5%83%8F' } },
+      }
+    }
         if (path === '/api/admin/billing/payment-notices/publish') {
           const notices = body?.notices || []
           return {
