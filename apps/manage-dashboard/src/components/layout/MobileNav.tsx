@@ -17,7 +17,7 @@ interface NavItem {
 const getBottomNavItems = (role: Role): NavItem[] => {
   if (role === 'teacher') {
     return [
-      { href: '/schedules', icon: '📅', label: '課表', roles: ['teacher'] },
+      { href: '/scheduling-center', icon: '📅', label: '排課中心', roles: ['teacher'] },
       { href: '/my-salary', icon: '💵', label: '薪資', roles: ['teacher'] },
     ]
   }
@@ -41,7 +41,6 @@ const getMoreMenuItems = (role: Role): NavItem[] => {
   if (['superadmin', 'admin'].includes(role)) {
     items.push({ href: '/teachers', icon: '👨‍🏫', label: '講師管理', roles: ['superadmin', 'admin'] })
     items.push({ href: '/scheduling-center', icon: '📅', label: '排課中心', roles: ['superadmin', 'admin'] })
-    items.push({ href: '/schedules', icon: '📅', label: '課表管理', roles: ['superadmin', 'admin'] })
     items.push({ href: '/teacher-attendance', icon: '🕐', label: '師資出缺勤', roles: ['superadmin', 'admin'] })
     items.push({ href: '/my-salary', icon: '💵', label: '我的薪資條', roles: ['superadmin', 'admin'] })
   }

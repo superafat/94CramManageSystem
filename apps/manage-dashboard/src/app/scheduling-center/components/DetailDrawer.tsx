@@ -9,6 +9,8 @@ interface DetailDrawerProps {
   onEditClick: () => void
   onRosterClick: () => void
   onMakeupClick: () => void
+  onRenewalClick: () => void
+  onCancelClick: () => void
 }
 
 const COURSE_TYPE_LABEL: Record<string, string> = {
@@ -27,7 +29,7 @@ function formatTime(time: string): string {
   return time.slice(0, 5)
 }
 
-export default function DetailDrawer({ event, students, onClose, onEditClick, onRosterClick, onMakeupClick }: DetailDrawerProps) {
+export default function DetailDrawer({ event, students, onClose, onEditClick, onRosterClick, onMakeupClick, onRenewalClick, onCancelClick }: DetailDrawerProps) {
   return (
     <>
       {/* Overlay */}
@@ -115,24 +117,43 @@ export default function DetailDrawer({ event, students, onClose, onEditClick, on
         </div>
 
         {/* Footer actions */}
-        <div className="px-5 py-4 border-t border-border flex gap-3">
+        <div className="px-5 py-4 border-t border-border space-y-2">
+          {/* Row 1: 補課 + 續班 */}
+          <div className="flex gap-2">
+            <button
+              onClick={onMakeupClick}
+              className="flex-1 px-3 py-2 text-sm font-medium rounded-lg border border-[#C4956A] text-[#C4956A] hover:bg-[#C4956A]/10 transition-colors"
+            >
+              安排補課
+            </button>
+            <button
+              onClick={onRenewalClick}
+              className="flex-1 px-3 py-2 text-sm font-medium rounded-lg border border-primary text-primary hover:bg-primary/10 transition-colors"
+            >
+              📋 續班
+            </button>
+          </div>
+          {/* Row 2: 編輯 + 管理名單 */}
+          <div className="flex gap-2">
+            <button
+              onClick={onEditClick}
+              className="flex-1 px-3 py-2 text-sm font-medium rounded-lg border border-border text-text hover:bg-border/30 transition-colors"
+            >
+              編輯
+            </button>
+            <button
+              onClick={onRosterClick}
+              className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors"
+            >
+              管理名單
+            </button>
+          </div>
+          {/* Row 3: 取消課程 */}
           <button
-            onClick={onMakeupClick}
-            className="flex-1 px-4 py-2 text-sm font-medium rounded-lg border border-[#C4956A] text-[#C4956A] hover:bg-[#C4956A]/10 transition-colors"
+            onClick={onCancelClick}
+            className="w-full px-3 py-2 text-sm font-medium rounded-lg border border-red-300 text-red-500 hover:bg-red-50 transition-colors"
           >
-            安排補課
-          </button>
-          <button
-            onClick={onEditClick}
-            className="flex-1 px-4 py-2 text-sm font-medium rounded-lg border border-border text-text hover:bg-border/30 transition-colors"
-          >
-            編輯
-          </button>
-          <button
-            onClick={onRosterClick}
-            className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors"
-          >
-            管理名單
+            取消此堂課
           </button>
         </div>
       </div>

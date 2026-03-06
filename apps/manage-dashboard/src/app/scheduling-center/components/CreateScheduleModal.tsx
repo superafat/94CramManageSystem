@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import StudentPicker from './StudentPicker'
+import type { ScheduleEvent } from './types'
 
 interface CreateScheduleModalProps {
   isOpen: boolean
   onClose: () => void
   onCreated: () => void
+  existingEvents: ScheduleEvent[]
 }
 
 interface CourseOption {
@@ -20,7 +22,7 @@ interface TeacherOption {
   name: string
 }
 
-export default function CreateScheduleModal({ isOpen, onClose, onCreated }: CreateScheduleModalProps) {
+export default function CreateScheduleModal({ isOpen, onClose, onCreated, existingEvents }: CreateScheduleModalProps) {
   // Form state
   const [courseId, setCourseId] = useState('')
   const [scheduledDate, setScheduledDate] = useState('')
@@ -41,6 +43,29 @@ export default function CreateScheduleModal({ isOpen, onClose, onCreated }: Crea
   const [saving, setSaving] = useState(false)
 
   const selectedCourse = useMemo(() => courses.find(c => c.id === courseId), [courses, courseId])
+
+  // 衝突偵測
+  const conflicts = useMemo(() => {
+    if (!scheduledDate || !startTime || !endTime) return []
+    const warnings: { type: 'teacher' | 'room'; message: string }[] = []
+    const sameDayEvents = existingEvents.filter(e => e.date === scheduledDate)
+    const timesOverlap = (aStart: string, aEnd: string, bStart: string, bEnd: string) =>
+      aStart < bEnd && bStart < aEnd
+    for (const e of sameDayEvents) {
+      const overlap = timesOverlap(startTime, endTime, e.startTime.slice(0, 5), e.endTime.slice(0, 5))
+      if (!overlap) continue
+      if (room.trim() && e.room && e.room.trim() === room.trim()) {
+        warnings.push({ type: 'room', message: `教室「${room}」${e.startTime.slice(0, 5)}-${e.endTime.slice(0, 5)} 已有「${e.courseName}」` })
+      }
+      if (teacherId) {
+        const selectedTeacher = teachers.find(t => t.id === teacherId)
+        if (selectedTeacher && e.teacherName.includes(selectedTeacher.name)) {
+          warnings.push({ type: 'teacher', message: `老師 ${e.startTime.slice(0, 5)}-${e.endTime.slice(0, 5)} 已有「${e.courseName}」` })
+        }
+      }
+    }
+    return warnings
+  }, [scheduledDate, startTime, endTime, room, teacherId, teachers, existingEvents])
 
   // Fetch courses
   const fetchCourses = useCallback(async () => {
@@ -271,6 +296,16 @@ export default function CreateScheduleModal({ isOpen, onClose, onCreated }: Crea
                   />
                 </div>
               </div>
+
+              {/* 衝突警告 */}
+              {conflicts.length > 0 && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-1">
+                  <p className="text-xs font-semibold text-amber-700">⚠️ 偵測到時間衝突</p>
+                  {conflicts.map((c, i) => (
+                    <p key={i} className="text-xs text-amber-700">{c.message}</p>
+                  ))}
+                </div>
+              )}
 
               {/* Student picker (show only when course is selected) */}
               {courseId && selectedCourse && (

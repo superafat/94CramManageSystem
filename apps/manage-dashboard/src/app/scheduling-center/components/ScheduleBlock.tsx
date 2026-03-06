@@ -14,6 +14,24 @@ const COURSE_TYPE_BORDER: Record<string, string> = {
   daycare: 'border-l-[#A8B5A2]',
 }
 
+const COURSE_TYPE_BG: Record<string, string> = {
+  group: 'bg-[#EDF1F5]',
+  individual: 'bg-[#F7F0E8]',
+  daycare: 'bg-[#EDF2EC]',
+}
+
+const COURSE_TYPE_BADGE: Record<string, string> = {
+  group: 'bg-[#9DAEBB]/20 text-[#5A7A8F]',
+  individual: 'bg-[#C8A882]/20 text-[#8F6A3A]',
+  daycare: 'bg-[#A8B5A2]/20 text-[#4A6B44]',
+}
+
+const COURSE_TYPE_LABEL: Record<string, string> = {
+  group: '團班',
+  individual: '個指',
+  daycare: '安親',
+}
+
 function getScheduleStatus(event: ScheduleEvent): ScheduleStatus {
   if (!event.date) return 'upcoming'
 
@@ -35,11 +53,11 @@ function getScheduleStatus(event: ScheduleEvent): ScheduleStatus {
   return 'upcoming'
 }
 
-const STATUS_STYLES: Record<ScheduleStatus, string> = {
-  in_session: 'bg-[#8FA895]/10 ring-2 ring-[#8FA895] animate-pulse',
-  dismissed: 'bg-[#8FA895]/5 opacity-50',
-  ended: 'bg-gray-50 opacity-60',
-  upcoming: 'bg-[#6B9BD2]/5',
+const STATUS_OVERLAY: Record<ScheduleStatus, string> = {
+  in_session: 'ring-2 ring-[#8FA895] animate-pulse',
+  dismissed: 'opacity-60',
+  ended: 'opacity-50 grayscale-[30%]',
+  upcoming: '',
 }
 
 const STATUS_LABEL: Record<ScheduleStatus, string> = {
@@ -63,17 +81,25 @@ function formatTime(time: string): string {
 export default function ScheduleBlock({ event, onClick }: ScheduleBlockProps) {
   const status = useMemo(() => getScheduleStatus(event), [event])
   const borderColor = COURSE_TYPE_BORDER[event.courseType] ?? 'border-l-gray-400'
+  const bgColor = COURSE_TYPE_BG[event.courseType] ?? 'bg-white'
+  const badge = COURSE_TYPE_BADGE[event.courseType] ?? ''
+  const typeLabel = COURSE_TYPE_LABEL[event.courseType] ?? event.courseType
 
   return (
     <div
-      className={`p-1.5 rounded-lg border-l-4 ${borderColor} ${STATUS_STYLES[status]} cursor-pointer transition-all hover:shadow-sm`}
+      className={`p-1.5 rounded-lg border-l-4 ${borderColor} ${bgColor} ${STATUS_OVERLAY[status]} cursor-pointer transition-all hover:shadow-sm`}
       onClick={() => onClick(event)}
       title={`${event.courseName} ${formatTime(event.startTime)}-${formatTime(event.endTime)} ${event.teacherName}`}
     >
-      <div className="flex items-center gap-1">
-        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[status]}`} />
-        <span className="text-xs font-medium text-text truncate">
-          {event.courseName}
+      <div className="flex items-center justify-between gap-1">
+        <div className="flex items-center gap-1 min-w-0">
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[status]}`} />
+          <span className="text-xs font-medium text-text truncate">
+            {event.courseName}
+          </span>
+        </div>
+        <span className={`text-[9px] px-1 py-0.5 rounded-full font-medium shrink-0 ${badge}`}>
+          {typeLabel}
         </span>
       </div>
       <p className="text-[10px] text-text-muted mt-0.5 truncate">

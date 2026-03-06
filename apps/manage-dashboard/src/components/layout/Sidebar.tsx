@@ -39,7 +39,6 @@ const navItems: NavItem[] = [
   { type: 'separator', separator: '講師管理', roles: ['superadmin', 'admin'] },
   { href: '/teachers', icon: '👨‍🏫', label: '講師名單', roles: ['superadmin', 'admin'] },
   { href: '/scheduling-center', icon: '📅', label: '排課中心', roles: ['superadmin', 'admin'] },
-  { href: '/schedules', icon: '📅', label: '課表管理', roles: ['superadmin', 'admin'] },
   { href: '/teacher-attendance', icon: '🕐', label: '師資出缺勤', roles: ['superadmin', 'admin'] },
   { href: '/my-salary', icon: '💵', label: '我的薪資條', roles: ['staff', 'teacher'] },
 ]

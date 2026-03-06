@@ -13,6 +13,7 @@ import RosterModal from './components/RosterModal'
 import EditScheduleModal from './components/EditScheduleModal'
 import CreateScheduleModal from './components/CreateScheduleModal'
 import MakeupScheduleModal from './components/MakeupScheduleModal'
+import RenewalModal from './components/RenewalModal'
 
 const API_BASE = ''
 
@@ -74,6 +75,11 @@ export default function SchedulingCenterPage() {
     courseName: string
     date: string
   } | null>(null)
+
+  // Teachers & Students for RenewalModal
+  const [teachers, setTeachers] = useState<{ id: string; name: string; title?: string; ratePerClass?: number }[]>([])
+  const [students, setStudents] = useState<{ id: string; name: string }[]>([])
+  const [renewalEvent, setRenewalEvent] = useState<ScheduleEvent | null>(null)
 
   // Edit schedule modal state
   const [editScheduleId, setEditScheduleId] = useState<string | null>(null)
@@ -211,11 +217,59 @@ export default function SchedulingCenterPage() {
     }
   }, [])
 
+  const fetchTeachers = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/w8/teachers`, { credentials: 'include' })
+      if (!res.ok) return
+      const data = await res.json()
+      const list = data.data?.teachers || data.teachers || []
+      setTeachers(list.map((t: Record<string, unknown>) => ({
+        id: t.id as string,
+        name: (t.name as string) || '',
+        title: t.title as string | undefined,
+        ratePerClass: t.rate_per_class as number | undefined,
+      })))
+    } catch (err) { console.error('Failed to fetch teachers:', err) }
+  }, [])
+
+  const fetchStudents = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/w8/students`, { credentials: 'include' })
+      if (!res.ok) return
+      const data = await res.json()
+      const list = data.data?.students || data.students || []
+      setStudents(list.map((s: Record<string, unknown>) => ({
+        id: s.id as string,
+        name: (s.name as string) || '',
+      })))
+    } catch (err) { console.error('Failed to fetch students:', err) }
+  }, [])
+
+  const handleCancelEvent = useCallback(async () => {
+    if (!selectedEvent) return
+    if (!confirm('確定取消此堂課？')) return
+    try {
+      const baseId = selectedEvent.id.includes('-') ? selectedEvent.id.split('-').slice(0, -1).join('-') : selectedEvent.id
+      const sid = /^[0-9a-f-]{36}$/i.test(selectedEvent.id) ? selectedEvent.id : baseId
+      await fetch(`${API_BASE}/api/w8/schedules/${sid}/change`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ changeType: 'cancel', reason: '手動取消' }),
+      })
+      setSelectedEvent(null)
+      setDetailStudents([])
+      fetchSchedules()
+    } catch { alert('取消失敗') }
+  }, [selectedEvent, fetchSchedules])
+
   useEffect(() => {
     const userStr = localStorage.getItem('user')
     if (!userStr) { router.push('/login'); return }
     fetchCourses()
-  }, [router, fetchCourses])
+    fetchTeachers()
+    fetchStudents()
+  }, [router, fetchCourses, fetchTeachers, fetchStudents])
 
   useEffect(() => { fetchSchedules() }, [fetchSchedules])
 
@@ -507,6 +561,12 @@ export default function SchedulingCenterPage() {
               setSelectedEvent(null)
             }
           }}
+          onRenewalClick={() => {
+            setRenewalEvent(selectedEvent)
+            setSelectedEvent(null)
+            setDetailStudents([])
+          }}
+          onCancelClick={handleCancelEvent}
         />
       )}
 
@@ -515,7 +575,19 @@ export default function SchedulingCenterPage() {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreated={() => { setShowCreateModal(false); fetchSchedules(); fetchCourses() }}
+        existingEvents={events}
       />
+
+      {/* Renewal Modal */}
+      {renewalEvent && (
+        <RenewalModal
+          event={renewalEvent}
+          teachers={teachers}
+          students={students}
+          onClose={() => setRenewalEvent(null)}
+          onSuccess={() => { setRenewalEvent(null); fetchSchedules() }}
+        />
+      )}
 
       {/* Edit Schedule Modal */}
       {editScheduleId && (
