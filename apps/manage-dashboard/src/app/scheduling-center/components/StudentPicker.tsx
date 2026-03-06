@@ -8,6 +8,12 @@ interface StudentOption {
   grade?: string
 }
 
+interface PaymentSummary {
+  studentId: string
+  totalEnrollments: number
+  paidEnrollments: number
+}
+
 interface StudentPickerProps {
   selectedIds: Set<string>
   onSelectionChange: (ids: Set<string>) => void
@@ -15,8 +21,17 @@ interface StudentPickerProps {
   maxStudents?: number
 }
 
+function PaymentBadge({ summary }: { summary?: PaymentSummary }) {
+  if (!summary || summary.totalEnrollments === 0) return null
+  const isPaid = summary.paidEnrollments >= summary.totalEnrollments
+  return isPaid
+    ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#A8B5A2]/20 text-[#4A6B44] font-medium shrink-0">已繳費</span>
+    : <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#B5706E]/15 text-[#B5706E] font-medium shrink-0">未繳費</span>
+}
+
 export default function StudentPicker({ selectedIds, onSelectionChange, courseType, maxStudents }: StudentPickerProps) {
   const [allStudents, setAllStudents] = useState<StudentOption[]>([])
+  const [paymentMap, setPaymentMap] = useState<Map<string, PaymentSummary>>(new Map())
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [gradeFilter, setGradeFilter] = useState('')
@@ -24,15 +39,24 @@ export default function StudentPicker({ selectedIds, onSelectionChange, courseTy
   const fetchStudents = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/students?status=active&limit=200', { credentials: 'include' })
-      if (!res.ok) return
-      const data = await res.json()
-      const students = data.data?.students || data.students || []
-      setAllStudents(students.map((s: Record<string, unknown>) => ({
-        id: s.id as string,
-        name: (s.full_name as string) || (s.name as string) || '',
-        grade: (s.grade_level as string) || (s.grade as string) || undefined,
-      })))
+      const [studentsRes, paymentRes] = await Promise.all([
+        fetch('/api/admin/students?status=active&limit=200', { credentials: 'include' }),
+        fetch('/api/admin/billing/payment-summary', { credentials: 'include' }),
+      ])
+      if (studentsRes.ok) {
+        const data = await studentsRes.json()
+        const students = data.data?.students || data.students || []
+        setAllStudents(students.map((s: Record<string, unknown>) => ({
+          id: s.id as string,
+          name: (s.full_name as string) || (s.name as string) || '',
+          grade: (s.grade_level as string) || (s.grade as string) || undefined,
+        })))
+      }
+      if (paymentRes.ok) {
+        const data = await paymentRes.json()
+        const summary: PaymentSummary[] = data.data?.summary || data.summary || []
+        setPaymentMap(new Map(summary.map(s => [s.studentId, s])))
+      }
     } catch (err) {
       console.error('Failed to fetch students:', err)
     } finally {
@@ -101,6 +125,7 @@ export default function StudentPicker({ selectedIds, onSelectionChange, courseTy
                 className="rounded border-border text-primary focus:ring-primary/40" />
               <span className="text-sm text-text flex-1">{s.name}</span>
               {s.grade && <span className="text-xs text-text-muted">{s.grade}</span>}
+              <PaymentBadge summary={paymentMap.get(s.id)} />
             </label>
           ))}
         </div>

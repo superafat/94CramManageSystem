@@ -343,6 +343,39 @@ billingRoutes.get('/billing/payment-records', requirePermission(Permission.BILLI
   }
 })
 
+// Get payment summary for all active students (used by scheduling picker)
+billingRoutes.get('/billing/payment-summary',
+  requirePermission(Permission.BILLING_READ),
+  async (c) => {
+    const user = c.get('user')
+    const tenantId = user.tenant_id
+
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          s.id as student_id,
+          COUNT(DISTINCT e.id)::int as total_enrollments,
+          COUNT(DISTINCT p.id)::int as paid_enrollments
+        FROM manage_students s
+        LEFT JOIN manage_enrollments e ON e.student_id = s.id AND e.status = 'active' AND e.deleted_at IS NULL
+        LEFT JOIN manage_payments p ON p.enrollment_id = e.id AND p.status = 'paid'
+        WHERE s.tenant_id = ${tenantId} AND s.deleted_at IS NULL AND s.status = 'active'
+        GROUP BY s.id
+      `)
+
+      const summary = rows(result).map((r: QueryResult) => ({
+        studentId: r.student_id as string,
+        totalEnrollments: Number(r.total_enrollments),
+        paidEnrollments: Number(r.paid_enrollments),
+      }))
+
+      return success(c, { summary })
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
+
 // ==================== 安親套餐 CRUD ====================
 
 const daycarePackageBodySchema = z.object({
