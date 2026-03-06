@@ -429,8 +429,76 @@ export default function TeacherAttendancePage() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-border overflow-hidden">
+      {/* 手機版：卡片列表 */}
+      <div className="lg:hidden space-y-3">
+        {attendanceList.length === 0 ? (
+          <div className="text-center py-10 text-text-muted text-sm">
+            {editMode ? '載入師資清單中...' : '該日期無出缺勤記錄，點擊「點名模式」開始點名'}
+          </div>
+        ) : attendanceList.map((record) => {
+          const isOnLeave = record.status === 'leave'
+          const currentStatus = changes[record.teacher_id] || record.status
+          return (
+            <div key={record.teacher_id} className="bg-white rounded-xl border border-border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-text">{record.teacher_name}</span>
+                  <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">{record.role}</span>
+                </div>
+                {!editMode && (
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                    isOnLeave ? 'bg-blue-50 text-blue-600'
+                    : record.status === 'present' ? 'bg-[#7B9E89]/10 text-[#7B9E89]'
+                    : record.status === 'late' ? 'bg-amber-50 text-amber-600'
+                    : 'bg-[#B5706E]/10 text-[#B5706E]'
+                  }`}>
+                    {isOnLeave
+                      ? `請假${record.leave_type ? `（${LEAVE_TYPE_LABELS[record.leave_type]}）` : ''}`
+                      : record.status === 'present' ? '出席'
+                      : record.status === 'late' ? '遲到' : '缺席'}
+                  </span>
+                )}
+              </div>
+              {isOnLeave && record.leave_reason && (
+                <p className="text-xs text-text-muted">原因：{record.leave_reason}</p>
+              )}
+              {record.notes && <p className="text-xs text-text-muted">備註：{record.notes}</p>}
+              {editMode && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {(['present', 'late', 'absent'] as const).map(status => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => handleStatusChange(record.teacher_id, status)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium min-h-[36px] transition-all ${
+                        currentStatus === status
+                          ? status === 'present' ? 'bg-[#7B9E89] text-white'
+                            : status === 'late' ? 'bg-amber-400 text-white'
+                            : 'bg-[#B5706E] text-white'
+                          : 'bg-surface-hover text-text-muted hover:bg-surface'
+                      }`}
+                    >
+                      {status === 'present' ? '出席' : status === 'late' ? '遲到' : '缺席'}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => openLeaveModal({ id: record.teacher_id, name: record.teacher_name })}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[#C4956A]/40 text-[#C4956A] hover:bg-[#C4956A]/10 transition-colors"
+                >
+                  📝 請假
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* 桌面版：表格 */}
+      <div className="hidden lg:block bg-white rounded-2xl shadow-sm border border-border overflow-hidden">
         <table className="w-full">
           <thead className="bg-surface">
             <tr>

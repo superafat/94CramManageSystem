@@ -219,22 +219,20 @@ export default function TeachersPage() {
         </button>
       </div>
 
-      {/* Content */}
-      <div className="p-4 space-y-3">
+      {/* 手機版：卡片列表 */}
+      <div className="lg:hidden p-4 space-y-3">
         {teachers.length === 0 ? (
-          <div className="text-center py-12 text-text-muted">
-            尚無講師資料
-          </div>
+          <div className="text-center py-12 text-text-muted">尚無講師資料</div>
         ) : (
           teachers.map((teacher) => (
             <div
               key={teacher.id}
               onClick={() => openEdit(teacher)}
-              className="bg-surface rounded-xl p-4 border border-border cursor-pointer hover:border-primary transition-colors"
+              className="bg-surface rounded-xl p-4 border border-border cursor-pointer hover:border-primary transition-colors active:bg-surface-hover"
             >
               <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="font-medium text-text">{teacher.name}</span>
                     <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
                       {teacher.title}
@@ -245,10 +243,11 @@ export default function TeachersPage() {
                       </span>
                     )}
                   </div>
-                  {teacher.phone && (
-                    <p className="text-sm text-text-muted mt-1">{teacher.phone}</p>
-                  )}
-                  {(teacher.grade_levels && teacher.grade_levels.length > 0 || teacher.subjects && teacher.subjects.length > 0) && (
+                  <div className="flex items-center gap-3 text-sm text-text-muted">
+                    {teacher.phone && <span>📱 {teacher.phone}</span>}
+                    {teacher.email && <span className="truncate">✉️ {teacher.email}</span>}
+                  </div>
+                  {(teacher.grade_levels?.length || teacher.subjects?.length) ? (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {teacher.grade_levels?.map((level) => (
                         <span key={level} className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
@@ -261,10 +260,10 @@ export default function TeachersPage() {
                         </span>
                       ))}
                     </div>
-                  )}
+                  ) : null}
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-semibold text-primary">
+                <div className="text-right ml-3 shrink-0">
+                  <p className="text-base font-semibold text-primary">
                     ${teacher.salary_type === 'monthly'
                       ? Number(teacher.base_salary || 0).toLocaleString()
                       : Number(teacher.rate_per_class || 0).toLocaleString()}
@@ -277,6 +276,58 @@ export default function TeachersPage() {
             </div>
           ))
         )}
+      </div>
+
+      {/* 桌面版：表格 */}
+      <div className="hidden lg:block overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-surface border-b border-border">
+            <tr>
+              <th className="px-6 py-4 text-left text-sm font-medium text-text">姓名</th>
+              <th className="px-6 py-4 text-left text-sm font-medium text-text">稱謂/身分</th>
+              <th className="px-6 py-4 text-left text-sm font-medium text-text">電話</th>
+              <th className="px-6 py-4 text-left text-sm font-medium text-text">科目</th>
+              <th className="px-6 py-4 text-left text-sm font-medium text-text">薪資</th>
+              <th className="px-6 py-4 text-center text-sm font-medium text-text">操作</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {teachers.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-6 py-12 text-center text-text-muted">尚無講師資料</td>
+              </tr>
+            ) : (
+              teachers.map((teacher) => (
+                <tr key={teacher.id} className="hover:bg-surface-hover transition-colors">
+                  <td className="px-6 py-4 text-sm font-medium text-text">{teacher.name}</td>
+                  <td className="px-6 py-4 text-sm text-text-muted">
+                    {teacher.title}{teacher.teacher_role && ` · ${teacher.teacher_role}`}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-text-muted">{teacher.phone || '—'}</td>
+                  <td className="px-6 py-4 text-sm text-text-muted">
+                    {teacher.subjects?.join('、') || '—'}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-text">
+                    ${teacher.salary_type === 'monthly'
+                      ? Number(teacher.base_salary || 0).toLocaleString()
+                      : Number(teacher.rate_per_class || 0).toLocaleString()}
+                    <span className="text-xs text-text-muted ml-1">
+                      {teacher.salary_type === 'monthly' ? '/月' : teacher.salary_type === 'hourly' ? '/時' : '/堂'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <button
+                      onClick={() => openEdit(teacher)}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      編輯
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Modal */}
