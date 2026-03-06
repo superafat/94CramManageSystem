@@ -992,19 +992,31 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
       const now = new Date()
       const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
       const month = searchParams.get('month') || currentMonth
+      const teacherId = searchParams.get('teacherId')
       const records = TEACHER_ATTENDANCE.filter(ta => ta.date.startsWith(month))
-      const stats = TEACHERS.map(t => {
+      let stats = TEACHERS.map(t => {
         const tRecs = records.filter(r => r.teacher_id === t.id)
         return {
           teacher_id: t.id, teacher_name: t.name,
+          attendance_days: tRecs.filter(r => r.status === 'present' || r.status === 'late').length,
           present: tRecs.filter(r => r.status === 'present').length,
           late: tRecs.filter(r => r.status === 'late').length,
           absent: tRecs.filter(r => r.status === 'absent').length,
           leave: tRecs.filter(r => r.status === 'leave').length,
+          late_count: tRecs.filter(r => r.status === 'late').length,
+          absent_days: tRecs.filter(r => r.status === 'absent').length,
+          sick_leave_days: tRecs.filter(r => r.status === 'leave' && r.leave_type === 'sick').length,
+          personal_leave_days: tRecs.filter(r => r.status === 'leave' && r.leave_type === 'personal').length,
+          annual_leave_days: tRecs.filter(r => r.status === 'leave' && r.leave_type === 'annual').length,
+          family_leave_days: tRecs.filter(r => r.status === 'leave' && r.leave_type === 'family').length,
+          other_leave_days: tRecs.filter(r => r.status === 'leave' && (r.leave_type === 'other' || !r.leave_type)).length,
+          total_leave_days: tRecs.filter(r => r.status === 'leave').length,
           substitute: tRecs.filter(r => r.status === 'substitute').length,
+          substitute_count: tRecs.filter(r => r.status === 'substitute' || !!r.substitute_teacher_id).length,
           attendance_rate: tRecs.length > 0 ? Math.round(tRecs.filter(r => r.status === 'present' || r.status === 'late').length / tRecs.length * 100) : 100,
         }
       })
+      if (teacherId) stats = stats.filter(item => item.teacher_id === teacherId)
       return { status: 200, body: { success: true, data: { stats, month } } }
     }
 

@@ -12,6 +12,8 @@ import { aiProvidersRoutes } from './ai-providers'
 import { conversationsRoutes } from './conversations'
 import { settingsRoutes } from './settings'
 import { analyticsRoutes } from './analytics'
+import { attendanceRoutes } from './attendance'
+import { makeupClassesRoutes } from './makeup-classes'
 import { makeupSlotsRoutes } from './makeup-slots'
 import { enrollmentRoutes } from './enrollments'
 import { bindingTokensRoutes } from './binding-tokens'
@@ -32,8 +34,10 @@ adminRoutes.route('/', auditRoutes)
 adminRoutes.route('/', aiProvidersRoutes)
 adminRoutes.route('/', conversationsRoutes)
 adminRoutes.route('/', settingsRoutes)
-adminRoutes.route('/', analyticsRoutes)
+adminRoutes.route('/', attendanceRoutes)
+adminRoutes.route('/', makeupClassesRoutes)
 adminRoutes.route('/', makeupSlotsRoutes)
 adminRoutes.route('/', enrollmentRoutes)
 adminRoutes.route('/', bindingTokensRoutes)
 adminRoutes.route('/', financeRoutes)
+adminRoutes.route('/', analyticsRoutes)

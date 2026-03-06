@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { SalaryData, TeacherSalary, ScheduleItem, AttendanceStats, AutoDeduction, AutoDeductionOverride } from '../../salary/types'
 import { API_BASE } from '../../salary/constants'
-import { getMonthRange, computeAutoDeductions, normalizeSalaryData } from '../../salary/utils'
+import { getMonthRange, computeAutoDeductions, normalizeAttendanceStats, normalizeSalaryData } from '../../salary/utils'
 import { MonthNavigation } from '../../salary/components/MonthNavigation'
 import { TeacherCard } from '../../salary/components/TeacherCard'
 import { AdjustmentModal, type AdjustmentFormState } from '../../salary/components/AdjustmentModal'
@@ -79,7 +79,7 @@ export default function SalaryContent() {
     if (attendanceMap[teacherId] !== undefined) return
     try {
       const res = await fetch(
-        `${API_BASE}/api/teacher-attendance/stats?teacherId=${teacherId}&startDate=${monthRange.start}&endDate=${monthRange.end}`,
+        `${API_BASE}/api/teacher-attendance/stats?teacherId=${teacherId}&month=${monthRange.start.slice(0, 7)}`,
         { credentials: 'include' }
       )
       if (res.ok) {
@@ -87,7 +87,7 @@ export default function SalaryContent() {
         const raw = result.data ?? result
         setAttendanceMap(prev => ({
           ...prev,
-          [teacherId]: (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : { late_count: 0, absent_days: 0, personal_leave_days: 0 }
+          [teacherId]: normalizeAttendanceStats(teacherId, raw)
         }))
       }
     } catch { /* ignore */ }

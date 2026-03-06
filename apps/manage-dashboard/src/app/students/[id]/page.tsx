@@ -8,7 +8,7 @@ import { apiFetch, type Student } from '@/lib/api'
 interface AttendanceRecord {
   id: string
   date: string
-  status: 'present' | 'absent' | 'late'
+  status: 'present' | 'absent' | 'late' | 'leave' | 'excused'
   course?: string
   notes?: string
 }
@@ -55,10 +55,11 @@ export default function StudentDetailPage() {
 
         // Try to fetch attendance (optional)
         try {
-          const attendanceData = await apiFetch<{ records: AttendanceRecord[] }>(
+          const attendanceData = await apiFetch<{ records?: AttendanceRecord[]; data?: { records?: AttendanceRecord[] } }>(
             `/api/admin/attendance?studentId=${studentId}`
           )
-          setAttendance(attendanceData.records ?? [])
+          const payload = attendanceData.data ?? attendanceData
+          setAttendance(payload.records ?? [])
         } catch {
           // Attendance API may not exist yet
           setAttendance([])
@@ -478,17 +479,21 @@ function RiskBadge({ level }: { level?: 'high' | 'medium' | 'low' | null }) {
   )
 }
 
-function AttendanceStatusBadge({ status }: { status: 'present' | 'absent' | 'late' }) {
+function AttendanceStatusBadge({ status }: { status: 'present' | 'absent' | 'late' | 'leave' | 'excused' }) {
   const styles = {
     present: 'bg-[#7B9E89]/10 text-[#7B9E89] border-[#7B9E89]/20',
     late: 'bg-[#C4956A]/10 text-[#C4956A] border-[#C4956A]/20',
     absent: 'bg-[#B5706E]/10 text-[#B5706E] border-[#B5706E]/20',
+    leave: 'bg-[#8FA9B8]/10 text-[#8FA9B8] border-[#8FA9B8]/20',
+    excused: 'bg-[#A08FB8]/10 text-[#A08FB8] border-[#A08FB8]/20',
   }
 
   const labels = {
     present: '出席',
     late: '遲到',
     absent: '缺席',
+    leave: '請假',
+    excused: '核准缺席',
   }
 
   return (

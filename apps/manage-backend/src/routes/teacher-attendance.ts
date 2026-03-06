@@ -29,6 +29,7 @@ teacherAttendanceRoutes.use('*', authMiddleware)
 // ============================================================
 
 const listQuerySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date 格式應為 YYYY-MM-DD').optional(),
   month: z.string().regex(/^\d{4}-\d{2}$/, 'month 格式應為 YYYY-MM').optional(),
   teacherId: z.string().uuid('teacherId 必須是 UUID').optional(),
   page: z.coerce.number().int().positive().default(1),
@@ -38,7 +39,7 @@ const listQuerySchema = z.object({
 const createSchema = z.object({
   teacherId: z.string().uuid('teacherId 必須是 UUID'),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date 格式應為 YYYY-MM-DD'),
-  type: z.enum(['checkin', 'sick_leave', 'personal_leave', 'annual_leave', 'other_leave']),
+  type: z.enum(['checkin', 'absent', 'sick_leave', 'personal_leave', 'annual_leave', 'family_leave', 'other_leave']),
   checkInTime: z.string().optional(),   // HH:MM
   reason: z.string().max(500).optional(),
   branchId: z.string().uuid().optional(),
@@ -56,6 +57,8 @@ const substituteSchema = z.object({
 
 const statsQuerySchema = z.object({
   month: z.string().regex(/^\d{4}-\d{2}$/, 'month 格式應為 YYYY-MM').optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'startDate 格式應為 YYYY-MM-DD').optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'endDate 格式應為 YYYY-MM-DD').optional(),
   teacherId: z.string().uuid().optional(),
 })
 
@@ -76,13 +79,16 @@ teacherAttendanceRoutes.get(
 
       const tenantId = user.tenant_id
       const month = query.month ?? new Date().toISOString().slice(0, 7)
-      const [year, mon] = month.split('-')
+      const conditions = [sql`ta.tenant_id = ${tenantId}`]
 
-      const conditions = [
-        sql`ta.tenant_id = ${tenantId}`,
-        sql`EXTRACT(YEAR FROM ta.date) = ${parseInt(year)}`,
-        sql`EXTRACT(MONTH FROM ta.date) = ${parseInt(mon)}`,
-      ]
+      if (query.startDate && query.endDate) {
+        conditions.push(sql`ta.date >= ${query.startDate}::date`)
+        conditions.push(sql`ta.date <= ${query.endDate}::date`)
+      } else {
+        const [year, mon] = month.split('-')
+        conditions.push(sql`EXTRACT(YEAR FROM ta.date) = ${parseInt(year)}`)
+        conditions.push(sql`EXTRACT(MONTH FROM ta.date) = ${parseInt(mon)}`)
+      }
       if (query.teacherId) {
         conditions.push(sql`ta.teacher_id = ${query.teacherId}`)
       }
@@ -94,12 +100,18 @@ teacherAttendanceRoutes.get(
           t.id AS teacher_id,
           t.full_name AS teacher_name,
           COUNT(*) FILTER (WHERE ta.type = 'checkin' AND ta.status = 'approved') AS attendance_days,
-          COUNT(*) FILTER (WHERE ta.type = 'checkin' AND ta.check_in_time > (ta.date::text || ' 09:15')::timestamp) AS late_count,
-          COUNT(*) FILTER (WHERE ta.type IN ('sick_leave','personal_leave','annual_leave','other_leave') AND ta.status = 'approved') AS leave_days,
+          COUNT(*) FILTER (WHERE ta.type = 'checkin' AND ta.status = 'approved' AND ta.check_in_time > (ta.date::text || ' 09:15')::timestamp) AS late_count,
+          COUNT(*) FILTER (WHERE ta.type = 'absent' AND ta.status = 'approved') AS absent_days,
+          COUNT(*) FILTER (WHERE ta.type = 'sick_leave' AND ta.status = 'approved') AS sick_leave_days,
+          COUNT(*) FILTER (WHERE ta.type = 'personal_leave' AND ta.status = 'approved') AS personal_leave_days,
+          COUNT(*) FILTER (WHERE ta.type = 'annual_leave' AND ta.status = 'approved') AS annual_leave_days,
+          COUNT(*) FILTER (WHERE ta.type = 'family_leave' AND ta.status = 'approved') AS family_leave_days,
+          COUNT(*) FILTER (WHERE ta.type = 'other_leave' AND ta.status = 'approved') AS other_leave_days,
+          COUNT(*) FILTER (WHERE ta.type IN ('sick_leave','personal_leave','annual_leave','family_leave','other_leave') AND ta.status = 'approved') AS total_leave_days,
           COUNT(*) FILTER (WHERE ta.substitute_teacher_id IS NOT NULL) AS substitute_count,
           ROUND(
             100.0 * COUNT(*) FILTER (WHERE ta.type = 'checkin' AND ta.status = 'approved') /
-            NULLIF(COUNT(*) FILTER (WHERE ta.type = 'checkin'), 0),
+            NULLIF(COUNT(*) FILTER (WHERE ta.type IN ('checkin','absent')), 0),
             1
           ) AS attendance_rate
         FROM manage_teacher_attendance ta
@@ -137,7 +149,9 @@ teacherAttendanceRoutes.get(
 
       const conditions = [sql`ta.tenant_id = ${tenantId}`]
 
-      if (query.month) {
+      if (query.date) {
+        conditions.push(sql`ta.date = ${query.date}::date`)
+      } else if (query.month) {
         const [year, mon] = query.month.split('-')
         conditions.push(sql`EXTRACT(YEAR FROM ta.date) = ${parseInt(year)}`)
         conditions.push(sql`EXTRACT(MONTH FROM ta.date) = ${parseInt(mon)}`)
@@ -218,7 +232,7 @@ teacherAttendanceRoutes.post(
 
       const tenantId = user.tenant_id
 
-      // 檢查同一老師同一天是否已有記錄
+      // 檢查同一老師同一天是否已有相同類型記錄
       const existing = await db.execute(sql`
         SELECT id FROM manage_teacher_attendance
         WHERE tenant_id = ${tenantId}
@@ -228,16 +242,32 @@ teacherAttendanceRoutes.post(
         LIMIT 1
       `)
 
-      if (rows(existing).length > 0) {
-        return badRequest(c, '該老師在此日期已有相同類型的記錄')
-      }
-
-      // checkin 自動核准；請假預設待審核
-      const status = body.type === 'checkin' ? 'approved' : 'pending'
+      // checkin / absent 自動核准；請假預設待審核
+      const status = body.type === 'checkin' || body.type === 'absent' ? 'approved' : 'pending'
 
       const checkInTime = body.checkInTime
         ? sql`${body.date + ' ' + body.checkInTime}::timestamp`
         : sql`NULL`
+
+      const existingRecord = first(existing)
+
+      if (existingRecord) {
+        const updated = await db.execute(sql`
+          UPDATE manage_teacher_attendance
+          SET
+            status = ${status},
+            check_in_time = ${checkInTime},
+            reason = ${body.reason ?? null},
+            branch_id = ${body.branchId ?? null},
+            updated_at = NOW()
+          WHERE id = ${existingRecord.id}
+          RETURNING *
+        `)
+
+        const record = first(updated)
+        logger.info({ teacherId: body.teacherId, date: body.date, type: body.type }, 'teacher attendance updated')
+        return success(c, { record })
+      }
 
       const result = await db.execute(sql`
         INSERT INTO manage_teacher_attendance

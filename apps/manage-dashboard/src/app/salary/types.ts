@@ -90,11 +90,17 @@ export interface ScheduleItem {
 
 export interface AttendanceStats {
   teacher_id: string
+  attendance_days?: number
   sick_leave_days: number
   personal_leave_days: number
+  annual_leave_days?: number
+  family_leave_days?: number
+  other_leave_days?: number
   absent_days: number
   late_count: number
   total_leave_days: number
+  substitute_count?: number
+  attendance_rate?: number
 }
 
 // ───────────── Auto-Deduction Types ─────────────

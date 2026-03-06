@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { BackButton } from '@/components/ui/BackButton'
 import type { SalaryData, TeacherSalary, ScheduleItem, AttendanceStats, AutoDeduction, AutoDeductionOverride } from './types'
 import { API_BASE } from './constants'
-import { getMonthRange, computeAutoDeductions, normalizeSalaryData } from './utils'
+import { getMonthRange, computeAutoDeductions, normalizeAttendanceStats, normalizeSalaryData } from './utils'
 import { MonthNavigation } from './components/MonthNavigation'
 import { TeacherCard } from './components/TeacherCard'
 import { AdjustmentModal, type AdjustmentFormState } from './components/AdjustmentModal'
@@ -103,13 +103,13 @@ export default function SalaryPage() {
     if (attendanceMap[teacherId] !== undefined) return
     try {
       const res = await fetch(
-        `${API_BASE}/api/teacher-attendance/stats?teacherId=${teacherId}&startDate=${monthRange.start}&endDate=${monthRange.end}`,
+        `${API_BASE}/api/teacher-attendance/stats?teacherId=${teacherId}&month=${monthRange.start.slice(0, 7)}`,
         { credentials: 'include' }
       )
       if (res.ok) {
         const result = await res.json()
         const raw = result.data ?? result
-        const stats: AttendanceStats = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : { late_count: 0, absent_days: 0, personal_leave_days: 0 }
+        const stats: AttendanceStats = normalizeAttendanceStats(teacherId, raw)
         setAttendanceMap(prev => ({ ...prev, [teacherId]: stats }))
       }
     } catch {

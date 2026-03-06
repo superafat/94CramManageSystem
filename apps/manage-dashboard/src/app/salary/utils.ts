@@ -17,6 +17,51 @@ import {
   SECOND_GEN_HEALTH_PREMIUM_THRESHOLD,
 } from './constants'
 
+export const emptyAttendanceStats = (teacherId: string): AttendanceStats => ({
+  teacher_id: teacherId,
+  attendance_days: 0,
+  sick_leave_days: 0,
+  personal_leave_days: 0,
+  annual_leave_days: 0,
+  family_leave_days: 0,
+  other_leave_days: 0,
+  absent_days: 0,
+  late_count: 0,
+  total_leave_days: 0,
+  substitute_count: 0,
+  attendance_rate: 0,
+})
+
+export const normalizeAttendanceStats = (teacherId: string, payload: unknown): AttendanceStats => {
+  const source = isRecord(payload) && isRecord(payload.data)
+    ? payload.data
+    : isRecord(payload)
+      ? payload
+      : null
+
+  const statsList = source && Array.isArray(source.stats)
+    ? source.stats.filter(isRecord)
+    : []
+
+  const matched = statsList.find((item) => String(item.teacher_id ?? '') === teacherId)
+  if (!matched) return emptyAttendanceStats(teacherId)
+
+  return {
+    teacher_id: teacherId,
+    attendance_days: toNumber(matched.attendance_days, 0),
+    sick_leave_days: toNumber(matched.sick_leave_days, 0),
+    personal_leave_days: toNumber(matched.personal_leave_days, 0),
+    annual_leave_days: toNumber(matched.annual_leave_days, 0),
+    family_leave_days: toNumber(matched.family_leave_days, 0),
+    other_leave_days: toNumber(matched.other_leave_days, 0),
+    absent_days: toNumber(matched.absent_days, 0),
+    late_count: toNumber(matched.late_count, 0),
+    total_leave_days: toNumber(matched.total_leave_days, 0),
+    substitute_count: toNumber(matched.substitute_count, 0),
+    attendance_rate: toNumber(matched.attendance_rate, 0),
+  }
+}
+
 // ───────────── Date Utilities ─────────────
 
 export const getMonthRange = (offset: number = 0) => {

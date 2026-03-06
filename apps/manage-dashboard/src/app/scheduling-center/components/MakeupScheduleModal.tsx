@@ -123,7 +123,11 @@ export default function MakeupScheduleModal({
       }
 
       const createData = await createRes.json()
-      const makeupClassId = createData.data?.id || createData.id
+      const makeupClassId = createData.data?.makeupClass?.id || createData.makeupClass?.id || createData.id
+
+      if (!makeupClassId) {
+        throw new Error('建立補課記錄成功但找不到補課 ID')
+      }
 
       // Step 2: Schedule the makeup class
       let finalNotes = notes
@@ -133,7 +137,7 @@ export default function MakeupScheduleModal({
           : `[收費: $${chargeAmount}]`
       }
 
-      const scheduleRes = await fetch(`/api/admin/makeup-classes/${makeupClassId}/schedule`, {
+      const scheduleRes = await fetch(`/api/admin/makeup-classes/${makeupClassId}`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

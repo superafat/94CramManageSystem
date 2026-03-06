@@ -21,6 +21,60 @@ interface Teacher {
   role: string
 }
 
+type RawTeacherRecord = Record<string, unknown>
+
+function parseTimeValue(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length === 0) return null
+  if (/^\d{2}:\d{2}/.test(value)) return value.slice(0, 5)
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toTimeString().slice(0, 5)
+}
+
+function normalizeTeacher(raw: RawTeacherRecord): Teacher {
+  return {
+    id: String(raw.id ?? ''),
+    full_name: String(raw.full_name ?? raw.name ?? ''),
+    role: String(raw.role ?? raw.teacher_role ?? raw.title ?? '教師'),
+  }
+}
+
+function mapLeaveType(type: string | undefined): TeacherAttendanceRecord['leave_type'] {
+  if (type === 'sick_leave') return 'sick'
+  if (type === 'personal_leave') return 'personal'
+  if (type === 'family_leave') return 'family'
+  if (type === 'annual_leave' || type === 'other_leave') return 'other'
+  return undefined
+}
+
+function normalizeTeacherAttendanceRecord(raw: RawTeacherRecord, teachers: Teacher[]): TeacherAttendanceRecord {
+  const teacherId = String(raw.teacher_id ?? '')
+  const teacher = teachers.find((item) => item.id === teacherId)
+  const type = String(raw.type ?? '')
+  const checkInTime = parseTimeValue(raw.check_in_time)
+
+  let status: TeacherAttendanceRecord['status'] = 'absent'
+  if (type === 'checkin') {
+    status = checkInTime && checkInTime > '09:15' ? 'late' : 'present'
+  } else if (type === 'absent') {
+    status = 'absent'
+  } else if (type.includes('leave')) {
+    status = 'leave'
+  }
+
+  return {
+    id: String(raw.id ?? teacherId),
+    teacher_id: teacherId,
+    teacher_name: String(raw.teacher_name ?? teacher?.full_name ?? ''),
+    role: String(raw.role ?? teacher?.role ?? '教師'),
+    date: String(raw.date ?? '').slice(0, 10),
+    status,
+    notes: String(raw.reason ?? raw.approve_note ?? ''),
+    leave_type: mapLeaveType(type),
+    leave_reason: typeof raw.reason === 'string' ? raw.reason : undefined,
+  }
+}
+
 interface LeaveForm {
   teacherId: string
   teacherName: string
@@ -122,7 +176,8 @@ export default function TeacherAttendancePage() {
         if (teacherRes.ok) {
           const json = await teacherRes.json()
           const payload = json.data ?? json
-          loadedTeachers = payload.teachers || payload || []
+          const teacherList = Array.isArray(payload.teachers) ? payload.teachers : Array.isArray(payload) ? payload : []
+          loadedTeachers = teacherList.map((teacher: Record<string, unknown>) => normalizeTeacher(teacher))
         } else {
           demoMode = true
         }
@@ -132,13 +187,14 @@ export default function TeacherAttendancePage() {
 
       // 載入出缺勤記錄
       try {
-        const attRes = await fetch(`${API_BASE}/api/admin/teacher-attendance?date=${selectedDate}`, {
+        const attRes = await fetch(`${API_BASE}/api/teacher-attendance?date=${selectedDate}`, {
           credentials: 'include',
         })
         if (attRes.ok) {
           const json = await attRes.json()
           const payload = json.data ?? json
-          loadedRecords = payload.records || payload || []
+          const rawRecords = Array.isArray(payload.records) ? payload.records : Array.isArray(payload) ? payload : []
+          loadedRecords = rawRecords.map((record: Record<string, unknown>) => normalizeTeacherAttendanceRecord(record, loadedTeachers))
         } else {
           demoMode = true
         }
@@ -195,11 +251,21 @@ export default function TeacherAttendancePage() {
       if (!isDemo) {
         await Promise.all(
           Object.entries(changes).map(([teacherId, status]) =>
-            fetch(`${API_BASE}/api/admin/teacher-attendance`, {
+            fetch(`${API_BASE}/api/teacher-attendance`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
-              body: JSON.stringify({ teacherId, date: selectedDate, status, notes: '' }),
+              body: JSON.stringify(
+                status === 'absent'
+                  ? { teacherId, date: selectedDate, type: 'absent', reason: '缺席登記' }
+                  : {
+                      teacherId,
+                      date: selectedDate,
+                      type: 'checkin',
+                      checkInTime: status === 'late' ? '09:16' : '09:00',
+                      reason: status === 'late' ? '遲到登記' : undefined,
+                    }
+              ),
             })
           )
         )
@@ -251,14 +317,21 @@ export default function TeacherAttendancePage() {
     if (!leaveForm.reason.trim()) return
     setLeaveSubmitting(true)
     try {
-      const res = await fetch(`${API_BASE}/api/admin/teacher-attendance/leave`, {
+      const leaveTypeMap: Record<LeaveForm['leaveType'], string> = {
+        sick: 'sick_leave',
+        personal: 'personal_leave',
+        family: 'family_leave',
+        other: 'other_leave',
+      }
+
+      const res = await fetch(`${API_BASE}/api/teacher-attendance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           teacherId: leaveForm.teacherId,
           date: leaveForm.date,
-          leaveType: leaveForm.leaveType,
+          type: leaveTypeMap[leaveForm.leaveType],
           reason: leaveForm.reason,
         }),
       })

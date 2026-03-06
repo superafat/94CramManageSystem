@@ -30,7 +30,7 @@ attendanceRoutes.get('/attendance',
     const offset = (query.page - 1) * query.limit
 
     try {
-      const conditions = [sql`s.tenant_id = ${tenantId}`]
+      const conditions = [sql`a.tenant_id = ${tenantId}`]
 
       if (query.studentId) conditions.push(sql`a.student_id = ${query.studentId}`)
       if (query.from) conditions.push(sql`a.date >= ${query.from}::date`)
@@ -52,15 +52,43 @@ attendanceRoutes.get('/attendance',
       `))
 
       const attendanceRows = await db.execute(sql`
-        SELECT a.id, a.student_id, a.lesson_id, a.date, a.present, a.notes, a.created_at,
-          s.full_name as student_name, s.grade_level
-        FROM attendance a JOIN students s ON a.student_id = s.id
+        SELECT a.id, a.student_id, a.enrollment_id, a.date, a.status, a.note, a.created_at,
+          s.name as student_name, s.grade,
+          e.course_name
+        FROM attendance a
+        JOIN students s ON a.student_id = s.id
+        LEFT JOIN enrollments e ON a.enrollment_id = e.id
         WHERE ${where}
-        ORDER BY a.date DESC, s.full_name
+        ORDER BY a.date DESC, s.name
         LIMIT ${query.limit} OFFSET ${offset}
       `)
 
-      return successWithPagination(c, { attendance: rows(attendanceRows) }, {
+      const normalized = rows(attendanceRows).map((record) => {
+        const status = String(record.status ?? 'absent')
+        const date = String(record.date ?? '').slice(0, 10)
+
+        return {
+          id: record.id,
+          studentId: record.student_id,
+          student_id: record.student_id,
+          enrollmentId: record.enrollment_id ?? null,
+          enrollment_id: record.enrollment_id ?? null,
+          date,
+          status,
+          present: status === 'present' || status === 'late',
+          notes: record.note ?? null,
+          note: record.note ?? null,
+          studentName: record.student_name,
+          student_name: record.student_name,
+          grade: record.grade ?? null,
+          grade_level: record.grade ?? null,
+          course: record.course_name ?? null,
+          course_name: record.course_name ?? null,
+          created_at: record.created_at,
+        }
+      })
+
+      return successWithPagination(c, { attendance: normalized, records: normalized }, {
         page: query.page,
         limit: query.limit,
         total: Number(cnt?.total) || 0,
@@ -75,6 +103,7 @@ attendanceRoutes.post('/attendance',
   requirePermission(Permission.ATTENDANCE_WRITE),
   zValidator('json', z.union([createAttendanceSchema, bulkAttendanceSchema])),
   async (c) => {
+    const user = c.get('user')
     const body = c.req.valid('json')
 
     try {
@@ -82,11 +111,12 @@ attendanceRoutes.post('/attendance',
       let inserted = 0
 
       for (const rec of records) {
+        const status = rec.present ? 'present' : 'absent'
         await db.execute(sql`
-          INSERT INTO attendance (student_id, lesson_id, date, present, notes)
-          VALUES (${rec.studentId}, ${rec.lessonId ?? null},
+          INSERT INTO attendance (tenant_id, student_id, enrollment_id, date, status, note)
+          VALUES (${user.tenant_id}, ${rec.studentId}, ${rec.lessonId ?? null},
             ${rec.date ?? new Date().toISOString().slice(0, 10)}::date,
-            ${rec.present ?? true}, ${rec.notes ?? null})
+            ${status}, ${rec.notes ?? null})
         `)
         inserted++
       }
