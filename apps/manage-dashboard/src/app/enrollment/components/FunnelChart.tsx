@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeFunnelStages } from '../status'
+
 interface FunnelStage {
   stage: string
   label: string
@@ -50,7 +52,8 @@ export function FunnelChart({ stages, loading }: FunnelChartProps) {
     )
   }
 
-  const displayStages = stages.length > 0 ? stages : DEFAULT_STAGES
+  const normalizedStages = normalizeFunnelStages(stages)
+  const displayStages = normalizedStages.length > 0 ? normalizedStages : DEFAULT_STAGES
   const maxCount = Math.max(...displayStages.map((s) => s.count), 1)
 
   return (

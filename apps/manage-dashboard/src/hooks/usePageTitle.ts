@@ -17,6 +17,8 @@ const exactTitles: Record<string, string> = {
   '/teachers': '講師名單',
   '/scheduling-center': '排課中心',
   '/teacher-attendance': '師資出缺勤',
+  '/schedules': '我的課表',
+  '/my-attendance': '我的出缺勤紀錄',
   '/salary': '薪資管理',
   '/my-salary': '我的薪資條',
   '/headquarters': '總部管理',

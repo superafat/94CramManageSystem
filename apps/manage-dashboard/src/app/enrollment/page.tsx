@@ -5,6 +5,7 @@ import { ConversionStats } from './components/ConversionStats'
 import { FunnelChart } from './components/FunnelChart'
 import { LeadTable, type Lead } from './components/LeadTable'
 import { TrialBookingModal } from './components/TrialBookingModal'
+import { normalizeFunnelStages, normalizeLeadStatus } from './status'
 
 type Period = 'week' | 'month' | 'quarter'
 
@@ -57,7 +58,10 @@ export default function EnrollmentPage() {
   const loadData = useCallback(async () => {
     setLoadingFunnel(true)
     setLoadingLeads(true)
+    setError(null)
     try {
+      let hasEmbeddedLeads = false
+
       const [funnelRes, convRes] = await Promise.all([
         fetch(`${API_BASE}/api/admin/enrollment/funnel?period=${period}`, {
           headers: getHeaders(),
@@ -72,8 +76,30 @@ export default function EnrollmentPage() {
       if (funnelRes.ok) {
         const json = await funnelRes.json()
         const data = json.data ?? json
-        setFunnelStages(data.stages || [])
-        setLeads(data.leads || [])
+        setFunnelStages(normalizeFunnelStages(data.stages ?? data.funnel ?? []))
+        if (Array.isArray(data.leads)) {
+          hasEmbeddedLeads = true
+          setLeads(data.leads.map((lead: Lead) => ({
+            ...lead,
+            status: normalizeLeadStatus(String(lead.status ?? 'new')),
+          })))
+        }
+      }
+
+      if (!hasEmbeddedLeads) {
+        const leadsRes = await fetch(`${API_BASE}/api/admin/enrollment/leads`, {
+          headers: getHeaders(),
+          credentials: 'include',
+        })
+        if (leadsRes.ok) {
+          const leadsJson = await leadsRes.json()
+          const leadsData = leadsJson.data ?? leadsJson
+          const rawLeads = Array.isArray(leadsData.leads) ? leadsData.leads : []
+          setLeads(rawLeads.map((lead: Lead) => ({
+            ...lead,
+            status: normalizeLeadStatus(String(lead.status ?? 'new')),
+          })))
+        }
       }
 
       if (convRes.ok) {
@@ -110,7 +136,7 @@ export default function EnrollmentPage() {
       })
       if (res.ok) {
         setLeads((prev) =>
-          prev.map((lead) => (lead.id === id ? { ...lead, status } : lead))
+          prev.map((lead) => (lead.id === id ? { ...lead, status: normalizeLeadStatus(status) } : lead))
         )
         // Refresh stats after status change
         loadData()

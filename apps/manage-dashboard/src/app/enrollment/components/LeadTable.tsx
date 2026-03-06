@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { STATUS_CONFIG, STATUS_OPTIONS, normalizeLeadStatus } from '../status'
 
 export interface Lead {
   id: string
@@ -20,19 +21,9 @@ interface LeadTableProps {
   onStatusChange: (id: string, status: string, followUpDate?: string) => Promise<void>
 }
 
-const STATUS_CONFIG: Record<string, { label: string; badge: string }> = {
-  new: { label: '新諮詢', badge: 'bg-gray-100 text-gray-600 border-gray-200' },
-  contacted: { label: '已聯絡', badge: 'bg-[#6B8CAE]/10 text-[#6B8CAE] border-[#6B8CAE]/20' },
-  trial_scheduled: { label: '預約試聽', badge: 'bg-[#C4956A]/10 text-[#C4956A] border-[#C4956A]/20' },
-  trial_completed: { label: '完成試聽', badge: 'bg-[#9B7FB6]/10 text-[#9B7FB6] border-[#9B7FB6]/20' },
-  enrolled: { label: '已報名', badge: 'bg-[#7B9E89]/10 text-[#7B9E89] border-[#7B9E89]/20' },
-  lost: { label: '已流失', badge: 'bg-[#B5706E]/10 text-[#B5706E] border-[#B5706E]/20' },
-}
-
-const STATUS_OPTIONS = ['new', 'contacted', 'trial_scheduled', 'trial_completed', 'enrolled', 'lost']
-
 function StatusBadge({ status }: { status: string }) {
-  const config = STATUS_CONFIG[status] ?? { label: status, badge: 'bg-gray-100 text-gray-600 border-gray-200' }
+  const normalizedStatus = normalizeLeadStatus(status)
+  const config = STATUS_CONFIG[normalizedStatus] ?? { label: status, badge: 'bg-gray-100 text-gray-600 border-gray-200' }
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${config.badge}`}>
       {config.label}
@@ -77,7 +68,7 @@ function StatusDropdown({
                   key={s}
                   onClick={() => handleSelect(s)}
                   className={`w-full text-left px-3 py-1.5 text-xs hover:bg-surface-hover transition-colors ${
-                    lead.status === s ? 'font-medium' : ''
+                    normalizeLeadStatus(lead.status) === s ? 'font-medium' : ''
                   }`}
                 >
                   {config?.label ?? s}
