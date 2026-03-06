@@ -323,7 +323,7 @@ async function cmdSchedule(ctx: CmdContext): Promise<string> {
            s.name as student_name, t.name as teacher_name
     FROM time_slots ts
     LEFT JOIN students s ON ts.student_id = s.id
-    LEFT JOIN teachers t ON ts.teacher_id = t.id
+    LEFT JOIN manage_teachers t ON ts.teacher_id = t.id
     WHERE ts.tenant_id = ${ctx.tenantId} AND ts.branch_id = ${ctx.branchId}
       AND ts.status = 'active'
     ORDER BY ts.day_of_week, ts.start_time
@@ -453,9 +453,9 @@ async function cmdLeads(ctx: CmdContext): Promise<string> {
 // --- 教練列表 ---
 async function cmdListTeachers(ctx: CmdContext): Promise<string> {
   const teacherRows = rows(await db.execute(sql`
-    SELECT name, phone, school, department, specialty, status
-    FROM teachers
-    WHERE tenant_id = ${ctx.tenantId} AND deleted_at IS NULL
+    SELECT name, phone, expertise
+    FROM manage_teachers
+    WHERE tenant_id = ${ctx.tenantId}
     ORDER BY name
   `))
 
@@ -463,9 +463,10 @@ async function cmdListTeachers(ctx: CmdContext): Promise<string> {
 
   let msg = `👩‍🏫 *教練列表*（${teacherRows.length}人）\n\n`
   for (const _r of teacherRows) {
-    const r = _r as { name: string; phone: string | null; school: string | null; department: string | null; specialty: string }
-    const spec = r.specialty === 'arts' ? '文' : r.specialty === 'science' ? '理' : '文理'
-    msg += `• ${r.name}（${spec}）— ${r.school ?? ''} ${r.department ?? ''}\n`
+    const r = _r as { name: string; phone: string | null; expertise: string | null }
+    msg += `• ${r.name}`
+    if (r.expertise) msg += `（${r.expertise}）`
+    msg += '\n'
     if (r.phone) msg += `  📱 ${r.phone}\n`
   }
   return msg

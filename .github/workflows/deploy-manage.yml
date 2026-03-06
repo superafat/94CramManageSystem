@@ -53,7 +53,7 @@ jobs:
             --max-instances=3 \
             --revision-suffix="mgmt-be-$(echo ${{ github.sha }} | cut -c1-7)" \
             --no-traffic \
-            --set-env-vars="NODE_ENV=production,DEPLOY_SHA=${{ github.sha }},BACKEND_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_BASE=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,GCS_BUCKET_NAME=94allsolve-uploads" \
+            --set-env-vars="NODE_ENV=production,DEPLOY_SHA=${{ github.sha }},BACKEND_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_BASE=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,GCS_BUCKET_NAME=94allsolve-uploads,GCS_TEACHER_AVATAR_BUCKET_NAME=94allsolve-question-images" \
             --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,INTERNAL_API_KEY=INTERNAL_API_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,LINE_CHANNEL_SECRET=LINE_CHANNEL_SECRET:latest,LINE_CHANNEL_ACCESS_TOKEN=LINE_CHANNEL_ACCESS_TOKEN:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest" \
             --set-cloudsql-instances=cram94-manage-system:asia-east1:platform94-db
 
@@ -102,7 +102,7 @@ jobs:
             --max-instances=2 \
             --revision-suffix="mgmt-dash-$(echo ${{ github.sha }} | cut -c1-7)" \
             --no-traffic \
-            --set-env-vars="NODE_ENV=production,DEPLOY_SHA=${{ github.sha }},BACKEND_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_BASE=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,GCS_BUCKET_NAME=94allsolve-uploads" \
+            --set-env-vars="NODE_ENV=production,DEPLOY_SHA=${{ github.sha }},BACKEND_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_BASE=https://cram94-manage-backend-1015149159553.asia-east1.run.app,NEXT_PUBLIC_API_URL=https://cram94-manage-backend-1015149159553.asia-east1.run.app,GCS_BUCKET_NAME=94allsolve-uploads,GCS_TEACHER_AVATAR_BUCKET_NAME=94allsolve-question-images" \
             --set-secrets="JWT_SECRET=JWT_SECRET:latest"
 
       - name: Safe deploy (verify + route + cleanup)

@@ -15,6 +15,67 @@ import { deleteTeacherAvatar, uploadTeacherAvatar } from '../../services/gcs'
 
 export const teacherRoutes = new Hono<{ Variables: RBACVariables }>()
 
+const TEACHER_SELECT = sql`
+  SELECT
+    t.id,
+    t.tenant_id,
+    NULL::uuid AS branch_id,
+    t.user_id,
+    t.name,
+    '教師'::varchar AS title,
+    t.avatar_url,
+    t.phone,
+    COALESCE(t.email, u.email) AS email,
+    NULL::numeric AS rate_per_class,
+    'active'::varchar AS status,
+    NULL::varchar AS teacher_role,
+    'hourly'::varchar AS salary_type,
+    NULL::numeric AS base_salary,
+    t.hourly_rate,
+    NULL::jsonb AS insurance_config,
+    NULL::varchar AS id_number,
+    NULL::date AS birthday,
+    NULL::text AS address,
+    NULL::varchar AS emergency_contact,
+    NULL::varchar AS emergency_phone,
+    NULL::varchar AS bank_name,
+    NULL::varchar AS bank_branch,
+    NULL::varchar AS bank_account,
+    NULL::varchar AS bank_account_name,
+    regexp_split_to_array(t.expertise, '、')::text[] AS subjects,
+    NULL::text[] AS grade_levels,
+    t.expertise,
+    t.created_at,
+    NULL::timestamp AS deleted_at,
+    u.username
+  FROM manage_teachers t
+  LEFT JOIN users u ON t.user_id = u.id
+`
+
+function parsePgTextArray(value: unknown): string[] | null {
+  if (Array.isArray(value)) return value.map(String)
+  if (typeof value !== 'string') return null
+  if (!value.startsWith('{') || !value.endsWith('}')) return null
+
+  const inner = value.slice(1, -1)
+  if (!inner) return []
+
+  return inner.split(',').map((item) => item.replace(/^"|"$/g, ''))
+}
+
+function normalizeTeacherRow<T extends Record<string, unknown> | null | undefined>(teacher: T): T {
+  if (!teacher) return teacher
+
+  const normalized = { ...teacher } as Record<string, unknown>
+  const subjects = parsePgTextArray(normalized.subjects)
+  if (subjects) normalized.subjects = subjects
+
+  const gradeLevels = parsePgTextArray(normalized.grade_levels)
+  if (gradeLevels) normalized.grade_levels = gradeLevels
+
+  return normalized as T
+}
+
 const resolveCompensation = (
   salaryType: string,
   ratePerClass: number | null | undefined,
@@ -55,6 +116,10 @@ const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
 const ALLOWED_AVATAR_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'] as const
 const MAX_AVATAR_SIZE = 3 * 1024 * 1024
 
+const updateTeacherAvatarSchema = z.object({
+  avatarUrl: z.string().url().max(500),
+})
+
 teacherRoutes.post('/teachers/upload-avatar', requireRole(Role.ADMIN, Role.MANAGER), async (c) => {
   try {
     const user = c.get('user')
@@ -88,6 +153,54 @@ teacherRoutes.post('/teachers/upload-avatar', requireRole(Role.ADMIN, Role.MANAG
   }
 })
 
+teacherRoutes.patch('/teachers/:id/avatar', requireRole(Role.ADMIN, Role.MANAGER),
+  zValidator('param', z.object({ id: uuidSchema })),
+  zValidator('json', updateTeacherAvatarSchema),
+  async (c) => {
+    try {
+      const { id } = c.req.valid('param')
+      const body = c.req.valid('json')
+      const user = c.get('user')
+      if (!user?.tenant_id) {
+        return badRequest(c, 'Missing tenant context')
+      }
+
+      const existingResult = await db.execute(sql`
+        SELECT avatar_url
+        FROM manage_teachers
+        WHERE id = ${id} AND tenant_id = ${user.tenant_id}
+        LIMIT 1
+      `)
+      const existingTeacher = first(existingResult)
+      if (!existingTeacher) {
+        return notFound(c, 'Teacher')
+      }
+
+      const previousAvatarUrl = typeof existingTeacher.avatar_url === 'string' ? existingTeacher.avatar_url : null
+
+      const result = await db.execute(sql`
+        UPDATE manage_teachers
+        SET avatar_url = ${body.avatarUrl}
+        WHERE id = ${id} AND tenant_id = ${user.tenant_id}
+        RETURNING *
+      `)
+
+      const teacher = first(result)
+
+      if (previousAvatarUrl && previousAvatarUrl !== body.avatarUrl) {
+        deleteTeacherAvatar(previousAvatarUrl).catch((error) => {
+          logger.warn({ err: error, teacherId: id }, 'Failed to delete previous teacher avatar')
+        })
+      }
+
+      return success(c, { teacher })
+    } catch (error) {
+      logger.error({ err: error }, 'Error updating teacher avatar:')
+      return internalError(c, error)
+    }
+  }
+)
+
 teacherRoutes.get('/teachers', requirePermission(Permission.SCHEDULE_READ), zValidator('query', teacherQuerySchema), async (c) => {
   try {
     const query = c.req.valid('query')
@@ -98,20 +211,15 @@ teacherRoutes.get('/teachers', requirePermission(Permission.SCHEDULE_READ), zVal
     const conditions = [sql`1=1`]
     // 優先使用 user 的 tenant_id，避免 query 覆寫造成跨租戶讀取
     conditions.push(sql`t.tenant_id = ${user?.tenant_id ?? query.tenant_id}`)
-    if (query.branch_id) conditions.push(sql`t.branch_id = ${query.branch_id}`)
-    if (query.status) conditions.push(sql`t.status = ${query.status}`)
+    if (query.status === 'inactive' || query.status === 'resigned') {
+      conditions.push(sql`1 = 0`)
+    }
 
     const where = sql.join(conditions, sql` AND `)
 
-    const result = await db.execute(sql`
-      SELECT t.*, u.username, u.email
-      FROM teachers t
-      LEFT JOIN users u ON t.user_id = u.id
-      WHERE ${where}
-      ORDER BY t.name
-    `)
+    const result = await db.execute(sql`${TEACHER_SELECT} WHERE ${where} ORDER BY t.name`)
 
-    return success(c, { teachers: rows(result) })
+    return success(c, { teachers: rows(result).map((teacher) => normalizeTeacherRow(teacher)) })
   } catch (error) {
     logger.error({ err: error }, 'Error fetching teachers:')
     return internalError(c, error)
@@ -125,19 +233,14 @@ teacherRoutes.get('/teachers/:id', requirePermission(Permission.SCHEDULE_READ), 
     if (!user?.tenant_id) {
       return badRequest(c, 'Missing tenant context')
     }
-    const result = await db.execute(sql`
-      SELECT t.*, u.username, u.email
-      FROM teachers t
-      LEFT JOIN users u ON t.user_id = u.id
-      WHERE t.id = ${id} AND t.tenant_id = ${user.tenant_id}
-    `)
+    const result = await db.execute(sql`${TEACHER_SELECT} WHERE t.id = ${id} AND t.tenant_id = ${user.tenant_id}`)
 
     const teacher = first(result)
     if (!teacher) {
       return notFound(c, 'Teacher')
     }
 
-    return success(c, { teacher })
+    return success(c, { teacher: normalizeTeacherRow(teacher) })
   } catch (error) {
     logger.error({ err: error }, 'Error fetching teacher:')
     return internalError(c, error)
@@ -150,34 +253,27 @@ teacherRoutes.post('/teachers', requireRole(Role.ADMIN, Role.MANAGER), zValidato
     const user = c.get('user')
     const salaryType = body.salaryType || 'per_class'
     const compensation = resolveCompensation(salaryType, body.ratePerClass, body.hourlyRate, body.baseSalary)
-    const insuranceConfig = normalizeTeacherInsuranceConfig(body.insuranceConfig, salaryType)
+    normalizeTeacherInsuranceConfig(body.insuranceConfig, salaryType)
+    const storedHourlyRate = compensation.hourlyRate ?? compensation.ratePerClass ?? compensation.baseSalary ?? null
+    const derivedExpertise = body.subjects && body.subjects.length > 0 ? body.subjects.join('、') : null
 
-    const result = await db.execute(sql`
-      INSERT INTO teachers (
-        user_id, tenant_id, branch_id, name, title, phone, email, rate_per_class,
-        hourly_rate, teacher_role, salary_type, base_salary, insurance_config,
-        id_number, birthday, address, emergency_contact, emergency_phone,
-        bank_name, bank_branch, bank_account, bank_account_name,
-        subjects, grade_levels, avatar_url
+    const insertResult = await db.execute(sql`
+      INSERT INTO manage_teachers (
+        user_id, tenant_id, name, phone, email, expertise,
+        hourly_rate, avatar_url
       )
       VALUES (
-        ${body.userId || null}, ${user?.tenant_id ?? body.tenantId}, ${body.branchId},
-        ${sanitizeString(body.name)}, ${sanitizeString(body.title)}, ${body.phone || null}, ${body.email || null}, ${compensation.ratePerClass},
-        ${compensation.hourlyRate}, ${body.teacherRole || null}, ${salaryType}, ${compensation.baseSalary},
-        ${sql`${JSON.stringify(insuranceConfig)}::jsonb`},
-        ${body.idNumber || null}, ${body.birthday ? sql`${body.birthday}::date` : null},
-        ${body.address ? sanitizeString(body.address) : null},
-        ${body.emergencyContact ? sanitizeString(body.emergencyContact) : null}, ${body.emergencyPhone || null},
-        ${body.bankName ? sanitizeString(body.bankName) : null}, ${body.bankBranch ? sanitizeString(body.bankBranch) : null},
-        ${body.bankAccount || null}, ${body.bankAccountName ? sanitizeString(body.bankAccountName) : null},
-        ${body.subjects ? sql`${body.subjects}::text[]` : null},
-        ${body.gradeLevels ? sql`${body.gradeLevels}::text[]` : null},
-        ${body.avatarUrl || null}
+        ${body.userId || null}, ${user?.tenant_id ?? body.tenantId},
+        ${sanitizeString(body.name)}, ${body.phone || null}, ${body.email || null}, ${derivedExpertise},
+        ${storedHourlyRate}, ${body.avatarUrl || null}
       )
-      RETURNING *
+      RETURNING id
     `)
 
-    return success(c, { teacher: first(result) }, 201)
+    const insertedTeacher = first(insertResult)
+    const result = await db.execute(sql`${TEACHER_SELECT} WHERE t.id = ${insertedTeacher?.id} AND t.tenant_id = ${user?.tenant_id ?? body.tenantId}`)
+
+    return success(c, { teacher: normalizeTeacherRow(first(result)) }, 201)
   } catch (error) {
     logger.error({ err: error }, 'Error creating teacher:')
     if (error instanceof Error && (error as Error & { code?: string }).code === '23505') {
@@ -200,8 +296,8 @@ teacherRoutes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER),
       }
 
       const existingResult = await db.execute(sql`
-        SELECT salary_type, insurance_config, rate_per_class, hourly_rate, base_salary, avatar_url
-        FROM teachers
+        SELECT hourly_rate, avatar_url
+        FROM manage_teachers
         WHERE id = ${id} AND tenant_id = ${user.tenant_id}
         LIMIT 1
       `)
@@ -210,49 +306,36 @@ teacherRoutes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER),
         return notFound(c, 'Teacher')
       }
 
-      const salaryType = body.salaryType ?? String(existingTeacher.salary_type ?? 'per_class')
       const compensation = resolveCompensation(
-        salaryType,
-        body.ratePerClass ?? (existingTeacher.rate_per_class == null ? null : Number(existingTeacher.rate_per_class)),
+        body.salaryType ?? 'hourly',
+        body.ratePerClass ?? null,
         body.hourlyRate ?? (existingTeacher.hourly_rate == null ? null : Number(existingTeacher.hourly_rate)),
-        body.baseSalary ?? (existingTeacher.base_salary == null ? null : Number(existingTeacher.base_salary))
+        body.baseSalary ?? null
       )
-      const insuranceConfig = body.insuranceConfig === undefined
-        ? normalizeTeacherInsuranceConfig(existingTeacher.insurance_config, salaryType)
-        : normalizeTeacherInsuranceConfig(body.insuranceConfig ?? createDefaultInsuranceConfig(salaryType), salaryType)
+      normalizeTeacherInsuranceConfig(body.insuranceConfig ?? createDefaultInsuranceConfig('hourly'), body.salaryType ?? 'hourly')
+      const storedHourlyRate = compensation.hourlyRate ?? compensation.ratePerClass ?? null
       const previousAvatarUrl = typeof existingTeacher.avatar_url === 'string' ? existingTeacher.avatar_url : null
       const nextAvatarUrl = body.avatarUrl === undefined ? previousAvatarUrl : body.avatarUrl
+      const derivedExpertise = body.subjects === undefined
+        ? undefined
+        : body.subjects && body.subjects.length > 0
+          ? body.subjects.join('、')
+          : null
 
-      const result = await db.execute(sql`
-        UPDATE teachers
+      const updateResult = await db.execute(sql`
+        UPDATE manage_teachers
         SET name = COALESCE(${body.name != null ? sanitizeString(body.name) : null}, name),
-            title = COALESCE(${body.title != null ? sanitizeString(body.title) : null}, title),
             phone = COALESCE(${body.phone ?? null}, phone),
             email = COALESCE(${body.email ?? null}, email),
-          avatar_url = COALESCE(${body.avatarUrl ?? null}, avatar_url),
-            rate_per_class = ${compensation.ratePerClass},
-            hourly_rate = ${compensation.hourlyRate},
-            status = COALESCE(${body.status ?? null}, status),
-            teacher_role = COALESCE(${body.teacherRole ?? null}, teacher_role),
-            salary_type = ${salaryType},
-            base_salary = ${compensation.baseSalary},
-            insurance_config = ${sql`${JSON.stringify(insuranceConfig)}::jsonb`},
-            id_number = COALESCE(${body.idNumber ?? null}, id_number),
-            birthday = COALESCE(${body.birthday != null ? sql`${body.birthday}::date` : null}, birthday),
-            address = COALESCE(${body.address != null ? sanitizeString(body.address) : null}, address),
-            emergency_contact = COALESCE(${body.emergencyContact != null ? sanitizeString(body.emergencyContact) : null}, emergency_contact),
-            emergency_phone = COALESCE(${body.emergencyPhone ?? null}, emergency_phone),
-            bank_name = COALESCE(${body.bankName != null ? sanitizeString(body.bankName) : null}, bank_name),
-            bank_branch = COALESCE(${body.bankBranch != null ? sanitizeString(body.bankBranch) : null}, bank_branch),
-            bank_account = COALESCE(${body.bankAccount ?? null}, bank_account),
-            bank_account_name = COALESCE(${body.bankAccountName != null ? sanitizeString(body.bankAccountName) : null}, bank_account_name),
-            subjects = COALESCE(${body.subjects ? sql`${body.subjects}::text[]` : null}, subjects),
-            grade_levels = COALESCE(${body.gradeLevels ? sql`${body.gradeLevels}::text[]` : null}, grade_levels),
-            updated_at = NOW()
+            expertise = COALESCE(${derivedExpertise ?? null}, expertise),
+            avatar_url = COALESCE(${body.avatarUrl ?? null}, avatar_url),
+            hourly_rate = COALESCE(${storedHourlyRate}, hourly_rate)
         WHERE id = ${id} AND tenant_id = ${user.tenant_id}
-        RETURNING *
+        RETURNING id
       `)
 
+      const updatedTeacher = first(updateResult)
+      const result = await db.execute(sql`${TEACHER_SELECT} WHERE t.id = ${updatedTeacher?.id} AND t.tenant_id = ${user.tenant_id}`)
       const teacher = first(result)
 
       if (previousAvatarUrl && previousAvatarUrl !== nextAvatarUrl) {
@@ -261,7 +344,7 @@ teacherRoutes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER),
         })
       }
 
-      return success(c, { teacher })
+      return success(c, { teacher: normalizeTeacherRow(teacher) })
     } catch (error) {
       logger.error({ err: error }, 'Error updating teacher:')
       return internalError(c, error)
@@ -278,13 +361,13 @@ teacherRoutes.delete('/teachers/:id', requireRole(Role.ADMIN), zValidator('param
     }
 
     // Soft delete
-    const result = await db.execute(sql`
-      UPDATE teachers SET deleted_at = NOW(), status = 'resigned'
-      WHERE id = ${id} AND tenant_id = ${user.tenant_id} AND deleted_at IS NULL
-      RETURNING *
+    const deletedResult = await db.execute(sql`
+      DELETE FROM manage_teachers
+      WHERE id = ${id} AND tenant_id = ${user.tenant_id}
+      RETURNING id, avatar_url
     `)
 
-    const teacher = first(result)
+    const teacher = first(deletedResult)
     if (!teacher) {
       return notFound(c, 'Teacher')
     }

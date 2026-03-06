@@ -14,6 +14,15 @@ import { db, sql, logger, success, notFound, badRequest, internalError, rows, fi
 
 export const scheduleRoutes = new Hono<{ Variables: RBACVariables }>()
 
+const MANAGE_TEACHER_SCHEDULE_JOIN = sql`
+  SELECT
+    t.id,
+    t.name,
+    '教師'::varchar AS title,
+    NULL::numeric AS rate_per_class
+  FROM manage_teachers t
+`
+
 const scheduleQuerySchema = z.object({
   teacher_id: uuidSchema.optional(),
   course_id: uuidSchema.optional(),
@@ -47,7 +56,7 @@ scheduleRoutes.get('/schedules', requirePermission(Permission.SCHEDULE_READ), zV
         ms.full_name as student_name
       FROM schedules s
       JOIN courses c ON s.course_id = c.id
-      LEFT JOIN teachers t ON s.teacher_id = t.id
+      LEFT JOIN (${MANAGE_TEACHER_SCHEDULE_JOIN}) t ON s.teacher_id = t.id
       LEFT JOIN manage_enrollments me ON me.course_id = s.course_id AND me.status = 'active' AND me.deleted_at IS NULL
       LEFT JOIN manage_students ms ON ms.id = me.student_id
       WHERE ${where}
@@ -72,7 +81,7 @@ scheduleRoutes.get('/schedules/:id', requirePermission(Permission.SCHEDULE_READ)
         t.name as teacher_name, t.title as teacher_title, t.rate_per_class
       FROM schedules s
       JOIN courses c ON s.course_id = c.id
-      LEFT JOIN teachers t ON s.teacher_id = t.id
+      LEFT JOIN (${MANAGE_TEACHER_SCHEDULE_JOIN}) t ON s.teacher_id = t.id
       WHERE s.id = ${id} AND s.tenant_id = ${user?.tenant_id}
     `)
 
@@ -172,7 +181,7 @@ scheduleRoutes.post('/schedules/:id/change', requirePermission(Permission.SCHEDU
         SELECT s.*, c.name as course_name, t.name as teacher_name
         FROM schedules s
         JOIN courses c ON s.course_id = c.id
-        LEFT JOIN teachers t ON s.teacher_id = t.id
+        LEFT JOIN (${MANAGE_TEACHER_SCHEDULE_JOIN}) t ON s.teacher_id = t.id
         WHERE s.id = ${id}
       `)
 

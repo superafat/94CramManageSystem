@@ -38,26 +38,26 @@ export async function calculatePayroll(
     SELECT
       l.teacher_id,
       t.name as teacher_name,
-      t.hourly_rates,
+      t.hourly_rate,
       COUNT(*) FILTER (WHERE l.attendance = 'present')::int as sessions
     FROM lessons l
-    JOIN teachers t ON l.teacher_id = t.id
+    JOIN manage_teachers t ON l.teacher_id = t.id
     WHERE l.tenant_id = ${tenantId}
       AND l.date >= ${startDate}::date
       AND l.date <= ${endDate}::date
       AND l.teacher_id IS NOT NULL
-    GROUP BY l.teacher_id, t.name, t.hourly_rates
+    GROUP BY l.teacher_id, t.name, t.hourly_rate
   `))
 
   const records: PayrollSummary[] = []
 
   for (const _row of lessonCounts) {
-    const row = _row as { teacher_id: string; teacher_name: string; hourly_rates: { tutoring?: number; private?: number; assistant?: number } | null; sessions: number }
-    const rates = row.hourly_rates ?? { tutoring: 250, private: 350, assistant: 88 }
+    const row = _row as { teacher_id: string; teacher_name: string; hourly_rate: number | string | null; sessions: number }
+    const tutoringRate = Number(row.hourly_rate || 250)
     const sessions = row.sessions
 
     // Default: all sessions are tutoring (can be refined later with lesson types)
-    const tutoringAmount = sessions * (rates.tutoring ?? 250)
+    const tutoringAmount = sessions * tutoringRate
 
     // Check if record exists
     const existing = rows(await db.execute(sql`
@@ -97,7 +97,7 @@ export async function getPayroll(tenantId: string, period: string) {
   return db.execute(sql`
     SELECT pr.*, t.name as teacher_name
     FROM payroll_records pr
-    JOIN teachers t ON pr.teacher_id = t.id
+    JOIN manage_teachers t ON pr.teacher_id = t.id
     WHERE pr.tenant_id = ${tenantId} AND pr.period = ${period}
     ORDER BY t.name
   `)

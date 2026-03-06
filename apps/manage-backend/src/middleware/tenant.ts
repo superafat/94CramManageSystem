@@ -39,7 +39,10 @@ export async function tenantMiddleware(c: Context, next: Next) {
     if (cached && Date.now() < cached) {
       // Cache hit — tenant is valid
     } else {
-      const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId))
+      const [tenant] = await db
+        .select({ id: tenants.id })
+        .from(tenants)
+        .where(eq(tenants.id, tenantId))
       if (!tenant) {
         return c.json({ error: 'Tenant not found' }, 404)
       }

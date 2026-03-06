@@ -16,12 +16,31 @@ import { calculateSalarySettlementSummary } from './insurance-plan'
 
 export const salaryRoutes = new Hono<{ Variables: RBACVariables }>()
 
+const MANAGE_TEACHER_SALARY_SELECT = sql`
+  SELECT
+    t.id,
+    t.tenant_id,
+    t.name,
+    '教師'::varchar AS title,
+    NULL::varchar AS teacher_role,
+    'hourly'::varchar AS salary_type,
+    NULL::jsonb AS insurance_config,
+    NULL::numeric AS rate_per_class,
+    NULL::numeric AS base_salary,
+    t.hourly_rate
+  FROM manage_teachers t
+`
+
 // GET /api/w8/salary/calculate - 計算薪資預覽
 salaryRoutes.get('/salary/calculate', requireRole(Role.ADMIN, Role.MANAGER),
   zValidator('query', salaryCalculateSchema),
   async (c) => {
     try {
       const query = c.req.valid('query')
+      const user = c.get('user')
+      if (!user?.tenant_id) {
+        return badRequest(c, 'Missing tenant context')
+      }
 
       const conditions = [
         sql`s.scheduled_date >= ${query.startDate}::date`,
@@ -52,16 +71,15 @@ salaryRoutes.get('/salary/calculate', requireRole(Role.ADMIN, Role.MANAGER),
             SUM(EXTRACT(EPOCH FROM (s.end_time::time - s.start_time::time)) / 3600 * COALESCE(t.hourly_rate, 0)),
             0
           )::numeric as hourly_amount
-        FROM teachers t
+        FROM (${MANAGE_TEACHER_SALARY_SELECT}) t
         LEFT JOIN schedules s ON t.id = s.teacher_id AND ${where}
         LEFT JOIN courses c ON s.course_id = c.id
-        WHERE t.deleted_at IS NULL
+        WHERE t.tenant_id = ${user.tenant_id}
         GROUP BY t.id, t.name, t.title, t.teacher_role, t.salary_type, t.rate_per_class, t.base_salary, t.hourly_rate
         ORDER BY t.name
       `)
 
       // 查詢薪資調整（獎金/扣薪）
-      const user = c.get('user')
       const adjResult = await db.execute(sql`
         SELECT id, teacher_id, type, name, amount, notes
         FROM manage_salary_adjustments
@@ -166,7 +184,7 @@ salaryRoutes.post('/salary/records', requireRole(Role.ADMIN), zValidator('json',
         t.insurance_config,
         COUNT(s.id)::int as total_classes,
         COALESCE(SUM(EXTRACT(EPOCH FROM (s.end_time::time - s.start_time::time)) / 3600), 0)::numeric as total_hours
-      FROM teachers t
+      FROM (${MANAGE_TEACHER_SALARY_SELECT}) t
       LEFT JOIN schedules s ON t.id = s.teacher_id
         AND s.scheduled_date >= ${body.periodStart}::date
         AND s.scheduled_date <= ${body.periodEnd}::date
@@ -265,9 +283,9 @@ salaryRoutes.get('/salary/records', requireRole(Role.ADMIN, Role.MANAGER),
       const where = sql.join(conditions, sql` AND `)
 
       const result = await db.execute(sql`
-        SELECT sr.*, t.name as teacher_name, t.title
+        SELECT sr.*, t.name as teacher_name, '教師'::varchar as title
         FROM salary_records sr
-        JOIN teachers t ON sr.teacher_id = t.id
+        JOIN manage_teachers t ON sr.teacher_id = t.id
         WHERE ${where}
         ORDER BY sr.period_start DESC, t.name
       `)
@@ -329,7 +347,7 @@ salaryRoutes.put('/salary/records/:id/pay', requireRole(Role.ADMIN),
       // Notify teacher via Telegram
       if (record) {
         const teacherResult = await db.execute(sql`
-          SELECT t.id as teacher_id, t.full_name, t.tenant_id
+          SELECT t.id as teacher_id, t.name, t.tenant_id
           FROM manage_teachers t
           JOIN salary_records sr ON sr.teacher_id = t.id
           WHERE sr.id = ${id}
@@ -343,7 +361,7 @@ salaryRoutes.put('/salary/records/:id/pay', requireRole(Role.ADMIN),
           void notifySalaryPaid(
             String(teacher.tenant_id),
             String(teacher.teacher_id),
-            String(teacher.full_name),
+            String(teacher.name),
             period,
             Number(record.total_amount || 0)
           )
@@ -383,7 +401,7 @@ salaryRoutes.get('/salary/adjustments', requireRole(Role.ADMIN, Role.MANAGER),
       const result = await db.execute(sql`
         SELECT sa.*, t.name as teacher_name
         FROM manage_salary_adjustments sa
-        JOIN teachers t ON sa.teacher_id = t.id
+        JOIN manage_teachers t ON sa.teacher_id = t.id
         WHERE ${where}
         ORDER BY sa.created_at DESC
       `)

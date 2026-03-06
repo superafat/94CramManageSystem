@@ -6,8 +6,11 @@ import { z } from 'zod'
 
 // ===== Common Schemas =====
 
-/** UUID v4 格式驗證 */
-export const uuidSchema = z.string().uuid('Invalid UUID format')
+/** UUID 格式驗證（接受 PostgreSQL 既有資料中使用的非 RFC variant UUID） */
+export const uuidSchema = z.string().regex(
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
+  'Invalid UUID format'
+)
 
 /** 非空字串 */
 export const nonEmptyString = z.string().min(1, 'Cannot be empty')

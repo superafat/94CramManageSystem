@@ -63,7 +63,7 @@ export async function checkConflicts(input: TimeSlotInput): Promise<ScheduleConf
   const teacherConflicts = rows(await db.execute(sql`
     SELECT ts.subject, ts.start_time::text, ts.end_time::text, t.name as entity_name
     FROM time_slots ts
-    JOIN teachers t ON ts.teacher_id = t.id
+    JOIN manage_teachers t ON ts.teacher_id = t.id
     WHERE ts.tenant_id = ${input.tenantId}
       AND ts.teacher_id = ${input.teacherId}
       AND ts.day_of_week = ${input.dayOfWeek}
@@ -137,7 +137,7 @@ export async function getWeeklySchedule(tenantId: string, branchId: string) {
     SELECT ts.*, s.name as student_name, t.name as teacher_name, cr.name as classroom_name
     FROM time_slots ts
     LEFT JOIN students s ON ts.student_id = s.id
-    LEFT JOIN teachers t ON ts.teacher_id = t.id
+    LEFT JOIN manage_teachers t ON ts.teacher_id = t.id
     LEFT JOIN classrooms cr ON ts.classroom_id = cr.id
     WHERE ts.tenant_id = ${tenantId}
       AND ts.branch_id = ${branchId}
