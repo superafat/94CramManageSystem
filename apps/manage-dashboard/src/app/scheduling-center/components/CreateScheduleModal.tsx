@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import StudentPicker from './StudentPicker'
 import type { ScheduleEvent } from './types'
+import { BottomSheet } from '@/components/ui/BottomSheet'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface CreateScheduleModalProps {
   isOpen: boolean
@@ -23,6 +25,9 @@ interface TeacherOption {
 }
 
 export default function CreateScheduleModal({ isOpen, onClose, onCreated, existingEvents }: CreateScheduleModalProps) {
+  const isMobile = useIsMobile()
+  const [step, setStep] = useState(1)
+
   // Form state
   const [courseId, setCourseId] = useState('')
   const [scheduledDate, setScheduledDate] = useState('')
@@ -123,6 +128,7 @@ export default function CreateScheduleModal({ isOpen, onClose, onCreated, existi
       setRoom('')
       setNotes('')
       setSelectedStudentIds(new Set())
+      setStep(1)
     }
   }, [isOpen, fetchCourses, fetchTeachers])
 
@@ -175,6 +181,107 @@ export default function CreateScheduleModal({ isOpen, onClose, onCreated, existi
   if (!isOpen) return null
 
   const isLoading = loadingCourses || loadingTeachers
+  const canProceed = !!courseId && !!scheduledDate && !!startTime && !!endTime
+
+  // Mobile: BottomSheet with 2-step flow
+  if (isMobile) {
+    return (
+      <BottomSheet isOpen={isOpen} onClose={onClose} title="新增排課">
+        {/* Step indicator */}
+        <div className="px-5 pt-3 pb-1">
+          <div className="flex items-center gap-2 mb-3">
+            {[1, 2].map(s => (
+              <div key={s} className="flex items-center gap-2 flex-1">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${
+                  step >= s ? 'bg-primary text-white' : 'bg-surface-hover text-text-muted'
+                }`}>{s}</div>
+                <div className={`flex-1 h-1 rounded-full ${s < 2 ? (step > s ? 'bg-primary' : 'bg-surface-hover') : 'hidden'}`} />
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-text-muted">{step === 1 ? '基本資訊' : '選擇學生'}</p>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        ) : step === 1 ? (
+          <div className="px-5 py-4 space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-text-muted mb-1">課程</label>
+              <select title="課程" value={courseId} onChange={e => { setCourseId(e.target.value); setSelectedStudentIds(new Set()) }}
+                className="w-full text-sm px-3 py-2.5 rounded-xl border border-border bg-white">
+                <option value="">選擇課程</option>
+                {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-muted mb-1">上課日期</label>
+              <input title="上課日期" type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)}
+                className="w-full text-sm px-3 py-2.5 rounded-xl border border-border" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-text-muted mb-1">開始時間</label>
+                <input title="開始時間" type="time" value={startTime} onChange={e => setStartTime(e.target.value)}
+                  className="w-full text-sm px-3 py-2.5 rounded-xl border border-border" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-muted mb-1">結束時間</label>
+                <input title="結束時間" type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
+                  className="w-full text-sm px-3 py-2.5 rounded-xl border border-border" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-muted mb-1">教室</label>
+              <input type="text" value={room} onChange={e => setRoom(e.target.value)} placeholder="例：A101"
+                className="w-full text-sm px-3 py-2.5 rounded-xl border border-border" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-muted mb-1">授課老師</label>
+              <select title="授課老師" value={teacherId} onChange={e => setTeacherId(e.target.value)}
+                className="w-full text-sm px-3 py-2.5 rounded-xl border border-border bg-white">
+                <option value="">選擇老師</option>
+                {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-muted mb-1">備註</label>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="選填" rows={2}
+                className="w-full text-sm px-3 py-2.5 rounded-xl border border-border resize-none" />
+            </div>
+            {conflicts.length > 0 && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-1">
+                <p className="text-xs font-semibold text-amber-700">⚠️ 偵測到時間衝突</p>
+                {conflicts.map((c, i) => <p key={i} className="text-xs text-amber-700">{c.message}</p>)}
+              </div>
+            )}
+            <div className="flex gap-3 pt-2 pb-4">
+              <button type="button" onClick={onClose}
+                className="flex-1 py-3 border border-border rounded-xl text-sm text-text">取消</button>
+              <button type="button" onClick={() => setStep(2)} disabled={!canProceed}
+                className="flex-1 py-3 bg-primary text-white rounded-xl text-sm font-medium disabled:opacity-50">下一步</button>
+            </div>
+          </div>
+        ) : (
+          <div className="px-5 py-4 space-y-4">
+            {courseId && selectedCourse && (
+              <StudentPicker selectedIds={selectedStudentIds} onSelectionChange={setSelectedStudentIds} courseType={selectedCourse.courseType} />
+            )}
+            <div className="flex gap-3 pt-2 pb-4">
+              <button type="button" onClick={() => setStep(1)}
+                className="flex-1 py-3 border border-border rounded-xl text-sm text-text">上一步</button>
+              <button type="button" onClick={handleSave} disabled={saving}
+                className="flex-1 py-3 bg-primary text-white rounded-xl text-sm font-medium disabled:opacity-50">
+                {saving ? '建立中...' : '完成'}
+              </button>
+            </div>
+          </div>
+        )}
+      </BottomSheet>
+    )
+  }
 
   return (
     <>

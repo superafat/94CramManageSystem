@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { BottomSheet } from '@/components/ui/BottomSheet'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface EditScheduleModalProps {
   isOpen: boolean
@@ -21,6 +23,20 @@ interface StudentOption {
   id: string
   name: string
   grade?: string
+}
+
+interface PaymentSummary {
+  studentId: string
+  totalEnrollments: number
+  paidEnrollments: number
+}
+
+function PaymentBadge({ summary }: { summary?: PaymentSummary }) {
+  if (!summary || summary.totalEnrollments === 0) return null
+  const isPaid = summary.paidEnrollments >= summary.totalEnrollments
+  return isPaid
+    ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#A8B5A2]/20 text-[#4A6B44] font-medium shrink-0">已繳費</span>
+    : <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#B5706E]/15 text-[#B5706E] font-medium shrink-0">未繳費</span>
 }
 
 const COURSE_TYPE_LABEL: Record<string, string> = {
@@ -44,6 +60,9 @@ export default function EditScheduleModal({
   onClose,
   onUpdated,
 }: EditScheduleModalProps) {
+  const isMobile = useIsMobile()
+  const [step, setStep] = useState(1)
+
   // Form state
   const [scheduledDate, setScheduledDate] = useState('')
   const [startTime, setStartTime] = useState('')
@@ -55,6 +74,7 @@ export default function EditScheduleModal({
   // Data state
   const [teachers, setTeachers] = useState<TeacherOption[]>([])
   const [allStudents, setAllStudents] = useState<StudentOption[]>([])
+  const [paymentMap, setPaymentMap] = useState<Map<string, PaymentSummary>>(new Map())
   const [initialStudentIds, setInitialStudentIds] = useState<Set<string>>(new Set())
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set())
   const [studentSearch, setStudentSearch] = useState('')
@@ -116,17 +136,26 @@ export default function EditScheduleModal({
   const fetchAllStudents = useCallback(async () => {
     setLoadingStudents(true)
     try {
-      const res = await fetch('/api/admin/students?status=active&limit=200', { credentials: 'include' })
-      if (!res.ok) return
-      const data = await res.json()
-      const students = data.data?.students || data.students || []
-      setAllStudents(
-        students.map((s: Record<string, unknown>) => ({
-          id: s.id as string,
-          name: (s.name as string) || '',
-          grade: (s.grade as string) || undefined,
-        }))
-      )
+      const [studentsRes, paymentRes] = await Promise.all([
+        fetch('/api/admin/students?status=active&limit=200', { credentials: 'include' }),
+        fetch('/api/admin/billing/payment-summary', { credentials: 'include' }),
+      ])
+      if (studentsRes.ok) {
+        const data = await studentsRes.json()
+        const students = data.data?.students || data.students || []
+        setAllStudents(
+          students.map((s: Record<string, unknown>) => ({
+            id: s.id as string,
+            name: (s.full_name as string) || (s.name as string) || '',
+            grade: (s.grade_level as string) || (s.grade as string) || undefined,
+          }))
+        )
+      }
+      if (paymentRes.ok) {
+        const data = await paymentRes.json()
+        const summary: PaymentSummary[] = data.data?.summary || data.summary || []
+        setPaymentMap(new Map(summary.map(s => [s.studentId, s])))
+      }
     } catch (err) {
       console.error('Failed to fetch students:', err)
     } finally {
@@ -140,6 +169,7 @@ export default function EditScheduleModal({
       fetchTeachers()
       fetchAllStudents()
       setStudentSearch('')
+      setStep(1)
     }
   }, [isOpen, fetchDetail, fetchTeachers, fetchAllStudents])
 
@@ -234,6 +264,115 @@ export default function EditScheduleModal({
   if (!isOpen) return null
 
   const isLoading = loadingDetail || loadingTeachers || loadingStudents
+
+  // Mobile: BottomSheet with 2-step flow
+  if (isMobile) {
+    return (
+      <BottomSheet isOpen={isOpen} onClose={onClose} title={`編輯排課 — ${courseName}`}>
+        {/* Step indicator */}
+        <div className="px-5 pt-3 pb-1">
+          <div className="flex items-center gap-2 mb-3">
+            {[1, 2].map(s => (
+              <div key={s} className="flex items-center gap-2 flex-1">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${
+                  step >= s ? 'bg-primary text-white' : 'bg-surface-hover text-text-muted'
+                }`}>{s}</div>
+                <div className={`flex-1 h-1 rounded-full ${s < 2 ? (step > s ? 'bg-primary' : 'bg-surface-hover') : 'hidden'}`} />
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-text-muted">{step === 1 ? '基本資訊' : '學生名單'}</p>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        ) : step === 1 ? (
+          <div className="px-5 py-4 space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-text-muted mb-1">上課日期</label>
+              <input title="上課日期" type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)}
+                className="w-full text-sm px-3 py-2.5 rounded-xl border border-border" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-text-muted mb-1">開始時間</label>
+                <input title="開始時間" type="time" value={startTime} onChange={e => setStartTime(e.target.value)}
+                  className="w-full text-sm px-3 py-2.5 rounded-xl border border-border" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-muted mb-1">結束時間</label>
+                <input title="結束時間" type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
+                  className="w-full text-sm px-3 py-2.5 rounded-xl border border-border" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-muted mb-1">教室</label>
+              <input type="text" value={room} onChange={e => setRoom(e.target.value)} placeholder="例：A101"
+                className="w-full text-sm px-3 py-2.5 rounded-xl border border-border" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-muted mb-1">授課老師</label>
+              <select title="授課老師" value={teacherId} onChange={e => setTeacherId(e.target.value)}
+                className="w-full text-sm px-3 py-2.5 rounded-xl border border-border bg-white">
+                <option value="">選擇老師</option>
+                {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-muted mb-1">備註</label>
+              <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="選填"
+                className="w-full text-sm px-3 py-2.5 rounded-xl border border-border" />
+            </div>
+            <div className="flex gap-3 pt-2 pb-4">
+              <button type="button" onClick={onClose}
+                className="flex-1 py-3 border border-border rounded-xl text-sm text-text">取消</button>
+              <button type="button" onClick={() => setStep(2)}
+                className="flex-1 py-3 bg-primary text-white rounded-xl text-sm font-medium">下一步</button>
+            </div>
+          </div>
+        ) : (
+          <div className="px-5 py-4 space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-text">
+                  學生名單 <span className="text-text-muted font-normal">({selectedStudentIds.size} 人)</span>
+                </p>
+                {hasStudentChanges && (
+                  <span className="text-xs text-[#C4956A]">
+                    {toAdd.length > 0 && `+${toAdd.length}`}{toAdd.length > 0 && toRemove.length > 0 && ' / '}{toRemove.length > 0 && `-${toRemove.length}`}
+                  </span>
+                )}
+              </div>
+              <input type="text" placeholder="搜尋學生姓名..." value={studentSearch}
+                onChange={e => setStudentSearch(e.target.value)}
+                className="w-full text-sm px-3 py-2 rounded-xl border border-border mb-2" />
+              <div className="max-h-56 overflow-y-auto space-y-1">
+                {filteredStudents.map(s => (
+                  <label key={s.id} className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-border/20 cursor-pointer">
+                    <input type="checkbox" checked={selectedStudentIds.has(s.id)} onChange={() => toggleStudent(s.id)}
+                      className="rounded border-border text-primary" />
+                    <span className="text-sm text-text flex-1">{s.name}</span>
+                    {s.grade && <span className="text-xs text-text-muted">{s.grade}</span>}
+                    <PaymentBadge summary={paymentMap.get(s.id)} />
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2 pb-4">
+              <button type="button" onClick={() => setStep(1)}
+                className="flex-1 py-3 border border-border rounded-xl text-sm text-text">上一步</button>
+              <button type="button" onClick={handleSave} disabled={saving}
+                className="flex-1 py-3 bg-primary text-white rounded-xl text-sm font-medium disabled:opacity-50">
+                {saving ? '儲存中...' : '完成'}
+              </button>
+            </div>
+          </div>
+        )}
+      </BottomSheet>
+    )
+  }
 
   return (
     <>
@@ -389,6 +528,7 @@ export default function EditScheduleModal({
                             {s.grade && (
                               <span className="text-xs text-text-muted">{s.grade}</span>
                             )}
+                            <PaymentBadge summary={paymentMap.get(s.id)} />
                           </label>
                         ))
                       )}
