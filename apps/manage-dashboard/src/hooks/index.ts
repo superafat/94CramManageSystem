@@ -11,3 +11,4 @@ export { useFormField } from './useFormField'
 export type { UseFormFieldReturn } from './useFormField'
 
 export { usePageTitle } from './usePageTitle'
+export { useIsMobile } from './useIsMobile'
