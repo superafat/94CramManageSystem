@@ -8,6 +8,30 @@ export interface SalaryAdjustment {
   notes?: string
 }
 
+export type InsuranceCalculationMode = 'auto' | 'manual'
+export type EmploymentType = 'full_time' | 'part_time'
+
+export interface TeacherInsurancePlan {
+  enabled: boolean
+  tierLevel: number | null
+  calculationMode: InsuranceCalculationMode
+  manualPersonalAmount: number | null
+  manualEmployerAmount: number | null
+}
+
+export interface TeacherSupplementalHealth {
+  employmentType: EmploymentType
+  insuredThroughUnit: boolean
+  averageWeeklyHours: number | null
+  notes: string | null
+}
+
+export interface TeacherInsuranceConfig {
+  labor: TeacherInsurancePlan
+  health: TeacherInsurancePlan
+  supplementalHealth: TeacherSupplementalHealth
+}
+
 export interface TeacherSalary {
   teacher_id: string
   teacher_name: string
@@ -23,6 +47,19 @@ export interface TeacherSalary {
   bonus_total: number
   deduction_total: number
   total_amount: number
+  net_amount: number
+  insurance_config: TeacherInsuranceConfig
+  labor_personal_amount: number
+  labor_employer_amount: number
+  health_personal_amount: number
+  health_employer_amount: number
+  personal_insurance_total: number
+  employer_insurance_total: number
+  supplemental_health_premium_amount: number
+  should_withhold_supplemental_health: boolean
+  supplemental_health_threshold: number
+  supplemental_health_rate: number
+  supplemental_health_reason: string
   adjustments: SalaryAdjustment[]
 }
 
@@ -31,6 +68,10 @@ export interface SalaryData {
   teachers: TeacherSalary[]
   grand_total_classes: number
   grand_total_amount: number
+  grand_net_amount: number
+  grand_personal_insurance_total: number
+  grand_employer_insurance_total: number
+  grand_supplemental_health_premium_amount: number
 }
 
 export interface ScheduleItem {

@@ -12,6 +12,7 @@ import {
 } from '../../utils/validation'
 import { db, sql, logger, success, notFound, badRequest, internalError, conflict, rows, first } from './_helpers'
 import { notifySalaryPaid } from '../../services/notify-helper'
+import { calculateSalarySettlementSummary } from './insurance-plan'
 
 export const salaryRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -40,10 +41,12 @@ salaryRoutes.get('/salary/calculate', requireRole(Role.ADMIN, Role.MANAGER),
           t.title,
           t.teacher_role,
           t.salary_type,
+          t.insurance_config,
           t.rate_per_class,
           t.base_salary,
           t.hourly_rate,
           COUNT(s.id)::int as total_classes,
+          COALESCE(SUM(EXTRACT(EPOCH FROM (s.end_time::time - s.start_time::time)) / 3600), 0)::numeric as total_hours,
           (COUNT(s.id) * COALESCE(t.rate_per_class, 0))::numeric as class_amount,
           COALESCE(
             SUM(EXTRACT(EPOCH FROM (s.end_time::time - s.start_time::time)) / 3600 * COALESCE(t.hourly_rate, 0)),
@@ -84,25 +87,49 @@ salaryRoutes.get('/salary/calculate', requireRole(Role.ADMIN, Role.MANAGER),
         const teacherAdj = adjustments.filter((a) => a.teacher_id === t.teacher_id)
         const bonusTotal = teacherAdj.filter((a) => a.type === 'bonus').reduce((s, a) => s + parseFloat(String(a.amount || 0)), 0)
         const deductionTotal = teacherAdj.filter((a) => a.type === 'deduction').reduce((s, a) => s + parseFloat(String(a.amount || 0)), 0)
-        const totalAmount = baseAmount + bonusTotal - deductionTotal
+        const grossAmount = baseAmount + bonusTotal - deductionTotal
+        const settlement = calculateSalarySettlementSummary(t.insurance_config, salaryType, grossAmount, false)
 
         return {
           ...t,
           salary_type: salaryType,
           total_classes: Number(t.total_classes) || 0,
+          total_hours: Number(t.total_hours) || 0,
           base_amount: baseAmount,
           bonus_total: bonusTotal,
           deduction_total: deductionTotal,
-          total_amount: totalAmount,
+          total_amount: grossAmount,
+          net_amount: settlement.netAmount,
+          insurance_config: settlement.insurance.config,
+          labor_personal_amount: settlement.insurance.laborPersonalAmount,
+          labor_employer_amount: settlement.insurance.laborEmployerAmount,
+          health_personal_amount: settlement.insurance.healthPersonalAmount,
+          health_employer_amount: settlement.insurance.healthEmployerAmount,
+          personal_insurance_total: settlement.personalInsuranceTotal,
+          employer_insurance_total: settlement.insurance.employerTotal,
+          supplemental_health_premium_amount: settlement.supplementalHealthPremiumAmount,
+          should_withhold_supplemental_health: settlement.supplementalHealth.shouldWithhold,
+          supplemental_health_threshold: settlement.supplementalHealth.threshold,
+          supplemental_health_rate: settlement.supplementalHealth.rate,
+          supplemental_health_reason: settlement.supplementalHealth.reason,
           adjustments: teacherAdj,
         }
       })
+
+      const grandPersonalInsuranceTotal = teachers.reduce((sum: number, teacher) => sum + (teacher.personal_insurance_total || 0), 0)
+      const grandEmployerInsuranceTotal = teachers.reduce((sum: number, teacher) => sum + (teacher.employer_insurance_total || 0), 0)
+      const grandSupplementalHealthPremiumAmount = teachers.reduce((sum: number, teacher) => sum + (teacher.supplemental_health_premium_amount || 0), 0)
+      const grandNetAmount = teachers.reduce((sum: number, teacher) => sum + (teacher.net_amount || 0), 0)
 
       return success(c, {
         period: { start: query.startDate, end: query.endDate },
         teachers,
         grandTotalClasses: teachers.reduce((sum: number, r) => sum + (Number(r.total_classes) || 0), 0),
         grandTotalAmount: teachers.reduce((sum: number, r) => sum + (r.total_amount || 0), 0),
+        grandNetAmount,
+        grandPersonalInsuranceTotal,
+        grandEmployerInsuranceTotal,
+        grandSupplementalHealthPremiumAmount,
       })
     } catch (error) {
       logger.error({ err: error }, 'Error calculating salary:')
@@ -131,15 +158,21 @@ salaryRoutes.post('/salary/records', requireRole(Role.ADMIN), zValidator('json',
     // Calculate
     const calcResult = await db.execute(sql`
       SELECT
+        t.tenant_id,
+        t.salary_type,
         t.rate_per_class,
-        COUNT(s.id)::int as total_classes
+        t.base_salary,
+        t.hourly_rate,
+        t.insurance_config,
+        COUNT(s.id)::int as total_classes,
+        COALESCE(SUM(EXTRACT(EPOCH FROM (s.end_time::time - s.start_time::time)) / 3600), 0)::numeric as total_hours
       FROM teachers t
       LEFT JOIN schedules s ON t.id = s.teacher_id
         AND s.scheduled_date >= ${body.periodStart}::date
         AND s.scheduled_date <= ${body.periodEnd}::date
         AND s.status IN ('scheduled', 'completed')
       WHERE t.id = ${body.teacherId}
-      GROUP BY t.id, t.rate_per_class
+      GROUP BY t.id, t.tenant_id, t.salary_type, t.rate_per_class, t.base_salary, t.hourly_rate, t.insurance_config
     `)
 
     const calc = first(calcResult)
@@ -147,12 +180,62 @@ salaryRoutes.post('/salary/records', requireRole(Role.ADMIN), zValidator('json',
       return notFound(c, 'Teacher')
     }
 
-    const totalAmount = parseFloat(String(calc.rate_per_class)) * Number(calc.total_classes)
+    const salaryType = String(calc.salary_type || 'per_class')
+    const totalClasses = Number(calc.total_classes) || 0
+    const totalHours = Number(calc.total_hours) || 0
+
+    let baseAmount = 0
+    if (salaryType === 'monthly') {
+      baseAmount = parseFloat(String(calc.base_salary || 0))
+    } else if (salaryType === 'hourly') {
+      baseAmount = totalHours * parseFloat(String(calc.hourly_rate || 0))
+    } else {
+      baseAmount = totalClasses * parseFloat(String(calc.rate_per_class || 0))
+    }
+
+    const adjustmentResult = await db.execute(sql`
+      SELECT type, amount
+      FROM manage_salary_adjustments
+      WHERE tenant_id = ${calc.tenant_id}
+        AND teacher_id = ${body.teacherId}
+        AND period_start >= ${body.periodStart}::date
+        AND period_end <= ${body.periodEnd}::date
+    `)
+    const teacherAdjustments = rows(adjustmentResult)
+    const bonusTotal = teacherAdjustments
+      .filter((adjustment) => adjustment.type === 'bonus')
+      .reduce((sum, adjustment) => sum + parseFloat(String(adjustment.amount || 0)), 0)
+    const deductionTotal = teacherAdjustments
+      .filter((adjustment) => adjustment.type === 'deduction')
+      .reduce((sum, adjustment) => sum + parseFloat(String(adjustment.amount || 0)), 0)
+    const grossAmount = baseAmount + bonusTotal - deductionTotal
+    const settlement = calculateSalarySettlementSummary(
+      calc.insurance_config,
+      salaryType,
+      grossAmount,
+      Boolean(body.withholdSupplementalHealth)
+    )
+    const reviewNote = body.supplementalHealthReviewNote ? sanitizeString(body.supplementalHealthReviewNote) : null
 
     const insertResult = await db.execute(sql`
-      INSERT INTO salary_records (teacher_id, period_start, period_end, total_classes, rate_per_class, total_amount)
+      INSERT INTO salary_records (
+        teacher_id,
+        period_start,
+        period_end,
+        total_classes,
+        rate_per_class,
+        total_amount,
+        supplemental_health_premium_amount,
+        supplemental_health_withheld,
+        supplemental_health_reason,
+        supplemental_health_review_note
+      )
       VALUES (${body.teacherId}, ${body.periodStart}::date, ${body.periodEnd}::date,
-              ${calc.total_classes}, ${calc.rate_per_class}, ${totalAmount})
+              ${totalClasses}, ${calc.rate_per_class}, ${settlement.netAmount},
+              ${settlement.supplementalHealthPremiumAmount},
+              ${settlement.supplementalHealthDeductedAmount > 0},
+              ${settlement.supplementalHealth.reason},
+              ${reviewNote})
       RETURNING *
     `)
 

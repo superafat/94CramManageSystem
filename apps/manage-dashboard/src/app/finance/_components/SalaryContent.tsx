@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import type { SalaryData, TeacherSalary, ScheduleItem, AttendanceStats, AutoDeduction, AutoDeductionOverride } from '../../salary/types'
-import { API_BASE, LABOR_TIERS, HEALTH_TIERS, calcLabor, calcHealth } from '../../salary/constants'
-import { getMonthRange, computeAutoDeductions, getEffectiveDeductionAmount } from '../../salary/utils'
+import { API_BASE } from '../../salary/constants'
+import { getMonthRange, computeAutoDeductions, normalizeSalaryData } from '../../salary/utils'
 import { MonthNavigation } from '../../salary/components/MonthNavigation'
 import { TeacherCard } from '../../salary/components/TeacherCard'
 import { AdjustmentModal, type AdjustmentFormState } from '../../salary/components/AdjustmentModal'
@@ -25,8 +25,6 @@ export default function SalaryContent() {
   const [autoDeductOverrides, setAutoDeductOverrides] = useState<Record<string, AutoDeductionOverride>>({})
   const [adjustingDeduct, setAdjustingDeduct] = useState<{ teacher: TeacherSalary; deduction: AutoDeduction } | null>(null)
   const [slipTeacher, setSlipTeacher] = useState<TeacherSalary | null>(null)
-  const [laborTierIndex, setLaborTierIndex] = useState(0)
-  const [healthTierIndex, setHealthTierIndex] = useState(0)
 
   const monthRange = getMonthRange(monthOffset)
 
@@ -45,7 +43,7 @@ export default function SalaryContent() {
       )
       if (!res.ok) return
       const result = await res.json()
-      const d = result.data ?? result
+      const d = normalizeSalaryData(result.data ?? result)
       setData(d)
       if (d?.teachers) setTeachers(d.teachers.map((t: TeacherSalary) => ({ id: t.teacher_id, name: t.teacher_name })))
     } catch (err) {
@@ -155,9 +153,6 @@ export default function SalaryContent() {
     setAdjustingDeduct(null)
   }
 
-  const laborPersonal = calcLabor(LABOR_TIERS[laborTierIndex].wage).personal
-  const healthPersonal = calcHealth(HEALTH_TIERS[healthTierIndex].wage).personal
-
   return (
     <div className="space-y-4">
       {/* Salary Header */}
@@ -166,12 +161,8 @@ export default function SalaryContent() {
           monthLabel={monthRange.label}
           monthStart={monthRange.start}
           monthEnd={monthRange.end}
-          laborTierIndex={laborTierIndex}
-          healthTierIndex={healthTierIndex}
           onPrevMonth={() => setMonthOffset(m => m - 1)}
           onNextMonth={() => setMonthOffset(m => m + 1)}
-          onLaborTierChange={setLaborTierIndex}
-          onHealthTierChange={setHealthTierIndex}
         />
         <button onClick={() => setShowAdjModal(true)} className="px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-medium shrink-0">
           + 獎金/扣薪
@@ -186,11 +177,13 @@ export default function SalaryContent() {
         <div className="space-y-4">
           {/* Summary */}
           <div className="bg-gradient-to-r from-primary to-primary-hover rounded-2xl p-6 text-white">
-            <p className="text-sm opacity-80">本月薪資總計</p>
-            <p className="text-3xl font-bold mt-1">${data.grand_total_amount.toLocaleString()}</p>
+            <p className="text-sm opacity-80">本月實發總計</p>
+            <p className="text-3xl font-bold mt-1">${data.grand_net_amount.toLocaleString()}</p>
             <div className="flex gap-6 mt-4 text-sm">
               <div><p className="opacity-80">總堂數</p><p className="font-semibold">{data.grand_total_classes} 堂</p></div>
               <div><p className="opacity-80">講師數</p><p className="font-semibold">{data.teachers.length} 位</p></div>
+              <div><p className="opacity-80">勞健保自付</p><p className="font-semibold">${data.grand_personal_insurance_total.toLocaleString()}</p></div>
+              <div><p className="opacity-80">補充保費試算</p><p className="font-semibold">${data.grand_supplemental_health_premium_amount.toLocaleString()}</p></div>
             </div>
           </div>
 
@@ -201,14 +194,12 @@ export default function SalaryContent() {
               <TeacherCard
                 key={teacher.teacher_id}
                 teacher={teacher}
-                grandTotalAmount={data.grand_total_amount}
+                grandTotalAmount={data.grand_net_amount}
                 isExpanded={expandedTeacher === teacher.teacher_id}
                 schedules={teacherSchedules[teacher.teacher_id] ?? []}
                 schedulesLoading={schedulesLoading[teacher.teacher_id] ?? false}
                 attendance={attendanceMap[teacher.teacher_id] ?? null}
                 autoDeductions={getAutoDeductions(teacher)}
-                laborPersonal={laborPersonal}
-                healthPersonal={healthPersonal}
                 confirming={confirming}
                 monthRangeStart={monthRange.start}
                 monthRangeEnd={monthRange.end}
@@ -225,30 +216,28 @@ export default function SalaryContent() {
           </div>
 
           {/* Insurance Summary */}
-          {data.teachers.length > 0 && (() => {
-            const count = data.teachers.length
-            const le = calcLabor(LABOR_TIERS[laborTierIndex].wage).employer
-            const he = calcHealth(HEALTH_TIERS[healthTierIndex].wage).employer
-            return (
-              <div className="bg-surface rounded-xl border border-border p-4">
-                <p className="text-sm font-semibold text-text mb-3">雇主勞健保負擔總計</p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
-                  <div className="bg-[#EDF1F5] rounded-lg p-3">
-                    <p className="text-[10px] text-[#5A7A8F] mb-1">勞保雇主負擔</p>
-                    <p className="text-sm font-bold text-[#5A7A8F]">${(le * count).toLocaleString()}</p>
-                  </div>
-                  <div className="bg-[#EDF2EC] rounded-lg p-3">
-                    <p className="text-[10px] text-[#4A6B44] mb-1">健保雇主負擔</p>
-                    <p className="text-sm font-bold text-[#4A6B44]">${(he * count).toLocaleString()}</p>
-                  </div>
-                  <div className="bg-[#F7F0E8] rounded-lg p-3">
-                    <p className="text-[10px] text-[#8F6A3A] mb-1">合計支出</p>
-                    <p className="text-sm font-bold text-[#8F6A3A]">${((le + he) * count).toLocaleString()}</p>
-                  </div>
+          {data.teachers.length > 0 && (
+            <div className="bg-surface rounded-xl border border-border p-4">
+              <p className="text-sm font-semibold text-text mb-3">雇主勞健保負擔總計</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+                <div className="bg-[#EDF1F5] rounded-lg p-3">
+                  <p className="text-[10px] text-[#5A7A8F] mb-1">薪資毛額</p>
+                  <p className="text-sm font-bold text-[#5A7A8F]">${data.grand_total_amount.toLocaleString()}</p>
+                </div>
+                <div className="bg-[#EDF2EC] rounded-lg p-3">
+                  <p className="text-[10px] text-[#4A6B44] mb-1">勞健保雇主負擔</p>
+                  <p className="text-sm font-bold text-[#4A6B44]">${data.grand_employer_insurance_total.toLocaleString()}</p>
+                </div>
+                <div className="bg-[#F7F0E8] rounded-lg p-3">
+                  <p className="text-[10px] text-[#8F6A3A] mb-1">公司總支出</p>
+                  <p className="text-sm font-bold text-[#8F6A3A]">${(data.grand_total_amount + data.grand_employer_insurance_total).toLocaleString()}</p>
                 </div>
               </div>
-            )
-          })()}
+              <p className="text-[10px] text-text-muted mt-2 text-right">
+                * 補充保費僅提供試算提醒，未自動併入公司總支出
+              </p>
+            </div>
+          )}
 
           {data.teachers.length === 0 && (
             <div className="text-center py-12 text-text-muted">本月無排課記錄</div>

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { TeacherSalary, ScheduleItem, AttendanceStats, AutoDeduction, AutoDeductionOverride } from '../types'
 import { SALARY_TYPE_LABELS, API_BASE } from '../constants'
-import { getEffectiveDeductionAmount, autoDeductionSummaryLabel } from '../utils'
+import { getEffectiveDeductionAmount, autoDeductionSummaryLabel, getTierLabel } from '../utils'
 import { ScheduleDetailPanel } from './ScheduleDetailPanel'
 
 export interface TeacherCardProps {
@@ -14,8 +14,6 @@ export interface TeacherCardProps {
   schedulesLoading: boolean
   attendance: AttendanceStats | null
   autoDeductions: AutoDeduction[]
-  laborPersonal: number
-  healthPersonal: number
   confirming: string | null
   monthRangeStart: string
   monthRangeEnd: string
@@ -37,8 +35,6 @@ export function TeacherCard({
   schedulesLoading,
   attendance,
   autoDeductions,
-  laborPersonal,
-  healthPersonal,
   confirming,
   monthRangeStart,
   monthRangeEnd,
@@ -59,8 +55,22 @@ export function TeacherCard({
   const autoDeductTotal = autoDeductions.reduce((acc, d) => acc + getEffectiveDeductionAmount(d), 0)
   const hasAttendanceData = attendance !== null
   const hasAutoDeductions = autoDeductions.length > 0
-  const netAmount = teacher.total_amount - autoDeductTotal
+  const netAmount = teacher.net_amount - autoDeductTotal
   const hasSickLeave = attendance && attendance.sick_leave_days > 0
+  const laborLabel = getTierLabel('labor', teacher.insurance_config.labor.tierLevel, teacher.insurance_config.labor.enabled)
+  const healthLabel = getTierLabel('health', teacher.insurance_config.health.tierLevel, teacher.insurance_config.health.enabled)
+  const supplementalPremiumAmount = teacher.supplemental_health_premium_amount ?? 0
+  const sharePercentage = grandTotalAmount > 0 ? (Number(teacher.net_amount) / grandTotalAmount) * 100 : 0
+  const progressWidthClass = sharePercentage >= 90 ? 'w-full'
+    : sharePercentage >= 80 ? 'w-10/12'
+    : sharePercentage >= 70 ? 'w-9/12'
+    : sharePercentage >= 60 ? 'w-8/12'
+    : sharePercentage >= 50 ? 'w-7/12'
+    : sharePercentage >= 40 ? 'w-6/12'
+    : sharePercentage >= 30 ? 'w-5/12'
+    : sharePercentage >= 20 ? 'w-4/12'
+    : sharePercentage >= 10 ? 'w-3/12'
+    : sharePercentage > 0 ? 'w-2/12' : 'w-0'
 
   const handleInlineAdd = async () => {
     if (!inlineForm.name || !inlineForm.amount) return
@@ -131,12 +141,28 @@ export function TeacherCard({
             {/* Insurance badges */}
             <div className="flex gap-2 mt-1.5 flex-wrap">
               <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-[#EDF1F5] text-[#5A7A8F]">
-                勞保自付 ${laborPersonal.toLocaleString()}
+                勞保 {laborLabel} / 自付 ${teacher.labor_personal_amount.toLocaleString()}
               </span>
               <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-[#EDF2EC] text-[#4A6B44]">
-                健保自付 ${healthPersonal.toLocaleString()}
+                健保 {healthLabel} / 自付 ${teacher.health_personal_amount.toLocaleString()}
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-[#F7F0E8] text-[#8F6A3A]">
+                雇主負擔 ${teacher.employer_insurance_total.toLocaleString()}
+              </span>
+              <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded ${supplementalPremiumAmount > 0 ? 'bg-orange-50 text-orange-700' : 'bg-slate-100 text-slate-600'}`}>
+                補充保費試算 ${supplementalPremiumAmount.toLocaleString()}
               </span>
             </div>
+
+            {teacher.insurance_config.supplementalHealth.employmentType === 'part_time' && (
+              <div className="flex gap-2 mt-2 flex-wrap">
+                <span className={`px-2 py-0.5 text-xs rounded-full ${teacher.should_withhold_supplemental_health ? 'bg-orange-50 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>
+                  {teacher.should_withhold_supplemental_health
+                    ? `兼職，建議代扣補充保費 $${supplementalPremiumAmount.toLocaleString()}`
+                    : (teacher.supplemental_health_reason || '兼職，暫不列補充保費代扣')}
+                </span>
+              </div>
+            )}
 
             {hasSickLeave && (
               <div className="flex gap-2 mt-2 flex-wrap">
@@ -153,6 +179,12 @@ export function TeacherCard({
             </p>
             {autoDeductTotal > 0 && (
               <p className="text-xs text-red-500">含自動扣款</p>
+            )}
+            {teacher.personal_insurance_total > 0 && (
+              <p className="text-xs text-text-muted">已扣勞健保 ${teacher.personal_insurance_total.toLocaleString()}</p>
+            )}
+            {teacher.should_withhold_supplemental_health && supplementalPremiumAmount > 0 && (
+              <p className="text-xs text-orange-600">補充保費試算 ${supplementalPremiumAmount.toLocaleString()}</p>
             )}
           </div>
         </div>
@@ -190,6 +222,7 @@ export function TeacherCard({
           <div className="mt-2 p-2 border border-dashed border-primary/40 rounded-lg bg-primary/5 space-y-2">
             <div className="flex gap-2">
               <select
+                title="獎金或扣薪類型"
                 value={inlineForm.type}
                 onChange={e => setInlineForm({ ...inlineForm, type: e.target.value as 'bonus' | 'deduction' })}
                 className="px-2 py-1 border border-border rounded text-xs bg-white"
@@ -287,12 +320,11 @@ export function TeacherCard({
         <div className="mt-3">
           <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
             <div
-              className="h-full bg-primary rounded-full transition-all"
-              style={{ width: `${grandTotalAmount > 0 ? Math.min(100, (Number(teacher.total_amount) / grandTotalAmount) * 100) : 0}%` }}
+              className={`h-full bg-primary rounded-full transition-all ${progressWidthClass}`}
             />
           </div>
           <p className="text-xs text-text-muted mt-1 text-right">
-            佔比 {grandTotalAmount > 0 ? ((Number(teacher.total_amount) / grandTotalAmount) * 100).toFixed(1) : '0.0'}%
+            佔比 {sharePercentage.toFixed(1)}%
           </p>
         </div>
 
@@ -320,7 +352,7 @@ export function TeacherCard({
               onClick={() => onConfirm(teacher)}
               className="px-3 py-1.5 text-sm border border-primary text-primary rounded-lg disabled:opacity-50"
             >
-              {confirming === teacher.teacher_id ? '處理中...' : '確認薪資'}
+              {confirming === teacher.teacher_id ? '處理中...' : teacher.supplemental_health_premium_amount > 0 ? '覆核後確認' : '確認薪資'}
             </button>
           )}
         </div>

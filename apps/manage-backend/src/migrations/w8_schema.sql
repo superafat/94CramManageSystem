@@ -17,6 +17,10 @@ CREATE TABLE IF NOT EXISTS teachers (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+ALTER TABLE teachers ADD COLUMN IF NOT EXISTS hourly_rate DECIMAL(10,2);
+ALTER TABLE teachers ADD COLUMN IF NOT EXISTS insurance_config JSONB DEFAULT '{"labor":{"enabled":false,"tierLevel":1,"calculationMode":"auto","manualPersonalAmount":null,"manualEmployerAmount":null},"health":{"enabled":false,"tierLevel":1,"calculationMode":"auto","manualPersonalAmount":null,"manualEmployerAmount":null},"supplementalHealth":{"employmentType":"part_time","insuredThroughUnit":false,"averageWeeklyHours":null,"notes":null}}'::jsonb;
+
+
 -- 2. 課程表
 CREATE TABLE IF NOT EXISTS courses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -90,6 +94,10 @@ CREATE TABLE IF NOT EXISTS salary_records (
   total_classes INT NOT NULL,
   rate_per_class DECIMAL(10,2) NOT NULL,
   total_amount DECIMAL(12,2) NOT NULL,
+  supplemental_health_premium_amount DECIMAL(10,2) DEFAULT 0,
+  supplemental_health_withheld BOOLEAN DEFAULT FALSE,
+  supplemental_health_reason TEXT,
+  supplemental_health_review_note TEXT,
   status VARCHAR(20) DEFAULT 'pending',
   created_at TIMESTAMP DEFAULT NOW(),
   confirmed_at TIMESTAMP,

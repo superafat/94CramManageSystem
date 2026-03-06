@@ -114,6 +114,8 @@ export const SALARY_TYPE_OPTIONS = ['monthly', 'hourly', 'per_class'] as const
 
 export const teacherRoleSchema = z.enum(TEACHER_ROLE_OPTIONS)
 export const salaryTypeSchema = z.enum(SALARY_TYPE_OPTIONS)
+export const insuranceCalculationModeSchema = z.enum(['auto', 'manual'])
+export const employmentTypeSchema = z.enum(['full_time', 'part_time'])
 
 // 科目與年級固定選項
 export const SUBJECT_OPTIONS = [
@@ -127,6 +129,27 @@ export const GRADE_LEVEL_OPTIONS = ['國小', '國中', '高中'] as const
 export const subjectSchema = z.enum(SUBJECT_OPTIONS)
 export const gradeLevelSchema = z.enum(GRADE_LEVEL_OPTIONS)
 
+export const teacherInsurancePlanSchema = z.object({
+  enabled: z.boolean().default(false),
+  tierLevel: z.coerce.number().int().min(1).max(12).nullable().default(1),
+  calculationMode: insuranceCalculationModeSchema.default('auto'),
+  manualPersonalAmount: z.coerce.number().nonnegative().nullable().optional(),
+  manualEmployerAmount: z.coerce.number().nonnegative().nullable().optional(),
+})
+
+export const teacherSupplementalHealthSchema = z.object({
+  employmentType: employmentTypeSchema.default('part_time'),
+  insuredThroughUnit: z.boolean().default(false),
+  averageWeeklyHours: z.coerce.number().nonnegative().max(168).nullable().optional(),
+  notes: z.string().max(500).nullable().optional(),
+})
+
+export const teacherInsuranceConfigSchema = z.object({
+  labor: teacherInsurancePlanSchema,
+  health: teacherInsurancePlanSchema,
+  supplementalHealth: teacherSupplementalHealthSchema,
+})
+
 export const createTeacherSchema = z.object({
   userId: uuidSchema.optional().nullable(),
   tenantId: uuidSchema,
@@ -136,10 +159,12 @@ export const createTeacherSchema = z.object({
   phone: phoneSchema,
   email: emailSchema,
   ratePerClass: z.coerce.number().nonnegative('Rate must be non-negative').optional(),
+  hourlyRate: z.coerce.number().nonnegative('Hourly rate must be non-negative').optional(),
   // 身分與薪資
   teacherRole: teacherRoleSchema.optional(),
   salaryType: salaryTypeSchema.default('per_class'),
   baseSalary: z.coerce.number().nonnegative().optional(),
+  insuranceConfig: teacherInsuranceConfigSchema.optional(),
   // 個人資料
   idNumber: z.string().max(10).optional(),
   birthday: dateStringSchema.optional(),
@@ -162,11 +187,13 @@ export const updateTeacherSchema = z.object({
   phone: phoneSchema,
   email: emailSchema,
   ratePerClass: z.coerce.number().nonnegative().optional(),
+  hourlyRate: z.coerce.number().nonnegative().optional().nullable(),
   status: teacherStatusSchema.optional(),
   // 身分與薪資
   teacherRole: teacherRoleSchema.optional().nullable(),
   salaryType: salaryTypeSchema.optional(),
   baseSalary: z.coerce.number().nonnegative().optional().nullable(),
+  insuranceConfig: teacherInsuranceConfigSchema.optional().nullable(),
   // 個人資料
   idNumber: z.string().max(10).optional().nullable(),
   birthday: dateStringSchema.optional().nullable(),
@@ -248,6 +275,8 @@ export const createSalaryRecordSchema = z.object({
   teacherId: uuidSchema,
   periodStart: dateStringSchema,
   periodEnd: dateStringSchema,
+  withholdSupplementalHealth: z.boolean().optional(),
+  supplementalHealthReviewNote: z.string().max(500).optional(),
 }).refine(
   (data) => new Date(data.periodStart) <= new Date(data.periodEnd),
   { message: 'Period start must be before or equal to period end' }

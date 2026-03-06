@@ -9,8 +9,38 @@ import {
   sanitizeString,
 } from '../../utils/validation'
 import { db, sql, logger, success, notFound, badRequest, internalError, conflict, rows, first } from './_helpers'
+import { createDefaultInsuranceConfig, normalizeTeacherInsuranceConfig } from './insurance-plan'
 
 export const teacherRoutes = new Hono<{ Variables: RBACVariables }>()
+
+const resolveCompensation = (
+  salaryType: string,
+  ratePerClass: number | null | undefined,
+  hourlyRate: number | null | undefined,
+  baseSalary: number | null | undefined
+) => {
+  if (salaryType === 'hourly') {
+    return {
+      ratePerClass: null,
+      hourlyRate: hourlyRate ?? ratePerClass ?? null,
+      baseSalary: null,
+    }
+  }
+
+  if (salaryType === 'monthly') {
+    return {
+      ratePerClass: null,
+      hourlyRate: null,
+      baseSalary: baseSalary ?? null,
+    }
+  }
+
+  return {
+    ratePerClass: ratePerClass ?? null,
+    hourlyRate: null,
+    baseSalary: null,
+  }
+}
 
 // Query params schema for teachers list
 const teacherQuerySchema = z.object({
@@ -79,19 +109,23 @@ teacherRoutes.post('/teachers', requireRole(Role.ADMIN, Role.MANAGER), zValidato
   try {
     const body = c.req.valid('json')
     const user = c.get('user')
+    const salaryType = body.salaryType || 'per_class'
+    const compensation = resolveCompensation(salaryType, body.ratePerClass, body.hourlyRate, body.baseSalary)
+    const insuranceConfig = normalizeTeacherInsuranceConfig(body.insuranceConfig, salaryType)
 
     const result = await db.execute(sql`
       INSERT INTO teachers (
         user_id, tenant_id, branch_id, name, title, phone, email, rate_per_class,
-        teacher_role, salary_type, base_salary,
+        hourly_rate, teacher_role, salary_type, base_salary, insurance_config,
         id_number, birthday, address, emergency_contact, emergency_phone,
         bank_name, bank_branch, bank_account, bank_account_name,
         subjects, grade_levels
       )
       VALUES (
         ${body.userId || null}, ${user?.tenant_id ?? body.tenantId}, ${body.branchId},
-        ${sanitizeString(body.name)}, ${sanitizeString(body.title)}, ${body.phone || null}, ${body.email || null}, ${body.ratePerClass ?? null},
-        ${body.teacherRole || null}, ${body.salaryType || 'per_class'}, ${body.baseSalary ?? null},
+        ${sanitizeString(body.name)}, ${sanitizeString(body.title)}, ${body.phone || null}, ${body.email || null}, ${compensation.ratePerClass},
+        ${compensation.hourlyRate}, ${body.teacherRole || null}, ${salaryType}, ${compensation.baseSalary},
+        ${sql`${JSON.stringify(insuranceConfig)}::jsonb`},
         ${body.idNumber || null}, ${body.birthday ? sql`${body.birthday}::date` : null},
         ${body.address ? sanitizeString(body.address) : null},
         ${body.emergencyContact ? sanitizeString(body.emergencyContact) : null}, ${body.emergencyPhone || null},
@@ -125,17 +159,41 @@ teacherRoutes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER),
         return badRequest(c, 'Missing tenant context')
       }
 
+      const existingResult = await db.execute(sql`
+        SELECT salary_type, insurance_config, rate_per_class, hourly_rate, base_salary
+        FROM teachers
+        WHERE id = ${id} AND tenant_id = ${user.tenant_id}
+        LIMIT 1
+      `)
+      const existingTeacher = first(existingResult)
+      if (!existingTeacher) {
+        return notFound(c, 'Teacher')
+      }
+
+      const salaryType = body.salaryType ?? String(existingTeacher.salary_type ?? 'per_class')
+      const compensation = resolveCompensation(
+        salaryType,
+        body.ratePerClass ?? (existingTeacher.rate_per_class == null ? null : Number(existingTeacher.rate_per_class)),
+        body.hourlyRate ?? (existingTeacher.hourly_rate == null ? null : Number(existingTeacher.hourly_rate)),
+        body.baseSalary ?? (existingTeacher.base_salary == null ? null : Number(existingTeacher.base_salary))
+      )
+      const insuranceConfig = body.insuranceConfig === undefined
+        ? normalizeTeacherInsuranceConfig(existingTeacher.insurance_config, salaryType)
+        : normalizeTeacherInsuranceConfig(body.insuranceConfig ?? createDefaultInsuranceConfig(salaryType), salaryType)
+
       const result = await db.execute(sql`
         UPDATE teachers
         SET name = COALESCE(${body.name != null ? sanitizeString(body.name) : null}, name),
             title = COALESCE(${body.title != null ? sanitizeString(body.title) : null}, title),
             phone = COALESCE(${body.phone ?? null}, phone),
             email = COALESCE(${body.email ?? null}, email),
-            rate_per_class = COALESCE(${body.ratePerClass ?? null}, rate_per_class),
+            rate_per_class = ${compensation.ratePerClass},
+            hourly_rate = ${compensation.hourlyRate},
             status = COALESCE(${body.status ?? null}, status),
             teacher_role = COALESCE(${body.teacherRole ?? null}, teacher_role),
-            salary_type = COALESCE(${body.salaryType ?? null}, salary_type),
-            base_salary = COALESCE(${body.baseSalary ?? null}, base_salary),
+            salary_type = ${salaryType},
+            base_salary = ${compensation.baseSalary},
+            insurance_config = ${sql`${JSON.stringify(insuranceConfig)}::jsonb`},
             id_number = COALESCE(${body.idNumber ?? null}, id_number),
             birthday = COALESCE(${body.birthday != null ? sql`${body.birthday}::date` : null}, birthday),
             address = COALESCE(${body.address != null ? sanitizeString(body.address) : null}, address),
@@ -153,9 +211,6 @@ teacherRoutes.put('/teachers/:id', requireRole(Role.ADMIN, Role.MANAGER),
       `)
 
       const teacher = first(result)
-      if (!teacher) {
-        return notFound(c, 'Teacher')
-      }
 
       return success(c, { teacher })
     } catch (error) {

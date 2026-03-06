@@ -1,5 +1,21 @@
-import type { TeacherSalary, AttendanceStats, AutoDeduction, AutoDeductionOverride, ScheduleItem } from './types'
-import { LATE_DEDUCTION_PER_OCCURRENCE } from './constants'
+import type {
+  TeacherSalary,
+  AttendanceStats,
+  AutoDeduction,
+  AutoDeductionOverride,
+  ScheduleItem,
+  SalaryData,
+  TeacherInsuranceConfig,
+  TeacherInsurancePlan,
+  TeacherSupplementalHealth,
+} from './types'
+import {
+  HEALTH_TIERS,
+  INSURANCE_TIER_LABEL_FALLBACK,
+  LABOR_TIERS,
+  LATE_DEDUCTION_PER_OCCURRENCE,
+  SECOND_GEN_HEALTH_PREMIUM_THRESHOLD,
+} from './constants'
 
 // ───────────── Date Utilities ─────────────
 
@@ -128,4 +144,161 @@ export function getEffectiveDeductionAmount(d: AutoDeduction): number {
 export function autoDeductionSummaryLabel(d: AutoDeduction): string {
   const eff = getEffectiveDeductionAmount(d)
   return `${d.label} → -$${eff.toLocaleString()}`
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+)
+
+const toNumber = (value: unknown, fallback: number = 0): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return fallback
+}
+
+const toNullableNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null
+  return toNumber(value, 0)
+}
+
+const normalizeInsurancePlan = (value: unknown): TeacherInsurancePlan => {
+  if (!isRecord(value)) {
+    return {
+      enabled: false,
+      tierLevel: 1,
+      calculationMode: 'auto',
+      manualPersonalAmount: null,
+      manualEmployerAmount: null,
+    }
+  }
+
+  return {
+    enabled: typeof value.enabled === 'boolean' ? value.enabled : false,
+    tierLevel: value.tierLevel === null ? null : toNumber(value.tierLevel, 1),
+    calculationMode: value.calculationMode === 'manual' ? 'manual' : 'auto',
+    manualPersonalAmount: toNullableNumber(value.manualPersonalAmount),
+    manualEmployerAmount: toNullableNumber(value.manualEmployerAmount),
+  }
+}
+
+const normalizeSupplementalHealth = (value: unknown): TeacherSupplementalHealth => {
+  if (!isRecord(value)) {
+    return {
+      employmentType: 'part_time',
+      insuredThroughUnit: false,
+      averageWeeklyHours: null,
+      notes: null,
+    }
+  }
+
+  return {
+    employmentType: value.employmentType === 'full_time' ? 'full_time' : 'part_time',
+    insuredThroughUnit: typeof value.insuredThroughUnit === 'boolean' ? value.insuredThroughUnit : false,
+    averageWeeklyHours: toNullableNumber(value.averageWeeklyHours),
+    notes: typeof value.notes === 'string' && value.notes.trim() !== '' ? value.notes.trim() : null,
+  }
+}
+
+export const normalizeInsuranceConfig = (value: unknown): TeacherInsuranceConfig => {
+  if (!isRecord(value)) {
+    return {
+      labor: normalizeInsurancePlan(null),
+      health: normalizeInsurancePlan(null),
+      supplementalHealth: normalizeSupplementalHealth(null),
+    }
+  }
+
+  return {
+    labor: normalizeInsurancePlan(value.labor),
+    health: normalizeInsurancePlan(value.health),
+    supplementalHealth: normalizeSupplementalHealth(value.supplementalHealth),
+  }
+}
+
+const normalizeTeacherSalary = (teacher: unknown): TeacherSalary => {
+  const source = isRecord(teacher) ? teacher : {}
+
+  return {
+    teacher_id: String(source.teacher_id ?? source.teacherId ?? ''),
+    teacher_name: String(source.teacher_name ?? source.teacherName ?? ''),
+    title: String(source.title ?? ''),
+    teacher_role: typeof source.teacher_role === 'string' ? source.teacher_role : typeof source.teacherRole === 'string' ? source.teacherRole : undefined,
+    salary_type: String(source.salary_type ?? source.salaryType ?? 'per_class'),
+    rate_per_class: String(source.rate_per_class ?? source.ratePerClass ?? '0'),
+    base_salary: String(source.base_salary ?? source.baseSalary ?? '0'),
+    hourly_rate: String(source.hourly_rate ?? source.hourlyRate ?? '0'),
+    total_classes: toNumber(source.total_classes ?? source.totalClasses, 0),
+    total_hours: toNumber(source.total_hours ?? source.totalHours, 0),
+    base_amount: toNumber(source.base_amount ?? source.baseAmount, 0),
+    bonus_total: toNumber(source.bonus_total ?? source.bonusTotal, 0),
+    deduction_total: toNumber(source.deduction_total ?? source.deductionTotal, 0),
+    total_amount: toNumber(source.total_amount ?? source.totalAmount, 0),
+    net_amount: toNumber(source.net_amount ?? source.netAmount ?? source.total_amount ?? source.totalAmount, 0),
+    insurance_config: normalizeInsuranceConfig(source.insurance_config ?? source.insuranceConfig),
+    labor_personal_amount: toNumber(source.labor_personal_amount ?? source.laborPersonalAmount, 0),
+    labor_employer_amount: toNumber(source.labor_employer_amount ?? source.laborEmployerAmount, 0),
+    health_personal_amount: toNumber(source.health_personal_amount ?? source.healthPersonalAmount, 0),
+    health_employer_amount: toNumber(source.health_employer_amount ?? source.healthEmployerAmount, 0),
+    personal_insurance_total: toNumber(source.personal_insurance_total ?? source.personalInsuranceTotal, 0),
+    employer_insurance_total: toNumber(source.employer_insurance_total ?? source.employerInsuranceTotal, 0),
+    supplemental_health_premium_amount: toNumber(
+      source.supplemental_health_premium_amount ?? source.supplementalHealthPremiumAmount,
+      0
+    ),
+    should_withhold_supplemental_health: Boolean(
+      source.should_withhold_supplemental_health ?? source.shouldWithholdSupplementalHealth
+    ),
+    supplemental_health_threshold: toNumber(
+      source.supplemental_health_threshold ?? source.supplementalHealthThreshold,
+      SECOND_GEN_HEALTH_PREMIUM_THRESHOLD
+    ),
+    supplemental_health_rate: toNumber(source.supplemental_health_rate ?? source.supplementalHealthRate, 0),
+    supplemental_health_reason: String(
+      source.supplemental_health_reason ?? source.supplementalHealthReason ?? ''
+    ),
+    adjustments: Array.isArray(source.adjustments) ? source.adjustments.map((adjustment) => {
+      const item = isRecord(adjustment) ? adjustment : {}
+      return {
+        id: String(item.id ?? `${item.type ?? 'adj'}-${item.name ?? 'item'}`),
+        type: String(item.type ?? ''),
+        name: String(item.name ?? ''),
+        amount: String(item.amount ?? '0'),
+        notes: typeof item.notes === 'string' ? item.notes : undefined,
+      }
+    }) : [],
+  }
+}
+
+export const normalizeSalaryData = (value: unknown): SalaryData => {
+  const source = isRecord(value) ? value : {}
+  const teachersRaw = Array.isArray(source.teachers) ? source.teachers : []
+
+  return {
+    period: isRecord(source.period)
+      ? {
+          start: String(source.period.start ?? ''),
+          end: String(source.period.end ?? ''),
+        }
+      : { start: '', end: '' },
+    teachers: teachersRaw.map(normalizeTeacherSalary),
+    grand_total_classes: toNumber(source.grand_total_classes ?? source.grandTotalClasses, 0),
+    grand_total_amount: toNumber(source.grand_total_amount ?? source.grandTotalAmount, 0),
+    grand_net_amount: toNumber(source.grand_net_amount ?? source.grandNetAmount ?? source.grand_total_amount ?? source.grandTotalAmount, 0),
+    grand_personal_insurance_total: toNumber(source.grand_personal_insurance_total ?? source.grandPersonalInsuranceTotal, 0),
+    grand_employer_insurance_total: toNumber(source.grand_employer_insurance_total ?? source.grandEmployerInsuranceTotal, 0),
+    grand_supplemental_health_premium_amount: toNumber(
+      source.grand_supplemental_health_premium_amount ?? source.grandSupplementalHealthPremiumAmount,
+      0
+    ),
+  }
+}
+
+export const getTierLabel = (kind: 'labor' | 'health', tierLevel: number | null, enabled: boolean): string => {
+  if (!enabled) return '未啟用'
+  const tiers = kind === 'labor' ? LABOR_TIERS : HEALTH_TIERS
+  const tier = tiers.find((item) => item.level === tierLevel)
+  return tier?.label ?? INSURANCE_TIER_LABEL_FALLBACK
 }

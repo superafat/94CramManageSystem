@@ -56,4 +56,9 @@ export const SALARY_TYPE_LABELS: Record<string, string> = {
   per_class: '堂薪制',
 }
 
+export const INSURANCE_TIER_LABEL_FALLBACK = '未設定級距'
+
+export const SECOND_GEN_HEALTH_PREMIUM_RATE = 0.0211
+export const SECOND_GEN_HEALTH_PREMIUM_THRESHOLD = 29500
+
 export const LATE_DEDUCTION_PER_OCCURRENCE = 200  // 每次遲到扣 200 元

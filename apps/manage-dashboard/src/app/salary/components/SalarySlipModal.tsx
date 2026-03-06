@@ -38,7 +38,8 @@ export function SalarySlipModal({ teacher, schedules, attendance, autoDeductions
   }
 
   const autoDeductTotal = autoDeductions.reduce((acc, d) => acc + getEffectiveDeductionAmount(d), 0)
-  const netAmount = teacher.total_amount - autoDeductTotal
+  const supplementalPremiumAmount = teacher.supplemental_health_premium_amount ?? 0
+  const netAmount = teacher.net_amount - autoDeductTotal
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
@@ -178,6 +179,18 @@ export function SalarySlipModal({ teacher, schedules, attendance, autoDeductions
               )}
 
               {/* Total */}
+              {teacher.personal_insurance_total > 0 && (
+                <tr className="text-red-700">
+                  <td className="px-3 py-2">- 勞健保自付</td>
+                  <td className="px-3 py-2 text-right">-${teacher.personal_insurance_total.toLocaleString()}</td>
+                </tr>
+              )}
+              {supplementalPremiumAmount > 0 && (
+                <tr className="text-amber-700">
+                  <td className="px-3 py-2">二代健保補充保費試算</td>
+                  <td className="px-3 py-2 text-right">${supplementalPremiumAmount.toLocaleString()}</td>
+                </tr>
+              )}
               <tr className="bg-indigo-50 font-bold">
                 <td className="px-3 py-2 text-gray-800">實發金額</td>
                 <td className="px-3 py-2 text-right text-indigo-700 text-base">
@@ -186,6 +199,12 @@ export function SalarySlipModal({ teacher, schedules, attendance, autoDeductions
               </tr>
             </tbody>
           </table>
+
+          {teacher.supplemental_health_reason && (
+            <p className="text-xs text-gray-500">
+              補充保費備註：{teacher.supplemental_health_reason}
+            </p>
+          )}
 
           {/* Attendance summary */}
           {attendance && (

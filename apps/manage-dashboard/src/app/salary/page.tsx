@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { BackButton } from '@/components/ui/BackButton'
 import type { SalaryData, TeacherSalary, ScheduleItem, AttendanceStats, AutoDeduction, AutoDeductionOverride } from './types'
-import { API_BASE, LABOR_TIERS, HEALTH_TIERS, calcLabor, calcHealth, SALARY_TYPE_LABELS } from './constants'
-import { getMonthRange, computeAutoDeductions, getEffectiveDeductionAmount } from './utils'
+import { API_BASE } from './constants'
+import { getMonthRange, computeAutoDeductions, normalizeSalaryData } from './utils'
 import { MonthNavigation } from './components/MonthNavigation'
 import { TeacherCard } from './components/TeacherCard'
 import { AdjustmentModal, type AdjustmentFormState } from './components/AdjustmentModal'
@@ -38,10 +38,11 @@ export default function SalaryPage() {
 
   // Salary slip modal
   const [slipTeacher, setSlipTeacher] = useState<TeacherSalary | null>(null)
-
-  // 勞健保級距選擇（預設第1級）
-  const [laborTierIndex, setLaborTierIndex] = useState(0)
-  const [healthTierIndex, setHealthTierIndex] = useState(0)
+  const [supplementalReview, setSupplementalReview] = useState<{
+    teacher: TeacherSalary
+    withhold: boolean
+    note: string
+  } | null>(null)
 
   const monthRange = getMonthRange(monthOffset)
 
@@ -62,7 +63,7 @@ export default function SalaryPage() {
       )
       if (!res.ok) return
       const result = await res.json()
-      const d = result.data ?? result
+      const d = normalizeSalaryData(result.data ?? result)
       setData(d)
       if (d?.teachers) {
         setTeachers(d.teachers.map((t: TeacherSalary) => ({ id: t.teacher_id, name: t.teacher_name })))
@@ -153,7 +154,7 @@ export default function SalaryPage() {
     }
   }
 
-  const handleConfirmSalary = async (teacher: TeacherSalary) => {
+  const executeConfirmSalary = async (teacher: TeacherSalary, withholdSupplementalHealth: boolean, supplementalHealthReviewNote?: string) => {
     setConfirming(teacher.teacher_id)
     try {
       const res = await fetch(`${API_BASE}/api/w8/salary/records`, {
@@ -164,9 +165,17 @@ export default function SalaryPage() {
           teacherId: teacher.teacher_id,
           periodStart: monthRange.start,
           periodEnd: monthRange.end,
+          withholdSupplementalHealth,
+          supplementalHealthReviewNote: supplementalHealthReviewNote || undefined,
         }),
       })
-      if (res.ok) alert(`${teacher.teacher_name} 薪資已確認`)
+      if (res.ok) {
+        const message = withholdSupplementalHealth && teacher.supplemental_health_premium_amount > 0
+          ? `${teacher.teacher_name} 薪資已確認，已正式代扣補充保費 $${teacher.supplemental_health_premium_amount.toLocaleString()}`
+          : `${teacher.teacher_name} 薪資已確認`
+        alert(message)
+        setSupplementalReview(null)
+      }
       else alert('確認失敗')
     } catch (err) {
       console.error('[Salary] Confirm failed:', err)
@@ -174,6 +183,19 @@ export default function SalaryPage() {
     } finally {
       setConfirming(null)
     }
+  }
+
+  const handleConfirmSalary = async (teacher: TeacherSalary) => {
+    if (teacher.supplemental_health_premium_amount > 0) {
+      setSupplementalReview({
+        teacher,
+        withhold: teacher.should_withhold_supplemental_health,
+        note: teacher.supplemental_health_reason || '',
+      })
+      return
+    }
+
+    await executeConfirmSalary(teacher, false)
   }
 
   const getSalaryBreakdown = (t: TeacherSalary) => {
@@ -201,9 +223,6 @@ export default function SalaryPage() {
     setAdjustingDeduct(null)
   }
 
-  const laborPersonal = calcLabor(LABOR_TIERS[laborTierIndex].wage).personal
-  const healthPersonal = calcHealth(HEALTH_TIERS[healthTierIndex].wage).personal
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -225,12 +244,8 @@ export default function SalaryPage() {
           monthLabel={monthRange.label}
           monthStart={monthRange.start}
           monthEnd={monthRange.end}
-          laborTierIndex={laborTierIndex}
-          healthTierIndex={healthTierIndex}
           onPrevMonth={() => setMonthOffset(m => m - 1)}
           onNextMonth={() => setMonthOffset(m => m + 1)}
-          onLaborTierChange={setLaborTierIndex}
-          onHealthTierChange={setHealthTierIndex}
         />
       </div>
 
@@ -244,9 +259,9 @@ export default function SalaryPage() {
           <div className="space-y-4">
             {/* Summary Card */}
             <div className="bg-gradient-to-r from-primary to-primary-hover rounded-2xl p-6 text-white">
-              <p className="text-sm opacity-80">本月薪資總計</p>
+              <p className="text-sm opacity-80">本月實發總計</p>
               <p className="text-3xl font-bold mt-1">
-                ${data.grand_total_amount.toLocaleString()}
+                ${data.grand_net_amount.toLocaleString()}
               </p>
               <div className="flex gap-6 mt-4 text-sm">
                 <div>
@@ -256,6 +271,14 @@ export default function SalaryPage() {
                 <div>
                   <p className="opacity-80">講師數</p>
                   <p className="font-semibold">{data.teachers.length} 位</p>
+                </div>
+                <div>
+                  <p className="opacity-80">勞健保自付</p>
+                  <p className="font-semibold">${data.grand_personal_insurance_total.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="opacity-80">補充保費試算</p>
+                  <p className="font-semibold">${data.grand_supplemental_health_premium_amount.toLocaleString()}</p>
                 </div>
               </div>
             </div>
@@ -268,14 +291,12 @@ export default function SalaryPage() {
                 <TeacherCard
                   key={teacher.teacher_id}
                   teacher={teacher}
-                  grandTotalAmount={data.grand_total_amount}
+                  grandTotalAmount={data.grand_net_amount}
                   isExpanded={expandedTeacher === teacher.teacher_id}
                   schedules={teacherSchedules[teacher.teacher_id] ?? []}
                   schedulesLoading={schedulesLoading[teacher.teacher_id] ?? false}
                   attendance={attendanceMap[teacher.teacher_id] ?? null}
                   autoDeductions={getAutoDeductions(teacher)}
-                  laborPersonal={laborPersonal}
-                  healthPersonal={healthPersonal}
                   confirming={confirming}
                   monthRangeStart={monthRange.start}
                   monthRangeEnd={monthRange.end}
@@ -292,39 +313,28 @@ export default function SalaryPage() {
             </div>
 
             {/* 雇主勞健保負擔總計 */}
-            {data.teachers.length > 0 && (() => {
-              const teacherCount = data.teachers.length
-              const laborEmployer = calcLabor(LABOR_TIERS[laborTierIndex].wage).employer
-              const healthEmployer = calcHealth(HEALTH_TIERS[healthTierIndex].wage).employer
-              const totalLaborEmployer = laborEmployer * teacherCount
-              const totalHealthEmployer = healthEmployer * teacherCount
-              const totalInsuranceCost = totalLaborEmployer + totalHealthEmployer
-              return (
-                <div className="bg-surface rounded-xl border border-border p-4 mt-2">
-                  <p className="text-sm font-semibold text-text mb-3">雇主勞健保負擔總計</p>
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div className="bg-[#EDF1F5] rounded-lg p-3">
-                      <p className="text-[10px] text-[#5A7A8F] mb-1">勞保雇主負擔</p>
-                      <p className="text-sm font-bold text-[#5A7A8F]">${totalLaborEmployer.toLocaleString()}</p>
-                      <p className="text-[10px] text-[#9DAEBB] mt-0.5">${laborEmployer.toLocaleString()} × {teacherCount}人</p>
-                    </div>
-                    <div className="bg-[#EDF2EC] rounded-lg p-3">
-                      <p className="text-[10px] text-[#4A6B44] mb-1">健保雇主負擔</p>
-                      <p className="text-sm font-bold text-[#4A6B44]">${totalHealthEmployer.toLocaleString()}</p>
-                      <p className="text-[10px] text-[#A8B5A2] mt-0.5">${healthEmployer.toLocaleString()} × {teacherCount}人</p>
-                    </div>
-                    <div className="bg-[#F7F0E8] rounded-lg p-3">
-                      <p className="text-[10px] text-[#8F6A3A] mb-1">合計支出</p>
-                      <p className="text-sm font-bold text-[#8F6A3A]">${totalInsuranceCost.toLocaleString()}</p>
-                      <p className="text-[10px] text-[#C8A882] mt-0.5">勞保＋健保</p>
-                    </div>
+            {data.teachers.length > 0 && (
+              <div className="bg-surface rounded-xl border border-border p-4 mt-2">
+                <p className="text-sm font-semibold text-text mb-3">雇主勞健保負擔總計</p>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="bg-[#EDF1F5] rounded-lg p-3">
+                    <p className="text-[10px] text-[#5A7A8F] mb-1">薪資毛額</p>
+                    <p className="text-sm font-bold text-[#5A7A8F]">${data.grand_total_amount.toLocaleString()}</p>
                   </div>
-                  <p className="text-[10px] text-text-muted mt-2 text-right">
-                    * 依選定投保級距計算，不含政府補助部分
-                  </p>
+                  <div className="bg-[#EDF2EC] rounded-lg p-3">
+                    <p className="text-[10px] text-[#4A6B44] mb-1">勞健保雇主負擔</p>
+                    <p className="text-sm font-bold text-[#4A6B44]">${data.grand_employer_insurance_total.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-[#F7F0E8] rounded-lg p-3">
+                    <p className="text-[10px] text-[#8F6A3A] mb-1">公司總支出</p>
+                    <p className="text-sm font-bold text-[#8F6A3A]">${(data.grand_total_amount + data.grand_employer_insurance_total).toLocaleString()}</p>
+                  </div>
                 </div>
-              )
-            })()}
+                <p className="text-[10px] text-text-muted mt-2 text-right">
+                  * 依各老師設定的級距方案彙總；補充保費為試算提醒，實際是否代扣仍需覆核
+                </p>
+              </div>
+            )}
 
             {data.teachers.length === 0 && (
               <div className="text-center py-12 text-text-muted">本月無排課記錄</div>
@@ -365,6 +375,79 @@ export default function SalaryPage() {
           period={monthRange.label}
           onClose={() => setSlipTeacher(null)}
         />
+      )}
+
+      {supplementalReview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-surface border border-border shadow-xl">
+            <div className="border-b border-border px-5 py-4">
+              <h2 className="text-lg font-semibold text-text">覆核二代健保補充保費</h2>
+              <p className="mt-1 text-sm text-text-muted">
+                {supplementalReview.teacher.teacher_name} 本期補充保費試算為
+                ${supplementalReview.teacher.supplemental_health_premium_amount.toLocaleString()}。
+              </p>
+            </div>
+
+            <div className="space-y-4 px-5 py-4 text-sm text-text">
+              <div className="rounded-xl bg-background border border-border p-3 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span>目前試算原因</span>
+                  <span className="font-medium">${supplementalReview.teacher.supplemental_health_premium_amount.toLocaleString()}</span>
+                </div>
+                <p className="text-xs leading-5 text-text-muted">{supplementalReview.teacher.supplemental_health_reason}</p>
+                <p className="text-xs text-text-muted">
+                  若正式代扣，本次實發將由 ${supplementalReview.teacher.net_amount.toLocaleString()} 變為
+                  ${(supplementalReview.teacher.net_amount - supplementalReview.teacher.supplemental_health_premium_amount).toLocaleString()}。
+                </p>
+              </div>
+
+              <label className="flex items-start gap-3 rounded-xl border border-border p-3">
+                <input
+                  type="checkbox"
+                  title="是否正式代扣補充保費"
+                  checked={supplementalReview.withhold}
+                  onChange={(e) => setSupplementalReview((prev) => prev ? { ...prev, withhold: e.target.checked } : prev)}
+                  className="mt-0.5 rounded border-border text-primary"
+                />
+                <span>
+                  <span className="block font-medium text-text">本次結算正式代扣補充保費</span>
+                  <span className="block text-xs text-text-muted mt-1">未勾選時，只保留試算與覆核紀錄，不會從正式薪資扣除。</span>
+                </span>
+              </label>
+
+              <div>
+                <label className="mb-1 block text-sm text-text-muted">覆核備註</label>
+                <textarea
+                  title="補充保費覆核備註"
+                  value={supplementalReview.note}
+                  onChange={(e) => setSupplementalReview((prev) => prev ? { ...prev, note: e.target.value } : prev)}
+                  className="min-h-[96px] w-full rounded-lg border border-border bg-background px-3 py-2 text-text"
+                  placeholder="例如：已確認非本單位投保，依單次給付達門檻正式代扣。"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
+              <button
+                onClick={() => setSupplementalReview(null)}
+                className="rounded-lg border border-border px-4 py-2 text-sm text-text-muted"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => executeConfirmSalary(
+                  supplementalReview.teacher,
+                  supplementalReview.withhold,
+                  supplementalReview.note
+                )}
+                disabled={confirming === supplementalReview.teacher.teacher_id}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {confirming === supplementalReview.teacher.teacher_id ? '處理中...' : '確認結算'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
