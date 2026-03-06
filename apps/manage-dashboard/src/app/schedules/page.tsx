@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BackButton } from '@/components/ui/BackButton'
 import { resolveCurrentTeacher, type CurrentTeacher } from '@/lib/current-teacher'
+import { formatDate, formatTime, getMonthRange, getWeekday } from '@/lib/format'
 
 interface ScheduleRecord {
   id: string
@@ -15,38 +16,6 @@ interface ScheduleRecord {
   status: string
   course_type?: string
   student_name?: string
-}
-
-const API_BASE = ''
-
-function getMonthRange(offset: number) {
-  const date = new Date()
-  date.setMonth(date.getMonth() + offset)
-  const year = date.getFullYear()
-  const month = date.getMonth()
-  const start = new Date(year, month, 1)
-  const end = new Date(year, month + 1, 0)
-  return {
-    start: start.toISOString().split('T')[0],
-    end: end.toISOString().split('T')[0],
-    label: `${year}年${month + 1}月`,
-  }
-}
-
-function formatTime(value?: string) {
-  if (!value) return '—'
-  return value.slice(0, 5)
-}
-
-function formatDate(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return `${date.getMonth() + 1}/${date.getDate()}`
-}
-
-function getWeekday(value: string) {
-  const date = new Date(value)
-  return ['日', '一', '二', '三', '四', '五', '六'][date.getDay()] ?? ''
 }
 
 function statusLabel(status: string) {
@@ -65,7 +34,15 @@ export default function TeacherSchedulesPage() {
 
   const monthRange = useMemo(() => getMonthRange(monthOffset), [monthOffset])
 
+  // Resolve teacher identity once on mount
   useEffect(() => {
+    resolveCurrentTeacher().then(setTeacher)
+  }, [])
+
+  // Fetch schedules when teacher or month changes
+  useEffect(() => {
+    if (!teacher) return
+
     let cancelled = false
 
     const loadData = async () => {
@@ -73,16 +50,8 @@ export default function TeacherSchedulesPage() {
       setError(null)
 
       try {
-        const currentTeacher = await resolveCurrentTeacher()
-        if (!currentTeacher) {
-          throw new Error('找不到對應的教師身份資料')
-        }
-        if (cancelled) return
-
-        setTeacher(currentTeacher)
-
         const res = await fetch(
-          `${API_BASE}/api/w8/schedules?teacher_id=${currentTeacher.id}&start_date=${monthRange.start}&end_date=${monthRange.end}`,
+          `/api/w8/schedules?teacher_id=${teacher.id}&start_date=${monthRange.start}&end_date=${monthRange.end}`,
           { credentials: 'include' }
         )
 
@@ -108,7 +77,7 @@ export default function TeacherSchedulesPage() {
 
     loadData()
     return () => { cancelled = true }
-  }, [monthRange.end, monthRange.start])
+  }, [teacher, monthRange.start, monthRange.end])
 
   return (
     <div className="space-y-4">
@@ -121,9 +90,9 @@ export default function TeacherSchedulesPage() {
       </div>
 
       <div className="flex items-center justify-center gap-4">
-        <button onClick={() => setMonthOffset((value) => value - 1)} className="p-2 text-text-muted hover:text-text rounded-lg hover:bg-surface">&larr; 上月</button>
+        <button type="button" onClick={() => setMonthOffset((value) => value - 1)} className="p-2 text-text-muted hover:text-text rounded-lg hover:bg-surface">&larr; 上月</button>
         <span className="font-medium text-text">{monthRange.label}</span>
-        <button onClick={() => setMonthOffset((value) => value + 1)} className="p-2 text-text-muted hover:text-text rounded-lg hover:bg-surface">下月 &rarr;</button>
+        <button type="button" onClick={() => setMonthOffset((value) => value + 1)} className="p-2 text-text-muted hover:text-text rounded-lg hover:bg-surface">下月 &rarr;</button>
       </div>
 
       {loading ? (

@@ -138,11 +138,9 @@ export default function EnrollmentPage() {
         setLeads((prev) =>
           prev.map((lead) => (lead.id === id ? { ...lead, status: normalizeLeadStatus(status) } : lead))
         )
-        // Refresh stats after status change
-        loadData()
       }
-    } catch {
-      // handle silently
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '更新狀態失敗')
     }
   }
 

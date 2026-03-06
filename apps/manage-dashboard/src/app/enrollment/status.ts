@@ -46,11 +46,6 @@ export function normalizeLeadStatus(status: string): string {
   return LEAD_STATUS_ALIASES[status] ?? status
 }
 
-export function getLeadStatusLabel(status: string): string {
-  const normalized = normalizeLeadStatus(status)
-  return STATUS_CONFIG[normalized]?.label ?? status
-}
-
 export function normalizeFunnelStages(payload: unknown): EnrollmentStageDisplay[] {
   if (!Array.isArray(payload)) return []
 

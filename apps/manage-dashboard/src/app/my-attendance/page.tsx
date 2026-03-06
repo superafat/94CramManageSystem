@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BackButton } from '@/components/ui/BackButton'
 import { resolveCurrentTeacher, type CurrentTeacher } from '@/lib/current-teacher'
+import { formatDate } from '@/lib/format'
 
 interface AttendanceRecord {
   id: string
@@ -14,20 +15,17 @@ interface AttendanceRecord {
   approve_note?: string | null
 }
 
-const API_BASE = ''
+const LATE_THRESHOLD = '09:15'
 
 function getCurrentMonth() {
   return new Date().toISOString().slice(0, 7)
 }
 
-function formatDate(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return `${date.getMonth() + 1}/${date.getDate()}`
-}
-
 function formatType(record: AttendanceRecord) {
-  if (record.type === 'checkin') return record.check_in_time && record.check_in_time.slice(11, 16) > '09:15' ? '遲到' : '出勤'
+  if (record.type === 'checkin') {
+    const checkInTime = record.check_in_time?.slice(11, 16)
+    return checkInTime && checkInTime > LATE_THRESHOLD ? '遲到' : '出勤'
+  }
   if (record.type === 'absent') return '缺勤'
   if (record.type === 'sick_leave') return '病假'
   if (record.type === 'personal_leave') return '事假'
@@ -50,13 +48,26 @@ export default function MyAttendancePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const summary = useMemo(() => ({
-    present: records.filter((record) => record.type === 'checkin' && record.status === 'approved').length,
-    absent: records.filter((record) => record.type === 'absent' && record.status === 'approved').length,
-    leave: records.filter((record) => record.type.includes('leave') && record.status === 'approved').length,
-  }), [records])
+  const summary = useMemo(() => {
+    const s = { present: 0, absent: 0, leave: 0 }
+    for (const r of records) {
+      if (r.status !== 'approved') continue
+      if (r.type === 'checkin') s.present++
+      else if (r.type === 'absent') s.absent++
+      else if (r.type.includes('leave')) s.leave++
+    }
+    return s
+  }, [records])
 
+  // Resolve teacher identity once on mount
   useEffect(() => {
+    resolveCurrentTeacher().then(setTeacher)
+  }, [])
+
+  // Fetch attendance when teacher or month changes
+  useEffect(() => {
+    if (!teacher) return
+
     let cancelled = false
 
     const loadData = async () => {
@@ -64,16 +75,8 @@ export default function MyAttendancePage() {
       setError(null)
 
       try {
-        const currentTeacher = await resolveCurrentTeacher()
-        if (!currentTeacher) {
-          throw new Error('找不到對應的教師身份資料')
-        }
-        if (cancelled) return
-
-        setTeacher(currentTeacher)
-
         const res = await fetch(
-          `${API_BASE}/api/teacher-attendance?teacherId=${currentTeacher.id}&month=${month}`,
+          `/api/teacher-attendance?teacherId=${teacher.id}&month=${month}`,
           { credentials: 'include' }
         )
         if (!res.ok) {
@@ -98,7 +101,7 @@ export default function MyAttendancePage() {
 
     loadData()
     return () => { cancelled = true }
-  }, [month])
+  }, [teacher, month])
 
   return (
     <div className="space-y-4">
@@ -129,6 +132,7 @@ export default function MyAttendancePage() {
           type="month"
           value={month}
           onChange={(event) => setMonth(event.target.value)}
+          aria-label="選擇月份"
           className="px-3 py-2 rounded-xl border border-border bg-background"
         />
       </div>

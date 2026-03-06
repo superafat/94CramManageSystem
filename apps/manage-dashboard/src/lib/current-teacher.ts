@@ -26,7 +26,8 @@ interface AuthUserLike {
   teacherId?: string
 }
 
-const API_BASE = ''
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+let cache: { teacher: CurrentTeacher | null; expiry: number } | null = null
 
 function normalizeTeacherRecord(record: TeacherApiRecord): CurrentTeacher | null {
   const id = String(record.id ?? '')
@@ -41,34 +42,39 @@ function normalizeTeacherRecord(record: TeacherApiRecord): CurrentTeacher | null
 }
 
 export async function resolveCurrentTeacher(): Promise<CurrentTeacher | null> {
+  if (cache && Date.now() < cache.expiry) return cache.teacher
+
   const user = getUser()
   if (!user) return null
   const authUser = user as unknown as AuthUserLike
 
   const teacherId = authUser.teacher_id ?? authUser.teacherId
   if (typeof teacherId === 'string' && teacherId.trim() !== '') {
-    return {
+    const teacher: CurrentTeacher = {
       id: teacherId,
       name: user.name,
       email: authUser.email,
     }
+    cache = { teacher, expiry: Date.now() + CACHE_TTL }
+    return teacher
   }
 
-  const res = await fetch(`${API_BASE}/api/w8/teachers`, { credentials: 'include' })
+  const res = await fetch('/api/w8/teachers', { credentials: 'include' })
   if (!res.ok) return null
 
   const json = await res.json()
   const payload = json.data ?? json
   const rawTeachers = Array.isArray(payload.teachers) ? payload.teachers : Array.isArray(payload) ? payload : []
 
+  // Match by user_id, email, or username only — name matching is unreliable
   const matched = rawTeachers.find((teacher: TeacherApiRecord) => {
     const record = teacher as TeacherApiRecord
     return record.user_id === user.id
-      || record.email === authUser.email
-      || record.username === authUser.username
-      || record.name === user.name
-      || record.full_name === user.name
+      || (authUser.email && record.email === authUser.email)
+      || (authUser.username && record.username === authUser.username)
   }) as TeacherApiRecord | undefined
 
-  return matched ? normalizeTeacherRecord(matched) : null
+  const result = matched ? normalizeTeacherRecord(matched) : null
+  cache = { teacher: result, expiry: Date.now() + CACHE_TTL }
+  return result
 }
