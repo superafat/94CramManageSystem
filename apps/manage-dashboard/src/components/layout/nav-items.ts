@@ -2,14 +2,9 @@
 
 export type Role = 'superadmin' | 'admin' | 'staff' | 'teacher'
 
-export interface NavItem {
-  href?: string
-  icon?: string
-  label?: string
-  type?: 'separator'
-  separator?: string
-  roles: Role[]
-}
+export type NavItem =
+  | { type: 'separator'; separator: string; roles: Role[] }
+  | { type?: undefined; href: string; icon: string; label: string; roles: Role[] }
 
 export const navItems: NavItem[] = [
   { href: '/dashboard', icon: '📊', label: '總覽', roles: ['superadmin', 'admin', 'staff'] },

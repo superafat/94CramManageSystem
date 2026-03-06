@@ -77,7 +77,7 @@ export function Sidebar() {
             )
           }
           
-          const href = item.href!
+          const href = item.href
           const isActive = pathname === href ||
             (href !== '/dashboard' && pathname?.startsWith(href))
             
