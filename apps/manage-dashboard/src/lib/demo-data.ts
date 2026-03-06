@@ -786,18 +786,67 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     }
 
     // Billing — 按課程查詢帳務
+    if (path === '/api/admin/billing/classes-overview') {
+      const classes = COURSES.map((course) => {
+        const students = COURSE_STUDENTS[course.id] || []
+        const paidStudents = students.filter((student) => Boolean(student.payment_id)).length
+        const pendingStudents = students.filter((student) => !student.payment_id).length
+        const totalStudents = students.length
+        return {
+          id: course.id,
+          name: course.name,
+          subject: course.subject,
+          grade: course.grade,
+          course_type: course.course_type,
+          fee_monthly: course.fee_monthly ?? 0,
+          fee_per_session: course.fee_per_session ?? 0,
+          stats: {
+            totalStudents,
+            paidStudents,
+            pendingStudents: 0,
+            unpaidStudents: pendingStudents,
+          },
+        }
+      })
+
+      return { status: 200, body: { success: true, data: { periodMonth: searchParams.get('periodMonth') || '2026-03', classes } } }
+    }
+
     const billingCourseMatch = path.match(/^\/api\/admin\/billing\/course\/([\w-]+)$/)
     if (billingCourseMatch) {
       const courseId = billingCourseMatch[1]
       const course = COURSES.find(c => c.id === courseId)
       const periodMonth = searchParams.get('periodMonth') || '2026-03'
-      const students = COURSE_STUDENTS[courseId] || []
-      const paid = students.filter(s => s.payment_id).length
+      const session = getDemoSessionCount(courseId, periodMonth)
+      const students = (COURSE_STUDENTS[courseId] || []).map((student) => {
+        const memory = DEMO_PRICE_MEMORY.find((item) => item.course_id === courseId && item.student_id === student.id)
+        return {
+          ...student,
+          payment_status: student.payment_id ? 'paid' : 'unpaid',
+          remembered_amount: memory ? Number(memory.amount) : null,
+          remembered_payment_type: memory?.payment_type || null,
+          remembered_metadata: memory?.metadata || null,
+        }
+      })
+
+      const paid = students.filter(s => s.payment_status === 'paid').length
       return { status: 200, body: { success: true, data: {
-        course: course ? { id: course.id, name: course.name, subject: course.subject, grade_level: course.grade, fee_monthly: course.fee_monthly, fee_quarterly: course.fee_monthly * 3 * 0.95, fee_semester: course.fee_monthly * 6 * 0.9, fee_yearly: course.fee_monthly * 12 * 0.85 } : null,
+        course: course ? {
+          id: course.id,
+          name: course.name,
+          subject: course.subject,
+          grade: course.grade,
+          course_type: course.course_type,
+          fee_monthly: course.fee_monthly,
+          fee_per_session: course.fee_per_session,
+          fee_quarterly: course.fee_monthly * 3 * 0.95,
+          fee_semester: course.fee_monthly * 6 * 0.9,
+          fee_yearly: course.fee_monthly * 12 * 0.85,
+        } : null,
         periodMonth,
+        sessionCount: session.sessionCount,
         students,
-        stats: { total: students.length, paid, unpaid: students.length - paid },
+        stats: { total: students.length, paid, pending: 0, unpaid: students.length - paid },
       } } }
     }
 
@@ -1166,6 +1215,53 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
 
   // Write operations — return success
   if (method === 'POST') {
+        if (path === '/api/admin/billing/payment-notices/publish') {
+          const notices = body?.notices || []
+          return {
+            status: 200,
+            body: {
+              success: true,
+              data: {
+                periodMonth: body?.periodMonth || '2026-03',
+                created: notices.length,
+                updated: 0,
+                skippedPaid: 0,
+                notified: notices.length,
+              },
+            },
+          }
+        }
+
+        if (path === '/api/admin/billing/payment-notices/revoke') {
+          const studentIds = body?.studentIds || []
+          const revokeStrategy = body?.revokeStrategy || 'cancel_status'
+          return {
+            status: 200,
+            body: {
+              success: true,
+              data: {
+                periodMonth: body?.periodMonth || '2026-03',
+                revoked: studentIds.length,
+                revokeStrategy,
+              },
+            },
+          }
+        }
+
+        if (path === '/api/admin/billing/payment-notices/resend') {
+          const studentIds = body?.studentIds || []
+          return {
+            status: 200,
+            body: {
+              success: true,
+              data: {
+                periodMonth: body?.periodMonth || '2026-03',
+                resent: studentIds.length,
+              },
+            },
+          }
+        }
+
     if (path === '/api/bot/ai-query') {
       return { status: 200, body: { answer: '您好！這是 Demo 模式，AI 功能在正式版中可用。目前補習班共有 8 位學生，3 個班級。', model: 'demo', intent: 'general_query', latencyMs: 150 } }
     }

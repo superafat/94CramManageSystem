@@ -14,6 +14,8 @@ import { notifyBillingPaid, notifyBillingCreated } from '../../services/notify-h
 
 const billingRoutes = new Hono<{ Variables: RBACVariables }>()
 
+const periodMonthSchema = z.string().regex(/^\d{4}-\d{2}$/)
+
 const billingQuerySchema = z.object({
   parentId: uuidSchema.optional(),
   branchId: uuidSchema.optional(),
@@ -196,7 +198,7 @@ billingRoutes.get('/billing/course/:courseId',
   requirePermission(Permission.BILLING_READ),
   zValidator('param', z.object({ courseId: uuidSchema })),
   zValidator('query', z.object({
-    periodMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+    periodMonth: periodMonthSchema.optional(),
   })),
   async (c) => {
     const user = c.get('user')
@@ -206,7 +208,7 @@ billingRoutes.get('/billing/course/:courseId',
     try {
       // Get course info with fees
       const course = first(await db.execute(sql`
-        SELECT id, name, fee_monthly, fee_quarterly, fee_semester, fee_yearly
+        SELECT id, name, course_type, subject, grade, fee_monthly, fee_quarterly, fee_semester, fee_yearly, fee_per_session
         FROM manage_courses WHERE id = ${courseId} AND tenant_id = ${user.tenant_id}
       `))
 
@@ -215,12 +217,33 @@ billingRoutes.get('/billing/course/:courseId',
       // Get students in this course with payment records
       const studentRows = await db.execute(sql`
         SELECT
-          s.id, s.name, s.grade,
-          pr.id as payment_id, pr.amount as paid_amount, pr.payment_method
+          s.id,
+          s.name,
+          s.grade,
+          ce.id as enrollment_id,
+          pr.id as payment_id,
+          pr.amount as paid_amount,
+          pr.payment_method,
+          pr.status as payment_status,
+          pr.paid_at as payment_date,
+          pm.amount as remembered_amount,
+          pm.payment_type as remembered_payment_type,
+          pm.metadata as remembered_metadata
         FROM manage_students s
         LEFT JOIN manage_enrollments ce ON ce.student_id = s.id AND ce.course_id = ${courseId} AND ce.status = 'active'
-        LEFT JOIN manage_payments pr ON pr.enrollment_id = ce.id
-          AND pr.status = 'paid'
+        LEFT JOIN LATERAL (
+          SELECT id, amount, payment_method, status, paid_at, created_at
+          FROM manage_payments
+          WHERE enrollment_id = ce.id
+            AND deleted_at IS NULL
+            AND to_char(COALESCE(paid_at, created_at), 'YYYY-MM') = ${periodMonth}
+          ORDER BY COALESCE(paid_at, created_at) DESC, created_at DESC
+          LIMIT 1
+        ) pr ON TRUE
+        LEFT JOIN manage_price_memory pm
+          ON pm.tenant_id = ${user.tenant_id}
+          AND pm.course_id = ${courseId}
+          AND pm.student_id = s.id
         WHERE s.tenant_id = ${user.tenant_id} AND s.deleted_at IS NULL
           AND ce.student_id IS NOT NULL
         ORDER BY s.name
@@ -228,18 +251,369 @@ billingRoutes.get('/billing/course/:courseId',
 
       const students = rows(studentRows)
       const total = students.length
-      const paid = students.filter((s: QueryResult) => s.payment_id).length
+      const paid = students.filter((s: QueryResult) => s.payment_status === 'paid').length
+      const pending = students.filter((s: QueryResult) => s.payment_status === 'pending').length
+
+      const [yearStr, monthStr] = periodMonth.split('-')
+      const year = Number(yearStr)
+      const month = Number(monthStr)
+      const schedules = await db
+        .select()
+        .from(inclassSchedules)
+        .where(
+          and(
+            eq(inclassSchedules.tenantId, user.tenant_id),
+            eq(inclassSchedules.courseId, courseId),
+            isNull(inclassSchedules.deletedAt),
+          )
+        )
+
+      let sessionCount = 0
+      for (const sched of schedules) {
+        sessionCount += expandScheduleDates(year, month, sched.dayOfWeek).length
+      }
 
       return success(c, {
         course,
         periodMonth,
+        sessionCount,
         students,
         stats: {
           total,
           paid,
-          unpaid: total - paid,
+          pending,
+          unpaid: total - paid - pending,
         },
       })
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
+
+// 班級總覽（左側班級列表）
+billingRoutes.get('/billing/classes-overview',
+  requirePermission(Permission.BILLING_READ),
+  zValidator('query', z.object({ periodMonth: periodMonthSchema.optional() })),
+  async (c) => {
+    const user = c.get('user')
+    const periodMonth = c.req.valid('query').periodMonth || new Date().toISOString().substring(0, 7)
+
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          c.id,
+          c.name,
+          c.course_type,
+          c.subject,
+          c.grade,
+          c.fee_monthly,
+          c.fee_per_session,
+          COUNT(DISTINCT e.student_id)::int as total_students,
+          COUNT(DISTINCT CASE WHEN pm.status = 'paid' THEN e.student_id END)::int as paid_students,
+          COUNT(DISTINCT CASE WHEN pm.status = 'pending' THEN e.student_id END)::int as pending_students
+        FROM manage_courses c
+        LEFT JOIN manage_enrollments e
+          ON e.course_id = c.id
+          AND e.tenant_id = ${user.tenant_id}
+          AND e.status = 'active'
+          AND e.deleted_at IS NULL
+        LEFT JOIN LATERAL (
+          SELECT pr.status
+          FROM manage_payments pr
+          WHERE pr.enrollment_id = e.id
+            AND pr.deleted_at IS NULL
+            AND to_char(COALESCE(pr.paid_at, pr.created_at), 'YYYY-MM') = ${periodMonth}
+          ORDER BY COALESCE(pr.paid_at, pr.created_at) DESC, pr.created_at DESC
+          LIMIT 1
+        ) pm ON TRUE
+        WHERE c.tenant_id = ${user.tenant_id}
+          AND c.deleted_at IS NULL
+        GROUP BY c.id, c.name, c.course_type, c.subject, c.grade, c.fee_monthly, c.fee_per_session
+        ORDER BY c.course_type, c.name
+      `)
+
+      const classes = rows(result).map((course) => {
+        const totalStudents = Number(course.total_students || 0)
+        const paidStudents = Number(course.paid_students || 0)
+        const pendingStudents = Number(course.pending_students || 0)
+        return {
+          ...course,
+          stats: {
+            totalStudents,
+            paidStudents,
+            pendingStudents,
+            unpaidStudents: Math.max(totalStudents - paidStudents - pendingStudents, 0),
+          },
+        }
+      })
+
+      return success(c, { periodMonth, classes })
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
+
+const publishPaymentNoticesSchema = z.object({
+  courseId: uuidSchema,
+  periodMonth: periodMonthSchema,
+  notices: z.array(z.object({
+    studentId: uuidSchema,
+    billingMode: z.enum(['monthly', 'per_session']),
+    customAmount: z.number().positive().optional(),
+    sessionCount: z.number().int().nonnegative().optional(),
+    perSessionFee: z.number().positive().optional(),
+    note: z.string().max(500).optional(),
+  })).min(1),
+})
+
+const paymentNoticesActionSchema = z.object({
+  courseId: uuidSchema,
+  periodMonth: periodMonthSchema,
+  studentIds: z.array(uuidSchema).optional(),
+  revokeStrategy: z.enum(['soft_delete', 'cancel_status']).optional(),
+})
+
+// 一鍵發布繳費單 + 家長通知
+billingRoutes.post('/billing/payment-notices/publish',
+  requirePermission(Permission.BILLING_WRITE),
+  zValidator('json', publishPaymentNoticesSchema),
+  async (c) => {
+    const user = c.get('user')
+    const tenantId = user.tenant_id
+    const body = c.req.valid('json')
+
+    try {
+      const course = first(await db.execute(sql`
+        SELECT id, name, fee_monthly, fee_per_session
+        FROM manage_courses
+        WHERE id = ${body.courseId} AND tenant_id = ${tenantId} AND deleted_at IS NULL
+      `))
+
+      if (!course) return notFound(c, 'Course not found')
+
+      let created = 0
+      let updated = 0
+      let skippedPaid = 0
+      let notified = 0
+
+      for (const notice of body.notices) {
+        const enrollment = first(await db.execute(sql`
+          SELECT id
+          FROM manage_enrollments
+          WHERE tenant_id = ${tenantId}
+            AND student_id = ${notice.studentId}
+            AND course_id = ${body.courseId}
+            AND status = 'active'
+            AND deleted_at IS NULL
+          LIMIT 1
+        `))
+
+        if (!enrollment) {
+          continue
+        }
+
+        const existingPayment = first(await db.execute(sql`
+          SELECT id, status
+          FROM manage_payments
+          WHERE enrollment_id = ${enrollment.id}
+            AND tenant_id = ${tenantId}
+            AND deleted_at IS NULL
+            AND to_char(COALESCE(paid_at, created_at), 'YYYY-MM') = ${body.periodMonth}
+          ORDER BY COALESCE(paid_at, created_at) DESC, created_at DESC
+          LIMIT 1
+        `))
+
+        let amount = 0
+        if (notice.billingMode === 'monthly') {
+          amount = Number(notice.customAmount ?? course.fee_monthly ?? 0)
+        } else {
+          const perSessionFee = Number(notice.perSessionFee ?? course.fee_per_session ?? 0)
+          const sessionCount = Number(notice.sessionCount ?? 0)
+          amount = perSessionFee * sessionCount
+        }
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+          continue
+        }
+
+        if (existingPayment?.status === 'paid') {
+          skippedPaid += 1
+          continue
+        }
+
+        if (existingPayment) {
+          await db.execute(sql`
+            UPDATE manage_payments
+            SET amount = ${amount},
+                payment_method = ${notice.billingMode},
+                status = 'pending',
+                paid_at = NULL
+            WHERE id = ${existingPayment.id}
+          `)
+          updated += 1
+        } else {
+          await db.execute(sql`
+            INSERT INTO manage_payments (tenant_id, enrollment_id, amount, payment_method, status, created_at)
+            VALUES (${tenantId}, ${enrollment.id}, ${amount}, ${notice.billingMode}, 'pending', NOW())
+          `)
+          created += 1
+        }
+
+        const metadata = notice.billingMode === 'per_session'
+          ? { sessionCount: notice.sessionCount ?? 0, perSessionFee: notice.perSessionFee ?? Number(course.fee_per_session ?? 0) }
+          : { note: notice.note ?? null }
+
+        await db
+          .insert(managePriceMemory)
+          .values({
+            tenantId,
+            courseId: body.courseId,
+            studentId: notice.studentId,
+            amount: String(amount),
+            paymentType: notice.billingMode,
+            metadata,
+            updatedAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: [managePriceMemory.tenantId, managePriceMemory.courseId, managePriceMemory.studentId],
+            set: {
+              amount: String(amount),
+              paymentType: notice.billingMode,
+              metadata,
+              updatedAt: new Date(),
+            },
+          })
+
+        const student = first(await db.execute(sql`
+          SELECT name FROM manage_students
+          WHERE id = ${notice.studentId} AND tenant_id = ${tenantId}
+          LIMIT 1
+        `))
+
+        if (student) {
+          void notifyBillingCreated(tenantId, notice.studentId, String(student.name || ''), String(course.name || ''), amount)
+          notified += 1
+        }
+      }
+
+      return success(c, {
+        periodMonth: body.periodMonth,
+        created,
+        updated,
+        skippedPaid,
+        notified,
+      })
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
+
+// 批次撤回當月待繳繳費單（僅撤回 pending）
+billingRoutes.post('/billing/payment-notices/revoke',
+  requirePermission(Permission.BILLING_WRITE),
+  zValidator('json', paymentNoticesActionSchema),
+  async (c) => {
+    const user = c.get('user')
+    const tenantId = user.tenant_id
+    const body = c.req.valid('json')
+    const revokeStrategy = body.revokeStrategy || 'soft_delete'
+
+    try {
+      const idFilter = body.studentIds && body.studentIds.length > 0
+        ? sql`AND me.student_id = ANY(${body.studentIds}::uuid[])`
+        : sql``
+
+      let result
+      if (revokeStrategy === 'cancel_status') {
+        result = await db.execute(sql`
+          UPDATE manage_payments mp
+          SET status = 'cancelled', paid_at = NULL
+          FROM manage_enrollments me
+          WHERE mp.enrollment_id = me.id
+            AND mp.tenant_id = ${tenantId}
+            AND me.course_id = ${body.courseId}
+            AND me.tenant_id = ${tenantId}
+            AND mp.status = 'pending'
+            AND mp.deleted_at IS NULL
+            AND to_char(COALESCE(mp.paid_at, mp.created_at), 'YYYY-MM') = ${body.periodMonth}
+            ${idFilter}
+        `)
+      } else {
+        result = await db.execute(sql`
+          UPDATE manage_payments mp
+          SET deleted_at = NOW()
+          FROM manage_enrollments me
+          WHERE mp.enrollment_id = me.id
+            AND mp.tenant_id = ${tenantId}
+            AND me.course_id = ${body.courseId}
+            AND me.tenant_id = ${tenantId}
+            AND mp.status = 'pending'
+            AND mp.deleted_at IS NULL
+            AND to_char(COALESCE(mp.paid_at, mp.created_at), 'YYYY-MM') = ${body.periodMonth}
+            ${idFilter}
+        `)
+      }
+
+      return success(c, {
+        revoked: Number(result.count || 0),
+        periodMonth: body.periodMonth,
+        revokeStrategy,
+      })
+    } catch (err) {
+      return internalError(c, err)
+    }
+  }
+)
+
+// 批次重發當月待繳繳費通知（不改金額、不改狀態）
+billingRoutes.post('/billing/payment-notices/resend',
+  requirePermission(Permission.BILLING_WRITE),
+  zValidator('json', paymentNoticesActionSchema),
+  async (c) => {
+    const user = c.get('user')
+    const tenantId = user.tenant_id
+    const body = c.req.valid('json')
+
+    try {
+      const idFilter = body.studentIds && body.studentIds.length > 0
+        ? sql`AND me.student_id = ANY(${body.studentIds}::uuid[])`
+        : sql``
+
+      const pendingRows = await db.execute(sql`
+        SELECT
+          me.student_id,
+          s.name as student_name,
+          c.name as course_name,
+          mp.amount
+        FROM manage_payments mp
+        JOIN manage_enrollments me ON me.id = mp.enrollment_id
+        JOIN manage_students s ON s.id = me.student_id
+        JOIN manage_courses c ON c.id = me.course_id
+        WHERE mp.tenant_id = ${tenantId}
+          AND me.tenant_id = ${tenantId}
+          AND me.course_id = ${body.courseId}
+          AND mp.status = 'pending'
+          AND mp.deleted_at IS NULL
+          AND to_char(COALESCE(mp.paid_at, mp.created_at), 'YYYY-MM') = ${body.periodMonth}
+          ${idFilter}
+      `)
+
+      let notified = 0
+      for (const row of rows(pendingRows)) {
+        void notifyBillingCreated(
+          tenantId,
+          String(row.student_id),
+          String(row.student_name || ''),
+          String(row.course_name || ''),
+          Number(row.amount || 0)
+        )
+        notified += 1
+      }
+
+      return success(c, { resent: notified, periodMonth: body.periodMonth })
     } catch (err) {
       return internalError(c, err)
     }
@@ -321,7 +695,7 @@ billingRoutes.get('/billing/payment-records', requirePermission(Permission.BILLI
   try {
     const conditions = [sql`pr.tenant_id = ${user.tenant_id}`]
     if (courseId) conditions.push(sql`me.course_id = ${courseId}`)
-    // periodMonth filter removed — manage_payments no longer has period_month column
+    if (periodMonth) conditions.push(sql`to_char(COALESCE(pr.paid_at, pr.created_at), 'YYYY-MM') = ${periodMonth}`)
     if (studentId) conditions.push(sql`me.student_id = ${studentId}`)
 
     const where = sql.join(conditions, sql` AND `)
@@ -695,6 +1069,7 @@ billingRoutes.get('/billing/session-count',
       return success(c, {
         courseId,
         month,
+        count: sessions.length,
         sessionCount: sessions.length,
         sessions,
       })
