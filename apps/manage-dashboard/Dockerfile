@@ -14,6 +14,8 @@ COPY packages/shared/ packages/shared/
 COPY apps/manage-dashboard/ apps/manage-dashboard/
 
 WORKDIR /app/apps/manage-dashboard
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 RUN pnpm build
 
 FROM node:20-alpine AS runner

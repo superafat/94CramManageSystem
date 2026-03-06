@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { GoogleLogin } from '@react-oauth/google'
 
 // 使用相對路徑，讓 Next.js proxy (rewrites) 處理跨域
 const API_BASE = ''
@@ -70,6 +71,40 @@ export default function LoginPage() {
     }
   }
 
+  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
+    if (!credentialResponse.credential) return
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ credential: credentialResponse.credential }),
+      })
+      const data = await res.json().catch(() => { throw new Error('API 回應格式錯誤') })
+      if (!res.ok) {
+        setError(data.error?.message || data.error || 'Google 登入失敗')
+        return
+      }
+      const responseData = data.data || data
+      const userData = responseData.user
+      if (!userData) { setError('登入回應格式錯誤'); return }
+      localStorage.setItem('user', JSON.stringify(userData))
+      localStorage.setItem('tenantId', userData.tenant_id)
+      localStorage.setItem('branchId', userData.branch_id || '')
+      const role = userData.role
+      const homePages: Record<string, string> = {
+        superadmin: '/dashboard', admin: '/dashboard', staff: '/students', teacher: '/schedules',
+      }
+      router.push(homePages[role] || '/dashboard')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google 登入失敗')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
@@ -114,6 +149,17 @@ export default function LoginPage() {
               {loading ? '登入中...' : '登入'}
             </button>
           </form>
+
+          <div className="mt-4 pt-4 border-t border-border">
+            <p className="text-xs text-text-muted text-center mb-3">或使用 Google 帳號登入</p>
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setError('Google 登入失敗，請稍後再試')}
+                locale="zh-TW"
+              />
+            </div>
+          </div>
 
           <div className="text-center mt-4 pt-4 border-t border-border">
             <button

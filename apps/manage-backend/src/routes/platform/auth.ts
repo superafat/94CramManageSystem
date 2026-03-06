@@ -186,6 +186,93 @@ platformAuthRoutes.post('/login', zValidator('json', platformLoginSchema), async
 })
 
 // ========================================================================
+// POST /google - Google OAuth 2.0 Login (superadmin only)
+// ========================================================================
+platformAuthRoutes.post('/google', async (c) => {
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>
+  const credential = body.credential as string | undefined
+
+  if (!credential) {
+    return unauthorized(c, '缺少 Google credential')
+  }
+
+  const clientId = process.env.GOOGLE_CLIENT_ID
+  if (!clientId) {
+    return internalError(c, new Error('Google OAuth 未設定'))
+  }
+
+  try {
+    const tokenInfoRes = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
+    )
+    if (!tokenInfoRes.ok) {
+      return unauthorized(c, 'Google 憑證驗證失敗')
+    }
+
+    const tokenInfo = await tokenInfoRes.json() as {
+      aud: string
+      email: string
+      email_verified: string
+      error_description?: string
+    }
+
+    if (tokenInfo.error_description || tokenInfo.aud !== clientId || tokenInfo.email_verified !== 'true') {
+      return unauthorized(c, 'Google 憑證無效')
+    }
+
+    const rows = await db.execute(sql`
+      SELECT id, username, full_name, email, password_hash, role, tenant_id, branch_id, is_active
+      FROM users
+      WHERE email = ${tokenInfo.email}
+        AND deleted_at IS NULL
+      LIMIT 1
+    `) as QueryResultRows<AuthUserRow>
+
+    const dbUser = firstRow(rows)
+
+    if (!dbUser) {
+      return unauthorized(c, '此 Google 帳號尚未在系統中建立，請聯繫管理員')
+    }
+    if (!dbUser.is_active) {
+      return forbidden(c, '帳號已停用')
+    }
+    if (dbUser.role !== Role.SUPERADMIN) {
+      return forbidden(c, '權限不足，此入口僅供超級管理員使用')
+    }
+
+    const role = dbUser.role as Role
+    const permissions = getUserPermissions(role)
+
+    const jwt = await generateToken({
+      sub: dbUser.id,
+      name: (dbUser.full_name ?? dbUser.username) ?? undefined,
+      email: dbUser.email ?? undefined,
+      role,
+      tenant_id: dbUser.tenant_id,
+      branch_id: dbUser.branch_id ?? undefined,
+    })
+
+    db.execute(sql`UPDATE users SET last_login_at = NOW() WHERE id = ${dbUser.id}`)
+      .catch(() => {})
+
+    await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id)
+    return success(c, {
+      token: jwt,
+      user: {
+        id: dbUser.id,
+        name: (dbUser.full_name ?? dbUser.username) ?? undefined,
+        email: dbUser.email ?? undefined,
+        role,
+        permissions,
+      },
+    })
+  } catch (err: unknown) {
+    logger.error({ err }, 'Platform Google login error')
+    return internalError(c, err instanceof Error ? err : undefined)
+  }
+})
+
+// ========================================================================
 // POST /logout - Clear auth cookie
 // ========================================================================
 platformAuthRoutes.post('/logout', async (c) => {

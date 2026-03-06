@@ -189,6 +189,64 @@ app.get('/users', async (c) => {
   return c.json(tenantUsers);
 });
 
+app.post('/google', async (c) => {
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  const credential = body.credential as string | undefined;
+
+  if (!credential) {
+    return badRequest(c, '缺少 Google credential');
+  }
+
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    return internalError(c, new Error('Google OAuth 未設定'));
+  }
+
+  try {
+    const tokenInfoRes = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
+    );
+    if (!tokenInfoRes.ok) {
+      return unauthorized(c, 'Google 憑證驗證失敗');
+    }
+
+    const tokenInfo = await tokenInfoRes.json() as {
+      aud: string;
+      email: string;
+      email_verified: string;
+      error_description?: string;
+    };
+
+    if (tokenInfo.error_description || tokenInfo.aud !== clientId || tokenInfo.email_verified !== 'true') {
+      return unauthorized(c, 'Google 憑證無效');
+    }
+
+    const [user] = await db.select().from(users).where(eq(users.email, tokenInfo.email));
+    if (!user || user.isActive === false) {
+      return unauthorized(c, '此 Google 帳號尚未在系統中建立，請聯繫管理員');
+    }
+
+    await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
+
+    const token = await sign({
+      userId: user.id,
+      tenantId: user.tenantId ?? '',
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      systems: ['stock'],
+    });
+
+    await setAuthTokens(c, token, user.id, user.tenantId ?? '');
+    return c.json({
+      token,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role, tenantId: user.tenantId },
+    });
+  } catch (err: unknown) {
+    return internalError(c, err instanceof Error ? err : new Error(String(err)));
+  }
+});
+
 app.post('/refresh', async (c) => {
   const refreshToken = extractRefreshToken(c);
   if (!refreshToken) {

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Noto_Sans_TC } from 'next/font/google'
 import './globals.css'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { GoogleProvider } from '@/components/GoogleProvider'
 
 const notoSansTC = Noto_Sans_TC({
   subsets: ['latin'],
@@ -29,7 +30,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh-TW">
       <body className={`${notoSansTC.className} antialiased`}>
-        <AppLayout>{children}</AppLayout>
+        <GoogleProvider>
+          <AppLayout>{children}</AppLayout>
+        </GoogleProvider>
       </body>
     </html>
   )

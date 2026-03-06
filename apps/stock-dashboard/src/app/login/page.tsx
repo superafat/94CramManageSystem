@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAxiosError } from 'axios';
 import api from '@/lib/api';
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +13,21 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   type ErrorResponse = { error?: string };
+
+  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
+    if (!credentialResponse.credential) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.post('/auth/google', { credential: credentialResponse.credential });
+      if (res.data.user) localStorage.setItem('user', JSON.stringify(res.data.user));
+      router.push('/dashboard');
+    } catch (err: unknown) {
+      setError(isAxiosError<ErrorResponse>(err) ? err.response?.data?.error || 'Google 登入失敗' : 'Google 登入失敗');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +55,16 @@ export default function LoginPage() {
         {error && <p className="text-red-600 text-sm">{error}</p>}
         <button disabled={loading} className="w-full bg-[#8FA895] text-white rounded px-4 py-2 hover:bg-[#7a9380] disabled:opacity-60">{loading ? '登入中...' : '登入'}</button>
         <p className="text-sm text-gray-500">還沒有帳號？<a className="text-[#6f8d75]" href="/register">註冊</a></p>
+        <div className="border-t border-[#d8e2da] pt-4 mt-2">
+          <p className="text-sm text-gray-400 text-center mb-3">或使用 Google 帳號登入</p>
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError('Google 登入失敗，請稍後再試')}
+              locale="zh-TW"
+            />
+          </div>
+        </div>
       </form>
     </div>
   );

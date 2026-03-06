@@ -33,6 +33,7 @@ jobs:
         run: |
           docker build --platform linux/amd64 \
             -f apps/portal/Dockerfile \
+            --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }} \
             -t ${{ env.REGISTRY }}/94portal:${{ github.sha }} \
             .
           docker push ${{ env.REGISTRY }}/94portal:${{ github.sha }}

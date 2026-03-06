@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { GoogleLogin } from '@react-oauth/google'
 
 const API_BASE = ''
 
@@ -51,6 +52,36 @@ export default function LoginPage() {
     } catch (err) {
       console.error('Login error:', err)
       setError(err instanceof Error ? err.message : '無法連接伺服器')
+      setLoading(false)
+    }
+  }
+
+  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
+    if (!credentialResponse.credential) return
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ credential: credentialResponse.credential }),
+      })
+      const data = await res.json().catch(() => { throw new Error('API 回應格式錯誤') })
+      if (!res.ok) {
+        setError(data.error?.message || data.error || 'Google 登入失敗')
+        return
+      }
+      const responseData = data.data || data
+      const userData = responseData.user
+      if (!userData) { setError('登入回應格式錯誤'); return }
+      localStorage.setItem('user', JSON.stringify(userData))
+      localStorage.setItem('tenantId', userData.tenant_id)
+      if (responseData.token) localStorage.setItem('token', responseData.token)
+      router.push('/dashboard')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google 登入失敗')
+    } finally {
       setLoading(false)
     }
   }
@@ -119,6 +150,17 @@ export default function LoginPage() {
             >
               免費體驗 Demo →
             </button>
+          </div>
+
+          <div className="pt-4 mt-4 border-t border-border">
+            <p className="text-xs text-text-muted text-center mb-3">或使用 Google 帳號登入</p>
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setError('Google 登入失敗，請稍後再試')}
+                locale="zh-TW"
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -15,6 +15,8 @@ COPY apps/inclass-dashboard/ apps/inclass-dashboard/
 
 WORKDIR /app/apps/inclass-dashboard
 RUN rm -f .env.local .env.production
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 RUN pnpm build
 
 FROM node:20-alpine AS runner

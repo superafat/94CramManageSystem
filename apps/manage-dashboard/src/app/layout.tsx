@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Noto_Sans_TC } from 'next/font/google'
 import './globals.css'
 import { ToastProvider } from '@/components/ui/ToastProvider'
+import { GoogleProvider } from '@/components/GoogleProvider'
 
 const notoSansTC = Noto_Sans_TC({
   subsets: ['latin'],
@@ -49,9 +50,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
         />
-        <ToastProvider position="top-right">
-          {children}
-        </ToastProvider>
+        <GoogleProvider>
+          <ToastProvider position="top-right">
+            {children}
+          </ToastProvider>
+        </GoogleProvider>
       </body>
     </html>
   )

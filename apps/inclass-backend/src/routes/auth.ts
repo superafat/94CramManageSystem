@@ -144,6 +144,71 @@ auth.get('/me', async (c) => {
   }
 })
 
+auth.post('/google', async (c) => {
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>
+  const credential = body.credential as string | undefined
+
+  if (!credential) {
+    return c.json({ error: '缺少 Google credential' }, 400)
+  }
+
+  const clientId = process.env.GOOGLE_CLIENT_ID
+  if (!clientId) {
+    return c.json({ error: 'Google OAuth 未設定' }, 500)
+  }
+
+  try {
+    const tokenInfoRes = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
+    )
+    if (!tokenInfoRes.ok) {
+      return unauthorized(c, 'Google 憑證驗證失敗')
+    }
+
+    const tokenInfo = await tokenInfoRes.json() as {
+      aud: string
+      email: string
+      email_verified: string
+      name?: string
+      error_description?: string
+    }
+
+    if (tokenInfo.error_description || tokenInfo.aud !== clientId || tokenInfo.email_verified !== 'true') {
+      return unauthorized(c, 'Google 憑證無效')
+    }
+
+    const [user] = await db.select().from(users).where(eq(users.email, tokenInfo.email))
+    if (!user || !user.isActive) {
+      return unauthorized(c, '此 Google 帳號尚未在系統中建立，請聯繫管理員')
+    }
+
+    let school = null
+    if (user.tenantId) {
+      const [tenant] = await db.select().from(tenants).where(eq(tenants.id, user.tenantId))
+      if (tenant) school = { id: tenant.id, name: tenant.name, code: tenant.slug }
+    }
+
+    const token = await sign({
+      userId: user.id,
+      tenantId: user.tenantId ?? '',
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      systems: ['inclass'],
+    })
+
+    await setAuthTokens(c, token, user.id, user.tenantId ?? '')
+    return c.json({
+      token,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      school,
+    })
+  } catch (e) {
+    logger.error({ err: e instanceof Error ? e : new Error(String(e)) }, `[API Error] ${c.req.path} Google login error`)
+    return internalError(c, e)
+  }
+})
+
 auth.post('/demo', async (c) => {
   try {
     const demoUser = {

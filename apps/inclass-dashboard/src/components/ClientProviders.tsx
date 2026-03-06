@@ -2,6 +2,7 @@
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect } from 'react'
+import { GoogleOAuthProvider } from '@react-oauth/google'
 
 function RouteGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -32,11 +33,14 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
 }
 
 export default function ClientProviders({ children }: { children: React.ReactNode }) {
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
   return (
-    <AuthProvider>
-      <RouteGuard>
-        {children}
-      </RouteGuard>
-    </AuthProvider>
+    <GoogleOAuthProvider clientId={clientId || ''}>
+      <AuthProvider>
+        <RouteGuard>
+          {children}
+        </RouteGuard>
+      </AuthProvider>
+    </GoogleOAuthProvider>
   )
 }

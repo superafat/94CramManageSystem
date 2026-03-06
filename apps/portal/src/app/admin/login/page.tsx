@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { setToken } from '@/lib/auth'
 import { DEMO_SUPERADMIN_ID } from '@/lib/demo-data'
+import { GoogleLogin } from '@react-oauth/google'
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -57,6 +58,32 @@ export default function AdminLoginPage() {
       router.push('/admin')
     } catch {
       setError('網路錯誤，請確認連線狀態')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
+    if (!credentialResponse.credential) return
+    setError('')
+    setLoading(true)
+    try {
+      const res = await fetch('/api/platform/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: credentialResponse.credential }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(res.status === 403 ? '權限不足，此入口僅供超級管理員使用' : (data.message || 'Google 登入失敗'))
+        return
+      }
+      const result = await res.json()
+      const token = result.data?.token || result.token
+      setToken(token)
+      router.push('/admin')
+    } catch {
+      setError('Google 登入失敗，請確認連線狀態')
     } finally {
       setLoading(false)
     }
@@ -141,6 +168,17 @@ export default function AdminLoginPage() {
             >
               Demo 模式（不連接後端）
             </button>
+
+            <div className="border-t border-gray-100 pt-4">
+              <p className="text-xs text-gray-400 text-center mb-3">或使用 Google 帳號登入</p>
+              <div className="flex justify-center">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => setError('Google 登入失敗，請稍後再試')}
+                  locale="zh-TW"
+                />
+              </div>
+            </div>
           </form>
         </div>
 

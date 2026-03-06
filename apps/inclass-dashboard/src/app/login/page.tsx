@@ -3,13 +3,42 @@
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import Link from 'next/link'
+import { GoogleLogin } from '@react-oauth/google'
+import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
   const { login, demoLogin } = useAuth()
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
+    if (!credentialResponse.credential) return
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ credential: credentialResponse.credential }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Google 登入失敗')
+        return
+      }
+      if (data.user) localStorage.setItem('user', JSON.stringify(data.user))
+      if (data.school) localStorage.setItem('school', JSON.stringify(data.school))
+      router.push('/dashboard')
+    } catch {
+      setError('Google 登入失敗，請稍後再試')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -99,6 +128,18 @@ export default function LoginPage() {
           <Link href="/register" style={{ color: 'var(--primary)', fontWeight: 'bold', textDecoration: 'none' }}>
             註冊補習班
           </Link>
+        </div>
+
+        {/* Google Login */}
+        <div style={{ textAlign: 'center', marginTop: 'var(--space-lg)', paddingTop: 'var(--space-lg)', borderTop: '1px solid var(--border)' }}>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: 'var(--space-md)' }}>或使用 Google 帳號登入</p>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError('Google 登入失敗，請稍後再試')}
+              locale="zh-TW"
+            />
+          </div>
         </div>
 
         {/* Demo Login Button */}

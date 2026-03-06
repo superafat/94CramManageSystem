@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Noto_Sans_TC } from 'next/font/google'
 import './globals.css';
+import { GoogleProvider } from '@/components/GoogleProvider';
 
 const notoSansTC = Noto_Sans_TC({
   subsets: ['latin'],
@@ -327,7 +328,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         ))}
       </head>
       <body className={`${notoSansTC.className} min-h-screen bg-morandi-bg`}>
-        {children}
+        <GoogleProvider>{children}</GoogleProvider>
       </body>
     </html>
   );
