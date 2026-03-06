@@ -1,0 +1,150 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { navItems, roleLabels, type Role } from './nav-items'
+
+interface User {
+  id: string
+  name: string
+  role: Role
+  tenant_id: string
+  branch_id?: string
+}
+
+interface MobileDrawerProps {
+  isOpen: boolean
+  onClose: () => void
+}
+
+export function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    const userStr = localStorage.getItem('user')
+    if (userStr) {
+      try { setUser(JSON.parse(userStr)) } catch { localStorage.removeItem('user') }
+    }
+  }, [])
+
+  // Close drawer on route change
+  useEffect(() => {
+    onClose()
+  }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Prevent body scroll when open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [isOpen])
+
+  const userRole = (user?.role as Role) || 'staff'
+  const visibleItems = navItems.filter(item => item.roles.includes(userRole))
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    } catch { /* ignore */ }
+    localStorage.removeItem('user')
+    localStorage.removeItem('tenantId')
+    localStorage.removeItem('branchId')
+    router.push('/login')
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <>
+      {/* Overlay */}
+      <div
+        className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+        onClick={onClose}
+      />
+
+      {/* Drawer */}
+      <aside className="fixed left-0 top-0 h-screen w-72 max-w-[80vw] bg-surface border-r border-border z-50 flex flex-col lg:hidden animate-slide-in-left">
+        {/* User Info */}
+        <div className="p-5 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-lg shrink-0">
+              🐝
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-semibold text-text text-sm truncate">
+                {user?.name || '載入中...'}
+              </h2>
+              <p className="text-xs text-text-muted">
+                {roleLabels[userRole] || userRole}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          {visibleItems.map((item, index) => {
+            if (item.type === 'separator') {
+              return (
+                <div key={`separator-${index}`} className="py-2">
+                  <div className="border-t border-border" />
+                  <div className="text-xs text-text-muted px-4 pt-3 pb-1 font-medium">
+                    {item.separator}
+                  </div>
+                </div>
+              )
+            }
+
+            const href = item.href
+            const isActive = pathname === href ||
+              (href !== '/dashboard' && pathname?.startsWith(href))
+
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all ${
+                  isActive
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-text-muted hover:bg-surface-hover hover:text-text'
+                }`}
+              >
+                <span className="text-lg">{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
+        </nav>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-border space-y-2">
+          <div className="px-4 py-2 bg-primary/5 rounded-xl">
+            <p className="text-xs text-text-muted">
+              目前身份：<span className="font-medium text-primary">{roleLabels[userRole]}</span>
+            </p>
+          </div>
+          <a
+            href="https://94cram.com"
+            className="w-full flex items-center gap-3 px-4 py-2 text-text-muted hover:text-text transition-colors rounded-xl hover:bg-surface-hover"
+          >
+            <span>🏠</span>
+            <span className="text-sm">返回首頁</span>
+          </a>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-2 text-text-muted hover:text-text transition-colors rounded-xl hover:bg-surface-hover"
+          >
+            <span>🚪</span>
+            <span className="text-sm">切換帳號</span>
+          </button>
+        </div>
+      </aside>
+    </>
+  )
+}

@@ -1,23 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
-
-// 頁面標題對照
-const pageTitles: Record<string, string> = {
-  '/dashboard': '首頁',
-  '/dashboard/settings': '系統設定',
-  '/students': '學生管理',
-  '/schedules': '課表管理',
-  '/attendance': '出席管理',
-  '/grades': '成績管理',
-  '/billing': '帳務管理',
-  '/reports': '報表中心',
-  '/teachers': '講師管理',
-  '/salary': '薪資管理',
-  '/dashboard/trials': '試用管理',
-  '/dashboard/audit': '操作紀錄',
-}
+import { useRouter } from 'next/navigation'
+import { usePageTitle } from '@/hooks/usePageTitle'
 
 // 角色顯示名稱
 const roleLabels: Record<string, string> = {
@@ -34,9 +19,13 @@ interface User {
   role: string
 }
 
-export function MobileHeader() {
-  const pathname = usePathname()
+interface MobileHeaderProps {
+  onMenuOpen: () => void
+}
+
+export function MobileHeader({ onMenuOpen }: MobileHeaderProps) {
   const router = useRouter()
+  const title = usePageTitle()
   const [user, setUser] = useState<User | null>(null)
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -71,13 +60,20 @@ export function MobileHeader() {
     router.push('/login')
   }
 
-  const title = pageTitles[pathname || ''] || '蜂神榜'
-
   return (
     <header className="sticky top-0 bg-white border-b border-border z-20 safe-area-top">
       <div className="flex items-center justify-between px-4 h-14">
-        <div className="flex items-center gap-3">
-          <span className="text-xl">🐝</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onMenuOpen}
+            className="p-2 -ml-1 rounded-lg hover:bg-surface active:bg-surface transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+            aria-label="開啟選單"
+          >
+            <svg className="w-5 h-5 text-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
           <h1 className="font-semibold text-text">{title}</h1>
         </div>
         {user && (
