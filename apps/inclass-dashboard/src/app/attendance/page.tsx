@@ -16,6 +16,7 @@ interface TodayAttendance {
   id: string
   studentId: string
   studentName: string
+  courseId?: string | null
   status: 'arrived' | 'late' | 'absent' | 'leave'
   checkInTime: string | null
   checkOutTime?: string | null
@@ -25,6 +26,7 @@ interface HistoryRecord {
   id: string
   studentId: string
   studentName: string
+  courseId?: string | null
   date: string
   status: 'arrived' | 'late' | 'absent' | 'leave'
   checkInTime: string | null
@@ -35,6 +37,7 @@ interface LeaveRecord {
   id: string
   studentId: string
   studentName: string
+  courseId?: string | null
   leaveDate: string
   reason: string
   status: string
@@ -43,6 +46,48 @@ interface LeaveRecord {
 interface Student {
   id: string
   name: string
+}
+
+interface Teacher {
+  id: string
+  name: string
+}
+
+interface Schedule {
+  id: string
+  courseId: string
+  teacherId: string | null
+}
+
+interface MakeupTarget {
+  studentId: string
+  studentName: string
+  originalDate: string
+  originalCourseName?: string
+  sourceLabel: string
+  defaultTeacherId?: string
+}
+
+interface MakeupClassPayload {
+  id: string
+}
+
+type UnknownRecord = Record<string, unknown>
+
+function asRecord(value: unknown): UnknownRecord {
+  if (typeof value === 'object' && value !== null) {
+    return value as UnknownRecord
+  }
+  return {}
+}
+
+function asRecordArray(value: unknown): UnknownRecord[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is UnknownRecord => typeof item === 'object' && item !== null)
+}
+
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback
 }
 
 // --- Helpers ---
@@ -124,9 +169,25 @@ export default function AttendancePage() {
   const [students, setStudents] = useState<Student[]>([])
   const [filterStudentId, setFilterStudentId] = useState('')
 
+  // Teachers
+  const [teachers, setTeachers] = useState<Teacher[]>([])
+  const [schedules, setSchedules] = useState<Schedule[]>([])
+
   // Leaves
   const [leavesList, setLeavesList] = useState<LeaveRecord[]>([])
   const [leavesLoading, setLeavesLoading] = useState(false)
+
+  // Makeup scheduling
+  const [makeupModalOpen, setMakeupModalOpen] = useState(false)
+  const [makeupSubmitting, setMakeupSubmitting] = useState(false)
+  const [makeupTarget, setMakeupTarget] = useState<MakeupTarget | null>(null)
+  const [makeupForm, setMakeupForm] = useState({
+    makeupDate: '',
+    startTime: '',
+    endTime: '',
+    teacherId: '',
+    notes: '',
+  })
 
   // Toast
   const [message, setMessage] = useState('')
@@ -142,6 +203,8 @@ export default function AttendancePage() {
   useEffect(() => {
     fetchStats()
     fetchStudents()
+    fetchTeachers()
+    fetchSchedules()
   }, [])
 
   // Fetch tab data when tab changes
@@ -157,13 +220,65 @@ export default function AttendancePage() {
       const res = await fetch('/api/attendance/stats', { credentials: 'include', headers: getAuthHeaders() })
       if (res.ok) {
         const data = await res.json()
-        setStats(data)
+        const payload = data?.data && typeof data.data === 'object' ? data.data : data
+        if ('totalAttendances' in payload) {
+          setStats(payload as AttendanceStats)
+        } else {
+          const totalAttendances = Number(payload?.totalDays ?? 0)
+          const attendanceRate = Number(payload?.attendanceRate ?? 0)
+          const lateCount = Number(payload?.lateCount ?? 0)
+          const leaveCount = Number(payload?.leaveCount ?? 0)
+          setStats({ totalAttendances, attendanceRate, lateCount, leaveCount })
+        }
       }
     } catch (e) {
       console.error('Failed to fetch attendance stats:', e)
     } finally {
       setStatsLoading(false)
     }
+  }
+
+  const fetchTeachers = async () => {
+    try {
+      const res = await fetch('/api/teachers', { credentials: 'include', headers: getAuthHeaders() })
+      if (res.ok) {
+        const data = await res.json()
+        const payload = asRecord(data?.data && typeof data.data === 'object' ? data.data : data)
+        const rawTeachers = asRecordArray(payload.teachers)
+        const normalized = rawTeachers.map((t) => ({
+          id: asString(t.id),
+          name: asString(t.name) || asString(t.full_name) || '未命名老師',
+        }))
+        setTeachers(normalized)
+      }
+    } catch (e) {
+      console.error('Failed to fetch teachers:', e)
+    }
+  }
+
+  const fetchSchedules = async () => {
+    try {
+      const res = await fetch('/api/schedules', { credentials: 'include', headers: getAuthHeaders() })
+      if (res.ok) {
+        const data = await res.json()
+        const payload = asRecord(data?.data && typeof data.data === 'object' ? data.data : data)
+        const rawSchedules = asRecordArray(payload.schedules)
+        const normalized = rawSchedules.map((s) => ({
+          id: asString(s.id),
+          courseId: asString(s.courseId ?? s.course_id),
+          teacherId: asString(s.teacherId ?? s.teacher_id) || null,
+        }))
+        setSchedules(normalized)
+      }
+    } catch (e) {
+      console.error('Failed to fetch schedules:', e)
+    }
+  }
+
+  const getDefaultTeacherId = (courseId?: string | null) => {
+    if (!courseId) return ''
+    const matched = schedules.find((s) => s.courseId === courseId && s.teacherId)
+    return matched?.teacherId ?? ''
   }
 
   const fetchStudents = async () => {
@@ -184,7 +299,23 @@ export default function AttendancePage() {
       const res = await fetch('/api/attendance/today', { credentials: 'include', headers: getAuthHeaders() })
       if (res.ok) {
         const data = await res.json()
-        setTodayList(data.attendances || [])
+        const payload = asRecord(data?.data && typeof data.data === 'object' ? data.data : data)
+        const attendances = asRecordArray(payload.attendances)
+        const studentNameMap = new Map(students.map((s) => [s.id, s.name]))
+
+        const normalized = attendances.map((a) => {
+          const studentId = asString(a.studentId ?? a.student_id)
+          return {
+            id: asString(a.id),
+            studentId,
+            studentName: asString(a.studentName ?? a.student_name) || studentNameMap.get(studentId) || '未知學生',
+            courseId: asString(a.courseId ?? a.course_id) || null,
+            status: (asString(a.status, 'absent') as TodayAttendance['status']),
+            checkInTime: asString(a.checkInTime ?? a.check_in_time) || null,
+            checkOutTime: asString(a.checkOutTime ?? a.check_out_time) || null,
+          }
+        })
+        setTodayList(normalized)
       }
     } catch (e) {
       console.error('Failed to fetch today attendance:', e)
@@ -206,8 +337,24 @@ export default function AttendancePage() {
       const res = await fetch(`/api/attendance/history?${params.toString()}`, { credentials: 'include', headers: getAuthHeaders() })
       if (res.ok) {
         const data = await res.json()
-        setHistoryList(data.attendances || [])
-        setHistoryTotal(data.total || 0)
+        const payload = asRecord(data?.data && typeof data.data === 'object' ? data.data : data)
+        const records = payload.records !== undefined ? asRecordArray(payload.records) : asRecordArray(payload.attendances)
+
+        const normalized = records.map((r) => ({
+          id: asString(r.id),
+          studentId: asString(r.studentId ?? r.student_id),
+          studentName: asString(r.studentName ?? r.student_name, '未知學生'),
+          courseId: asString(r.courseId ?? r.course_id) || null,
+          date: asString(r.date).slice(0, 10),
+          status: (asString(r.status, 'absent') as HistoryRecord['status']),
+          checkInTime: asString(r.checkInTime ?? r.check_in_time) || null,
+          checkOutTime: asString(r.checkOutTime ?? r.check_out_time) || null,
+        }))
+
+        const pagination = asRecord(payload.pagination)
+        const total = Number(pagination.total ?? payload.total ?? normalized.length)
+        setHistoryList(normalized)
+        setHistoryTotal(total)
         setHistoryPage(page)
       }
     } catch (e) {
@@ -223,12 +370,108 @@ export default function AttendancePage() {
       const res = await fetch('/api/attendance/leaves', { credentials: 'include', headers: getAuthHeaders() })
       if (res.ok) {
         const data = await res.json()
-        setLeavesList(data.leaves || [])
+        const payload = asRecord(data?.data && typeof data.data === 'object' ? data.data : data)
+        const records = payload.records !== undefined ? asRecordArray(payload.records) : asRecordArray(payload.leaves)
+
+        const normalized = records.map((l) => ({
+          id: asString(l.id),
+          studentId: asString(l.studentId ?? l.student_id),
+          studentName: asString(l.studentName ?? l.student_name, '未知學生'),
+          courseId: asString(l.courseId ?? l.course_id) || null,
+          leaveDate: asString(l.leaveDate ?? l.leave_date).slice(0, 10),
+          reason: asString(l.reason),
+          status: asString(l.status, 'pending'),
+        }))
+
+        setLeavesList(normalized)
       }
     } catch (e) {
       console.error('Failed to fetch leaves:', e)
     } finally {
       setLeavesLoading(false)
+    }
+  }
+
+  const openMakeupModal = (target: MakeupTarget) => {
+    setMakeupTarget(target)
+    setMakeupForm({
+      makeupDate: target.originalDate,
+      startTime: '',
+      endTime: '',
+      teacherId: target.defaultTeacherId || '',
+      notes: '',
+    })
+    setMakeupModalOpen(true)
+  }
+
+  const closeMakeupModal = () => {
+    setMakeupModalOpen(false)
+    setMakeupSubmitting(false)
+    setMakeupTarget(null)
+  }
+
+  const submitMakeupSchedule = async () => {
+    if (!makeupTarget || !makeupForm.makeupDate || !makeupForm.startTime || !makeupForm.endTime) {
+      showMessage('請完整填寫補課日期與時間')
+      return
+    }
+
+    setMakeupSubmitting(true)
+    try {
+      const createRes = await fetch('/api/makeup-classes', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: makeupTarget.studentId,
+          originalDate: makeupTarget.originalDate,
+          originalCourseName: makeupTarget.originalCourseName,
+          notes: `來源：${makeupTarget.sourceLabel}${makeupForm.notes ? `；${makeupForm.notes}` : ''}`,
+        }),
+      })
+
+      if (!createRes.ok) {
+        const data = await createRes.json().catch(() => ({}))
+        throw new Error(data?.message || data?.error || '建立補課記錄失敗')
+      }
+
+      const createJson = await createRes.json().catch(() => ({}))
+      const createPayload = createJson?.data && typeof createJson.data === 'object' ? createJson.data : createJson
+      const makeupClass = (createPayload?.makeupClass ?? createPayload) as Partial<MakeupClassPayload>
+      const makeupClassId = typeof makeupClass?.id === 'string' ? makeupClass.id : ''
+
+      if (!makeupClassId) {
+        throw new Error('建立補課記錄成功但找不到記錄 ID')
+      }
+
+      const scheduleRes = await fetch(`/api/makeup-classes/${makeupClassId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          makeupDate: makeupForm.makeupDate,
+          makeupTime: makeupForm.startTime,
+          makeupEndTime: makeupForm.endTime,
+          makeupTeacherId: makeupForm.teacherId || undefined,
+          notes: makeupForm.notes || undefined,
+        }),
+      })
+
+      if (!scheduleRes.ok) {
+        const data = await scheduleRes.json().catch(() => ({}))
+        throw new Error(data?.message || data?.error || '安排補課失敗')
+      }
+
+      showMessage(`已安排 ${makeupTarget.studentName} 的補課`)
+      closeMakeupModal()
+      if (activeTab === 'history') fetchHistory(historyPage)
+      if (activeTab === 'leaves') fetchLeaves()
+      if (activeTab === 'today') fetchToday()
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '安排補課失敗，請稍後再試'
+      showMessage(message)
+    } finally {
+      setMakeupSubmitting(false)
     }
   }
 
@@ -348,28 +591,54 @@ export default function AttendancePage() {
                       <td style={tdStyle}><StatusBadge status={a.status} /></td>
                       <td style={tdStyle}>{formatTime(a.checkOutTime)}</td>
                       <td style={{ ...tdStyle, textAlign: 'center' }}>
-                        {a.status !== 'absent' && !a.checkOutTime ? (
-                          <button
-                            onClick={() => handleCheckout(a.studentId)}
-                            disabled={checkoutLoading === a.studentId}
-                            style={{
-                              padding: '5px 12px',
-                              borderRadius: '8px',
-                              background: checkoutLoading === a.studentId ? '#C0C0C0' : '#8FA9B8',
-                              color: 'white',
-                              border: 'none',
-                              fontSize: '12px',
-                              cursor: checkoutLoading === a.studentId ? 'not-allowed' : 'pointer',
-                              fontWeight: 'bold',
-                            }}
-                          >
-                            {checkoutLoading === a.studentId ? '處理中...' : '簽退'}
-                          </button>
-                        ) : (
-                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                            {a.checkOutTime ? '已簽退' : '—'}
-                          </span>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          {a.status !== 'absent' && !a.checkOutTime && (
+                            <button
+                              onClick={() => handleCheckout(a.studentId)}
+                              disabled={checkoutLoading === a.studentId}
+                              style={{
+                                padding: '5px 12px',
+                                borderRadius: '8px',
+                                background: checkoutLoading === a.studentId ? '#C0C0C0' : '#8FA9B8',
+                                color: 'white',
+                                border: 'none',
+                                fontSize: '12px',
+                                cursor: checkoutLoading === a.studentId ? 'not-allowed' : 'pointer',
+                                fontWeight: 'bold',
+                              }}
+                            >
+                              {checkoutLoading === a.studentId ? '處理中...' : '簽退'}
+                            </button>
+                          )}
+
+                          {(a.status === 'absent' || a.status === 'leave') && (
+                            <button
+                              onClick={() => openMakeupModal({
+                                studentId: a.studentId,
+                                studentName: a.studentName,
+                                originalDate: new Date().toISOString().slice(0, 10),
+                                sourceLabel: '今日出勤',
+                                defaultTeacherId: getDefaultTeacherId(a.courseId),
+                              })}
+                              style={{
+                                padding: '5px 12px',
+                                borderRadius: '8px',
+                                background: '#7B9E89',
+                                color: 'white',
+                                border: 'none',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                fontWeight: 'bold',
+                              }}
+                            >
+                              安排補課
+                            </button>
+                          )}
+
+                          {a.status !== 'absent' && a.status !== 'leave' && a.checkOutTime && (
+                            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>已簽退</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -455,6 +724,7 @@ export default function AttendancePage() {
                         <th style={thStyle}>狀態</th>
                         <th style={thStyle}>到課時間</th>
                         <th style={thStyle}>離開時間</th>
+                        <th style={{ ...thStyle, textAlign: 'center' }}>補課</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -465,6 +735,33 @@ export default function AttendancePage() {
                           <td style={tdStyle}><StatusBadge status={r.status} /></td>
                           <td style={tdStyle}>{formatTime(r.checkInTime)}</td>
                           <td style={tdStyle}>{formatTime(r.checkOutTime)}</td>
+                          <td style={{ ...tdStyle, textAlign: 'center' }}>
+                            {(r.status === 'absent' || r.status === 'leave') ? (
+                              <button
+                                onClick={() => openMakeupModal({
+                                  studentId: r.studentId,
+                                  studentName: r.studentName,
+                                  originalDate: r.date,
+                                  sourceLabel: '歷史出勤',
+                                  defaultTeacherId: getDefaultTeacherId(r.courseId),
+                                })}
+                                style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '8px',
+                                  border: 'none',
+                                  background: '#7B9E89',
+                                  color: 'white',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  fontWeight: 'bold',
+                                }}
+                              >
+                                安排補課
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>—</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -517,6 +814,7 @@ export default function AttendancePage() {
                     <th style={thStyle}>請假日期</th>
                     <th style={thStyle}>原因</th>
                     <th style={thStyle}>狀態</th>
+                    <th style={{ ...thStyle, textAlign: 'center' }}>補課</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -534,12 +832,146 @@ export default function AttendancePage() {
                           {l.status === 'approved' ? '已核准' : l.status === 'rejected' ? '已拒絕' : '待審核'}
                         </span>
                       </td>
+                      <td style={{ ...tdStyle, textAlign: 'center' }}>
+                        {l.status !== 'rejected' ? (
+                          <button
+                            onClick={() => openMakeupModal({
+                              studentId: l.studentId,
+                              studentName: l.studentName,
+                              originalDate: l.leaveDate,
+                              sourceLabel: '請假紀錄',
+                              defaultTeacherId: getDefaultTeacherId(l.courseId),
+                            })}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '8px',
+                              border: 'none',
+                              background: '#7B9E89',
+                              color: 'white',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            安排補課
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {makeupModalOpen && makeupTarget && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.35)',
+            zIndex: 180,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+          onClick={closeMakeupModal}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '520px',
+              background: 'var(--surface)',
+              borderRadius: '14px',
+              border: '1px solid var(--border)',
+              boxShadow: '0 16px 40px rgba(0,0,0,0.2)',
+              padding: '18px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: 0, marginBottom: '6px', fontSize: '20px', color: 'var(--text-primary)' }}>
+              安排補課
+            </h3>
+            <p style={{ marginTop: 0, marginBottom: '14px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+              學生：{makeupTarget.studentName}｜來源：{makeupTarget.sourceLabel}
+            </p>
+
+            <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: '1fr 1fr' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>補課日期</label>
+                <input
+                  type="date"
+                  value={makeupForm.makeupDate}
+                  onChange={(e) => setMakeupForm((v) => ({ ...v, makeupDate: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '2px solid var(--border)', background: 'var(--background)', color: 'var(--text-primary)' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>補課老師</label>
+                <select
+                  value={makeupForm.teacherId}
+                  onChange={(e) => setMakeupForm((v) => ({ ...v, teacherId: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '2px solid var(--border)', background: 'var(--background)', color: 'var(--text-primary)' }}
+                >
+                  <option value="">未指定</option>
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>開始時間</label>
+                <input
+                  type="time"
+                  value={makeupForm.startTime}
+                  onChange={(e) => setMakeupForm((v) => ({ ...v, startTime: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '2px solid var(--border)', background: 'var(--background)', color: 'var(--text-primary)' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>結束時間</label>
+                <input
+                  type="time"
+                  value={makeupForm.endTime}
+                  onChange={(e) => setMakeupForm((v) => ({ ...v, endTime: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '2px solid var(--border)', background: 'var(--background)', color: 'var(--text-primary)' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginTop: '10px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>備註（選填）</label>
+              <textarea
+                value={makeupForm.notes}
+                onChange={(e) => setMakeupForm((v) => ({ ...v, notes: e.target.value }))}
+                rows={3}
+                placeholder="例如：家長要求週六補課"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '2px solid var(--border)', background: 'var(--background)', color: 'var(--text-primary)', resize: 'vertical' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+              <button
+                onClick={closeMakeupModal}
+                disabled={makeupSubmitting}
+                style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)', cursor: makeupSubmitting ? 'not-allowed' : 'pointer' }}
+              >
+                取消
+              </button>
+              <button
+                onClick={submitMakeupSchedule}
+                disabled={makeupSubmitting || !makeupForm.makeupDate || !makeupForm.startTime || !makeupForm.endTime}
+                style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: makeupSubmitting ? '#A0A0A0' : '#7B9E89', color: 'white', cursor: makeupSubmitting ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
+              >
+                {makeupSubmitting ? '安排中...' : '確認安排補課'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
