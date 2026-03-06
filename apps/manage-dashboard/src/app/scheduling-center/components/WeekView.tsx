@@ -89,34 +89,33 @@ export default function WeekView({ events, weekStartDate, onEventClick }: WeekVi
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header row */}
-      <div className="flex border-b border-border shrink-0">
-        {/* Time gutter */}
-        <div className="w-12 shrink-0" />
-        {/* Day columns */}
-        {weekDates.map((date, idx) => {
-          const today = isToday(date)
-          return (
-            <div
-              key={idx}
-              className={`flex-1 py-2 text-center border-l border-border ${today ? 'bg-primary/5' : ''}`}
-            >
-              <p className={`text-xs font-medium ${today ? 'text-primary' : 'text-text-muted'}`}>
-                週{WEEKDAYS[idx]}
-              </p>
-              <p className={`text-sm font-semibold ${today ? 'text-primary' : 'text-text'}`}>
-                {date.getMonth() + 1}/{date.getDate()}
-              </p>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Time grid */}
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* 整個區域一起捲動，避免 scrollbar 造成 header/body 寬度不一致 */}
       <div className="flex-1 overflow-y-auto">
+        {/* Sticky header — 在 overflow container 內，寬度與 day columns 一致 */}
+        <div className="sticky top-0 z-10 flex border-b border-border bg-white">
+          <div className="w-12 shrink-0" />
+          {weekDates.map((date, idx) => {
+            const today = isToday(date)
+            return (
+              <div
+                key={idx}
+                className={`flex-1 py-2 text-center border-l border-border ${today ? 'bg-primary/5' : ''}`}
+              >
+                <p className={`text-xs font-medium ${today ? 'text-primary' : 'text-text-muted'}`}>
+                  週{WEEKDAYS[idx]}
+                </p>
+                <p className={`text-sm font-semibold ${today ? 'text-primary' : 'text-text'}`}>
+                  {date.getMonth() + 1}/{date.getDate()}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Time grid */}
         <div className="relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
-          {/* Horizontal hour grid lines — span full width */}
+          {/* Horizontal hour grid lines */}
           {HOURS.map(h => (
             <div
               key={`line-${h}`}
@@ -153,7 +152,6 @@ export default function WeekView({ events, weekStartDate, onEventClick }: WeekVi
                   key={colIdx}
                   className={`flex-1 relative border-l border-border ${today ? 'bg-primary/5' : ''}`}
                 >
-                  {/* Events */}
                   {positioned.map(({ event, column, totalColumns }) => {
                     const startMin = timeToMinutes(event.startTime)
                     const endMin = timeToMinutes(event.endTime)
