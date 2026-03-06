@@ -128,3 +128,5 @@ export type { RatingProps } from './Rating'
 export { TagInput } from './TagInput'
 export type { TagInputProps } from './TagInput'
 
+// BottomSheet component
+export { BottomSheet } from './BottomSheet'
