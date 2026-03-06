@@ -7,27 +7,35 @@ import { MobileHeader } from './MobileHeader'
 import { MobileDrawer } from './MobileDrawer'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 
-const PUBLIC_PATHS = ['/login', '/demo', '/trial-signup', '/landing', '/guide']
+// 不需要 shell layout 的路徑（公開頁 + 獨立環境）
+const PUBLIC_PATHS = ['/login', '/demo', '/trial-signup', '/landing', '/guide', '/liff', '/bind']
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [authorized, setAuthorized] = useState(false)
+
+  const isPublicPath = PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))
+
+  // 同步初始化：避免每次導航都出現 spinner flash
+  const [authorized, setAuthorized] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return !!localStorage.getItem('user')
+  })
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  // Public pages don't need layout
-  if (PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))) {
-    return <>{children}</>
-  }
-
+  // 所有 hooks 必須在條件式 return 之前 — 修正 Rules of Hooks 違規
   useEffect(() => {
-    const user = typeof window !== 'undefined' ? localStorage.getItem('user') : null
+    if (isPublicPath) return
+    const user = localStorage.getItem('user')
     if (!user) {
       router.push('/login')
       return
     }
     setAuthorized(true)
-  }, [pathname, router])
+  }, [pathname, router, isPublicPath])
+
+  // 公開頁：直接渲染，不套 shell
+  if (isPublicPath) return <>{children}</>
 
   if (!authorized) {
     return (

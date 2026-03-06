@@ -3,6 +3,7 @@ import { Noto_Sans_TC } from 'next/font/google'
 import './globals.css'
 import { ToastProvider } from '@/components/ui/ToastProvider'
 import { GoogleProvider } from '@/components/GoogleProvider'
+import { AppLayout } from '@/components/layout/AppLayout'
 
 const notoSansTC = Noto_Sans_TC({
   subsets: ['latin'],
@@ -52,7 +53,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <GoogleProvider>
           <ToastProvider position="top-right">
-            {children}
+            <AppLayout>
+              {children}
+            </AppLayout>
           </ToastProvider>
         </GoogleProvider>
       </body>

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, memo } from 'react'
 import { navItems, roleLabels, type Role, type NavItem } from './nav-items'
 
 interface User {
@@ -13,7 +13,7 @@ interface User {
   branch_id?: string
 }
 
-export function Sidebar() {
+function SidebarComponent() {
   const pathname = usePathname()
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
@@ -30,9 +30,12 @@ export function Sidebar() {
   }, [])
 
   const userRole = (user?.role as Role) || 'staff'
-  
-  // 過濾出當前角色可見的選單項目
-  const visibleItems = navItems.filter(item => item.roles.includes(userRole))
+
+  // useMemo 避免每次 pathname 變更時重複過濾
+  const visibleItems = useMemo(
+    () => navItems.filter(item => item.roles.includes(userRole)),
+    [userRole]
+  )
 
   const handleLogout = async () => {
     try {
@@ -126,3 +129,6 @@ export function Sidebar() {
     </aside>
   )
 }
+
+// memo 防止 AppLayout 的 drawerOpen state 變更時 Sidebar 不必要的重渲染
+export const Sidebar = memo(SidebarComponent)
