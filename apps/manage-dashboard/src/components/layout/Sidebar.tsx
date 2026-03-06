@@ -3,53 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-
-// 角色權限定義
-// superadmin = 系統管理員（您）, admin = 館長（業者）
-type Role = 'superadmin' | 'admin' | 'staff' | 'teacher'
-
-interface NavItem {
-  href?: string
-  icon?: string
-  label?: string
-  type?: 'separator'
-  separator?: string
-  roles: Role[] // 哪些角色可以看到
-}
-
-// 選單項目與權限對照
-// 知識庫 → 已移至總後台 (Portal)
-// 對話紀錄 → 已移至 94BOT (bot-gateway)
-// 家長/學生專區 → 已移至 94inClass
-const navItems: NavItem[] = [
-  // 行政總覽
-  { href: '/dashboard', icon: '📊', label: '總覽', roles: ['superadmin', 'admin', 'staff'] },
-  { href: '/headquarters', icon: '🏢', label: '總部管理', roles: ['superadmin'] },
-  { href: '/dashboard/audit', icon: '📋', label: '異動日誌', roles: ['superadmin', 'admin'] },
-  { href: '/dashboard/settings', icon: '⚙️', label: '系統設定', roles: ['superadmin'] },
-
-  // 班務管理區塊
-  { type: 'separator', separator: '班務管理', roles: ['superadmin', 'admin', 'staff'] },
-  { href: '/students', icon: '👥', label: '學生管理', roles: ['superadmin', 'admin', 'staff'] },
-  { href: '/finance', icon: '💰', label: '帳務管理', roles: ['superadmin', 'admin', 'staff'] },
-  { href: '/reports', icon: '📈', label: '報表中心', roles: ['superadmin', 'admin'] },
-  { href: '/enrollment', icon: '🎪', label: '招生管理', roles: ['superadmin', 'admin'] },
-
-  // 講師管理區塊 (W8)
-  { type: 'separator', separator: '講師管理', roles: ['superadmin', 'admin'] },
-  { href: '/teachers', icon: '👨‍🏫', label: '講師名單', roles: ['superadmin', 'admin'] },
-  { href: '/scheduling-center', icon: '📅', label: '排課中心', roles: ['superadmin', 'admin'] },
-  { href: '/teacher-attendance', icon: '🕐', label: '師資出缺勤', roles: ['superadmin', 'admin'] },
-  { href: '/my-salary', icon: '💵', label: '我的薪資條', roles: ['staff', 'teacher'] },
-]
-
-// 角色名稱對照
-const roleLabels: Record<Role, string> = {
-  superadmin: '系統管理員',
-  admin: '館長',
-  staff: '行政',
-  teacher: '教師',
-}
+import { navItems, roleLabels, type Role, type NavItem } from './nav-items'
 
 interface User {
   id: string
