@@ -9,3 +9,5 @@ export type { Validator, UseFormConfig, UseFormReturn } from './useForm'
 
 export { useFormField } from './useFormField'
 export type { UseFormFieldReturn } from './useFormField'
+
+export { usePageTitle } from './usePageTitle'
