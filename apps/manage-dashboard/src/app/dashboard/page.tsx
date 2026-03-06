@@ -143,6 +143,28 @@ export default function DashboardPage() {
         />
       </div>
 
+      {/* Quick Actions — 手機優先，桌面也顯示 */}
+      <div>
+        <h2 className="text-sm font-medium text-text-muted mb-3">快速操作</h2>
+        <div className="grid grid-cols-3 gap-3">
+          <a href="/scheduling-center"
+            className="flex flex-col items-center gap-2 p-4 bg-surface rounded-2xl border border-border hover:border-primary transition-colors active:bg-surface-hover">
+            <span className="text-2xl">📅</span>
+            <span className="text-xs font-medium text-text text-center">今日課表</span>
+          </a>
+          <a href="/finance"
+            className="flex flex-col items-center gap-2 p-4 bg-surface rounded-2xl border border-border hover:border-primary transition-colors active:bg-surface-hover">
+            <span className="text-2xl">💰</span>
+            <span className="text-xs font-medium text-text text-center">帳務管理</span>
+          </a>
+          <a href="/students"
+            className="flex flex-col items-center gap-2 p-4 bg-surface rounded-2xl border border-border hover:border-primary transition-colors active:bg-surface-hover">
+            <span className="text-2xl">👥</span>
+            <span className="text-xs font-medium text-text text-center">學生管理</span>
+          </a>
+        </div>
+      </div>
+
       {/* Alerts Section */}
       {alerts.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
