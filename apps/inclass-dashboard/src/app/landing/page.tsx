@@ -81,6 +81,11 @@ export default function LandingPage() {
               desc="輸入考試成績，自動生成成績單。班級排名、進步追蹤、學期報表一鍵產出。"
             />
             <FeatureCard
+              emoji="🎯"
+              title="即時課堂互動"
+              desc="教師發起投票、隨堂測驗、搶答、隨機抽問。學生用手機即時參與，課堂不再沈悶，學習效果倍增。"
+            />
+            <FeatureCard
               emoji="☁️"
               title="雲端部署"
               desc="資料儲存在雲端，自動備份，隨時隨地查看。手機、平板、電腦都能用。"
@@ -114,7 +119,7 @@ export default function LandingPage() {
             <IntegrationCard 
               title="蜂神榜 Ai 點名系統 🐝"
               subtitle="教學前線"
-              items={['NFC 點名', '臉部辨識', '成績管理', '出勤報表']}
+              items={['NFC 點名', '臉部辨識', '成績管理', '出勤報表', '即時課堂互動']}
               color="#8FA9B8"
             />
             <div style={{ display: 'flex', alignItems: 'center', fontSize: '40px', color: 'var(--primary)' }}>
@@ -146,7 +151,7 @@ export default function LandingPage() {
             <PricingCard 
               name="專業版"
               price="1,990"
-              features={['最多 200 位學生', 'NFC + AI 臉辨', 'LINE 通知', '進階報表', '優先支援']}
+              features={['最多 200 位學生', 'NFC + AI 臉辨', 'LINE 通知', '進階報表', '即時課堂互動', '優先支援']}
               highlighted={true}
             />
             <PricingCard 
@@ -227,10 +232,15 @@ export default function LandingPage() {
                 title="持續進化"
                 desc="每月新功能，免費自動升級"
               />
-              <AdvantageItem 
+              <AdvantageItem
                 icon="🛡️"
                 title="資料安全"
                 desc="雲端備份，符合個資法，絕不遺失"
+              />
+              <AdvantageItem
+                icon="🎯"
+                title="互動課堂"
+                desc="投票、搶答、隨堂測驗，學生用手機參與，提升課堂參與率 80%"
               />
             </div>
           </div>
@@ -281,9 +291,13 @@ export default function LandingPage() {
               q="和其他雲端系統比起來如何？"
               a="蜂神榜最大優勢是「免硬體 AI 臉辨」和「極低月費」。市面上許多系統需要購買硬體或月費較高，而且很多功能需要加購。蜂神榜一個價格包含所有核心功能，透明無隱藏費用。"
             />
-            <FAQItem 
+            <FAQItem
               q="NFC 卡片在哪裡買？"
               a="蜂神榜提供專門開發的專用 NFC 卡片，每張 NT$200-500（含設定）。也可自行購買 MIFARE 相容卡片，我們協助設定。"
+            />
+            <FAQItem
+              q="即時課堂互動怎麼用？"
+              a="教師在教學後台開啟課堂 session，學生掃 QR Code 或輸入代碼加入。教師可以發起投票、隨堂測驗、搶答或隨機抽問，學生用手機即時回答，結果即時顯示在教師畫面上。不需要額外安裝 APP。"
             />
           </div>
         </div>
