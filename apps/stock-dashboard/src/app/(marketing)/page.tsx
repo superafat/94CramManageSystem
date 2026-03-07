@@ -34,8 +34,14 @@ const features = [
   {
     emoji: '🔗',
     title: '系統整合',
-    description: '與 94Manage、94inClass 無縫串接，資料同步',
+    description: '與 94Manage 經營智慧中樞、94inClass 無縫串接，庫存異動自動反映至經營健康分數',
     accent: '#EC4899',
+  },
+  {
+    emoji: '🧠',
+    title: '智慧經營整合',
+    description: '庫存數據自動匯入 94Manage 經營智慧中樞，教材消耗納入營收預測與成本分析',
+    accent: '#6366F1',
   },
 ];
 
@@ -76,6 +82,7 @@ const faqs = [
   { q: '可以管理多個校區的倉庫嗎？', a: '當然！94Stock 支援無限倉庫，每個校區都能獨立管理庫存，總部可統一查看。' },
   { q: '與 94Manage、94inClass 如何整合？', a: '三系統共用同一帳號體系（SSO），庫存數據可自動同步，無需重複登入。' },
   { q: '資料安全如何保障？', a: '所有資料存放在台灣機房，SSL 加密傳輸、每日自動備份、多租戶完全隔離。' },
+  { q: '與經營智慧中樞如何整合？', a: '94Stock 的庫存消耗數據會自動匯入 94Manage 經營智慧中樞，作為營收預測與成本分析的參考依據。教材發放記錄也會納入學生學習歷程分析。' },
 ];
 
 export default function MarketingHomePage() {

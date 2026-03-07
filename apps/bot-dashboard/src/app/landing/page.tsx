@@ -54,6 +54,10 @@ export default function LandingPage() {
             <FeatureCard emoji="🔗" title="簡單綁定" desc="家長掃 QR Code 或輸入邀請碼即可綁定，一個帳號可綁定多位孩子。" />
             <FeatureCard emoji="📤" title="LINE Push 推播" desc="班級公告、活動通知、繳費提醒，一鍵推送給所有家長或指定群組。" />
             <FeatureCard emoji="🛡️" title="資料安全" desc="每間補習班資料完全隔離，符合個資法規範。管理者可隨時查看對話紀錄。" />
+            <FeatureCard emoji="🎓" title="AI 課業助教 — 神算子"
+              desc="學生透過 LINE 隨時問課業問題，AI 根據課程內容即時回答。拍照傳題目也能解題，24 小時不休息的專屬家教。" />
+            <FeatureCard emoji="📸" title="拍照解題"
+              desc="學生拍照傳作業或考卷，AI 辨識題目並提供解題思路，培養獨立思考能力。不直接給答案，引導學生思考。" />
           </div>
         </div>
       </section>
@@ -63,10 +67,10 @@ export default function LandingPage() {
           <h2 className="text-2xl text-primary text-center mb-2 font-bold">💰 簡單透明的價格</h2>
           <p className="text-sm text-text-muted text-center mb-8">年繳更優惠，最高省 17%</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
-            <PricingCard name="體驗版" price="299" ai={100} push={50} desc="適合剛開始使用" />
-            <PricingCard name="標準版" price="599" ai={500} push={200} desc="最受歡迎" highlighted />
-            <PricingCard name="專業版" price="999" ai={2000} push={1000} desc="中型補習班" />
-            <PricingCard name="旗艦版" price="1,899" ai={5000} push={3000} desc="大型連鎖" />
+            <PricingCard name="體驗版" price="299" ai={100} studentAi={50} push={50} desc="適合剛開始使用" />
+            <PricingCard name="標準版" price="599" ai={500} studentAi={200} push={200} desc="最受歡迎" highlighted />
+            <PricingCard name="專業版" price="999" ai={2000} studentAi={1000} push={1000} desc="中型補習班" />
+            <PricingCard name="旗艦版" price="1,899" ai={5000} studentAi={3000} push={3000} desc="大型連鎖" />
           </div>
           <div className="mt-6 text-center">
             <p className="text-sm text-text-muted">需要更大額度？<span className="text-primary ml-1">聯繫我們取得企業版報價</span></p>
@@ -81,23 +85,45 @@ export default function LandingPage() {
             94BOT 的聞太師 AI 自動從 94inClass 點名系統與 94Manage 管理系統取得資料，<br/>
             家長查詢時即時回覆，無需人工介入。
           </p>
-          <div className="flex gap-4 justify-center flex-wrap items-center">
-            <div className="bg-white rounded-2xl p-5 border border-border w-48">
-              <p className="text-2xl mb-2">🐝</p>
-              <p className="font-semibold text-sm text-text">94inClass</p>
-              <p className="text-xs text-text-muted">點名 · 成績 · 出勤</p>
+          <div className="flex flex-col gap-6 items-center">
+            {/* Row 1: 94inClass → 聞太師 → 家長 LINE */}
+            <div className="flex gap-4 justify-center flex-wrap items-center">
+              <div className="bg-white rounded-2xl p-5 border border-border w-48">
+                <p className="text-2xl mb-2">🐝</p>
+                <p className="font-semibold text-sm text-text">94inClass</p>
+                <p className="text-xs text-text-muted">點名 · 成績 · 出勤</p>
+              </div>
+              <span className="text-2xl text-primary">→</span>
+              <div className="bg-white rounded-2xl p-5 border-2 border-primary w-48">
+                <p className="text-2xl mb-2">🤖</p>
+                <p className="font-semibold text-sm text-primary">94BOT 聞太師</p>
+                <p className="text-xs text-text-muted">AI 回覆 · LINE 推播</p>
+              </div>
+              <span className="text-2xl text-primary">→</span>
+              <div className="bg-white rounded-2xl p-5 border border-border w-48">
+                <p className="text-2xl mb-2">👨‍👩‍👧</p>
+                <p className="font-semibold text-sm text-text">家長 LINE</p>
+                <p className="text-xs text-text-muted">查詢 · 通知 · 請假</p>
+              </div>
             </div>
-            <span className="text-2xl text-primary">→</span>
-            <div className="bg-white rounded-2xl p-5 border-2 border-primary w-48">
-              <p className="text-2xl mb-2">🤖</p>
-              <p className="font-semibold text-sm text-primary">94BOT 聞太師</p>
-              <p className="text-xs text-text-muted">AI 回覆 · LINE 推播</p>
-            </div>
-            <span className="text-2xl text-primary">→</span>
-            <div className="bg-white rounded-2xl p-5 border border-border w-48">
-              <p className="text-2xl mb-2">👨‍👩‍👧</p>
-              <p className="font-semibold text-sm text-text">家長 LINE</p>
-              <p className="text-xs text-text-muted">查詢 · 通知 · 請假</p>
+            {/* Row 2: 神算子 → 學生 LINE (connected from middle) */}
+            <div className="flex gap-4 justify-center flex-wrap items-center">
+              <div className="w-48 invisible" aria-hidden="true" />
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-primary text-lg leading-none">↓</span>
+                <p className="text-xs text-text-muted">學生端</p>
+              </div>
+              <div className="bg-white rounded-2xl p-5 border-2 border-secondary w-48">
+                <p className="text-2xl mb-2">🎓</p>
+                <p className="font-semibold text-sm text-secondary">94BOT 神算子</p>
+                <p className="text-xs text-text-muted">課業問答 · 拍照解題</p>
+              </div>
+              <span className="text-2xl text-secondary">→</span>
+              <div className="bg-white rounded-2xl p-5 border border-border w-48">
+                <p className="text-2xl mb-2">🧑‍🎓</p>
+                <p className="font-semibold text-sm text-text">學生 LINE</p>
+                <p className="text-xs text-text-muted">問題 · 解題 · 學習</p>
+              </div>
             </div>
           </div>
         </div>
@@ -132,8 +158,8 @@ function FeatureCard({ emoji, title, desc }: { emoji: string; title: string; des
   )
 }
 
-function PricingCard({ name, price, ai, push, desc, highlighted }: {
-  name: string; price: string; ai: number; push: number; desc: string; highlighted?: boolean
+function PricingCard({ name, price, ai, studentAi, push, desc, highlighted }: {
+  name: string; price: string; ai: number; studentAi: number; push: number; desc: string; highlighted?: boolean
 }) {
   return (
     <div className={`rounded-2xl p-5 border-2 transition-all ${highlighted ? 'border-primary bg-primary/5 shadow-md' : 'border-border bg-surface'}`}>
@@ -143,6 +169,7 @@ function PricingCard({ name, price, ai, push, desc, highlighted }: {
       <p className="text-2xl font-bold text-text mb-3">NT${price} <span className="text-xs font-normal text-text-muted">/ 月</span></p>
       <div className="space-y-1.5 text-sm text-text-muted">
         <p>AI 回覆 {ai.toLocaleString()} 則/月</p>
+        <p>學生問答 {studentAi.toLocaleString()} 則/月</p>
         <p>LINE Push {push.toLocaleString()} 則/月</p>
       </div>
     </div>

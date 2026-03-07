@@ -6,11 +6,18 @@ const ADMIN_BASE = `https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}`
 const PARENT_BASE = config.TELEGRAM_PARENT_BOT_TOKEN
   ? `https://api.telegram.org/bot${config.TELEGRAM_PARENT_BOT_TOKEN}`
   : null
+const STUDENT_BASE = config.TELEGRAM_STUDENT_BOT_TOKEN
+  ? `https://api.telegram.org/bot${config.TELEGRAM_STUDENT_BOT_TOKEN}`
+  : null
 
-function getBase(bot?: 'admin' | 'parent'): string {
+function getBase(bot?: 'admin' | 'parent' | 'student'): string {
   if (bot === 'parent') {
     if (!PARENT_BASE) throw new Error('TELEGRAM_PARENT_BOT_TOKEN is not configured')
     return PARENT_BASE
+  }
+  if (bot === 'student') {
+    if (!STUDENT_BASE) throw new Error('TELEGRAM_STUDENT_BOT_TOKEN is not configured')
+    return STUDENT_BASE
   }
   return ADMIN_BASE
 }
@@ -64,7 +71,7 @@ export async function sendMessage(
   chatId: number | string,
   text: string,
   options?: { reply_markup?: { inline_keyboard: InlineKeyboardButton[][] } },
-  bot?: 'admin' | 'parent'
+  bot?: 'admin' | 'parent' | 'student'
 ): Promise<TelegramMessage> {
   const base = getBase(bot)
   // enqueue to avoid bursts

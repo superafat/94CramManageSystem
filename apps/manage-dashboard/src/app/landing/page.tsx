@@ -78,13 +78,18 @@ export default function LandingPage() {
               title="薪資計算"
               desc="教師鐘點自動計算，加班、代課一併納入。薪資條一鍵生成，勞健保試算整合。"
             />
-            <FeatureCard 
+            <FeatureCard
               emoji="🤖"
               title="AI 分析"
-              desc="AI 流失預警，提前發現可能退班的學生。招生 CRM + RAG 知識庫，智慧營運決策。"
-              note="🤔 CRM=客戶關係管理（記錄家長、學生資料）、RAG=AI 大腦（能回答補習班相關問題）"
+              desc="AI 流失預警，提前發現可能退班的學生。結合經營智慧中樞，提供續班預測、教師績效評估與營收預測。"
+              note="🤔 整合學習歷程、出勤、成績數據，AI 自動分析經營健康度"
             />
-            <FeatureCard 
+            <FeatureCard
+              emoji="🧠"
+              title="經營智慧中樞"
+              desc="CEO 駕駛艙：續班率預測、教師績效排行、營收預測、經營健康分數。數據驅動決策，一目瞭然。"
+            />
+            <FeatureCard
               emoji="☁️"
               title="雲端系統"
               desc="資料安全儲存於雲端，自動備份。手機、平板、電腦隨時存取，多分校同步。"
@@ -160,12 +165,12 @@ export default function LandingPage() {
               highlighted={true}
               desc="點名系統整合"
             />
-            <PricingCard 
+            <PricingCard
               name="AI 版"
               price="2,499"
               yearPrice="29,988"
-              features={['無限學生', 'AI 流失預警', 'RAG 知識庫（AI 客服）', '多分校管理', '專屬客服']}
-              desc="完整 AI 功能｜RAG = AI 自動回答家長問題"
+              features={['無限學生', 'AI 流失預警', 'RAG 知識庫（AI 客服）', '經營智慧中樞', '多分校管理', '專屬客服']}
+              desc="完整 AI 功能｜含經營智慧中樞 CEO 駕駛艙"
             />
           </div>
 
@@ -240,6 +245,18 @@ export default function LandingPage() {
                   <tr className="border-t border-border">
                     <td className="p-2 text-text font-medium text-xs">點名系統整合</td>
                     <td className="p-2 text-center text-text-muted text-xs">需加購</td>
+                    <td className="p-2 text-center text-text-muted text-xs">—</td>
+                    <td className="p-2 text-center text-success bg-primary/5 text-xs">✓</td>
+                  </tr>
+                  <tr className="border-t border-border">
+                    <td className="p-2 text-text font-medium text-xs">續班率預測</td>
+                    <td className="p-2 text-center text-text-muted text-xs">—</td>
+                    <td className="p-2 text-center text-text-muted text-xs">—</td>
+                    <td className="p-2 text-center text-success bg-primary/5 text-xs">✓</td>
+                  </tr>
+                  <tr className="border-t border-border">
+                    <td className="p-2 text-text font-medium text-xs">經營智慧中樞</td>
+                    <td className="p-2 text-center text-text-muted text-xs">—</td>
                     <td className="p-2 text-center text-text-muted text-xs">—</td>
                     <td className="p-2 text-center text-success bg-primary/5 text-xs">✓</td>
                   </tr>

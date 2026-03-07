@@ -43,6 +43,7 @@ import parentExtRoutes from './routes/parent-ext.js'
 import { contactBookRoutes } from './routes/contact-book.js'
 import { contactBookParentRoutes } from './routes/contact-book-parent.js'
 import { makeupClassRoutes } from './routes/makeup-classes.js'
+import classroomRoutes from './routes/classroom.js'
 type Variables = {
   schoolId: string
   userId: string
@@ -193,6 +194,8 @@ app.route('/api/contact-book', contactBookRoutes)
 app.route('/api/parent/contact-book', contactBookParentRoutes)
 // Makeup class routes (migrated from manage-backend)
 app.route('/api/makeup-classes', makeupClassRoutes)
+// Classroom interaction routes
+app.route('/api/classroom', classroomRoutes)
 // ===== Global Error Handler =====
 app.onError((err, c) => {
   logger.error({ err }, `[Global Error Handler] ${c.req.path}`)

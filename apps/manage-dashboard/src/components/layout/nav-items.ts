@@ -18,6 +18,9 @@ export const navItems: NavItem[] = [
   { href: '/reports', icon: '📈', label: '報表中心', roles: ['superadmin', 'admin'] },
   { href: '/enrollment', icon: '🎪', label: '招生管理', roles: ['superadmin', 'admin'] },
 
+  { type: 'separator', separator: '經營智慧', roles: ['superadmin', 'admin'] },
+  { href: '/dashboard/intelligence', icon: '🧠', label: '智慧中樞', roles: ['superadmin', 'admin'] },
+
   { type: 'separator', separator: '講師管理', roles: ['superadmin', 'admin'] },
   { href: '/teachers', icon: '👨‍🏫', label: '講師名單', roles: ['superadmin', 'admin'] },
   { href: '/scheduling-center', icon: '📅', label: '排課中心', roles: ['superadmin', 'admin'] },

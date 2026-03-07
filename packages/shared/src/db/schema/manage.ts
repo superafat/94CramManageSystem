@@ -1,5 +1,5 @@
 // 94Manage Schema - 學員管理專屬表
-import { pgTable, uuid, varchar, text, timestamp, boolean, integer, decimal, jsonb, uniqueIndex, unique, index, date } from '../connection';
+import { pgTable, uuid, varchar, text, timestamp, boolean, integer, decimal, jsonb, uniqueIndex, unique, index, date, real } from '../connection';
 import { tenants, users, branches } from './common';
 
 // 課程
@@ -438,3 +438,52 @@ export const conversations = pgTable('conversations', {
   branchIdx: index('conversations_branch_id_idx').on(table.branchId),
   createdAtIdx: index('conversations_created_at_idx').on(table.createdAt),
 }));
+
+// === Intelligence Hub Tables ===
+
+// 學生學習概況（AI 分析彙整）
+export const manageStudentLearningProfiles = pgTable('manage_student_learning_profiles', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  branchId: uuid('branch_id').references(() => branches.id),
+  studentId: uuid('student_id').notNull().references(() => manageStudents.id),
+  attendanceRate30d: real('attendance_rate_30d'),
+  avgScoreTrend: varchar('avg_score_trend', { length: 20 }), // 'improving' | 'stable' | 'declining'
+  latestAvgScore: real('latest_avg_score'),
+  paymentStatus: varchar('payment_status', { length: 20 }), // 'paid' | 'partial' | 'overdue'
+  contactBookReadRate: real('contact_book_read_rate'),
+  churnRiskScore: real('churn_risk_score'),
+  renewalProbability: real('renewal_probability'),
+  aiSummary: text('ai_summary'),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// 教師績效評估
+export const manageTeacherPerformance = pgTable('manage_teacher_performance', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  teacherId: uuid('teacher_id').notNull().references(() => manageTeachers.id),
+  period: varchar('period', { length: 20 }).notNull(), // 'monthly' | 'quarterly'
+  periodStart: date('period_start').notNull(),
+  periodEnd: date('period_end').notNull(),
+  studentProgressRate: real('student_progress_rate'),
+  classAttendanceRate: real('class_attendance_rate'),
+  parentSatisfaction: real('parent_satisfaction'),
+  studentRetentionRate: real('student_retention_rate'),
+  teacherAttendanceRate: real('teacher_attendance_rate'),
+  overallScore: real('overall_score'),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// 收入預測
+export const manageRevenueForecasts = pgTable('manage_revenue_forecasts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  branchId: uuid('branch_id').references(() => branches.id),
+  forecastMonth: date('forecast_month').notNull(),
+  expectedRevenue: real('expected_revenue'),
+  churnAdjustment: real('churn_adjustment'),
+  seasonalFactor: real('seasonal_factor'),
+  confidence: real('confidence'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
