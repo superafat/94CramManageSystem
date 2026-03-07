@@ -61,9 +61,11 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
     }
   }
 
-  // Forward tenant header
+  const hasAuthContext = headers.has('Authorization')
+
+  // Only forward tenant header for unauthenticated calls.
   const xTenantId = request.headers.get('X-Tenant-Id')
-  if (xTenantId) headers.set('X-Tenant-Id', xTenantId)
+  if (!hasAuthContext && xTenantId) headers.set('X-Tenant-Id', xTenantId)
 
   const init: RequestInit = {
     method: request.method,

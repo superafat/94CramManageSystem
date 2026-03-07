@@ -16,8 +16,12 @@ const tenantCache = new Map<string, number>()
 const TENANT_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 export async function tenantMiddleware(c: Context, next: Next) {
-  // Platform routes handle their own auth/tenant — skip tenant middleware
-  if (c.req.path.startsWith('/api/platform/')) {
+  // Platform/internal/health routes handle their own auth/tenant semantics.
+  if (
+    c.req.path.startsWith('/api/platform/') ||
+    c.req.path.startsWith('/api/internal/') ||
+    c.req.path.startsWith('/api/health')
+  ) {
     await next()
     return
   }

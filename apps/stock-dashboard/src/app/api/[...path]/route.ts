@@ -50,8 +50,10 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
     }
   }
 
+  const hasAuthContext = headers.has('Authorization')
+
   const xTenantId = request.headers.get('X-Tenant-Id')
-  if (xTenantId) headers.set('X-Tenant-Id', xTenantId)
+  if (!hasAuthContext && xTenantId) headers.set('X-Tenant-Id', xTenantId)
 
   const init: RequestInit = { method: request.method, headers }
 

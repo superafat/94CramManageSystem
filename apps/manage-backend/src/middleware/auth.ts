@@ -4,11 +4,13 @@
  * 保留 RBAC（getUserPermissions）
  */
 import type { Context, Next } from 'hono'
-import { verify, extractToken } from '@94cram/shared/auth'
+import { verify, extractToken, type JWTPayload } from '@94cram/shared/auth'
 import { getUserPermissions, Role, type RBACVariables } from './rbac'
+import { logger } from '../utils/logger'
 
 interface AuthVariables extends RBACVariables {
   tenantId: string
+  jwtPayload: JWTPayload
 }
 
 interface AuthenticatedUser {
@@ -46,6 +48,7 @@ export async function authMiddleware(c: Context<{ Variables: AuthVariables }>, n
     }
 
     const permissions = getUserPermissions(user.role)
+    c.set('jwtPayload', payload)
     c.set('user', user)
     c.set('permissions', permissions)
     c.set('tenantId', user.tenant_id)
@@ -73,12 +76,13 @@ export async function optionalAuth(c: Context<{ Variables: AuthVariables }>, nex
           name: payload.name || '',
           role: (payload.role as Role) || Role.PARENT
         }
+        c.set('jwtPayload', payload)
         c.set('user', user)
         c.set('permissions', getUserPermissions(user.role))
         c.set('tenantId', user.tenant_id)
       }
-    } catch {
-      // Token 無效 — 繼續但不設 user
+    } catch (error) {
+      logger.warn({ err: error instanceof Error ? error : new Error(String(error)) }, '[optionalAuth] Ignoring invalid token')
     }
   }
   await next()
