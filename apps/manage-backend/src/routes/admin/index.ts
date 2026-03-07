@@ -18,6 +18,7 @@ import { makeupSlotsRoutes } from './makeup-slots'
 import { enrollmentRoutes } from './enrollments'
 import { bindingTokensRoutes } from './binding-tokens'
 import { financeRoutes } from './finance'
+import { intelligenceRoutes } from './intelligence'
 
 export const adminRoutes = new Hono<{ Variables: RBACVariables }>()
 
@@ -41,3 +42,4 @@ adminRoutes.route('/', enrollmentRoutes)
 adminRoutes.route('/', bindingTokensRoutes)
 adminRoutes.route('/', financeRoutes)
 adminRoutes.route('/', analyticsRoutes)
+adminRoutes.route('/', intelligenceRoutes)
