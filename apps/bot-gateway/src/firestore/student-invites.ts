@@ -22,6 +22,11 @@ export function generateStudentInviteCode(): string {
     .join('');
 }
 
+export async function getStudentInvite(code: string): Promise<StudentInvite | null> {
+  const doc = await col.doc(code).get();
+  return doc.exists ? (doc.data() as StudentInvite) : null;
+}
+
 export async function createStudentInvite(invite: Omit<StudentInvite, 'usedBy' | 'usedAt'>): Promise<void> {
   await col.doc(invite.code).set(invite);
 }

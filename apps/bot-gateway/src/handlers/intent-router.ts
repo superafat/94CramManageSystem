@@ -13,6 +13,24 @@ const WRITE_INTENTS = [
   'stock.ship', 'stock.restock',
 ];
 
+// Student intents are handled by student-intent-router, not by callBotApi.
+// These constants allow webhook handlers to identify and route student messages.
+export const STUDENT_INTENTS = [
+  'student.ask_question',
+  'student.weakness',
+  'student.homework_help',
+  'student.schedule',
+  'student.grades',
+  'student.help',
+  'student.unknown',
+] as const;
+
+export type StudentIntentName = (typeof STUDENT_INTENTS)[number];
+
+export function isStudentIntent(intent: string): intent is StudentIntentName {
+  return (STUDENT_INTENTS as readonly string[]).includes(intent);
+}
+
 export function isQueryIntent(intent: string): boolean {
   return QUERY_INTENTS.includes(intent);
 }
