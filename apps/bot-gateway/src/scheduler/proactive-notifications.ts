@@ -21,7 +21,11 @@ import {
   flexToPlainText,
   type BillingItem,
   type RecommendationCardData,
+  type LineFlexMessage,
 } from '../templates/line-flex-messages';
+import { sendMessage } from '../utils/telegram';
+import { sendLinePushMessage } from '../services/line';
+import { getAllAdminChatIds } from '../firestore/admin-lookup';
 
 // ─── 內部型別 ─────────────────────────────────────────────────────────────────
 
@@ -117,41 +121,93 @@ async function callInternalApi(
   }
 }
 
-// ─── 輔助：模擬發送通知（TODO 待替換為實際發送） ──────────────────────────────
+// ─── 輔助：發送 LINE Flex Message（Push API） ─────────────────────────────────
 
 /**
- * 發送文字通知給指定 Telegram chat
- * TODO: 替換為 sendMessage(chatId, text, undefined, 'admin') 或 LINE push API
+ * 透過 LINE Push API 發送 Flex Message 給指定 userId
  */
-function dispatchTextNotification(chatId: string, text: string, channel: 'admin' | 'parent'): void {
-  // TODO: 串接實際發送管道
-  // import { sendMessage } from '../utils/telegram';
-  // await sendMessage(chatId, text, undefined, channel);
-  logger.info(
-    { chatId, channel, textPreview: text.slice(0, 80) },
-    '[Scheduler][TODO] 模擬發送文字通知'
-  );
-  logger.info({ chatId, channel }, `[推播模擬][${channel.toUpperCase()}] -> chat_id=${chatId}\n${text}`);
+async function sendLineFlexMessage(to: string, flex: LineFlexMessage): Promise<void> {
+  const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!accessToken) {
+    logger.error('[Scheduler] LINE_CHANNEL_ACCESS_TOKEN 未設定，無法發送 Flex Message');
+    return;
+  }
+
+  try {
+    const res = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ to, messages: [flex] }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      logger.error(
+        { status: res.status, body, to },
+        '[Scheduler] LINE Flex Message push 失敗'
+      );
+    }
+  } catch (err: unknown) {
+    logger.error(
+      { err: err instanceof Error ? err : new Error(String(err)), to },
+      '[Scheduler] LINE Flex Message push 例外'
+    );
+  }
+}
+
+// ─── 輔助：發送通知（實際管道） ───────────────────────────────────────────────
+
+/**
+ * 發送文字通知。
+ * - admin 頻道 → Telegram sendMessage（使用 admin bot）
+ * - parent 頻道 → LINE Push text message
+ */
+async function dispatchTextNotification(chatId: string, text: string, channel: 'admin' | 'parent'): Promise<void> {
+  try {
+    if (channel === 'admin') {
+      await sendMessage(chatId, text, undefined, 'admin');
+      logger.info({ chatId, channel }, '[Scheduler] Telegram 文字通知已發送');
+    } else {
+      await sendLinePushMessage(chatId, [{ type: 'text', text }]);
+      logger.info({ chatId, channel }, '[Scheduler] LINE 文字通知已發送');
+    }
+  } catch (err: unknown) {
+    logger.error(
+      { err: err instanceof Error ? err : new Error(String(err)), chatId, channel },
+      '[Scheduler] dispatchTextNotification 失敗'
+    );
+  }
 }
 
 /**
- * 發送 Flex Message 給指定 Telegram chat（Telegram 降級為 altText）
- * TODO: LINE 頻道改為 pushFlexMessage(chatId, flex)
+ * 發送 Flex Message 通知。
+ * - parent 頻道 → LINE Push Flex Message
+ * - admin 頻道 → Telegram 以 altText 降級發送
  */
-function dispatchFlexNotification(
+async function dispatchFlexNotification(
   chatId: string,
   flex: ReturnType<typeof billingCard> | ReturnType<typeof recommendationCarousel>,
   channel: 'admin' | 'parent'
-): void {
+): Promise<void> {
   const altText = flexToPlainText(flex);
-  // TODO: 串接 LINE pushFlexMessage 或 Telegram sendMessage（以 altText 降級）
-  // await sendMessage(chatId, altText, undefined, channel); // Telegram
-  // await lineClient.pushMessage(chatId, flex); // LINE
-  logger.info(
-    { chatId, channel, altText },
-    '[Scheduler][TODO] 模擬發送 Flex Message'
-  );
-  logger.info({ chatId, channel }, `[推播模擬][${channel.toUpperCase()}][FLEX] -> chat_id=${chatId}\n${altText}`);
+  try {
+    if (channel === 'parent') {
+      await sendLineFlexMessage(chatId, flex);
+      logger.info({ chatId, channel }, '[Scheduler] LINE Flex Message 已發送');
+    } else {
+      // admin 頻道（Telegram）以純文字降級
+      await sendMessage(chatId, altText, undefined, 'admin');
+      logger.info({ chatId, channel }, '[Scheduler] Telegram Flex 降級文字已發送');
+    }
+  } catch (err: unknown) {
+    logger.error(
+      { err: err instanceof Error ? err : new Error(String(err)), chatId, channel },
+      '[Scheduler] dispatchFlexNotification 失敗'
+    );
+  }
 }
 
 // ─── 輔助：AI 弱科分析 ────────────────────────────────────────────────────────
@@ -240,15 +296,33 @@ function buildWeakSubjectNote(
 // ─── 分校主管逾期通知 ─────────────────────────────────────────────────────────
 
 /**
- * 通知分校主管逾期帳款摘要
- * TODO: 實際發送 — 查詢該 tenant 的 manager user，透過 LINE/Telegram 發送
+ * 通知分校主管逾期帳款摘要（廣播給該 tenant 所有已綁定的管理員）
  */
-function notifyBranchManagerOverdue(tenantId: string, unpaidCount: number, maxOverdueDays: number): void {
+async function notifyBranchManagerOverdue(tenantId: string, unpaidCount: number, maxOverdueDays: number): Promise<void> {
   const message = `【帳款提醒】貴校有 ${unpaidCount} 筆待繳帳款，最長逾期 ${Math.floor(maxOverdueDays)} 天，請儘速處理。`;
-  logger.info(
-    { tenantId, unpaidCount, maxOverdueDays, message },
-    '[Branch Manager Notification] 逾期帳款通知'
-  );
+  try {
+    const chatIds = await getAllAdminChatIds(tenantId);
+    if (chatIds.length === 0) {
+      logger.warn({ tenantId }, '[Scheduler][逾期提醒] 找不到任何已綁定的管理員');
+      return;
+    }
+    await Promise.all(
+      chatIds.map((chatId) =>
+        sendMessage(chatId, message, undefined, 'admin').catch((err: unknown) => {
+          logger.error(
+            { err: err instanceof Error ? err : new Error(String(err)), chatId, tenantId },
+            '[Scheduler][逾期提醒] Telegram 發送失敗'
+          );
+        })
+      )
+    );
+    logger.info({ tenantId, chatIds, unpaidCount, maxOverdueDays }, '[Scheduler][逾期提醒] 通知已發送');
+  } catch (err: unknown) {
+    logger.error(
+      { err: err instanceof Error ? err : new Error(String(err)), tenantId },
+      '[Scheduler][逾期提醒] notifyBranchManagerOverdue 失敗'
+    );
+  }
 }
 
 // ─── 任務一：每日繳費提醒（通知分校行政人員） ────────────────────────────────
@@ -323,13 +397,13 @@ export async function scheduleDailyBillingReminder(): Promise<void> {
         `請盡速聯繫家長處理。\n\n` +
         `📅 統計時間：${new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}`;
 
-      dispatchTextNotification(admin.admin_chat_id, message, 'admin');
+      await dispatchTextNotification(admin.admin_chat_id, message, 'admin');
 
       // 通知分校主管逾期帳款摘要
       const maxOverdueDays = tenantStudents.length > 0
         ? Math.max(...tenantStudents.map((s) => s.overdue_days))
         : 0;
-      notifyBranchManagerOverdue(tenantId, tenantStudents.length, maxOverdueDays);
+      await notifyBranchManagerOverdue(tenantId, tenantStudents.length, maxOverdueDays);
     }
 
     logger.info(
@@ -391,7 +465,7 @@ export async function scheduleWeeklyParentBillingReminder(): Promise<void> {
           unpaidItems: student.unpaid_items,
         });
 
-        dispatchFlexNotification(student.parent_chat_id, flex, 'parent');
+        await dispatchFlexNotification(student.parent_chat_id, flex, 'parent');
         sentCount++;
       } catch (sendErr: unknown) {
         const errMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
@@ -537,7 +611,7 @@ export async function scheduleAIRecommendationPush(
 
     // 步驟 3：組合 Flex Message 並推播
     const flex = recommendationCarousel(recommendationItems);
-    dispatchFlexNotification(contactBookData.parent_chat_id, flex, 'parent');
+    await dispatchFlexNotification(contactBookData.parent_chat_id, flex, 'parent');
 
     logger.info(
       { studentId, courseCount: recommendationItems.length },
