@@ -7,6 +7,7 @@ const envSchema = z.object({
   TELEGRAM_PARENT_BOT_TOKEN: z.string().min(1).optional(),
   TELEGRAM_PARENT_BOT_USERNAME: z.string().min(1).optional(),
   JWT_SECRET: z.string().min(1).optional(),
+  DATABASE_URL: z.string().optional(),
   GEMINI_API_KEY: z.string().min(1),
   MANAGE_URL: z.string().url(),
   INCLASS_URL: z.string().url(),

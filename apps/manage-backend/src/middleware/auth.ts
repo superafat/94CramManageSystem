@@ -4,7 +4,7 @@
  * 保留 RBAC（getUserPermissions）
  */
 import type { Context, Next } from 'hono'
-import { verify, extractToken, hasSystemAccess, type JWTPayload } from '@94cram/shared/auth'
+import { verify, extractToken, hasSystemAccess, firstRow, hasDbSystemEntitlement, type JWTPayload } from '@94cram/shared/auth'
 import { db } from '../db'
 import { sql } from 'drizzle-orm'
 import { getUserPermissions, Role, type RBACVariables } from './rbac'
@@ -26,6 +26,8 @@ interface AuthenticatedUser {
 
 type QueryResultRows<T> = T[] | { rows?: T[] }
 
+// QueryResultRows kept for getActiveUser's type cast below
+
 type AuthUserRow = {
   id: string
   username: string | null
@@ -37,11 +39,6 @@ type AuthUserRow = {
   is_active: boolean
 }
 
-function firstRow<T>(result: QueryResultRows<T>): T | null {
-  if (Array.isArray(result)) return result[0] ?? null
-  return result.rows?.[0] ?? null
-}
-
 async function getActiveUser(userId: string): Promise<AuthUserRow | null> {
   return firstRow(await db.execute(sql`
     SELECT id, username, full_name, email, role, tenant_id, branch_id, is_active
@@ -50,20 +47,6 @@ async function getActiveUser(userId: string): Promise<AuthUserRow | null> {
       AND deleted_at IS NULL
     LIMIT 1
   `) as QueryResultRows<AuthUserRow>)
-}
-
-async function hasDbSystemEntitlement(userId: string, tenantId: string, systemKey: string): Promise<boolean> {
-  const entitlement = firstRow(await db.execute(sql`
-    SELECT id
-    FROM user_system_entitlements
-    WHERE user_id = ${userId}
-      AND tenant_id = ${tenantId}
-      AND system_key = ${systemKey}
-      AND status = 'active'
-    LIMIT 1
-  `) as QueryResultRows<{ id: string }>)
-
-  return Boolean(entitlement)
 }
 
 /**
@@ -92,7 +75,7 @@ export async function authMiddleware(c: Context<{ Variables: AuthVariables }>, n
       return c.json({ error: 'Forbidden: Missing manage system access' }, 403)
     }
 
-    if (dbUser.role !== Role.SUPERADMIN && !(await hasDbSystemEntitlement(dbUser.id, payload.tenantId, 'manage'))) {
+    if (dbUser.role !== Role.SUPERADMIN && !(await hasDbSystemEntitlement(db, dbUser.id, payload.tenantId, 'manage'))) {
       return c.json({ error: 'Forbidden: Missing manage system access' }, 403)
     }
 
@@ -136,7 +119,7 @@ export async function optionalAuth(c: Context<{ Variables: AuthVariables }>, nex
           await next()
           return
         }
-        if (dbUser.role !== Role.SUPERADMIN && !(await hasDbSystemEntitlement(dbUser.id, payload.tenantId, 'manage'))) {
+        if (dbUser.role !== Role.SUPERADMIN && !(await hasDbSystemEntitlement(db, dbUser.id, payload.tenantId, 'manage'))) {
           await next()
           return
         }

@@ -3,8 +3,8 @@
  * 統一使用 @94cram/shared/auth
  */
 import type { Context, Next } from 'hono';
-import { eq, sql } from 'drizzle-orm';
-import { verify, extractToken, hasSystemAccess } from '@94cram/shared/auth';
+import { eq } from 'drizzle-orm';
+import { verify, extractToken, hasSystemAccess, hasDbSystemEntitlement } from '@94cram/shared/auth';
 import { users } from '@94cram/shared/db';
 import { config } from '../config';
 import { db } from '../db';
@@ -16,27 +16,6 @@ export interface AuthUser {
   role: string;
   email: string;
   name?: string;
-}
-
-type QueryResultRows<T> = T[] | { rows?: T[] };
-
-function firstRow<T>(result: QueryResultRows<T>): T | null {
-  if (Array.isArray(result)) return result[0] ?? null;
-  return result.rows?.[0] ?? null;
-}
-
-async function hasDbSystemEntitlement(userId: string, tenantId: string, systemKey: string): Promise<boolean> {
-  const entitlement = firstRow(await db.execute(sql`
-    SELECT id
-    FROM user_system_entitlements
-    WHERE user_id = ${userId}
-      AND tenant_id = ${tenantId}
-      AND system_key = ${systemKey}
-      AND status = 'active'
-    LIMIT 1
-  `) as QueryResultRows<{ id: string }>);
-
-  return Boolean(entitlement);
 }
 
 export async function authMiddleware(c: Context, next: Next) {
@@ -64,7 +43,7 @@ export async function authMiddleware(c: Context, next: Next) {
     if (!hasSystemAccess(payload, 'stock', { allowLegacyNoSystems: false }) && user.role !== 'superadmin') {
       return unauthorized(c, 'Stock system access required');
     }
-    if (user.role !== 'superadmin' && !(await hasDbSystemEntitlement(userId, tenantId, 'stock'))) {
+    if (user.role !== 'superadmin' && !(await hasDbSystemEntitlement(db, userId, tenantId, 'stock'))) {
       return unauthorized(c, 'Stock system entitlement required');
     }
 

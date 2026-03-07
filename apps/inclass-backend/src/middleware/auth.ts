@@ -5,7 +5,7 @@
  * 注意：inclass 用 schoolId = tenantId（alias）
  */
 import type { Context, Next } from 'hono';
-import { verify, type JWTPayload, extractToken, hasSystemAccess } from '@94cram/shared/auth';
+import { verify, type JWTPayload, extractToken, hasSystemAccess, firstRow, hasDbSystemEntitlement } from '@94cram/shared/auth';
 import { db } from '../db/index.js';
 import { users } from '@94cram/shared/db';
 import { eq, sql } from 'drizzle-orm';
@@ -24,11 +24,6 @@ export type AdminVariables = Variables & {
 
 type QueryResultRows<T> = T[] | { rows?: T[] };
 
-function firstRow<T>(result: QueryResultRows<T>): T | null {
-  if (Array.isArray(result)) return result[0] ?? null;
-  return result.rows?.[0] ?? null;
-}
-
 async function getActiveUser(userId: string) {
   return firstRow(await db.execute(sql`
     SELECT id, role, is_active
@@ -37,20 +32,6 @@ async function getActiveUser(userId: string) {
       AND deleted_at IS NULL
     LIMIT 1
   `) as QueryResultRows<{ id: string; role: string; is_active: boolean }>);
-}
-
-async function hasDbSystemEntitlement(userId: string, tenantId: string, systemKey: string): Promise<boolean> {
-  const entitlement = firstRow(await db.execute(sql`
-    SELECT id
-    FROM user_system_entitlements
-    WHERE user_id = ${userId}
-      AND tenant_id = ${tenantId}
-      AND system_key = ${systemKey}
-      AND status = 'active'
-    LIMIT 1
-  `) as QueryResultRows<{ id: string }>);
-
-  return Boolean(entitlement);
 }
 
 export function getJWTSecret(): Uint8Array {
@@ -96,7 +77,7 @@ export function jwtAuth() {
       if (!hasSystemAccess(payload, 'inclass', { allowLegacyNoSystems: false }) && dbUser.role !== 'superadmin') {
         return forbidden(c, 'InClass system access required');
       }
-      if (dbUser.role !== 'superadmin' && !(await hasDbSystemEntitlement(userId, schoolId, 'inclass'))) {
+      if (dbUser.role !== 'superadmin' && !(await hasDbSystemEntitlement(db, userId, schoolId, 'inclass'))) {
         return forbidden(c, 'InClass system entitlement required');
       }
       // inclass 用 schoolId = tenantId
