@@ -24,6 +24,7 @@ const navItems: NavItem[] = [
 
   { type: 'separator', separator: 'LINE', roles: ['admin'] },
   { href: '/dashboard/wentaishi', icon: '🤖', label: '聞太師（家長端）', roles: ['admin'] },
+  { href: '/dashboard/ai-tutor', icon: '🧑‍🏫', label: '神算子（課業助教）', roles: ['admin'] },
 
   { type: 'separator', separator: '系統', roles: ['admin'] },
   { href: '/dashboard/plans', icon: '💎', label: '方案加購', roles: ['admin'] },
