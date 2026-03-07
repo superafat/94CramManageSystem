@@ -2,19 +2,25 @@ import { Hono } from 'hono';
 import { db } from '../../db/index';
 import { stockItems, stockWarehouses, stockInventory } from '@94cram/shared/db';
 import { eq, and } from 'drizzle-orm';
+import { logger } from '../../utils/logger';
 
 type Env = { Variables: { tenantId: string } };
 const app = new Hono<Env>();
 
 // POST /data/items
 app.post('/items', async (c) => {
-  try {
-    const tenantId = c.get('tenantId') as string;
+  const botBody = c.get('botBody') as { tenant_id?: string } | undefined;
+  const tenantId = (c.get('tenantId') as string | undefined) ?? botBody?.tenant_id;
 
-    // 批次查詢：一次取得所有 items 和 inventory，避免 N+1 查詢
+  try {
+    if (!tenantId) {
+      return c.json({ success: false, error: 'missing_tenant', message: '缺少 tenant_id' }, 400);
+    }
+
+    // Production schema does not reliably expose is_active yet, so filter by tenant only.
     const [items, allInventory] = await Promise.all([
       db.select().from(stockItems)
-        .where(and(eq(stockItems.tenantId, tenantId), eq(stockItems.isActive, true))),
+        .where(eq(stockItems.tenantId, tenantId)),
       db.select().from(stockInventory)
         .where(eq(stockInventory.tenantId, tenantId)),
     ]);
@@ -34,14 +40,21 @@ app.post('/items', async (c) => {
 
     return c.json({ success: true, data: result });
   } catch (error) {
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)), tenantId }, '[bot/data/items] failed');
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });
 
 // POST /data/warehouses
 app.post('/warehouses', async (c) => {
+  const botBody = c.get('botBody') as { tenant_id?: string } | undefined;
+  const tenantId = (c.get('tenantId') as string | undefined) ?? botBody?.tenant_id;
+
   try {
-    const tenantId = c.get('tenantId') as string;
+    if (!tenantId) {
+      return c.json({ success: false, error: 'missing_tenant', message: '缺少 tenant_id' }, 400);
+    }
+
     const warehouses = await db.select().from(stockWarehouses)
       .where(eq(stockWarehouses.tenantId, tenantId));
 
@@ -50,6 +63,7 @@ app.post('/warehouses', async (c) => {
       data: warehouses.map(w => ({ warehouse_id: w.id, name: w.name, address: w.address })),
     });
   } catch (error) {
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)), tenantId }, '[bot/data/warehouses] failed');
     return c.json({ success: false, error: 'internal', message: '系統錯誤' }, 500);
   }
 });
