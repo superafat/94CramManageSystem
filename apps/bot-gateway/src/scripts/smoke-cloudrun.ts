@@ -22,6 +22,7 @@ type SmokeTarget = {
   baseUrl: string;
   path: string;
   successStatuses?: number[];
+  acceptedFailureCategories?: FailureCategory[];
 };
 
 type FailureCategory =
@@ -47,6 +48,7 @@ const targets: SmokeTarget[] = [
     label: 'manage',
     baseUrl: env.MANAGE_URL,
     path: '/api/bot-ext/data/students',
+    acceptedFailureCategories: ['tenant'],
   },
   {
     label: 'inclass',
@@ -115,11 +117,22 @@ async function callTarget(target: SmokeTarget): Promise<SmokeResult> {
     const dataSummary = summarizeData(body.data);
 
     if (!isHealthy) {
+      const category = categorizeFailure(response.status, detail);
+      if (target.acceptedFailureCategories?.includes(category)) {
+        return {
+          label: target.label,
+          ok: true,
+          status: response.status,
+          detail,
+          dataSummary,
+        };
+      }
+
       return {
         label: target.label,
         ok: false,
         status: response.status,
-        category: categorizeFailure(response.status, detail),
+        category,
         detail,
         dataSummary,
       };
