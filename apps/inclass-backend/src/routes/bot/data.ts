@@ -17,7 +17,11 @@ app.post('/students', async (c) => {
       return c.json({ success: false, error: 'missing_tenant', message: '缺少 tenant_id' }, 400);
     }
 
-    const students = await db.select().from(manageStudents)
+    const students = await db.select({
+      id: manageStudents.id,
+      name: manageStudents.name,
+      grade: manageStudents.grade,
+    }).from(manageStudents)
       .where(eq(manageStudents.tenantId, schoolId));
 
     return c.json({
@@ -40,7 +44,9 @@ app.post('/classes', async (c) => {
       return c.json({ success: false, error: 'missing_tenant', message: '缺少 tenant_id' }, 400);
     }
 
-    const courses = await db.select().from(manageCourses)
+    const courses = await db.select({
+      name: manageCourses.name,
+    }).from(manageCourses)
       .where(eq(manageCourses.tenantId, schoolId));
 
     return c.json({

@@ -19,9 +19,16 @@ app.post('/items', async (c) => {
 
     // Production schema does not reliably expose is_active yet, so filter by tenant only.
     const [items, allInventory] = await Promise.all([
-      db.select().from(stockItems)
+      db.select({
+        id: stockItems.id,
+        name: stockItems.name,
+        unit: stockItems.unit,
+      }).from(stockItems)
         .where(eq(stockItems.tenantId, tenantId)),
-      db.select().from(stockInventory)
+      db.select({
+        itemId: stockInventory.itemId,
+        quantity: stockInventory.quantity,
+      }).from(stockInventory)
         .where(eq(stockInventory.tenantId, tenantId)),
     ]);
 
@@ -55,7 +62,11 @@ app.post('/warehouses', async (c) => {
       return c.json({ success: false, error: 'missing_tenant', message: '缺少 tenant_id' }, 400);
     }
 
-    const warehouses = await db.select().from(stockWarehouses)
+    const warehouses = await db.select({
+      id: stockWarehouses.id,
+      name: stockWarehouses.name,
+      address: stockWarehouses.address,
+    }).from(stockWarehouses)
       .where(eq(stockWarehouses.tenantId, tenantId));
 
     return c.json({
