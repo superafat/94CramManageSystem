@@ -8,6 +8,7 @@ on:
       - 'apps/stock-dashboard/**'
       - 'packages/shared/**'
       - '.github/workflows/deploy-stock.yml'
+  workflow_dispatch:
 
 env:
   PROJECT_ID: cram94-manage-system

@@ -8,6 +8,7 @@ on:
       - 'apps/inclass-dashboard/**'
       - 'packages/shared/**'
       - '.github/workflows/deploy-inclass.yml'
+  workflow_dispatch:
 
 env:
   PROJECT_ID: cram94-manage-system

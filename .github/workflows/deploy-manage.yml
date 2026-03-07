@@ -9,6 +9,7 @@ on:
       - 'packages/shared/**'
       - 'packages/manage-errors/**'
       - '.github/workflows/deploy-manage.yml'
+  workflow_dispatch:
 
 env:
   PROJECT_ID: cram94-manage-system
