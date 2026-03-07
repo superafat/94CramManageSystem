@@ -67,12 +67,14 @@ attendanceRouter.post('/checkin', zValidator('json', checkinSchema), async (c) =
       and(
         eq(inclassAttendances.tenantId, schoolId),
         eq(inclassAttendances.studentId, student.id),
+        eq(inclassAttendances.courseId, classId),
+        isNull(inclassAttendances.deletedAt),
         gte(inclassAttendances.date, start),
         lt(inclassAttendances.date, end)
       )
     )
     if (existingRecord) {
-      return c.json({ error: 'Student already checked in today', existingRecord }, 400)
+      return c.json({ error: 'Student already checked in for this class today', existingRecord }, 400)
     }
 
     const [record] = await db.insert(inclassAttendances).values({
@@ -120,6 +122,7 @@ attendanceRouter.get('/today', async (c) => {
       and(
         eq(inclassAttendances.tenantId, schoolId),
         classId ? eq(inclassAttendances.courseId, classId) : undefined,
+        isNull(inclassAttendances.deletedAt),
         gte(inclassAttendances.date, start),
         lt(inclassAttendances.date, end)
       )
@@ -210,7 +213,7 @@ attendanceRouter.get('/stats', zValidator('query', statsQuerySchema), async (c) 
     const schoolId = c.get('schoolId')
     const q = c.req.valid('query')
 
-    const conditions = [eq(inclassAttendances.tenantId, schoolId)]
+    const conditions = [eq(inclassAttendances.tenantId, schoolId), isNull(inclassAttendances.deletedAt)]
     if (q.studentId) conditions.push(eq(inclassAttendances.studentId, q.studentId))
     if (q.from) conditions.push(gte(inclassAttendances.date, new Date(q.from)))
     if (q.to) {
@@ -246,6 +249,7 @@ attendanceRouter.get('/stats', zValidator('query', statsQuerySchema), async (c) 
 const checkoutSchema = z.object({
   studentId: z.string().uuid().optional(),
   cardUid: z.string().min(1).max(100).optional(),
+  classId: z.string().uuid().optional(),
 }).refine((d) => d.studentId || d.cardUid, { message: 'Either studentId or cardUid must be provided' })
 
 attendanceRouter.post('/checkout', zValidator('json', checkoutSchema), async (c) => {
@@ -273,15 +277,22 @@ attendanceRouter.post('/checkout', zValidator('json', checkoutSchema), async (c)
     const end = new Date(start)
     end.setDate(end.getDate() + 1)
 
-    const [record] = await db.select().from(inclassAttendances).where(
+    const records = await db.select().from(inclassAttendances).where(
       and(
         eq(inclassAttendances.tenantId, schoolId),
         eq(inclassAttendances.studentId, studentId),
+        body.classId ? eq(inclassAttendances.courseId, body.classId) : undefined,
+        isNull(inclassAttendances.deletedAt),
         gte(inclassAttendances.date, start),
         lt(inclassAttendances.date, end)
       )
     )
-    if (!record) return c.json({ error: 'No check-in record found for today' }, 404)
+    if (records.length === 0) return c.json({ error: 'No check-in record found for today' }, 404)
+    if (!body.classId && records.length > 1) {
+      return c.json({ error: 'Multiple attendance records found for today; classId is required for checkout' }, 400)
+    }
+
+    const [record] = records
 
     const [updated] = await db
       .update(inclassAttendances)

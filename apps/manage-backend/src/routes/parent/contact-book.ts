@@ -5,7 +5,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
-import { eq, and, inArray, desc } from 'drizzle-orm'
+import { eq, and, inArray, desc, sql } from 'drizzle-orm'
 import { db } from '../../db'
 import {
   manageContactBookEntries,
@@ -15,8 +15,10 @@ import {
   manageContactBookAiAnalysis,
   manageCourses,
   manageStudents,
+  users,
 } from '@94cram/shared/db'
 import type { RBACVariables } from '../../middleware/rbac'
+import { logger } from '../../utils/logger'
 
 type Variables = RBACVariables & { tenantId: string }
 
@@ -35,22 +37,63 @@ const feedbackBodySchema = z.object({
   comment: z.string().max(1000).optional(),
 })
 
-// ─── Helper: verify parent owns this student (same tenant) ───────────────────
-// 目前以 tenant 隔離為主；若未來需要更嚴格的監護人綁定可擴充此函式
-async function verifyStudentInTenant(
+type RelationRow = { allowed: boolean }
+
+function getSqlRows<T>(result: T[] | { rows: T[] }): T[] {
+  return Array.isArray(result) ? result : result.rows
+}
+
+async function verifyParentOwnsStudent(
   tenantId: string,
+  parentUserId: string,
   studentId: string
 ): Promise<boolean> {
+  const [parent] = await db
+    .select({ id: users.id, phone: users.phone })
+    .from(users)
+    .where(
+      and(
+        eq(users.id, parentUserId),
+        eq(users.tenantId, tenantId),
+        eq(users.role, 'parent'),
+        eq(users.isActive, true)
+      )
+    )
+    .limit(1)
+
+  if (!parent) return false
+
+  try {
+    const relationResult = await db.execute(sql`
+      SELECT EXISTS(
+        SELECT 1
+        FROM parent_students
+        WHERE parent_id = ${parentUserId}
+          AND student_id = ${studentId}
+      ) AS allowed
+    `) as unknown as RelationRow[] | { rows: RelationRow[] }
+
+    if (getSqlRows(relationResult)[0]?.allowed) {
+      return true
+    }
+  } catch (error) {
+    logger.warn({ err: error instanceof Error ? error : new Error(String(error)), tenantId, parentUserId, studentId }, '[parent/contact-book] parent_students lookup failed, fallback to guardian phone check')
+  }
+
+  if (!parent.phone) return false
+
   const [student] = await db
     .select({ id: manageStudents.id })
     .from(manageStudents)
     .where(
       and(
         eq(manageStudents.id, studentId),
-        eq(manageStudents.tenantId, tenantId)
+        eq(manageStudents.tenantId, tenantId),
+        eq(manageStudents.guardianPhone, parent.phone)
       )
     )
     .limit(1)
+
   return !!student
 }
 
@@ -61,9 +104,10 @@ contactBookRoutes.get(
   zValidator('query', listQuerySchema),
   async (c) => {
     const tenantId = c.get('tenantId')
+    const user = c.get('user')
     const { studentId, limit, offset } = c.req.valid('query')
 
-    const studentExists = await verifyStudentInTenant(tenantId, studentId)
+    const studentExists = await verifyParentOwnsStudent(tenantId, user.id, studentId)
     if (!studentExists) {
       return c.json({ success: false, error: 'not_found', message: '找不到該學生' }, 404)
     }
@@ -141,6 +185,7 @@ contactBookRoutes.get(
 
 contactBookRoutes.get('/:id', async (c) => {
   const tenantId = c.get('tenantId')
+  const user = c.get('user')
   const { id } = c.req.param()
 
   const [entry] = await db
@@ -174,6 +219,11 @@ contactBookRoutes.get('/:id', async (c) => {
 
   if (!entry) {
     return c.json({ success: false, error: 'not_found', message: '找不到該聯絡簿' }, 404)
+  }
+
+  const allowed = await verifyParentOwnsStudent(tenantId, user.id, entry.studentId)
+  if (!allowed) {
+    return c.json({ success: false, error: 'forbidden', message: '無權查看該學生的聯絡簿' }, 403)
   }
 
   // 首次查看：更新 readAt 和 status='read'
@@ -256,7 +306,7 @@ contactBookRoutes.post(
 
     // 確認 entry 存在且屬於該 tenant（且已 sent/read）
     const [entry] = await db
-      .select({ id: manageContactBookEntries.id })
+      .select({ id: manageContactBookEntries.id, studentId: manageContactBookEntries.studentId })
       .from(manageContactBookEntries)
       .where(
         and(
@@ -269,6 +319,11 @@ contactBookRoutes.post(
 
     if (!entry) {
       return c.json({ success: false, error: 'not_found', message: '找不到該聯絡簿' }, 404)
+    }
+
+    const allowed = await verifyParentOwnsStudent(tenantId, user.id, entry.studentId)
+    if (!allowed) {
+      return c.json({ success: false, error: 'forbidden', message: '無權回覆該學生的聯絡簿' }, 403)
     }
 
     // 檢查是否已有同一家長對同一 entry 的反饋

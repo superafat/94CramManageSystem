@@ -26,6 +26,15 @@ async function callBotApiBase(
   path: string,
   options?: { body?: Record<string, unknown>; query?: Record<string, string | number> }
 ): Promise<BotApiResponse> {
+  if (config.NODE_ENV === 'production' && !config.INTERNAL_API_KEY) {
+    logger.error('[API Client] INTERNAL_API_KEY is required in production')
+    return {
+      success: false,
+      error: 'misconfigured',
+      message: 'INTERNAL_API_KEY is required in production',
+    }
+  }
+
   const baseUrl = SERVICES[service];
   const prefix = service === 'manage' ? '/api/bot-ext' : '/api/bot';
   let url = `${baseUrl}${prefix}${path}`;
@@ -39,10 +48,18 @@ async function callBotApiBase(
 
   try {
     const client = await auth.getIdTokenClient(baseUrl);
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (config.INTERNAL_API_KEY) {
+      headers['X-Internal-Key'] = config.INTERNAL_API_KEY;
+    }
+
     const res = await client.request<BotApiResponse>({
       url,
       method,
-      ...(options?.body ? { data: options.body, headers: { 'Content-Type': 'application/json' } } : {}),
+      headers,
+      ...(options?.body ? { data: options.body } : {}),
     });
     return res.data;
   } catch (error: unknown) {

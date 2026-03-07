@@ -21,15 +21,29 @@ export default function BillingFilters({
   onMonthChange,
   onPaymentTypeChange,
 }: BillingFiltersProps) {
+  const [selectedYear = '', selectedMonthValue = ''] = selectedMonth.split('-')
+  const currentYear = new Date().getFullYear()
+  const yearOptions = Array.from({ length: 5 }, (_, index) => String(currentYear - 2 + index))
+  const monthOptions = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0'))
+
+  const handleYearChange = (year: string) => {
+    onMonthChange(`${year}-${selectedMonthValue || '01'}`)
+  }
+
+  const handleMonthValueChange = (month: string) => {
+    onMonthChange(`${selectedYear || String(currentYear)}-${month}`)
+  }
+
   return (
-    <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+    <div className="mb-4 rounded-2xl border border-border bg-surface p-4 shadow-sm">
+      <div className="mb-3 grid gap-3 md:grid-cols-2">
         <div>
-          <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '14px' }}>班級</label>
+          <label className="mb-1.5 block text-sm font-bold text-text">班級</label>
           <select
             value={selectedClassId}
             onChange={(e) => onClassChange(e.target.value)}
-            style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '14px' }}
+            aria-label="選擇班級"
+            className="w-full rounded-md border-2 border-border bg-white px-3 py-2.5 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             {classes.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
@@ -37,33 +51,46 @@ export default function BillingFilters({
           </select>
         </div>
         <div>
-          <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '14px' }}>月份</label>
-          <input
-            type="month"
-            value={selectedMonth}
-            onChange={(e) => onMonthChange(e.target.value)}
-            style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border)', fontSize: '14px' }}
-          />
+          <label className="mb-1.5 block text-sm font-bold text-text">月份</label>
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={selectedYear}
+              onChange={(e) => handleYearChange(e.target.value)}
+              aria-label="選擇繳費年份"
+              className="w-full rounded-md border-2 border-border bg-white px-3 py-2.5 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              {yearOptions.map((year) => (
+                <option key={year} value={year}>{year} 年</option>
+              ))}
+            </select>
+            <select
+              value={selectedMonthValue}
+              onChange={(e) => handleMonthValueChange(e.target.value)}
+              aria-label="選擇繳費月份"
+              className="w-full rounded-md border-2 border-border bg-white px-3 py-2.5 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              {monthOptions.map((month) => (
+                <option key={month} value={month}>{Number(month)} 月</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
       {/* Payment type selector */}
       <div>
-        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '14px' }}>繳費類型</label>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <label className="mb-1.5 block text-sm font-bold text-text">繳費類型</label>
+        <div className="flex flex-wrap gap-2">
           {(['monthly', 'quarterly', 'semester', 'yearly'] as const).map(type => (
             <button
               key={type}
               onClick={() => onPaymentTypeChange(type)}
-              style={{
-                padding: '8px 16px',
-                borderRadius: 'var(--radius-sm)',
-                background: paymentType === type ? 'var(--primary)' : 'var(--background)',
-                color: paymentType === type ? 'white' : 'var(--text-primary)',
-                border: `2px solid ${paymentType === type ? 'var(--primary)' : 'var(--border)'}`,
-                fontSize: '13px',
-                cursor: 'pointer',
-              }}
+              type="button"
+              className={`rounded-md border-2 px-4 py-2 text-sm font-medium transition ${
+                paymentType === type
+                  ? 'border-primary bg-primary text-white'
+                  : 'border-border bg-background text-text hover:bg-surface-hover'
+              }`}
             >
               {type === 'monthly' ? '月費' : type === 'quarterly' ? '季費' : type === 'semester' ? '學期費' : '學年費'}
             </button>

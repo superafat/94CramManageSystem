@@ -11,6 +11,7 @@ const app = new Hono<{ Variables: BotExtVariables }>()
 // POST /line/user-by-line-id
 app.post('/user-by-line-id', async (c) => {
   try {
+    const tenantId = c.get('tenantId')
     const { line_user_id } = c.get('botBody') as { line_user_id?: string }
 
     if (!line_user_id || typeof line_user_id !== 'string') {
@@ -27,7 +28,7 @@ app.post('/user-by-line-id', async (c) => {
         branch_id: users.branchId,
       })
       .from(users)
-      .where(eq(users.lineUserId, line_user_id))
+      .where(and(eq(users.tenantId, tenantId), eq(users.lineUserId, line_user_id)))
       .limit(1)
 
     return c.json({ success: true, data: { user: rows[0] ?? null } })
@@ -40,6 +41,7 @@ app.post('/user-by-line-id', async (c) => {
 // POST /line/bind
 app.post('/bind', async (c) => {
   try {
+    const tenantId = c.get('tenantId')
     const { line_user_id, student_name, phone_last_4 } = c.get('botBody') as {
       line_user_id?: string
       student_name?: string
@@ -50,23 +52,24 @@ app.post('/bind', async (c) => {
       return c.json({ success: false, error: 'missing_param', message: '缺少必要參數' }, 400)
     }
 
-    // Check if this LINE ID is already bound to any user (cross-tenant check)
+    // Check if this LINE ID is already bound inside the current tenant only
     const alreadyBound = await db
       .select({ id: users.id, tenantId: users.tenantId, name: users.name })
       .from(users)
-      .where(eq(users.lineUserId, line_user_id))
+      .where(and(eq(users.tenantId, tenantId), eq(users.lineUserId, line_user_id)))
       .limit(1)
 
     if (alreadyBound.length > 0) {
       return c.json({ success: false, error: 'already_bound', message: '此 LINE 帳號已綁定其他帳號，請聯繫客服協助' })
     }
 
-    // Search for matching users by name (case-insensitive) and phone last 4 digits, unbound only
+    // Search for matching users only inside the authorized tenant
     const candidates = await db
       .select({ id: users.id, name: users.name, phone: users.phone, tenantId: users.tenantId })
       .from(users)
       .where(
         and(
+          eq(users.tenantId, tenantId),
           ilike(users.name, student_name),
           sql`${users.phone} LIKE ${'%' + phone_last_4}`,
           sql`${users.lineUserId} IS NULL`

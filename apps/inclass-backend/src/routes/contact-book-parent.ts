@@ -13,8 +13,10 @@ import {
   inclassContactBookPhotos,
   inclassContactBookFeedback,
   inclassContactBookAiAnalysis,
+  inclassParents,
   manageCourses,
   manageStudents,
+  users,
 } from '@94cram/shared/db'
 import type { Variables } from '../middleware/auth.js'
 
@@ -33,22 +35,72 @@ const feedbackBodySchema = z.object({
   comment: z.string().max(1000).optional(),
 })
 
-// ─── Helper: verify parent owns this student (same tenant) ───────────────────
-
-async function verifyStudentInTenant(
+async function verifyParentOwnsStudent(
   tenantId: string,
+  parentUserId: string,
   studentId: string
 ): Promise<boolean> {
+  const [parentUser] = await db
+    .select({ id: users.id, phone: users.phone, lineUserId: users.lineUserId })
+    .from(users)
+    .where(
+      and(
+        eq(users.id, parentUserId),
+        eq(users.tenantId, tenantId),
+        eq(users.role, 'parent'),
+        eq(users.isActive, true)
+      )
+    )
+    .limit(1)
+
+  if (!parentUser) return false
+
+  if (parentUser.phone) {
+    const [directParent] = await db
+      .select({ id: inclassParents.id })
+      .from(inclassParents)
+      .where(
+        and(
+          eq(inclassParents.tenantId, tenantId),
+          eq(inclassParents.studentId, studentId),
+          eq(inclassParents.phone, parentUser.phone)
+        )
+      )
+      .limit(1)
+
+    if (directParent) return true
+  }
+
+  if (parentUser.lineUserId) {
+    const [lineBoundParent] = await db
+      .select({ id: inclassParents.id })
+      .from(inclassParents)
+      .where(
+        and(
+          eq(inclassParents.tenantId, tenantId),
+          eq(inclassParents.studentId, studentId),
+          eq(inclassParents.lineUserId, parentUser.lineUserId)
+        )
+      )
+      .limit(1)
+
+    if (lineBoundParent) return true
+  }
+
+  if (!parentUser.phone) return false
+
   const [student] = await db
     .select({ id: manageStudents.id })
     .from(manageStudents)
     .where(
       and(
         eq(manageStudents.id, studentId),
-        eq(manageStudents.tenantId, tenantId)
+        eq(manageStudents.tenantId, tenantId),
+        eq(manageStudents.guardianPhone, parentUser.phone)
       )
     )
     .limit(1)
+
   return !!student
 }
 
@@ -59,9 +111,10 @@ contactBookParentRoutes.get(
   zValidator('query', listQuerySchema),
   async (c) => {
     const tenantId = c.get('schoolId')
+    const userId = c.get('userId')
     const { studentId, limit, offset } = c.req.valid('query')
 
-    const studentExists = await verifyStudentInTenant(tenantId, studentId)
+    const studentExists = await verifyParentOwnsStudent(tenantId, userId, studentId)
     if (!studentExists) {
       return c.json({ success: false, error: 'not_found', message: '找不到該學生' }, 404)
     }
@@ -139,6 +192,7 @@ contactBookParentRoutes.get(
 
 contactBookParentRoutes.get('/:id', async (c) => {
   const tenantId = c.get('schoolId')
+  const userId = c.get('userId')
   const { id } = c.req.param()
 
   const [entry] = await db
@@ -172,6 +226,11 @@ contactBookParentRoutes.get('/:id', async (c) => {
 
   if (!entry) {
     return c.json({ success: false, error: 'not_found', message: '找不到該聯絡簿' }, 404)
+  }
+
+  const allowed = await verifyParentOwnsStudent(tenantId, userId, entry.studentId)
+  if (!allowed) {
+    return c.json({ success: false, error: 'forbidden', message: '無權查看該學生的聯絡簿' }, 403)
   }
 
   // 首次查看：更新 readAt 和 status='read'
@@ -254,7 +313,7 @@ contactBookParentRoutes.post(
 
     // 確認 entry 存在且屬於該 tenant（且已 sent/read）
     const [entry] = await db
-      .select({ id: inclassContactBookEntries.id })
+      .select({ id: inclassContactBookEntries.id, studentId: inclassContactBookEntries.studentId })
       .from(inclassContactBookEntries)
       .where(
         and(
@@ -267,6 +326,11 @@ contactBookParentRoutes.post(
 
     if (!entry) {
       return c.json({ success: false, error: 'not_found', message: '找不到該聯絡簿' }, 404)
+    }
+
+    const allowed = await verifyParentOwnsStudent(tenantId, userId, entry.studentId)
+    if (!allowed) {
+      return c.json({ success: false, error: 'forbidden', message: '無權回覆該學生的聯絡簿' }, 403)
     }
 
     // 檢查是否已有同一家長對同一 entry 的反饋

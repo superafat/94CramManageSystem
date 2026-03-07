@@ -34,6 +34,91 @@ interface ReportData {
   }
 }
 
+type UnknownRecord = Record<string, unknown>
+
+function asRecord(value: unknown): UnknownRecord {
+  return typeof value === 'object' && value !== null ? value as UnknownRecord : {}
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : []
+}
+
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : fallback
+  }
+  return fallback
+}
+
+function normalizeAttendanceReport(value: unknown): ReportData {
+  const record = asRecord(value)
+  const report = asRecord(record.report)
+  const records = asArray(report.records).map((entry) => asRecord(entry))
+  const dailyStats = records.reduce<Record<string, DailyStats>>((acc, entry) => {
+    const rawDate = asString(entry.date)
+    const date = rawDate ? new Date(rawDate).toISOString().split('T')[0] : 'unknown'
+    const rawStatus = asString(entry.status)
+    const status = rawStatus === 'present' ? 'arrived' : rawStatus
+    const current = acc[date] ?? { total: 0, arrived: 0, late: 0, absent: 0 }
+    current.total += 1
+    if (status === 'arrived') current.arrived += 1
+    if (status === 'late') current.late += 1
+    if (status === 'absent') current.absent += 1
+    acc[date] = current
+    return acc
+  }, {})
+
+  const studentMap = new Map<string, StudentStats>()
+  for (const entry of records) {
+    const studentId = asString(entry.studentId)
+    const studentName = asString(entry.studentName, '未命名學生')
+    const rawStatus = asString(entry.status)
+    const status = rawStatus === 'present' ? 'arrived' : rawStatus
+    const current = studentMap.get(studentId) ?? {
+      studentId,
+      studentName,
+      arrived: 0,
+      late: 0,
+      absent: 0,
+      total: 0,
+      rate: 0,
+    }
+    current.total += 1
+    if (status === 'arrived') current.arrived += 1
+    if (status === 'late') current.late += 1
+    if (status === 'absent') current.absent += 1
+    studentMap.set(studentId, current)
+  }
+
+  const studentStats = Array.from(studentMap.values())
+    .map((student) => ({
+      ...student,
+      rate: student.total > 0 ? Math.round(((student.arrived + student.late) / student.total) * 100) : 0,
+    }))
+    .sort((a, b) => b.rate - a.rate)
+
+  return {
+    month: asString(report.period),
+    dailyStats,
+    studentStats,
+    summary: {
+      totalDays: Object.keys(dailyStats).length,
+      totalAttendances: asNumber(report.total, records.length),
+      averageRate: studentStats.length > 0
+        ? Math.round(studentStats.reduce((sum, student) => sum + student.rate, 0) / studentStats.length)
+        : 0,
+      totalStudents: studentStats.length,
+    },
+  }
+}
+
 export default function AttendanceReportPage() {
   const router = useRouter()
   const { school } = useAuth()
@@ -54,7 +139,7 @@ export default function AttendanceReportPage() {
     setError('')
     try {
       const data = await api.getAttendanceReport(selectedMonth)
-      setReport(data)
+      setReport(normalizeAttendanceReport(data))
     } catch (e) {
       console.error('Failed to fetch report:', e)
       setReport(null)

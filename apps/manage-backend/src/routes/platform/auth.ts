@@ -302,9 +302,9 @@ platformAuthRoutes.post('/seed', async (c) => {
     // 建立平台 tenant
     const tenantId = crypto.randomUUID()
     await db.execute(sql`
-      INSERT INTO tenants (id, name, slug, plan, active, created_at, updated_at)
-      VALUES (${tenantId}, '94cram 平台', 'platform', 'enterprise', true, NOW(), NOW())
-      ON CONFLICT (slug) DO UPDATE SET name = '94cram 平台'
+      INSERT INTO tenants (id, name, slug, plan, status, created_at, updated_at)
+      VALUES (${tenantId}, '94cram 平台', 'platform', 'enterprise', 'active', NOW(), NOW())
+      ON CONFLICT (slug) DO UPDATE SET name = '94cram 平台', status = 'active', updated_at = NOW()
     `)
 
     // 取得 platform tenant id（可能已存在）
@@ -321,7 +321,7 @@ platformAuthRoutes.post('/seed', async (c) => {
     const passwordHash = await bcrypt.hash(defaultPassword, 12)
 
     await db.execute(sql`
-      INSERT INTO users (id, tenant_id, username, full_name, email, role, password_hash, is_active, created_at, updated_at)
+      INSERT INTO users (id, tenant_id, username, name, email, role, password_hash, is_active, created_at, updated_at)
       VALUES (${userId}, ${finalTenantId}, 'superadmin', '平台管理員', ${email}, 'superadmin', ${passwordHash}, true, NOW(), NOW())
     `)
 

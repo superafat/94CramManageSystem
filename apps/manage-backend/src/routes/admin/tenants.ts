@@ -11,7 +11,7 @@ const tenantsRoutes = new Hono<{ Variables: RBACVariables }>()
 tenantsRoutes.get('/tenants', requireRole(Role.SUPERADMIN), async (c) => {
   try {
     const result = await db.execute(sql`
-      SELECT id, name, slug, plan, active, created_at
+      SELECT id, name, slug, plan, (status = 'active') AS active, created_at
       FROM tenants
       ORDER BY created_at
     `)
@@ -45,7 +45,7 @@ tenantsRoutes.get('/trials', requireRole(Role.SUPERADMIN), async (c) => {
   try {
     const result = await db.execute(sql`
       SELECT
-        t.id, t.name, t.slug, t.plan, t.active, t.created_at,
+        t.id, t.name, t.slug, t.plan, (t.status = 'active') AS active, t.created_at,
         t.trial_status, t.trial_start_at, t.trial_end_at,
         t.trial_approved_at, t.trial_notes,
         t.trial_approved_by,

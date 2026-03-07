@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDemoResponse, DEMO_SUPERADMIN_ID } from '@/lib/demo-data'
+import { verify } from '@94cram/shared/auth'
 
 const BACKEND_URL = process.env.PORTAL_BACKEND_URL || 'http://localhost:3100'
 
-function isDemoToken(request: NextRequest): boolean {
+async function isDemoToken(request: NextRequest): Promise<boolean> {
   try {
     // Try Authorization header first
     let token = ''
@@ -16,14 +17,7 @@ function isDemoToken(request: NextRequest): boolean {
     }
     if (!token) return false
 
-    // Simple JWT payload decode (base64url decode the middle segment)
-    const parts = token.split('.')
-    if (parts.length !== 3) return false
-
-    const payload = JSON.parse(
-      Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8')
-    ) as Record<string, unknown>
-
+    const payload = await verify(token)
     return payload.userId === DEMO_SUPERADMIN_ID
   } catch {
     return false
@@ -38,7 +32,7 @@ async function handler(
   const targetPath = '/api/platform/' + path.join('/')
 
   // Demo mode interception
-  if (isDemoToken(request)) {
+  if (await isDemoToken(request)) {
     let requestBody: Record<string, unknown> | undefined
     if (!['GET', 'HEAD'].includes(request.method)) {
       try {

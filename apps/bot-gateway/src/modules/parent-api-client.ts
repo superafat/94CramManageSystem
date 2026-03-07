@@ -21,6 +21,15 @@ export async function callParentApi(
   tenantId: string,
   options?: { method?: 'GET' | 'POST'; body?: Record<string, unknown> }
 ): Promise<ParentApiResponse> {
+  if (config.NODE_ENV === 'production' && !config.INTERNAL_API_KEY) {
+    logger.error('[Parent API] INTERNAL_API_KEY is required in production')
+    return {
+      success: false,
+      error: 'misconfigured',
+      message: 'INTERNAL_API_KEY is required in production',
+    }
+  }
+
   const baseUrl = SERVICES[service];
   const url = `${baseUrl}/api/parent-ext${path}`;
   const method = options?.method ?? 'GET';

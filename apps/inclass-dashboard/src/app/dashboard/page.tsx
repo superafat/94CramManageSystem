@@ -18,6 +18,41 @@ interface DashboardStats {
   }
 }
 
+type UnknownRecord = Record<string, unknown>
+
+function asRecord(value: unknown): UnknownRecord {
+  return typeof value === 'object' && value !== null ? value as UnknownRecord : {}
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : fallback
+  }
+  return fallback
+}
+
+function normalizeDashboardStats(value: unknown): DashboardStats {
+  const record = asRecord(value)
+  const stats = asRecord(record.stats)
+
+  return {
+    totalStudents: asNumber(stats.totalStudents, 0),
+    newStudentsThisMonth: 0,
+    attendanceRate: asNumber(stats.totalStudents, 0) > 0
+      ? Math.round((asNumber(stats.todayAttendance, 0) / asNumber(stats.totalStudents, 1)) * 100)
+      : 0,
+    totalRevenue: 0,
+    stats: {
+      totalStudents: asNumber(stats.totalStudents, 0),
+      activeStudents: asNumber(stats.todayAttendance, 0),
+      totalClasses: asNumber(stats.totalClasses, 0),
+      totalTeachers: asNumber(stats.totalTeachers, 0),
+    },
+  }
+}
+
 export default function DashboardPage() {
   const { school } = useAuth()
   const router = useRouter()
@@ -34,7 +69,7 @@ export default function DashboardPage() {
     setLoading(true)
     try {
       const data = await api.getDashboardStats()
-      setStats(data)
+      setStats(normalizeDashboardStats(data))
     } catch (e) {
       console.error('Failed to fetch stats:', e)
       setError('讀取儀表板資料失敗，請稍後再試')

@@ -626,6 +626,8 @@ export default function MakeupClassesPage() {
                 <th className="px-4 py-4 w-10">
                   <input
                     type="checkbox"
+                    aria-label="全選待排定補課"
+                    title="全選待排定補課"
                     checked={records.length > 0 && selectedPendingIds.size === records.length}
                     onChange={toggleAllPending}
                     className="rounded border-border text-primary focus:ring-primary/30"
@@ -654,6 +656,8 @@ export default function MakeupClassesPage() {
                     <td className="px-4 py-4 w-10">
                       <input
                         type="checkbox"
+                        aria-label={`選取 ${record.student_name} 的補課紀錄`}
+                        title={`選取 ${record.student_name} 的補課紀錄`}
                         checked={selectedPendingIds.has(record.id)}
                         onChange={() => togglePendingSelection(record.id)}
                         className="rounded border-border text-primary focus:ring-primary/30"
@@ -813,6 +817,8 @@ export default function MakeupClassesPage() {
                   <div className="grid grid-cols-3 gap-2">
                     <input
                       type="text"
+                      aria-label="搜尋科目"
+                      title="搜尋科目"
                       value={slotSearchSubject}
                       onChange={e => setSlotSearchSubject(e.target.value)}
                       placeholder="科目"
@@ -820,12 +826,16 @@ export default function MakeupClassesPage() {
                     />
                     <input
                       type="date"
+                      aria-label="搜尋開始日期"
+                      title="搜尋開始日期"
                       value={slotSearchDateFrom}
                       onChange={e => setSlotSearchDateFrom(e.target.value)}
                       className="px-3 py-2 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                     <input
                       type="date"
+                      aria-label="搜尋結束日期"
+                      title="搜尋結束日期"
                       value={slotSearchDateTo}
                       onChange={e => setSlotSearchDateTo(e.target.value)}
                       className="px-3 py-2 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -901,6 +911,8 @@ export default function MakeupClassesPage() {
                     </label>
                     <input
                       type="date"
+                      aria-label="建立補課時段日期"
+                      title="建立補課時段日期"
                       value={slotCreateForm.makeupDate}
                       onChange={e => setSlotCreateForm(f => ({ ...f, makeupDate: e.target.value }))}
                       className="w-full px-4 py-2 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -913,6 +925,8 @@ export default function MakeupClassesPage() {
                       </label>
                       <input
                         type="time"
+                        aria-label="建立補課時段開始時間"
+                        title="建立補課時段開始時間"
                         value={slotCreateForm.startTime}
                         onChange={e => setSlotCreateForm(f => ({ ...f, startTime: e.target.value }))}
                         className="w-full px-4 py-2 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -924,6 +938,8 @@ export default function MakeupClassesPage() {
                       </label>
                       <input
                         type="time"
+                        aria-label="建立補課時段結束時間"
+                        title="建立補課時段結束時間"
                         value={slotCreateForm.endTime}
                         onChange={e => setSlotCreateForm(f => ({ ...f, endTime: e.target.value }))}
                         className="w-full px-4 py-2 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -933,6 +949,8 @@ export default function MakeupClassesPage() {
                   <div>
                     <label className="block text-sm font-medium text-text mb-1">指派講師</label>
                     <select
+                      aria-label="選擇補課講師"
+                      title="選擇補課講師"
                       value={slotCreateForm.teacherId}
                       onChange={e => setSlotCreateForm(f => ({ ...f, teacherId: e.target.value }))}
                       className="w-full px-4 py-2 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -958,6 +976,8 @@ export default function MakeupClassesPage() {
                       <label className="block text-sm font-medium text-text mb-1">最大人數</label>
                       <input
                         type="number"
+                        aria-label="補課時段最大人數"
+                        title="補課時段最大人數"
                         value={slotCreateForm.maxStudents}
                         onChange={e => setSlotCreateForm(f => ({ ...f, maxStudents: e.target.value }))}
                         min="1"
@@ -1017,6 +1037,8 @@ export default function MakeupClassesPage() {
                   選擇學生 <span className="text-red-400">*</span>
                 </label>
                 <select
+                  aria-label="選擇新增補課學生"
+                  title="選擇新增補課學生"
                   value={addForm.studentId}
                   onChange={e => setAddForm(f => ({ ...f, studentId: e.target.value }))}
                   className="w-full px-4 py-2 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -1034,6 +1056,8 @@ export default function MakeupClassesPage() {
                 </label>
                 <input
                   type="date"
+                  aria-label="新增補課缺課日期"
+                  title="新增補課缺課日期"
                   value={addForm.absentDate}
                   onChange={e => setAddForm(f => ({ ...f, absentDate: e.target.value }))}
                   className="w-full px-4 py-2 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -1132,6 +1156,8 @@ export default function MakeupClassesPage() {
                   <div className="grid grid-cols-3 gap-2">
                     <input
                       type="text"
+                      aria-label="批量搜尋科目"
+                      title="批量搜尋科目"
                       value={slotSearchSubject}
                       onChange={e => setSlotSearchSubject(e.target.value)}
                       placeholder="科目"
@@ -1139,12 +1165,16 @@ export default function MakeupClassesPage() {
                     />
                     <input
                       type="date"
+                      aria-label="批量搜尋開始日期"
+                      title="批量搜尋開始日期"
                       value={slotSearchDateFrom}
                       onChange={e => setSlotSearchDateFrom(e.target.value)}
                       className="px-3 py-2 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                     <input
                       type="date"
+                      aria-label="批量搜尋結束日期"
+                      title="批量搜尋結束日期"
                       value={slotSearchDateTo}
                       onChange={e => setSlotSearchDateTo(e.target.value)}
                       className="px-3 py-2 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -1219,6 +1249,8 @@ export default function MakeupClassesPage() {
                     </label>
                     <input
                       type="date"
+                      aria-label="批量建立補課時段日期"
+                      title="批量建立補課時段日期"
                       value={slotCreateForm.makeupDate}
                       onChange={e => setSlotCreateForm(f => ({ ...f, makeupDate: e.target.value }))}
                       className="w-full px-4 py-2 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -1231,6 +1263,8 @@ export default function MakeupClassesPage() {
                       </label>
                       <input
                         type="time"
+                        aria-label="批量建立補課時段開始時間"
+                        title="批量建立補課時段開始時間"
                         value={slotCreateForm.startTime}
                         onChange={e => setSlotCreateForm(f => ({ ...f, startTime: e.target.value }))}
                         className="w-full px-4 py-2 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -1242,6 +1276,8 @@ export default function MakeupClassesPage() {
                       </label>
                       <input
                         type="time"
+                        aria-label="批量建立補課時段結束時間"
+                        title="批量建立補課時段結束時間"
                         value={slotCreateForm.endTime}
                         onChange={e => setSlotCreateForm(f => ({ ...f, endTime: e.target.value }))}
                         className="w-full px-4 py-2 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -1251,6 +1287,8 @@ export default function MakeupClassesPage() {
                   <div>
                     <label className="block text-sm font-medium text-text mb-1">指派講師</label>
                     <select
+                      aria-label="批量選擇補課講師"
+                      title="批量選擇補課講師"
                       value={slotCreateForm.teacherId}
                       onChange={e => setSlotCreateForm(f => ({ ...f, teacherId: e.target.value }))}
                       className="w-full px-4 py-2 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -1276,6 +1314,8 @@ export default function MakeupClassesPage() {
                       <label className="block text-sm font-medium text-text mb-1">最大人數</label>
                       <input
                         type="number"
+                        aria-label="批量補課時段最大人數"
+                        title="批量補課時段最大人數"
                         value={slotCreateForm.maxStudents}
                         onChange={e => setSlotCreateForm(f => ({ ...f, maxStudents: e.target.value }))}
                         min="1"

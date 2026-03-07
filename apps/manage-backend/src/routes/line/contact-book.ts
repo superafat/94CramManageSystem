@@ -8,7 +8,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, sql } from 'drizzle-orm'
 import { db } from '../../db'
 import { users } from '../../db/schema'
 import {
@@ -18,6 +18,7 @@ import {
   manageContactBookFeedback,
   manageContactBookAiAnalysis,
   manageCourses,
+  manageStudents,
 } from '@94cram/shared/db'
 import { logger } from '../../utils/logger'
 
@@ -38,6 +39,68 @@ interface LiffUser {
 
 type LiffVariables = {
   liffUser: LiffUser
+}
+
+type RelationRow = { allowed: boolean }
+
+function getSqlRows<T>(result: T[] | { rows: T[] }): T[] {
+  return Array.isArray(result) ? result : result.rows
+}
+
+async function verifyLineParentOwnsStudent(
+  tenantId: string,
+  parentUserId: string,
+  studentId: string
+): Promise<boolean> {
+  const [parent] = await db
+    .select({ id: users.id, phone: users.phone })
+    .from(users)
+    .where(
+      and(
+        eq(users.id, parentUserId),
+        eq(users.tenantId, tenantId),
+        eq(users.role, 'parent')
+      )
+    )
+    .limit(1)
+
+  if (!parent) return false
+
+  try {
+    const relationResult = await db.execute(sql`
+      SELECT EXISTS(
+        SELECT 1
+        FROM parent_students
+        WHERE parent_id = ${parentUserId}
+          AND student_id = ${studentId}
+      ) AS allowed
+    `) as unknown as RelationRow[] | { rows: RelationRow[] }
+
+    if (getSqlRows(relationResult)[0]?.allowed) {
+      return true
+    }
+  } catch (error) {
+    logger.warn(
+      { err: error instanceof Error ? error : new Error(String(error)), tenantId, parentUserId, studentId },
+      '[LIFF/contact-book] parent_students lookup failed, fallback to guardian phone check'
+    )
+  }
+
+  if (!parent.phone) return false
+
+  const [student] = await db
+    .select({ id: manageStudents.id })
+    .from(manageStudents)
+    .where(
+      and(
+        eq(manageStudents.id, studentId),
+        eq(manageStudents.tenantId, tenantId),
+        eq(manageStudents.guardianPhone, parent.phone)
+      )
+    )
+    .limit(1)
+
+  return !!student
 }
 
 // ─── LIFF Auth Middleware ──────────────────────────────────────────────────────
@@ -86,7 +149,7 @@ app.use('*', async (c, next) => {
         lineUserId: users.lineUserId,
       })
       .from(users)
-      .where(eq(users.lineUserId, profile.userId))
+      .where(and(eq(users.lineUserId, profile.userId), eq(users.role, 'parent')))
       .limit(1)
 
     if (!user || !user.tenantId) {
@@ -152,6 +215,11 @@ app.get('/:id', async (c) => {
 
     if (!entry) {
       return c.json({ success: false, error: 'not_found', message: '找不到該聯絡簿' }, 404)
+    }
+
+    const allowed = await verifyLineParentOwnsStudent(liffUser.tenantId, liffUser.id, entry.studentId)
+    if (!allowed) {
+      return c.json({ success: false, error: 'forbidden', message: '無權查看該學生的聯絡簿' }, 403)
     }
 
     // 首次查看：更新 readAt 和 status='read'
@@ -248,7 +316,7 @@ app.post(
     try {
       // 確認 entry 存在且屬於該 tenant（且已 sent/read）
       const [entry] = await db
-        .select({ id: manageContactBookEntries.id })
+        .select({ id: manageContactBookEntries.id, studentId: manageContactBookEntries.studentId })
         .from(manageContactBookEntries)
         .where(
           and(
@@ -261,6 +329,11 @@ app.post(
 
       if (!entry) {
         return c.json({ success: false, error: 'not_found', message: '找不到該聯絡簿' }, 404)
+      }
+
+      const allowed = await verifyLineParentOwnsStudent(liffUser.tenantId, liffUser.id, entry.studentId)
+      if (!allowed) {
+        return c.json({ success: false, error: 'forbidden', message: '無權回覆該學生的聯絡簿' }, 403)
       }
 
       // 檢查是否已有同一家長對同一 entry 的反饋

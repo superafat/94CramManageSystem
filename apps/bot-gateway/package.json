@@ -6,7 +6,8 @@
     "dev": "tsx watch --env-file=.env src/index.ts",
     "build": "tsup",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke:cloudrun": "tsx src/scripts/smoke-cloudrun.ts"
   },
   "dependencies": {
     "@94cram/shared": "workspace:*",

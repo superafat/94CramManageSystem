@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DEMO_TENANTS, getDemoResponse } from '@/lib/demo-data'
+import { verify } from '@94cram/shared/auth'
 
 const GCP_PROJECT_NUMBER = process.env.GCP_PROJECT_NUMBER || '1015149159553'
 const BACKEND_URL =
   process.env.BACKEND_URL ||
   `https://cram94-manage-backend-${GCP_PROJECT_NUMBER}.asia-east1.run.app`
 
-function extractTenantFromJwt(request: NextRequest): string | undefined {
+async function extractTenantFromJwt(request: NextRequest): Promise<string | undefined> {
   let token = request.headers.get('Authorization')?.replace('Bearer ', '')
   if (!token) token = request.cookies.get('token')?.value
   if (!token) return undefined
   try {
-    const payload = token.split('.')[1]
-    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString())
-    return decoded.tenantId
+    const payload = await verify(token)
+    return payload.tenantId
   } catch {
     return undefined
   }
@@ -24,7 +24,7 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
   const targetPath = '/api/' + path.join('/')
 
   // Demo mode: return mock data instead of proxying to backend
-  const tenantId = extractTenantFromJwt(request)
+  const tenantId = await extractTenantFromJwt(request)
   if (tenantId && DEMO_TENANTS.includes(tenantId)) {
     let requestBody: Record<string, unknown> | undefined
     if (!['GET', 'HEAD'].includes(request.method)) {

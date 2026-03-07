@@ -52,6 +52,92 @@ interface AlertNotification {
   created_at: string
 }
 
+type UnknownRecord = Record<string, unknown>
+
+function asRecord(value: unknown): UnknownRecord {
+  return typeof value === 'object' && value !== null ? value as UnknownRecord : {}
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : []
+}
+
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : fallback
+  }
+  return fallback
+}
+
+function unwrapPayload<T extends UnknownRecord>(value: unknown): T {
+  const record = asRecord(value)
+  return ('data' in record ? asRecord(record.data) : record) as T
+}
+
+function normalizeStudentsResponse(value: unknown): Student[] {
+  const payload = unwrapPayload<{ students?: unknown }>(value)
+  return asArray(payload.students).map((entry) => {
+    const student = asRecord(entry)
+    return {
+      id: asString(student.id),
+      name: asString(student.name, '未命名學生'),
+      grade: asString(student.grade) || undefined,
+      nfcId: asString(student.nfcId) || undefined,
+      classId: asString(student.classId) || undefined,
+    }
+  })
+}
+
+function normalizeClassesResponse(value: unknown): ClassInfo[] {
+  const payload = unwrapPayload<{ classes?: unknown }>(value)
+  return asArray(payload.classes).map((entry) => {
+    const classInfo = asRecord(entry)
+    return {
+      id: asString(classInfo.id),
+      name: asString(classInfo.name, '未命名班級'),
+      feeMonthly: asNumber(classInfo.feeMonthly, 0),
+      feeQuarterly: asNumber(classInfo.feeQuarterly, 0),
+      feeSemester: asNumber(classInfo.feeSemester, 0),
+      feeYearly: asNumber(classInfo.feeYearly, 0),
+    }
+  })
+}
+
+function normalizeAttendanceResponse(value: unknown, students: Student[]): { stats: Stats; attendances: Attendance[] } {
+  const payload = asRecord(value)
+  const stats = asRecord(payload.stats)
+  const studentNameMap = new Map(students.map((student) => [student.id, student.name]))
+
+  return {
+    stats: {
+      total: asNumber(stats.total, 0),
+      arrived: asNumber(stats.arrived, 0),
+      late: asNumber(stats.late, 0),
+      absent: asNumber(stats.absent, 0),
+    },
+    attendances: asArray(payload.attendances).map((entry) => {
+      const attendance = asRecord(entry)
+      const studentId = asString(attendance.studentId)
+      const rawStatus = asString(attendance.status)
+      const normalizedStatus: Attendance['status'] = rawStatus === 'present' ? 'arrived' : rawStatus === 'late' ? 'late' : 'absent'
+
+      return {
+        id: asString(attendance.id, studentId),
+        studentId,
+        studentName: asString(attendance.studentName, studentNameMap.get(studentId) ?? '未命名學生'),
+        status: normalizedStatus,
+        checkInTime: asString(attendance.checkInTime),
+      }
+    }),
+  }
+}
+
 // Simple modal wrapper used for the Add Student dialog
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
@@ -155,7 +241,7 @@ export default function Home() {
   const fetchStudents = async () => {
     try {
       const data = await api.getStudents()
-      setStudents(data.students || [])
+      setStudents(normalizeStudentsResponse(data))
     } catch (e) {
       console.error('Failed to fetch students:', e)
       showMessage('❌ 讀取學生失敗')
@@ -165,8 +251,9 @@ export default function Home() {
   const fetchAttendance = async () => {
     try {
       const data = await api.getTodayAttendance()
-      setStats(data.stats || { total: 0, arrived: 0, late: 0, absent: 0 })
-      setAttendances(data.attendances || [])
+      const normalized = normalizeAttendanceResponse(data, students)
+      setStats(normalized.stats)
+      setAttendances(normalized.attendances)
     } catch (e) {
       console.error('Failed to fetch attendance:', e)
       showMessage('❌ 讀取點名紀錄失敗')
@@ -176,7 +263,7 @@ export default function Home() {
   const openPaymentModal = async (student: Student) => {
     setPaymentStudent(student)
     const data = await api.getClasses().catch(() => ({ classes: [] }))
-    const fetchedClasses = data.classes || []
+    const fetchedClasses = normalizeClassesResponse(data)
     setClasses(fetchedClasses)
 
     if (student.classId) {

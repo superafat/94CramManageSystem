@@ -549,20 +549,20 @@ authRoutes.post('/trial-signup', rateLimit('trial-signup'), zValidator('json', t
     
     // Create tenant
     await db.execute(sql`
-      INSERT INTO tenants (id, name, slug, plan, trial_status, active, created_at, updated_at)
-      VALUES (${tenantId}, ${body.tenantName}, ${body.tenantSlug}, 'free', 'pending', true, ${now}, ${now})
+      INSERT INTO tenants (id, name, slug, plan, trial_status, status, created_at, updated_at)
+      VALUES (${tenantId}, ${body.tenantName}, ${body.tenantSlug}, 'free', 'pending', 'active', ${now}, ${now})
     `)
     
     // Create default branch
     const branchId = generateId()
     await db.execute(sql`
-      INSERT INTO branches (id, tenant_id, name, code, created_at)
-      VALUES (${branchId}, ${tenantId}, ${body.tenantName}, ${body.tenantSlug}, ${now})
+      INSERT INTO branches (id, tenant_id, name, created_at)
+      VALUES (${branchId}, ${tenantId}, ${body.tenantName}, ${now})
     `)
     
     // Create admin user
     await db.execute(sql`
-      INSERT INTO users (id, tenant_id, branch_id, full_name, email, phone, password_hash, role, is_active, created_at, updated_at)
+      INSERT INTO users (id, tenant_id, branch_id, name, email, phone, password_hash, role, is_active, created_at, updated_at)
       VALUES (${userId}, ${tenantId}, ${branchId}, ${body.adminName}, ${body.adminEmail}, ${body.adminPhone || null}, ${passwordHash}, 'admin', true, ${now}, ${now})
     `)
     

@@ -222,17 +222,28 @@ miscRouter.get('/classes/:classId/billing', async (c) => {
   try {
     const schoolId = c.get('schoolId')
     const classId = c.req.param('classId')
-    const periodMonth = c.req.query('periodMonth')
+    const periodMonth = c.req.query('periodMonth') ?? ''
 
     const [course] = await db.select().from(manageCourses).where(
       and(eq(manageCourses.id, classId), eq(manageCourses.tenantId, schoolId))
     )
     if (!course) return c.json({ error: 'Class not found' }, 404)
 
-    // Get enrolled students
-    const enrollments = await db.select().from(manageEnrollments).where(
-      and(eq(manageEnrollments.courseId, classId), eq(manageEnrollments.tenantId, schoolId), eq(manageEnrollments.status, 'active'))
-    )
+    const enrollments = await db
+      .select({
+        studentId: manageEnrollments.studentId,
+        studentName: manageStudents.name,
+        studentGrade: manageStudents.grade,
+      })
+      .from(manageEnrollments)
+      .leftJoin(manageStudents, eq(manageEnrollments.studentId, manageStudents.id))
+      .where(
+        and(
+          eq(manageEnrollments.courseId, classId),
+          eq(manageEnrollments.tenantId, schoolId),
+          eq(manageEnrollments.status, 'active')
+        )
+      )
 
     // Get payment records for this class
     const conditions = [eq(inclassPaymentRecords.tenantId, schoolId), eq(inclassPaymentRecords.courseId, classId)]
@@ -240,8 +251,41 @@ miscRouter.get('/classes/:classId/billing', async (c) => {
     const payments = await db.select().from(inclassPaymentRecords).where(and(...conditions))
 
     const paidStudentIds = new Set(payments.filter(p => p.status === 'paid').map(p => p.studentId))
+    const paymentRecordMap = new Map(
+      payments
+        .filter((payment) => payment.status === 'paid')
+        .map((payment) => [payment.studentId, payment])
+    )
+
+    const students = enrollments.map((enrollment) => {
+      const paymentRecord = paymentRecordMap.get(enrollment.studentId)
+      return {
+        id: enrollment.studentId,
+        name: enrollment.studentName ?? '未命名學生',
+        grade: enrollment.studentGrade ?? undefined,
+        isPaid: paidStudentIds.has(enrollment.studentId),
+        paymentRecord: paymentRecord
+          ? {
+              id: paymentRecord.id,
+              amount: Number(paymentRecord.amount ?? 0),
+              paymentType: paymentRecord.paymentType,
+              paymentDate: paymentRecord.paymentDate,
+            }
+          : null,
+      }
+    })
+
+    const stats = {
+      total: enrollments.length,
+      paid: paidStudentIds.size,
+      unpaid: enrollments.length - paidStudentIds.size,
+    }
 
     return c.json({
+      class: course,
+      periodMonth,
+      students,
+      stats,
       billing: {
         course,
         totalEnrolled: enrollments.length,

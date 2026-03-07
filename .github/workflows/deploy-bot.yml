@@ -8,6 +8,7 @@ on:
       - 'apps/bot-dashboard/**'
       - 'packages/shared/**'
       - '.github/workflows/deploy-bot.yml'
+  workflow_dispatch:
 
 env:
   PROJECT_ID: cram94-manage-system
@@ -19,6 +20,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Auth to GCP
         uses: google-github-actions/auth@v2
@@ -61,6 +76,19 @@ jobs:
           service-name: cram94-bot-gateway
           revision-prefix: bot-gw
           region: ${{ env.REGION }}
+
+      - name: Load smoke secrets
+        run: |
+          echo "INTERNAL_API_KEY=$(gcloud secrets versions access latest --secret=INTERNAL_API_KEY)" >> "$GITHUB_ENV"
+
+      - name: Smoke downstream bot APIs
+        env:
+          MANAGE_URL: https://cram94-manage-backend-1015149159553.asia-east1.run.app
+          INCLASS_URL: https://cram94-inclass-backend-1015149159553.asia-east1.run.app
+          STOCK_URL: https://cram94-stock-backend-1015149159553.asia-east1.run.app
+          INTERNAL_API_KEY: ${{ env.INTERNAL_API_KEY }}
+          SMOKE_TENANT_ID: 11111111-1111-1111-1111-111111111111
+        run: pnpm --filter @94cram/bot-gateway smoke:cloudrun
 
   deploy-bot-dashboard:
     runs-on: ubuntu-latest

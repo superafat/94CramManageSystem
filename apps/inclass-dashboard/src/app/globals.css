@@ -20,6 +20,7 @@
   --success: #A8C5AF;
   --warning: #D4B896;
   --error: #C89B9B;
+  --surface-hover: #F7F4F1;
   
   /* Typography - WCAG AAA */
   --font-base: 16px;
@@ -41,6 +42,22 @@
   --shadow-sm: 0 2px 4px rgba(143, 169, 184, 0.08);
   --shadow-md: 0 4px 8px rgba(143, 169, 184, 0.12);
   --shadow-lg: 0 8px 16px rgba(143, 169, 184, 0.16);
+}
+
+@theme {
+  --color-primary: var(--primary);
+  --color-primary-light: var(--primary-light);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-text: var(--text-primary);
+  --color-text-muted: var(--text-secondary);
+  --color-border: var(--border);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
 }
 
 body {

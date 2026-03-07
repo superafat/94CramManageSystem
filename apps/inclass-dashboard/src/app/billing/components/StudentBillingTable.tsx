@@ -6,6 +6,8 @@ interface StudentBillingTableProps {
   students: StudentBilling[]
   selected: Record<string, boolean>
   amounts: Record<string, number>
+  selectedCount: number
+  unpaidCount: number
   onToggleSelectAll: () => void
   onToggleStudent: (studentId: string, checked: boolean) => void
   onAmountChange: (studentId: string, amount: number) => void
@@ -20,84 +22,85 @@ export default function StudentBillingTable({
   students,
   selected,
   amounts,
+  selectedCount,
+  unpaidCount,
   onToggleSelectAll,
   onToggleStudent,
   onAmountChange,
 }: StudentBillingTableProps) {
   return (
-    <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <h2 style={{ fontSize: '18px', color: 'var(--primary)', fontWeight: 'bold', margin: 0 }}>
+    <div className="mb-4 rounded-2xl border border-border bg-surface p-4 shadow-sm">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-primary">
           👥 學生繳費狀態
-        </h2>
+          </h2>
+          <p className="mt-1 text-sm text-text-muted">
+            已選取 {selectedCount} / {unpaidCount} 位未繳學生
+          </p>
+        </div>
         <button
           onClick={onToggleSelectAll}
-          style={{ padding: '6px 12px', borderRadius: 'var(--radius-sm)', background: 'var(--accent)', color: 'white', border: 'none', fontSize: '12px', cursor: 'pointer' }}
+          disabled={unpaidCount === 0}
+          className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           全選/取消
         </button>
       </div>
 
       {students.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+        <div className="py-10 text-center text-text-muted">
           此班級尚無學生
         </div>
       ) : (
-        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+        <div className="max-h-[400px] overflow-y-auto">
           {students.map(student => (
             <div
               key={student.id}
-              style={{
-                padding: '12px',
-                borderBottom: '1px solid var(--border)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                background: student.isPaid ? 'rgba(144, 238, 144, 0.1)' : 'transparent',
-              }}
+              className={`flex flex-col gap-3 border-b border-border px-1 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between ${student.isPaid ? 'bg-[rgba(168,197,175,0.12)]' : ''}`}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div className="flex items-center gap-3">
                 {!student.isPaid && (
                   <input
                     type="checkbox"
                     checked={selected[student.id] || false}
                     onChange={(e) => onToggleStudent(student.id, e.target.checked)}
-                    style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                    aria-label={`選取 ${student.name} 進行批次繳費`}
+                    className="h-5 w-5 cursor-pointer rounded border-border text-primary focus:ring-primary/30"
                   />
                 )}
                 <div>
-                  <div style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{student.name}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{student.grade || '-'}</div>
+                  <div className="font-bold text-text">{student.name}</div>
+                  <div className="text-xs text-text-muted">{student.grade || '-'}</div>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="flex items-center gap-2 self-end sm:self-auto">
                 {student.isPaid ? (
-                  <span style={{
-                    padding: '6px 12px',
-                    borderRadius: 'var(--radius-sm)',
-                    background: 'var(--success)',
-                    color: 'white',
-                    fontSize: '13px',
-                    fontWeight: 'bold'
-                  }}>
-                    ✅ 已繳 {formatCurrency(student.paymentRecord?.amount)}
-                  </span>
+                  <div className="text-right">
+                    <span className="inline-flex rounded-md bg-success px-3 py-1.5 text-sm font-bold text-white">
+                      ✅ 已繳 {formatCurrency(student.paymentRecord?.amount)}
+                    </span>
+                    {student.paymentRecord?.paymentDate && (
+                      <div className="mt-1 text-xs text-text-muted">{student.paymentRecord.paymentDate}</div>
+                    )}
+                  </div>
                 ) : (
-                  <input
-                    type="number"
-                    value={amounts[student.id] || 0}
-                    onChange={(e) => onAmountChange(student.id, Number(e.target.value))}
-                    style={{
-                      width: '100px',
-                      padding: '8px',
-                      borderRadius: 'var(--radius-sm)',
-                      border: '2px solid var(--border)',
-                      fontSize: '14px',
-                      textAlign: 'right'
-                    }}
-                    min="0"
-                  />
+                  <div className="flex flex-col items-end gap-1">
+                    <input
+                      type="number"
+                      value={amounts[student.id] || 0}
+                      onChange={(e) => onAmountChange(student.id, Number(e.target.value))}
+                      aria-label={`${student.name} 的繳費金額`}
+                      className={`w-28 rounded-md border-2 bg-white px-3 py-2 text-right text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/30 ${
+                        (amounts[student.id] || 0) <= 0 ? 'border-error' : 'border-border'
+                      }`}
+                      min="0"
+                    />
+                    {(amounts[student.id] || 0) <= 0 && (
+                      <span className="text-xs text-error">請輸入有效金額</span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

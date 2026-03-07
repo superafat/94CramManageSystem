@@ -62,6 +62,122 @@ interface StudentGradesResponse {
   grades: StudentGradeEntry[]
 }
 
+type UnknownRecord = Record<string, unknown>
+
+function asRecord(value: unknown): UnknownRecord {
+  return typeof value === 'object' && value !== null ? value as UnknownRecord : {}
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : []
+}
+
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' && value.trim() ? value : fallback
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function toDateString(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().split('T')[0]
+  if (typeof value !== 'string' || !value.trim()) return ''
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString().split('T')[0]
+}
+
+function unwrapPayload(value: unknown): UnknownRecord {
+  const record = asRecord(value)
+  if ('data' in record) return asRecord(record.data)
+  return record
+}
+
+function normalizeExam(rawExam: unknown): Exam {
+  const exam = asRecord(rawExam)
+  return {
+    id: asString(exam.id),
+    name: asString(exam.name, '未命名考試'),
+    subject: asString(exam.subject, '未設定科目'),
+    maxScore: asNumber(exam.maxScore, asNumber(exam.totalScore, 100)),
+    examDate: toDateString(exam.examDate),
+    passRate: typeof exam.passRate === 'number' ? exam.passRate : undefined,
+  }
+}
+
+function normalizeExamStats(rawStats: unknown): ExamStats {
+  const stats = unwrapPayload(rawStats)
+  return {
+    totalExams: asNumber(stats.totalExams, 0),
+    averageScorePercent: asNumber(stats.averageScorePercent, asNumber(stats.averageScorePercentage, 0)),
+    passRate: asNumber(stats.passRate, 0),
+    topPerformers: Array.isArray(stats.topPerformers)
+      ? stats.topPerformers.length
+      : asNumber(stats.topPerformers, 0),
+  }
+}
+
+function normalizeStudentGrades(
+  rawResponse: unknown,
+  studentId: string,
+  students: Student[]
+): StudentGradesResponse {
+  const payload = unwrapPayload(rawResponse)
+  const selectedStudent = students.find((student) => student.id === studentId)
+
+  return {
+    studentId,
+    studentName: asString(payload.studentName, selectedStudent?.name ?? '未命名學生'),
+    grades: asArray(payload.grades).map((entry) => {
+      const grade = asRecord(entry)
+      const maxScore = asNumber(grade.maxScore, asNumber(grade.totalScore, 100))
+      const percentage = asNumber(
+        grade.percentage,
+        maxScore > 0 ? Math.round((asNumber(grade.score, 0) / maxScore) * 1000) / 10 : 0
+      )
+
+      return {
+        examId: asString(grade.examId, asString(grade.scoreId)),
+        examName: asString(grade.examName, '未命名考試'),
+        subject: asString(grade.subject, '未設定科目'),
+        examDate: toDateString(grade.examDate),
+        score: asNumber(grade.score, 0),
+        maxScore,
+        percentage,
+        letterGrade: asString(grade.letterGrade, 'F'),
+        passed: typeof grade.passed === 'boolean' ? grade.passed : percentage >= 60,
+      }
+    }),
+  }
+}
+
+function normalizeExamDetail(rawResponse: unknown, students: Student[]): ExamDetail {
+  const payload = unwrapPayload(rawResponse)
+  const studentNameMap = new Map(students.map((student) => [student.id, student.name]))
+  const stats = asRecord(payload.stats)
+
+  return {
+    exam: normalizeExam(payload.exam),
+    scores: asArray(payload.scores).map((entry) => {
+      const score = asRecord(entry)
+      const studentId = asString(score.studentId)
+      return {
+        id: asString(score.id, studentId),
+        studentId,
+        studentName: asString(score.studentName, studentNameMap.get(studentId) ?? '未命名學生'),
+        score: asNumber(score.score, 0),
+      }
+    }),
+    stats: {
+      average: asNumber(stats.average, 0),
+      highest: asNumber(stats.highest, 0),
+      lowest: asNumber(stats.lowest, 0),
+      total: asNumber(stats.total, 0),
+    },
+  }
+}
+
 const LETTER_GRADE_COLORS: Record<string, { bg: string; text: string }> = {
   A: { bg: '#D4EDDA', text: '#155724' },
   B: { bg: '#CCE5FF', text: '#004085' },
@@ -108,8 +224,9 @@ export default function GradesPage() {
 
   const fetchExams = async () => {
     try {
-      const data = await api.getExams() as { exams?: Exam[] }
-      setExams(data.exams || [])
+      const data = await api.getExams()
+      const payload = unwrapPayload(data)
+      setExams(asArray(payload.exams).map(normalizeExam))
     } catch (e) {
       console.error(e)
       setError('讀取考試列表失敗')
@@ -134,7 +251,7 @@ export default function GradesPage() {
       const res = await fetch('/api/exams/stats', { credentials: 'include', headers })
       if (res.ok) {
         const data = await res.json()
-        setExamStats(data)
+        setExamStats(normalizeExamStats(data))
       }
     } catch (e) {
       console.error('Failed to fetch exam stats:', e)
@@ -154,7 +271,7 @@ export default function GradesPage() {
       const res = await fetch(`/api/exams/student-grades/${studentId}`, { credentials: 'include', headers })
       if (res.ok) {
         const data = await res.json()
-        setStudentGrades(data)
+        setStudentGrades(normalizeStudentGrades(data, studentId, students))
       } else {
         setStudentGrades(null)
       }
@@ -189,10 +306,11 @@ export default function GradesPage() {
 
   const loadExamScores = async (examId: string) => {
     try {
-      const data = await api.getExamScores(examId) as ExamDetail
-      setSelectedExam(data)
+      const data = await api.getExamScores(examId)
+      const normalizedDetail = normalizeExamDetail(data, students)
+      setSelectedExam(normalizedDetail)
       const inputs: Record<string, number> = {}
-      data.scores.forEach((s: Score) => {
+      normalizedDetail.scores.forEach((s: Score) => {
         inputs[s.studentId] = s.score
       })
       setScoreInputs(inputs)
