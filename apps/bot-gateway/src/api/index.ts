@@ -19,6 +19,11 @@ import {
 } from '../firestore/student-invites';
 import { listStudentBindings } from '../firestore/student-bindings';
 import { getRecentConversations } from '../firestore/parent-conversations';
+import { botPromptsRouter } from './bot-prompts';
+import { botHealthRouter } from './bot-health-routes';
+import { conversationsRouter } from './conversations-routes';
+import { analyticsRouter } from './analytics-routes';
+import { knowledgeBaseRouter } from './knowledge-base-routes';
 
 type Env = { Variables: { user: DashboardUser } };
 
@@ -416,3 +421,10 @@ apiRouter.get('/ai-tutor/analytics', async (c) => {
     topQuestions,
   });
 });
+
+// === New unified API routes ===
+apiRouter.route('/bot-prompts', botPromptsRouter);
+apiRouter.route('/bot-health', botHealthRouter);
+apiRouter.route('/conversations', conversationsRouter);
+apiRouter.route('/analytics', analyticsRouter);
+apiRouter.route('/knowledge-base', knowledgeBaseRouter);

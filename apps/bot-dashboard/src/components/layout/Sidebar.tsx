@@ -18,16 +18,21 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/dashboard', icon: '📊', label: '總覽', roles: ['admin', 'staff'] },
 
-  { type: 'separator', separator: 'Telegram', roles: ['admin', 'staff'] },
-  { href: '/dashboard/clairvoyant', icon: '🏫', label: '千里眼（行政端）', roles: ['admin', 'staff'] },
-  { href: '/dashboard/windear', icon: '👨‍👩‍👧', label: '順風耳（家長端）', roles: ['admin'] },
+  { type: 'separator', separator: 'Bot 管理', roles: ['admin', 'staff'] },
+  { href: '/dashboard/clairvoyant', icon: '🔮', label: '千里眼（行政端）', roles: ['admin', 'staff'] },
+  { href: '/dashboard/windear', icon: '👂', label: '順風耳（家長端）', roles: ['admin'] },
+  { href: '/dashboard/ai-tutor', icon: '📐', label: '神算子（課業助教）', roles: ['admin'] },
+  { href: '/dashboard/wentaishi', icon: '📖', label: '聞仲老師（LINE）', roles: ['admin'] },
 
-  { type: 'separator', separator: 'LINE', roles: ['admin'] },
-  { href: '/dashboard/wentaishi', icon: '🤖', label: '聞太師（家長端）', roles: ['admin'] },
-  { href: '/dashboard/ai-tutor', icon: '🧑‍🏫', label: '神算子（課業助教）', roles: ['admin'] },
+  { type: 'separator', separator: '資料管理', roles: ['admin', 'staff'] },
+  { href: '/dashboard/conversations', icon: '💬', label: '對話紀錄', roles: ['admin', 'staff'] },
+  { href: '/dashboard/knowledge-base', icon: '📚', label: '知識庫', roles: ['admin'] },
+  { href: '/dashboard/analytics', icon: '📈', label: '統計分析', roles: ['admin', 'staff'] },
 
   { type: 'separator', separator: '系統', roles: ['admin'] },
-  { href: '/dashboard/plans', icon: '💎', label: '方案加購', roles: ['admin'] },
+  { href: '/dashboard/bindings', icon: '🔗', label: '綁定管理', roles: ['admin'] },
+  { href: '/dashboard/plans', icon: '💎', label: '訂閱方案', roles: ['admin'] },
+  { href: '/dashboard/settings', icon: '⚙️', label: '系統設定', roles: ['admin'] },
 ]
 
 const roleLabels: Record<Role, string> = {

@@ -1,63 +1,50 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 
-interface BotStatus {
-  name: string
-  icon: string
+interface HealthItem {
+  botType: string
   platform: string
-  active: boolean
-  messages: number
-  bindings: number
-  href: string
+  lastEventAt: string
+  messagesReceived24h: number
+  repliesSent24h: number
+  errors24h: number
+  avgLatencyMs24h: number
+}
+
+interface OverviewData {
+  today: { total: number; byBot: Record<string, number> }
+  month: { total: number; byBot: Record<string, number>; byRole: Record<string, number> }
+  health: HealthItem[]
+}
+
+const BOT_INFO: Record<string, { name: string; icon: string; platform: string; href: string }> = {
+  clairvoyant: { name: '千里眼', icon: '🔮', platform: 'Telegram', href: '/dashboard/clairvoyant' },
+  windear: { name: '順風耳', icon: '👂', platform: 'Telegram', href: '/dashboard/windear' },
+  'ai-tutor': { name: '神算子', icon: '📐', platform: 'Telegram', href: '/dashboard/ai-tutor' },
+  wentaishi: { name: '聞仲老師', icon: '📖', platform: 'LINE', href: '/dashboard/wentaishi' },
 }
 
 export default function DashboardPage() {
-  const [bots, setBots] = useState<BotStatus[]>([])
+  const [overview, setOverview] = useState<OverviewData | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    Promise.all([
-      fetch('/api/usage', { credentials: 'include' }).then(r => r.json()),
-      fetch('/api/subscriptions', { credentials: 'include' }).then(r => r.json()),
-      fetch('/api/bindings', { credentials: 'include' }).then(r => r.json()),
-      fetch('/api/parent-bindings', { credentials: 'include' }).then(r => r.json()),
-    ]).then(([usage, sub, adminBindings, parentBindings]) => {
-      const adminBindCount = Array.isArray(adminBindings) ? adminBindings.length : (adminBindings.data?.length || 0)
-      const parentBindCount = Array.isArray(parentBindings) ? parentBindings.length : (parentBindings.data?.length || 0)
-
-      setBots([
-        {
-          name: '千里眼',
-          icon: '🏫',
-          platform: 'Telegram',
-          active: sub.admin_bot_active ?? true,
-          messages: usage.api_calls || 0,
-          bindings: adminBindCount,
-          href: '/dashboard/clairvoyant',
-        },
-        {
-          name: '順風耳',
-          icon: '👨‍👩‍👧',
-          platform: 'Telegram',
-          active: sub.parent_bot_active ?? true,
-          messages: Math.floor((usage.ai_calls || 0) * 0.3),
-          bindings: parentBindCount,
-          href: '/dashboard/windear',
-        },
-        {
-          name: '聞太師',
-          icon: '🤖',
-          platform: 'LINE',
-          active: sub.parent_bot_active ?? true,
-          messages: usage.ai_calls || 0,
-          bindings: parentBindCount,
-          href: '/dashboard/wentaishi',
-        },
-      ])
-      setLoading(false)
-    }).catch(() => setLoading(false))
+  const fetchData = useCallback(() => {
+    fetch('/api/analytics/overview', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data) => {
+        setOverview(data)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    fetchData()
+    const interval = setInterval(fetchData, 30000)
+    return () => clearInterval(interval)
+  }, [fetchData])
 
   if (loading) {
     return (
@@ -67,72 +54,110 @@ export default function DashboardPage() {
     )
   }
 
-  const totalMessages = bots.reduce((sum, b) => sum + b.messages, 0)
-  const totalBindings = bots.reduce((sum, b) => sum + b.bindings, 0)
-  const activeBots = bots.filter(b => b.active).length
+  const todayTotal = overview?.today?.total ?? 0
+  const monthTotal = overview?.month?.total ?? 0
+  const activeRoles = overview?.month?.byRole ? Object.keys(overview.month.byRole).length : 0
+  const healthMap = new Map((overview?.health ?? []).map((h) => [h.botType, h]))
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-text mb-6">94BOT 總覽</h1>
 
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-surface rounded-2xl border border-border p-5">
-          <p className="text-sm text-text-muted mb-1">運作中機器人</p>
-          <p className="text-2xl font-bold text-text">{activeBots} <span className="text-sm font-normal text-text-muted">/ 3</span></p>
+          <p className="text-sm text-text-muted mb-1">今日對話</p>
+          <p className="text-2xl font-bold text-text">{todayTotal}</p>
         </div>
         <div className="bg-surface rounded-2xl border border-border p-5">
-          <p className="text-sm text-text-muted mb-1">本月總訊息</p>
-          <p className="text-2xl font-bold text-text">{totalMessages}</p>
+          <p className="text-sm text-text-muted mb-1">本月對話</p>
+          <p className="text-2xl font-bold text-text">{monthTotal}</p>
         </div>
         <div className="bg-surface rounded-2xl border border-border p-5">
-          <p className="text-sm text-text-muted mb-1">總綁定用戶</p>
-          <p className="text-2xl font-bold text-text">{totalBindings}</p>
+          <p className="text-sm text-text-muted mb-1">活躍角色類型</p>
+          <p className="text-2xl font-bold text-text">{activeRoles}</p>
         </div>
       </div>
 
-      <h2 className="text-lg font-semibold text-text mb-4">機器人狀態</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        {bots.map((bot) => (
-          <a
-            key={bot.name}
-            href={bot.href}
-            className="bg-surface rounded-2xl border border-border p-5 hover:border-primary/50 transition-all"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">{bot.icon}</span>
-                <div>
-                  <p className="font-semibold text-sm text-text">{bot.name}</p>
-                  <p className="text-xs text-text-muted">{bot.platform}</p>
+      {/* Bot Status Cards */}
+      <h2 className="text-lg font-semibold text-text mb-4">Bot 狀態</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {Object.entries(BOT_INFO).map(([botType, info]) => {
+          const health = healthMap.get(botType)
+          const lastEvent = health?.lastEventAt ? new Date(health.lastEventAt) : null
+          const minutesAgo = lastEvent ? Math.floor((Date.now() - lastEvent.getTime()) / 60000) : null
+
+          let statusIcon = '⚪'
+          let statusText = '未啟用'
+          if (minutesAgo !== null && minutesAgo < 30) { statusIcon = '🟢'; statusText = '運作中' }
+          else if (minutesAgo !== null && minutesAgo < 1440) { statusIcon = '🟡'; statusText = '閒置' }
+          else if (minutesAgo !== null) { statusIcon = '🔴'; statusText = '異常' }
+
+          const todayCount = overview?.today?.byBot?.[botType] ?? 0
+
+          return (
+            <Link
+              key={botType}
+              href={info.href}
+              className="bg-surface rounded-2xl border border-border p-5 hover:border-primary/50 transition-all"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{info.icon}</span>
+                  <div>
+                    <p className="font-semibold text-sm text-text">{info.name}</p>
+                    <p className="text-xs text-text-muted">{info.platform}</p>
+                  </div>
                 </div>
+                <span className="text-sm">{statusIcon}</span>
               </div>
-              <span className={`px-2 py-0.5 text-xs rounded-full ${bot.active ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
-                {bot.active ? '運作中' : '已暫停'}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm text-text-muted">
-              <span>訊息：{bot.messages}</span>
-              <span>綁定：{bot.bindings}</span>
-            </div>
-          </a>
-        ))}
+              <div className="space-y-1 text-sm text-text-muted">
+                <div className="flex justify-between">
+                  <span>狀態</span>
+                  <span className="font-medium text-text">{statusText}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>今日對話</span>
+                  <span className="font-medium text-text">{todayCount}</span>
+                </div>
+                {health && (
+                  <>
+                    <div className="flex justify-between">
+                      <span>24h 訊息</span>
+                      <span className="font-medium text-text">{health.messagesReceived24h || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>平均延遲</span>
+                      <span className="font-medium text-text">{health.avgLatencyMs24h || 0}ms</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </Link>
+          )
+        })}
       </div>
 
+      {/* Quick Actions */}
       <div className="bg-surface rounded-2xl border border-border p-6">
         <h2 className="text-lg font-semibold text-text mb-4">快速操作</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <a href="/dashboard/clairvoyant" className="flex items-center gap-3 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all">
-            <span className="text-xl">🏫</span>
-            <span className="text-sm font-medium text-text">管理千里眼</span>
-          </a>
-          <a href="/dashboard/windear" className="flex items-center gap-3 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all">
-            <span className="text-xl">👨‍👩‍👧</span>
-            <span className="text-sm font-medium text-text">管理順風耳</span>
-          </a>
-          <a href="/dashboard/wentaishi" className="flex items-center gap-3 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all">
-            <span className="text-xl">🤖</span>
-            <span className="text-sm font-medium text-text">管理聞太師</span>
-          </a>
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <Link href="/dashboard/conversations" className="flex items-center gap-3 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all">
+            <span className="text-xl">💬</span>
+            <span className="text-sm font-medium text-text">對話紀錄</span>
+          </Link>
+          <Link href="/dashboard/knowledge-base" className="flex items-center gap-3 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all">
+            <span className="text-xl">📚</span>
+            <span className="text-sm font-medium text-text">知識庫</span>
+          </Link>
+          <Link href="/dashboard/analytics" className="flex items-center gap-3 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all">
+            <span className="text-xl">📈</span>
+            <span className="text-sm font-medium text-text">統計分析</span>
+          </Link>
+          <Link href="/dashboard/bindings" className="flex items-center gap-3 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all">
+            <span className="text-xl">🔗</span>
+            <span className="text-sm font-medium text-text">綁定管理</span>
+          </Link>
         </div>
       </div>
     </div>
