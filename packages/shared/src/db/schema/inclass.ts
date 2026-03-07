@@ -250,3 +250,55 @@ export const inclassMakeupClasses = pgTable('inclass_makeup_classes', {
   studentIdx: index('inclass_makeup_classes_student_idx').on(table.studentId),
   statusIdx: index('inclass_makeup_classes_status_idx').on(table.tenantId, table.status),
 }));
+
+// 課堂互動 - 課堂會話
+export const inclassClassroomSessions = pgTable('inclass_classroom_sessions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  scheduleId: uuid('schedule_id').references(() => inclassSchedules.id),
+  teacherId: uuid('teacher_id').notNull(),
+  courseId: uuid('course_id').notNull(),
+  sessionDate: date('session_date').notNull(),
+  sessionCode: varchar('session_code', { length: 8 }).notNull(), // 學生加入用
+  status: varchar('status', { length: 20 }).notNull().default('active'), // active/ended
+  createdAt: timestamp('created_at').defaultNow(),
+  endedAt: timestamp('ended_at'),
+}, (table) => ({
+  tenantIdx: index('inclass_classroom_sessions_tenant_idx').on(table.tenantId),
+  statusIdx: index('inclass_classroom_sessions_status_idx').on(table.tenantId, table.status),
+  codeIdx: uniqueIndex('inclass_classroom_sessions_code_idx').on(table.sessionCode),
+}));
+
+// 課堂互動 - 互動活動（投票/測驗/抽問/搶答）
+export const inclassClassroomActivities = pgTable('inclass_classroom_activities', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  sessionId: uuid('session_id').references(() => inclassClassroomSessions.id).notNull(),
+  type: varchar('type', { length: 20 }).notNull(), // poll/quiz/random_pick/rush_answer
+  question: text('question').notNull(),
+  options: jsonb('options'), // string[] for poll/quiz choices
+  correctAnswer: varchar('correct_answer', { length: 255 }), // quiz 用
+  results: jsonb('results'), // 統計結果
+  winnerId: uuid('winner_id'), // 搶答/抽問的學生
+  status: varchar('status', { length: 20 }).notNull().default('active'), // active/closed
+  createdAt: timestamp('created_at').defaultNow(),
+  closedAt: timestamp('closed_at'),
+}, (table) => ({
+  sessionIdx: index('inclass_classroom_activities_session_idx').on(table.sessionId),
+  tenantIdx: index('inclass_classroom_activities_tenant_idx').on(table.tenantId),
+}));
+
+// 課堂互動 - 學生作答記錄
+export const inclassStudentResponses = pgTable('inclass_student_responses', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  activityId: uuid('activity_id').references(() => inclassClassroomActivities.id).notNull(),
+  studentId: uuid('student_id').notNull(),
+  answer: varchar('answer', { length: 500 }).notNull(),
+  responseTime: integer('response_time'), // ms, for rush_answer
+  isCorrect: boolean('is_correct'),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  activityIdx: index('inclass_student_responses_activity_idx').on(table.activityId),
+  studentActivityIdx: uniqueIndex('inclass_student_responses_student_activity_idx').on(table.activityId, table.studentId),
+}));
