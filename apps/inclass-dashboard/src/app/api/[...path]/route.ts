@@ -22,11 +22,19 @@ async function extractTenantFromJwt(request: NextRequest): Promise<string | null
 async function proxy(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params
   const targetPath = '/api/' + path.join('/')
+  let requestBody: Record<string, unknown> | undefined
+  if (!['GET', 'HEAD'].includes(request.method)) {
+    try {
+      requestBody = await request.clone().json() as Record<string, unknown>
+    } catch {
+      requestBody = undefined
+    }
+  }
 
   // Demo mode: return mock data instead of proxying to backend
   const tenantId = await extractTenantFromJwt(request)
   if (tenantId === DEMO_TENANT) {
-    const demoResult = getDemoResponse(request.method, targetPath, request.nextUrl.searchParams)
+    const demoResult = getDemoResponse(request.method, targetPath, request.nextUrl.searchParams, requestBody)
     if (demoResult) {
       return NextResponse.json(demoResult.body, { status: demoResult.status })
     }
@@ -76,12 +84,20 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
   try {
     const res = await fetch(url.toString(), init)
     const responseBody = await res.arrayBuffer()
-    return new NextResponse(responseBody, {
+    const response = new NextResponse(responseBody, {
       status: res.status,
       headers: {
         'Content-Type': res.headers.get('Content-Type') || 'application/json',
       },
     })
+
+    res.headers.forEach((value, key) => {
+      if (key.toLowerCase() === 'set-cookie') {
+        response.headers.append('Set-Cookie', value)
+      }
+    })
+
+    return response
   } catch (error) {
     console.error('Proxy error:', error)
     return NextResponse.json({ error: 'Backend unavailable' }, { status: 502 })

@@ -54,9 +54,6 @@ export default function AdminLoginPage() {
         return
       }
 
-      const result = await res.json()
-      const token = result.data?.token || result.token
-      setToken(token)
       router.push('/admin')
     } catch {
       setError('網路錯誤，請確認連線狀態')
@@ -80,9 +77,6 @@ export default function AdminLoginPage() {
         setError(res.status === 403 ? '權限不足，此入口僅供超級管理員使用' : (data.message || 'Google 登入失敗'))
         return
       }
-      const result = await res.json()
-      const token = result.data?.token || result.token
-      setToken(token)
       router.push('/admin')
     } catch {
       setError('Google 登入失敗，請確認連線狀態')

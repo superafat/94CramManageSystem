@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import bcrypt from 'bcryptjs';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '../db/index';
-import { tenants, users } from '@94cram/shared/db';
-import { sign, signRefreshToken, verifyRefreshToken, setAuthCookie, setRefreshCookie, clearAuthCookie, extractRefreshToken } from '@94cram/shared/auth';
+import { tenants, users, authSessions, authSessionEvents, userTenantMemberships, userBranchMemberships, userSystemEntitlements } from '@94cram/shared/db';
+import { sign, signRefreshToken, verifyRefreshToken, setAuthCookie, setRefreshCookie, clearAuthCookie, extractRefreshToken, hashSessionToken, getRefreshTokenExpiryDate } from '@94cram/shared/auth';
 import { authMiddleware, getAuthUser } from '../middleware/auth';
 import { tenantMiddleware, getTenantId } from '../middleware/tenant';
 import { z } from 'zod';
@@ -11,10 +11,111 @@ import { badRequest, unauthorized, forbidden, notFound, conflict, internalError 
 
 const app = new Hono();
 
-async function setAuthTokens(c: import('hono').Context, accessToken: string, userId: string, tenantId: string) {
+async function ensureIdentityRecords(userId: string, tenantId: string, branchId?: string | null) {
+  const [membership] = await db.select().from(userTenantMemberships).where(and(
+    eq(userTenantMemberships.userId, userId),
+    eq(userTenantMemberships.tenantId, tenantId),
+    eq(userTenantMemberships.status, 'active')
+  ));
+
+  if (!membership) {
+    await db.insert(userTenantMemberships).values({
+      userId,
+      tenantId,
+      membershipRole: 'member',
+      status: 'active',
+      primaryBranchId: branchId ?? undefined,
+    });
+  }
+
+  if (branchId) {
+    const [branchMembership] = await db.select().from(userBranchMemberships).where(and(
+      eq(userBranchMemberships.userId, userId),
+      eq(userBranchMemberships.tenantId, tenantId),
+      eq(userBranchMemberships.branchId, branchId),
+      eq(userBranchMemberships.status, 'active')
+    ));
+
+    if (!branchMembership) {
+      await db.insert(userBranchMemberships).values({
+        userId,
+        tenantId,
+        branchId,
+        branchRole: 'member',
+        status: 'active',
+      });
+    }
+  }
+
+  const [entitlement] = await db.select().from(userSystemEntitlements).where(and(
+    eq(userSystemEntitlements.userId, userId),
+    eq(userSystemEntitlements.tenantId, tenantId),
+    eq(userSystemEntitlements.systemKey, 'stock'),
+    eq(userSystemEntitlements.status, 'active')
+  ));
+
+  if (!entitlement) {
+    await db.insert(userSystemEntitlements).values({
+      userId,
+      tenantId,
+      systemKey: 'stock',
+      accessLevel: 'member',
+      status: 'active',
+    });
+  }
+}
+
+async function revokeSessionByRefreshToken(refreshToken: string | null, eventType: string) {
+  if (!refreshToken) return;
+
+  const refreshTokenHash = hashSessionToken(refreshToken);
+  const sessions = await db
+    .update(authSessions)
+    .set({ revokedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(authSessions.refreshTokenHash, refreshTokenHash), isNull(authSessions.revokedAt)))
+    .returning({ id: authSessions.id, userId: authSessions.userId, tenantId: authSessions.tenantId });
+
+  if (sessions.length > 0) {
+    await db.insert(authSessionEvents).values(sessions.map((session) => ({
+      sessionId: session.id,
+      userId: session.userId,
+      tenantId: session.tenantId ?? undefined,
+      eventType,
+      createdAt: new Date(),
+    })));
+  }
+}
+
+async function setAuthTokens(c: import('hono').Context, accessToken: string, userId: string, tenantId: string, branchId?: string | null, eventType = 'login') {
   setAuthCookie(c, accessToken);
   const refreshToken = await signRefreshToken({ userId, tenantId });
   setRefreshCookie(c, refreshToken);
+
+  await ensureIdentityRecords(userId, tenantId, branchId);
+
+  const session = await db.insert(authSessions).values({
+    userId,
+    tenantId,
+    branchId: branchId ?? undefined,
+    refreshTokenHash: hashSessionToken(refreshToken),
+    ipAddress: c.req.header('x-forwarded-for')?.split(',')[0]?.trim(),
+    userAgent: c.req.header('user-agent'),
+    expiresAt: getRefreshTokenExpiryDate(),
+    lastSeenAt: new Date(),
+    updatedAt: new Date(),
+  }).returning({ id: authSessions.id });
+
+  if (session[0]) {
+    await db.insert(authSessionEvents).values({
+      sessionId: session[0].id,
+      userId,
+      tenantId,
+      eventType,
+      ipAddress: c.req.header('x-forwarded-for')?.split(',')[0]?.trim(),
+      userAgent: c.req.header('user-agent'),
+      createdAt: new Date(),
+    });
+  }
 }
 
 const loginSchema = z.object({
@@ -66,7 +167,7 @@ app.post('/login', async (c) => {
     systems: ['stock'],
   });
 
-  await setAuthTokens(c, token, user.id, user.tenantId ?? '');
+  await setAuthTokens(c, token, user.id, user.tenantId ?? '', user.branchId ?? null, 'login');
   return c.json({
     token,
     user: {
@@ -237,7 +338,7 @@ app.post('/google', async (c) => {
       systems: ['stock'],
     });
 
-    await setAuthTokens(c, token, user.id, user.tenantId ?? '');
+    await setAuthTokens(c, token, user.id, user.tenantId ?? '', user.branchId ?? null, 'google_login');
     return c.json({
       token,
       user: { id: user.id, email: user.email, name: user.name, role: user.role, tenantId: user.tenantId },
@@ -271,7 +372,8 @@ app.post('/refresh', async (c) => {
       systems: ['stock'],
     });
 
-    await setAuthTokens(c, token, user.id, user.tenantId ?? '');
+    await revokeSessionByRefreshToken(refreshToken, 'refresh_replaced');
+    await setAuthTokens(c, token, user.id, user.tenantId ?? '', user.branchId ?? null, 'refresh');
     return c.json({
       success: true,
       token,
@@ -284,6 +386,7 @@ app.post('/refresh', async (c) => {
 });
 
 app.post('/logout', async (c) => {
+  await revokeSessionByRefreshToken(extractRefreshToken(c), 'logout');
   clearAuthCookie(c);
   return c.json({ success: true });
 });

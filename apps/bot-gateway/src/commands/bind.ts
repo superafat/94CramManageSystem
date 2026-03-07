@@ -1,5 +1,6 @@
 import { firestore } from '../firestore/client';
 import { addBinding } from '../firestore/bindings';
+import { callBotApi } from '../modules/api-client';
 import { sendMessage } from '../utils/telegram';
 
 export async function handleBind(chatId: string, userId: string, args: string): Promise<void> {
@@ -27,6 +28,24 @@ export async function handleBind(chatId: string, userId: string, args: string): 
   if (expiresAt < new Date()) {
     await sendMessage(chatId, '❌ 綁定碼已過期，請重新生成');
     return;
+  }
+
+  if (typeof codeData.created_by === 'string' && codeData.created_by) {
+    const bindingResult = await callBotApi('manage', '/channel-binding', {
+      tenant_id: codeData.tenant_id,
+      userId: codeData.created_by,
+      channelType: 'telegram',
+      externalUserId: userId,
+      metadata: {
+        source: 'bot_gateway_bind_code',
+        chatId,
+      },
+    });
+
+    if (!bindingResult.success) {
+      await sendMessage(chatId, '❌ 中央身份綁定失敗，請稍後再試');
+      return;
+    }
   }
 
   await codeRef.update({ used: true });

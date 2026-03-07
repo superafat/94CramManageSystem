@@ -15,6 +15,11 @@ export interface JWTPayload {
   systems?: string[]; // ['manage', 'inclass', 'stock']
 }
 
+interface SystemAccessOptions {
+  allowSuperadmin?: boolean;
+  allowLegacyNoSystems?: boolean;
+}
+
 function getSecret(secret?: string): Uint8Array {
   const s = secret || process.env.JWT_SECRET;
   if (!s) {
@@ -99,6 +104,25 @@ export async function verify(token: string, secret?: string): Promise<JWTPayload
     permissions: Array.isArray(payload.permissions) ? (payload.permissions as string[]) : [],
     systems: Array.isArray(payload.systems) ? (payload.systems as string[]) : [],
   };
+}
+
+export function hasSystemAccess(
+  payload: Pick<JWTPayload, 'role' | 'systems'>,
+  requiredSystem: string,
+  options: SystemAccessOptions = {}
+): boolean {
+  const { allowSuperadmin = true, allowLegacyNoSystems = true } = options;
+
+  if (allowSuperadmin && payload.role === 'superadmin') {
+    return true;
+  }
+
+  const systems = Array.isArray(payload.systems) ? payload.systems : [];
+  if (systems.length === 0) {
+    return allowLegacyNoSystems;
+  }
+
+  return systems.includes(requiredSystem);
 }
 
 /**

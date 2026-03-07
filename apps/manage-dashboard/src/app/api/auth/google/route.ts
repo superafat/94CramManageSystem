@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const GCP_PROJECT_NUMBER = process.env.GCP_PROJECT_NUMBER || '1015149159553'
-const INCLASS_BACKEND_URL =
-  process.env.BACKEND_URL ||
-  `https://cram94-inclass-backend-${GCP_PROJECT_NUMBER}.asia-east1.run.app`
+const MANAGE_BACKEND_URL =
+  process.env.MANAGE_BACKEND_URL ||
+  `https://cram94-manage-backend-${GCP_PROJECT_NUMBER}.asia-east1.run.app`
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.arrayBuffer()
-    const res = await fetch(`${INCLASS_BACKEND_URL}/api/auth/login`, {
+    const res = await fetch(`${MANAGE_BACKEND_URL}/api/auth/google`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,

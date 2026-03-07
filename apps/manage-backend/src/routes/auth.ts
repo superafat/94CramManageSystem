@@ -11,7 +11,8 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import * as jose from 'jose'
-import { setAuthCookie, setRefreshCookie, clearAuthCookie, extractToken, extractRefreshToken, signRefreshToken, verifyRefreshToken } from '@94cram/shared/auth'
+import { z } from 'zod'
+import { setAuthCookie, setRefreshCookie, clearAuthCookie, extractToken, extractRefreshToken, signRefreshToken, verifyRefreshToken, hashSessionToken, getRefreshTokenExpiryDate } from '@94cram/shared/auth'
 import { config } from '../config'
 import { db } from '../db'
 import { sql } from 'drizzle-orm'
@@ -49,6 +50,50 @@ type AuthUserRow = {
 }
 
 type TenantLookupRow = { id: string }
+
+type SessionRow = {
+  id: string
+  user_id: string
+  tenant_id: string | null
+  branch_id: string | null
+  created_at: Date
+  last_seen_at: Date | null
+  expires_at: Date
+  revoked_at: Date | null
+  refresh_token_hash: string
+}
+
+type MembershipRow = {
+  tenant_id: string
+  primary_branch_id: string | null
+  status: string
+}
+
+async function upsertChannelBinding(userId: string, tenantId: string, channelType: string, externalUserId: string, metadata: Record<string, unknown> = {}): Promise<void> {
+  const existing = firstRow(await db.execute(sql`
+    SELECT id
+    FROM user_channel_bindings
+    WHERE user_id = ${userId}
+      AND tenant_id = ${tenantId}
+      AND channel_type = ${channelType}
+      AND external_user_id = ${externalUserId}
+    LIMIT 1
+  `) as QueryResultRows<{ id: string }>)
+
+  if (existing) {
+    await db.execute(sql`
+      UPDATE user_channel_bindings
+      SET status = 'active', metadata = ${JSON.stringify(metadata)}::jsonb, verified_at = NOW(), updated_at = NOW()
+      WHERE id = ${existing.id}
+    `)
+    return
+  }
+
+  await db.execute(sql`
+    INSERT INTO user_channel_bindings (id, user_id, tenant_id, channel_type, external_user_id, status, metadata, verified_at, created_at, updated_at)
+    VALUES (${generateId()}, ${userId}, ${tenantId}, ${channelType}, ${externalUserId}, 'active', ${JSON.stringify(metadata)}::jsonb, NOW(), NOW(), NOW())
+  `)
+}
 
 function firstRow<T>(result: QueryResultRows<T>): T | null {
   if (Array.isArray(result)) return result[0] ?? null
@@ -148,6 +193,7 @@ async function generateToken(payload: {
     role: payload.role,
     tenantId: payload.tenant_id,
     branchId: payload.branch_id ?? undefined,
+    systems: ['manage'],
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -155,12 +201,115 @@ async function generateToken(payload: {
     .sign(secret)
 }
 
+async function ensureIdentityRecords(userId: string, tenantId: string, branchId?: string | null, systemKey = 'manage'): Promise<void> {
+  const membership = firstRow(await db.execute(sql`
+    SELECT tenant_id, primary_branch_id, status
+    FROM user_tenant_memberships
+    WHERE user_id = ${userId}
+      AND tenant_id = ${tenantId}
+      AND status = 'active'
+    LIMIT 1
+  `) as QueryResultRows<MembershipRow>)
+
+  if (!membership) {
+    await db.execute(sql`
+      INSERT INTO user_tenant_memberships (id, user_id, tenant_id, membership_role, status, primary_branch_id, created_at, updated_at)
+      VALUES (${generateId()}, ${userId}, ${tenantId}, 'member', 'active', ${branchId ?? null}, NOW(), NOW())
+    `)
+  }
+
+  if (branchId) {
+    const branchMembership = firstRow(await db.execute(sql`
+      SELECT id
+      FROM user_branch_memberships
+      WHERE user_id = ${userId}
+        AND tenant_id = ${tenantId}
+        AND branch_id = ${branchId}
+        AND status = 'active'
+      LIMIT 1
+    `) as QueryResultRows<{ id: string }>)
+
+    if (!branchMembership) {
+      await db.execute(sql`
+        INSERT INTO user_branch_memberships (id, user_id, tenant_id, branch_id, branch_role, status, created_at, updated_at)
+        VALUES (${generateId()}, ${userId}, ${tenantId}, ${branchId}, 'member', 'active', NOW(), NOW())
+      `)
+    }
+  }
+
+  const entitlement = firstRow(await db.execute(sql`
+    SELECT id
+    FROM user_system_entitlements
+    WHERE user_id = ${userId}
+      AND tenant_id = ${tenantId}
+      AND system_key = ${systemKey}
+      AND status = 'active'
+    LIMIT 1
+  `) as QueryResultRows<{ id: string }>)
+
+  if (!entitlement) {
+    await db.execute(sql`
+      INSERT INTO user_system_entitlements (id, user_id, tenant_id, system_key, access_level, status, created_at, updated_at)
+      VALUES (${generateId()}, ${userId}, ${tenantId}, ${systemKey}, 'member', 'active', NOW(), NOW())
+    `)
+  }
+}
+
+async function recordSessionEvent(sessionId: string, userId: string, tenantId: string | null, eventType: string, ipAddress?: string | null, userAgent?: string | null): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO auth_session_events (id, session_id, user_id, tenant_id, event_type, ip_address, user_agent, details, created_at)
+    VALUES (${generateId()}, ${sessionId}, ${userId}, ${tenantId}, ${eventType}, ${ipAddress ?? null}, ${userAgent ?? null}, '{}'::jsonb, NOW())
+  `)
+}
+
+async function persistSession(c: import('hono').Context, userId: string, tenantId: string, refreshToken: string, branchId?: string | null, eventType = 'login'): Promise<void> {
+  const sessionId = generateId()
+  const ipAddress = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? null
+  const userAgent = c.req.header('user-agent') ?? null
+
+  await db.execute(sql`
+    INSERT INTO auth_sessions (id, user_id, tenant_id, branch_id, refresh_token_hash, ip_address, user_agent, last_seen_at, expires_at, created_at, updated_at)
+    VALUES (${sessionId}, ${userId}, ${tenantId}, ${branchId ?? null}, ${hashSessionToken(refreshToken)}, ${ipAddress}, ${userAgent}, NOW(), ${getRefreshTokenExpiryDate()}, NOW(), NOW())
+  `)
+
+  await recordSessionEvent(sessionId, userId, tenantId, eventType, ipAddress, userAgent)
+}
+
+async function revokeSessionsByRefreshToken(refreshToken: string | null, eventType: string): Promise<void> {
+  if (!refreshToken) return
+
+  const sessions = await db.execute(sql`
+    UPDATE auth_sessions
+    SET revoked_at = NOW(), updated_at = NOW()
+    WHERE refresh_token_hash = ${hashSessionToken(refreshToken)}
+      AND revoked_at IS NULL
+    RETURNING id, user_id, tenant_id
+  `) as QueryResultRows<{ id: string; user_id: string; tenant_id: string | null }>
+
+  const rows = Array.isArray(sessions) ? sessions : sessions.rows ?? []
+  for (const session of rows) {
+    await recordSessionEvent(session.id, session.user_id, session.tenant_id, eventType)
+  }
+}
+
 /** Set both access + refresh token cookies */
-async function setAuthTokens(c: import('hono').Context, accessToken: string, userId: string, tenantId: string) {
+async function setAuthTokens(c: import('hono').Context, accessToken: string, userId: string, tenantId: string, branchId?: string | null, systemKey = 'manage', eventType = 'login') {
   setAuthCookie(c, accessToken)
   const refreshToken = await signRefreshToken({ userId, tenantId })
   setRefreshCookie(c, refreshToken)
+  await ensureIdentityRecords(userId, tenantId, branchId, systemKey)
+  await persistSession(c, userId, tenantId, refreshToken, branchId, eventType)
 }
+
+const switchTenantSchema = z.object({
+  tenantId: z.string().uuid(),
+  branchId: z.string().uuid().optional(),
+})
+
+const revokeSessionsSchema = z.object({
+  sessionId: z.string().uuid().optional(),
+  revokeAll: z.boolean().optional(),
+})
 
 // ========================================================================
 // POST /login - Username/Password or Firebase Token Login
@@ -216,7 +365,7 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
       db.execute(sql`UPDATE users SET last_login_at = NOW() WHERE id = ${dbUser.id}`)
         .catch(() => { /* non-critical */ })
 
-      await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id)
+      await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id, dbUser.branch_id ?? undefined, 'manage', 'login')
       return success(c, {
         token: jwt,
         user: {
@@ -290,7 +439,7 @@ authRoutes.post('/login', rateLimit('login'), zValidator('json', loginSchema), a
           branch_id: dbUser.branch_id ?? undefined,
         })
 
-        await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id)
+        await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id, dbUser.branch_id ?? undefined, 'manage', 'firebase_login')
         return success(c, {
           token: jwt,
           user: {
@@ -393,7 +542,7 @@ authRoutes.post('/google', rateLimit('login'), async (c) => {
     db.execute(sql`UPDATE users SET last_login_at = NOW() WHERE id = ${dbUser.id}`)
       .catch(() => {})
 
-    await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id)
+    await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id, dbUser.branch_id ?? undefined, 'manage', 'google_login')
     return success(c, {
       token: jwt,
       user: {
@@ -463,6 +612,10 @@ authRoutes.post('/telegram', zValidator('json', telegramLoginSchema), async (c) 
       const role = dbUser.role as Role
       const permissions = getUserPermissions(role)
 
+      await upsertChannelBinding(dbUser.id, dbUser.tenant_id, 'telegram', String(telegramId), {
+        source: 'manage_auth_telegram_login',
+      })
+
         const jwt = await generateToken({
           sub: dbUser.id,
           name: (dbUser.full_name ?? dbUser.username) ?? undefined,
@@ -472,7 +625,7 @@ authRoutes.post('/telegram', zValidator('json', telegramLoginSchema), async (c) 
           branch_id: dbUser.branch_id ?? undefined,
         })
 
-      await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id)
+      await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id, dbUser.branch_id ?? undefined, 'manage', 'telegram_login')
       return success(c, {
         token: jwt,
         user: {
@@ -496,7 +649,7 @@ authRoutes.post('/telegram', zValidator('json', telegramLoginSchema), async (c) 
       branch_id: 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d',
     })
 
-    await setAuthTokens(c, jwt, `tg-${telegramId}`, '11111111-1111-1111-1111-111111111111')
+    await setAuthTokens(c, jwt, `tg-${telegramId}`, '11111111-1111-1111-1111-111111111111', 'a1b2c3d4-e5f6-1a2b-8c3d-4e5f6a7b8c9d', 'manage', 'telegram_guest_login')
     return success(c, {
       token: jwt,
       user: {
@@ -697,7 +850,8 @@ authRoutes.post('/refresh', async (c) => {
     })
 
     // Rotate: issue new access + refresh tokens
-    await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id)
+    await revokeSessionsByRefreshToken(refreshToken, 'refresh_replaced')
+    await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id, dbUser.branch_id ?? undefined, 'manage', 'refresh')
 
     return c.json({
       success: true,
@@ -720,8 +874,199 @@ authRoutes.post('/refresh', async (c) => {
 // POST /logout - Clear auth cookie
 // ========================================================================
 authRoutes.post('/logout', async (c) => {
+  await revokeSessionsByRefreshToken(extractRefreshToken(c), 'logout')
   clearAuthCookie(c)
   return c.json({ success: true })
+})
+
+authRoutes.get('/sessions', async (c) => {
+  const token = extractToken(c)
+  if (!token) {
+    return unauthorized(c, 'Missing token')
+  }
+
+  try {
+    const { payload } = await jose.jwtVerify(token, secret)
+    const userId = String(payload.sub || payload.userId || '')
+    if (!userId) {
+      return unauthorized(c, 'Invalid token')
+    }
+
+    const currentRefreshToken = extractRefreshToken(c)
+    const currentRefreshHash = currentRefreshToken ? hashSessionToken(currentRefreshToken) : null
+
+    const sessions = await db.execute(sql`
+      SELECT id, user_id, tenant_id, branch_id, created_at, last_seen_at, expires_at, revoked_at, refresh_token_hash
+      FROM auth_sessions
+      WHERE user_id = ${userId}
+      ORDER BY created_at DESC
+    `) as QueryResultRows<SessionRow>
+
+    const rows = Array.isArray(sessions) ? sessions : sessions.rows ?? []
+
+    return success(c, {
+      sessions: rows.map((session) => ({
+        id: session.id,
+        tenantId: session.tenant_id,
+        branchId: session.branch_id,
+        createdAt: session.created_at,
+        lastSeenAt: session.last_seen_at,
+        expiresAt: session.expires_at,
+        revokedAt: session.revoked_at,
+        isCurrent: currentRefreshHash ? session.refresh_token_hash === currentRefreshHash : false,
+      })),
+    })
+  } catch {
+    return unauthorized(c, 'Invalid token')
+  }
+})
+
+authRoutes.post('/sessions/revoke', zValidator('json', revokeSessionsSchema), async (c) => {
+  const token = extractToken(c)
+  if (!token) {
+    return unauthorized(c, 'Missing token')
+  }
+
+  try {
+    const { payload } = await jose.jwtVerify(token, secret)
+    const userId = String(payload.sub || payload.userId || '')
+    if (!userId) {
+      return unauthorized(c, 'Invalid token')
+    }
+
+    const body = c.req.valid('json')
+
+    if (body.revokeAll) {
+      const sessions = await db.execute(sql`
+        UPDATE auth_sessions
+        SET revoked_at = NOW(), updated_at = NOW()
+        WHERE user_id = ${userId}
+          AND revoked_at IS NULL
+        RETURNING id, user_id, tenant_id
+      `) as QueryResultRows<{ id: string; user_id: string; tenant_id: string | null }>
+
+      const rows = Array.isArray(sessions) ? sessions : sessions.rows ?? []
+      for (const session of rows) {
+        await recordSessionEvent(session.id, session.user_id, session.tenant_id, 'manual_revoke_all')
+      }
+
+      clearAuthCookie(c)
+      return success(c, { revoked: rows.length })
+    }
+
+    if (!body.sessionId) {
+      return badRequest(c, 'sessionId is required when revokeAll is false')
+    }
+
+    const sessions = await db.execute(sql`
+      UPDATE auth_sessions
+      SET revoked_at = NOW(), updated_at = NOW()
+      WHERE id = ${body.sessionId}
+        AND user_id = ${userId}
+        AND revoked_at IS NULL
+      RETURNING id, user_id, tenant_id
+    `) as QueryResultRows<{ id: string; user_id: string; tenant_id: string | null }>
+
+    const row = firstRow(sessions)
+    if (row) {
+      await recordSessionEvent(row.id, row.user_id, row.tenant_id, 'manual_revoke')
+    }
+
+    return success(c, { revoked: row ? 1 : 0 })
+  } catch {
+    return unauthorized(c, 'Invalid token')
+  }
+})
+
+authRoutes.post('/switch-tenant', zValidator('json', switchTenantSchema), async (c) => {
+  const token = extractToken(c)
+  if (!token) {
+    return unauthorized(c, 'Missing token')
+  }
+
+  try {
+    const { payload } = await jose.jwtVerify(token, secret)
+    const body = c.req.valid('json')
+    const userId = String(payload.sub || payload.userId || '')
+    if (!userId) {
+      return unauthorized(c, 'Invalid token')
+    }
+
+    const membership = firstRow(await db.execute(sql`
+      SELECT tenant_id, primary_branch_id, status
+      FROM user_tenant_memberships
+      WHERE user_id = ${userId}
+        AND tenant_id = ${body.tenantId}
+        AND status = 'active'
+      LIMIT 1
+    `) as QueryResultRows<MembershipRow>)
+
+    if (!membership && body.tenantId !== String(payload.tenantId || '')) {
+      return forbidden(c, 'Tenant membership required')
+    }
+
+    const dbUser = firstRow(await db.execute(sql`
+      SELECT id, username, full_name, email, role, tenant_id, branch_id, is_active
+      FROM users
+      WHERE id = ${userId}
+        AND deleted_at IS NULL
+      LIMIT 1
+    `) as QueryResultRows<AuthUserRow>)
+
+    if (!dbUser || !dbUser.is_active) {
+      return unauthorized(c, 'User not found or inactive')
+    }
+
+    const entitlementRows = await db.execute(sql`
+      SELECT system_key
+      FROM user_system_entitlements
+      WHERE user_id = ${userId}
+        AND tenant_id = ${body.tenantId}
+        AND status = 'active'
+    `) as QueryResultRows<{ system_key: string }>
+
+    const systems = (Array.isArray(entitlementRows) ? entitlementRows : entitlementRows.rows ?? []).map((row) => row.system_key)
+    const effectiveSystems = systems.length > 0 ? systems : ['manage']
+
+    if (!effectiveSystems.includes('manage') && dbUser.role !== Role.SUPERADMIN) {
+      return forbidden(c, 'Manage system entitlement required for target tenant')
+    }
+
+    const targetBranchId = body.branchId ?? membership?.primary_branch_id ?? dbUser.branch_id ?? undefined
+    const jwt = await new jose.SignJWT({
+      sub: dbUser.id,
+      userId: dbUser.id,
+      name: (dbUser.full_name ?? dbUser.username) ?? undefined,
+      email: dbUser.email ?? undefined,
+      role: dbUser.role,
+      tenantId: body.tenantId,
+      branchId: targetBranchId ?? undefined,
+      systems: effectiveSystems,
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('1h')
+      .sign(secret)
+
+    await revokeSessionsByRefreshToken(extractRefreshToken(c), 'tenant_switch_replaced')
+    await setAuthTokens(c, jwt, dbUser.id, body.tenantId, targetBranchId, 'manage', 'tenant_switch')
+
+    return success(c, {
+      token: jwt,
+      user: {
+        id: dbUser.id,
+        name: (dbUser.full_name ?? dbUser.username) ?? undefined,
+        email: dbUser.email ?? undefined,
+        role: dbUser.role,
+        tenant_id: body.tenantId,
+        branch_id: targetBranchId,
+        permissions: getUserPermissions(dbUser.role as Role),
+        systems: effectiveSystems,
+      },
+    })
+  } catch (err: unknown) {
+    return internalError(c, err instanceof Error ? err : undefined)
+  }
 })
 
 export async function handleDemoLogin(c: import('hono').Context) {
@@ -758,7 +1103,7 @@ export async function handleDemoLogin(c: import('hono').Context) {
       branch_id: account.branchId,
     })
 
-    await setAuthTokens(c, jwt, account.id, account.tenantId)
+    await setAuthTokens(c, jwt, account.id, account.tenantId, account.branchId, 'manage', 'demo_login')
     return success(c, {
       token: jwt,
       user: {

@@ -75,12 +75,20 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
   try {
     const res = await fetch(url.toString(), init)
     const responseBody = await res.arrayBuffer()
-    return new NextResponse(responseBody, {
+    const response = new NextResponse(responseBody, {
       status: res.status,
       headers: {
         'Content-Type': res.headers.get('Content-Type') || 'application/json',
       },
     })
+
+    res.headers.forEach((value, key) => {
+      if (key.toLowerCase() === 'set-cookie') {
+        response.headers.append('Set-Cookie', value)
+      }
+    })
+
+    return response
   } catch (error) {
     console.error('Proxy error:', error)
     return NextResponse.json({ error: 'Backend unavailable' }, { status: 502 })

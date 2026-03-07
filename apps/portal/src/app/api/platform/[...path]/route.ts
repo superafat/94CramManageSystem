@@ -13,7 +13,7 @@ async function isDemoToken(request: NextRequest): Promise<boolean> {
       token = authHeader.slice(7)
     } else {
       // Fall back to cookie
-      token = request.cookies.get('platform_token')?.value || ''
+      token = request.cookies.get('token')?.value || request.cookies.get('platform_token')?.value || ''
     }
     if (!token) return false
 
@@ -63,7 +63,7 @@ async function handler(
   if (authHeader) {
     headers.set('Authorization', authHeader)
   } else {
-    const token = request.cookies.get('platform_token')?.value
+    const token = request.cookies.get('token')?.value || request.cookies.get('platform_token')?.value
     if (token) headers.set('Authorization', `Bearer ${token}`)
   }
 
@@ -76,12 +76,20 @@ async function handler(
   try {
     const res = await fetch(url.toString(), init)
     const responseBody = await res.arrayBuffer()
-    return new NextResponse(responseBody, {
+    const response = new NextResponse(responseBody, {
       status: res.status,
       headers: {
         'Content-Type': res.headers.get('Content-Type') || 'application/json',
       },
     })
+
+    res.headers.forEach((value, key) => {
+      if (key.toLowerCase() === 'set-cookie') {
+        response.headers.append('Set-Cookie', value)
+      }
+    })
+
+    return response
   } catch {
     return NextResponse.json(
       { success: false, message: '後端服務連線失敗' },

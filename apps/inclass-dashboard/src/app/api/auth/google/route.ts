@@ -8,7 +8,7 @@ const INCLASS_BACKEND_URL =
 export async function POST(request: NextRequest) {
   try {
     const body = await request.arrayBuffer()
-    const res = await fetch(`${INCLASS_BACKEND_URL}/api/auth/login`, {
+    const res = await fetch(`${INCLASS_BACKEND_URL}/api/auth/google`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,

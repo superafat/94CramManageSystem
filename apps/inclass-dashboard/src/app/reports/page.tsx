@@ -59,6 +59,45 @@ function asNumber(value: unknown, fallback = 0): number {
 
 function normalizeAttendanceReport(value: unknown): ReportData {
   const record = asRecord(value)
+  const topLevelDailyStats = asRecord(record.dailyStats)
+  const topLevelStudentStats = asArray(record.studentStats).map((entry) => asRecord(entry))
+  const topLevelSummary = asRecord(record.summary)
+
+  if (Object.keys(topLevelDailyStats).length > 0 || topLevelStudentStats.length > 0) {
+    const dailyStats = Object.entries(topLevelDailyStats).reduce<Record<string, DailyStats>>((acc, [date, stats]) => {
+      const statRecord = asRecord(stats)
+      acc[date] = {
+        total: asNumber(statRecord.total),
+        arrived: asNumber(statRecord.arrived),
+        late: asNumber(statRecord.late),
+        absent: asNumber(statRecord.absent),
+      }
+      return acc
+    }, {})
+
+    const studentStats = topLevelStudentStats.map((entry) => ({
+      studentId: asString(entry.studentId),
+      studentName: asString(entry.studentName, '未命名學生'),
+      arrived: asNumber(entry.arrived),
+      late: asNumber(entry.late),
+      absent: asNumber(entry.absent),
+      total: asNumber(entry.total),
+      rate: asNumber(entry.rate),
+    }))
+
+    return {
+      month: asString(record.month),
+      dailyStats,
+      studentStats,
+      summary: {
+        totalDays: asNumber(topLevelSummary.totalDays, Object.keys(dailyStats).length),
+        totalAttendances: asNumber(topLevelSummary.totalAttendances, studentStats.reduce((sum, student) => sum + student.total, 0)),
+        averageRate: asNumber(topLevelSummary.averageRate, studentStats.length > 0 ? Math.round(studentStats.reduce((sum, student) => sum + student.rate, 0) / studentStats.length) : 0),
+        totalStudents: asNumber(topLevelSummary.totalStudents, studentStats.length),
+      },
+    }
+  }
+
   const report = asRecord(record.report)
   const records = asArray(report.records).map((entry) => asRecord(entry))
   const dailyStats = records.reduce<Record<string, DailyStats>>((acc, entry) => {

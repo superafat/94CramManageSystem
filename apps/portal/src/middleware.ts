@@ -1,27 +1,28 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { verify } from '@94cram/shared/auth'
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // 只處理 /admin 路徑（排除 /admin/login）
   if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
-    const token = request.cookies.get('platform_token')?.value
+    const token = request.cookies.get('token')?.value || request.cookies.get('platform_token')?.value
 
     if (!token) {
       return NextResponse.redirect(new URL('/admin/login', request.url))
     }
 
-    // 簡單檢查 token 是否過期（解析 JWT payload）
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      if (payload.exp && payload.exp * 1000 < Date.now()) {
-        const response = NextResponse.redirect(new URL('/admin/login', request.url))
-        response.cookies.delete('platform_token')
-        return response
+      const payload = await verify(token)
+      if (payload.role !== 'superadmin') {
+        throw new Error('Forbidden')
       }
     } catch {
-      return NextResponse.redirect(new URL('/admin/login', request.url))
+      const response = NextResponse.redirect(new URL('/admin/login', request.url))
+      response.cookies.delete('token')
+      response.cookies.delete('platform_token')
+      return response
     }
   }
 

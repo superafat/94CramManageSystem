@@ -19,6 +19,7 @@ export async function platformFetch<T>(path: string, options?: RequestInit): Pro
   const token = getToken()
   const res = await fetch(`/api/platform${path}`, {
     ...options,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

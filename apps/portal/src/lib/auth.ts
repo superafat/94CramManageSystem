@@ -1,6 +1,7 @@
 import { decodeJwt } from 'jose'
 
-const COOKIE_NAME = 'platform_token'
+const COOKIE_NAMES = ['token', 'platform_token'] as const
+const LEGACY_COOKIE_NAME = 'platform_token'
 
 export interface PlatformUser {
   userId: string
@@ -11,17 +12,25 @@ export interface PlatformUser {
 }
 
 export function setToken(token: string): void {
-  document.cookie = `${COOKIE_NAME}=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
+  document.cookie = `${LEGACY_COOKIE_NAME}=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
 }
 
 export function getToken(): string | null {
   if (typeof document === 'undefined') return null
-  const match = document.cookie.match(new RegExp(`(?:^|; )${COOKIE_NAME}=([^;]*)`))
-  return match ? decodeURIComponent(match[1]) : null
+  for (const cookieName of COOKIE_NAMES) {
+    const match = document.cookie.match(new RegExp(`(?:^|; )${cookieName}=([^;]*)`))
+    if (match) return decodeURIComponent(match[1])
+  }
+  return null
 }
 
 export function removeToken(): void {
-  document.cookie = `${COOKIE_NAME}=; path=/; max-age=0`
+  for (const cookieName of COOKIE_NAMES) {
+    document.cookie = `${cookieName}=; path=/; max-age=0`
+  }
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('platform_token')
+  }
 }
 
 export function parseToken(token: string): PlatformUser | null {

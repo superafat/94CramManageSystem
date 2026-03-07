@@ -1,4 +1,6 @@
 # 94 教育生態系 — 統一架設規劃書
+
+> 2026-03-07 補充：舊版 SSO 假設已不適用。四系統合體與企業級 SSO 請改以 docs/plans/2026-03-07-four-system-unification-sso-plan.md 為準。
 > 版本: v3.0 | 2026-02-22 | 姜子牙 擬
 > 變更：v2.0 → v3.0 — 三個系統合併至 94CramManageSystem monorepo
 

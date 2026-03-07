@@ -66,6 +66,36 @@ export const userPermissions = pgTable('user_permissions', {
   userIdx: index('user_permissions_user_id_idx').on(table.userId),
 }));
 
+export const userTenantMemberships = pgTable('user_tenant_memberships', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  membershipRole: varchar('membership_role', { length: 30 }).notNull().default('member'),
+  status: varchar('status', { length: 20 }).notNull().default('active'),
+  primaryBranchId: uuid('primary_branch_id').references(() => branches.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  userIdx: index('user_tenant_memberships_user_id_idx').on(table.userId),
+  tenantIdx: index('user_tenant_memberships_tenant_id_idx').on(table.tenantId),
+  statusIdx: index('user_tenant_memberships_status_idx').on(table.status),
+}));
+
+export const userBranchMemberships = pgTable('user_branch_memberships', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  branchId: uuid('branch_id').references(() => branches.id).notNull(),
+  branchRole: varchar('branch_role', { length: 30 }).notNull().default('member'),
+  status: varchar('status', { length: 20 }).notNull().default('active'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  userIdx: index('user_branch_memberships_user_id_idx').on(table.userId),
+  tenantIdx: index('user_branch_memberships_tenant_id_idx').on(table.tenantId),
+  branchIdx: index('user_branch_memberships_branch_id_idx').on(table.branchId),
+}));
+
 export const auditLogs = pgTable('audit_logs', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').references(() => users.id),
@@ -78,6 +108,76 @@ export const auditLogs = pgTable('audit_logs', {
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
   tenantIdx: index('audit_logs_tenant_id_idx').on(table.tenantId),
+}));
+
+export const userSystemEntitlements = pgTable('user_system_entitlements', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  systemKey: varchar('system_key', { length: 30 }).notNull(),
+  accessLevel: varchar('access_level', { length: 20 }).notNull().default('member'),
+  status: varchar('status', { length: 20 }).notNull().default('active'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  userIdx: index('user_system_entitlements_user_id_idx').on(table.userId),
+  tenantIdx: index('user_system_entitlements_tenant_id_idx').on(table.tenantId),
+  systemIdx: index('user_system_entitlements_system_key_idx').on(table.systemKey),
+}));
+
+export const authSessions = pgTable('auth_sessions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id),
+  branchId: uuid('branch_id').references(() => branches.id),
+  deviceId: varchar('device_id', { length: 128 }),
+  refreshTokenHash: varchar('refresh_token_hash', { length: 255 }).notNull(),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: text('user_agent'),
+  lastSeenAt: timestamp('last_seen_at').defaultNow(),
+  revokedAt: timestamp('revoked_at'),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  userIdx: index('auth_sessions_user_id_idx').on(table.userId),
+  tenantIdx: index('auth_sessions_tenant_id_idx').on(table.tenantId),
+  refreshIdx: index('auth_sessions_refresh_token_hash_idx').on(table.refreshTokenHash),
+  activeIdx: index('auth_sessions_revoked_at_idx').on(table.revokedAt, table.expiresAt),
+}));
+
+export const authSessionEvents = pgTable('auth_session_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  sessionId: uuid('session_id').references(() => authSessions.id).notNull(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id),
+  eventType: varchar('event_type', { length: 50 }).notNull(),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: text('user_agent'),
+  details: jsonb('details').default({}),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  sessionIdx: index('auth_session_events_session_id_idx').on(table.sessionId),
+  userIdx: index('auth_session_events_user_id_idx').on(table.userId),
+  eventIdx: index('auth_session_events_event_type_idx').on(table.eventType),
+}));
+
+export const userChannelBindings = pgTable('user_channel_bindings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  channelType: varchar('channel_type', { length: 20 }).notNull(),
+  externalUserId: varchar('external_user_id', { length: 255 }).notNull(),
+  status: varchar('status', { length: 20 }).notNull().default('active'),
+  metadata: jsonb('metadata').default({}),
+  verifiedAt: timestamp('verified_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  userIdx: index('user_channel_bindings_user_id_idx').on(table.userId),
+  tenantIdx: index('user_channel_bindings_tenant_id_idx').on(table.tenantId),
+  channelIdx: index('user_channel_bindings_channel_type_idx').on(table.channelType),
+  externalIdx: index('user_channel_bindings_external_user_id_idx').on(table.externalUserId),
 }));
 
 // ===== Analytics =====

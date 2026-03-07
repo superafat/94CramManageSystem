@@ -286,6 +286,31 @@ export function getDemoResponse(method: string, path: string, _searchParams: URL
       if (warehouseId) batches = batches.filter(b => b.warehouseId === warehouseId)
       return { status: 200, body: batches }
     }
+    if (path === '/api/batches/expiry-report') {
+      const report = DEMO_BATCHES.map((batch) => {
+        const item = ITEMS.find((entry) => entry.id === batch.itemId)
+        const warehouse = WAREHOUSES.find((entry) => entry.id === batch.warehouseId)
+        const expiryDate = batch.expiryDate
+        const daysUntilExpiry = expiryDate
+          ? Math.floor((new Date(expiryDate).getTime() - new Date('2026-03-07T00:00:00Z').getTime()) / (1000 * 60 * 60 * 24))
+          : null
+
+        return {
+          id: batch.id,
+          batchNo: batch.batchNo,
+          itemName: item?.name ?? batch.itemId,
+          sku: item?.sku ?? '',
+          warehouseName: warehouse?.name ?? batch.warehouseId,
+          remainingQty: batch.remainingQty,
+          unit: item?.unit ?? '件',
+          manufactureDate: batch.manufactureDate,
+          expiryDate,
+          receivedAt: batch.receivedAt,
+          daysUntilExpiry,
+        }
+      })
+      return { status: 200, body: report }
+    }
 
     // Barcodes
     if (path === '/api/barcodes') return { status: 200, body: BARCODES }

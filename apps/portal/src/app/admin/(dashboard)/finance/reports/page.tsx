@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { formatNTD } from '@/lib/format'
+import { getToken } from '@/lib/auth'
 import {
   BarChart,
   Bar,
@@ -474,12 +475,13 @@ export default function ReportsPage() {
   async function handleExport(type: 'payments' | 'costs') {
     try {
       setExporting(true)
-      const token = typeof window !== 'undefined'
-        ? localStorage.getItem('platform_token') ?? ''
-        : ''
+      const token = typeof window !== 'undefined' ? getToken() ?? '' : ''
       const res = await fetch(
         `/api/platform/finance/reports/export?type=${type}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          credentials: 'include',
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        }
       )
       if (!res.ok) throw new Error('匯出失敗')
       const blob = await res.blob()

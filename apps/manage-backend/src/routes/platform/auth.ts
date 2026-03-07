@@ -10,7 +10,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import * as jose from 'jose'
 import bcrypt from 'bcryptjs'
-import { setAuthCookie, setRefreshCookie, clearAuthCookie, extractToken, signRefreshToken } from '@94cram/shared/auth'
+import { setAuthCookie, setRefreshCookie, clearAuthCookie, extractToken, extractRefreshToken, signRefreshToken, hashSessionToken, getRefreshTokenExpiryDate } from '@94cram/shared/auth'
 import { config } from '../../config'
 import { db } from '../../db'
 import { sql } from 'drizzle-orm'
@@ -18,7 +18,7 @@ import { getUserPermissions, Role } from '../../middleware/rbac'
 import type { RBACVariables } from '../../middleware/rbac'
 import { authMiddleware } from '../../middleware/auth'
 import { requireRole } from '../../middleware/rbac'
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import {
   success,
   unauthorized,
@@ -45,6 +45,8 @@ type AuthUserRow = {
   password_hash?: string | null
 }
 
+type QueryIdRow = { id: string }
+
 function firstRow<T>(result: QueryResultRows<T>): T | null {
   if (Array.isArray(result)) return result[0] ?? null
   return result.rows?.[0] ?? null
@@ -53,6 +55,10 @@ function firstRow<T>(result: QueryResultRows<T>): T | null {
 // ===== Helpers =====
 
 const secret = new TextEncoder().encode(config.JWT_SECRET)
+
+function generateId(): string {
+  return randomUUID()
+}
 
 /** Verify password - supports bcrypt and legacy sha256+salt */
 async function verifyPassword(password: string, stored: string): Promise<{ valid: boolean; isLegacy: boolean }> {
@@ -94,6 +100,7 @@ async function generateToken(payload: {
     role: payload.role,
     tenantId: payload.tenant_id,
     branchId: payload.branch_id ?? undefined,
+    systems: ['platform'],
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -102,10 +109,103 @@ async function generateToken(payload: {
 }
 
 /** Set both access + refresh token cookies */
-async function setAuthTokens(c: import('hono').Context, accessToken: string, userId: string, tenantId: string) {
+async function ensureIdentityRecords(userId: string, tenantId: string, branchId?: string | null): Promise<void> {
+  const entitlement = firstRow(await db.execute(sql`
+    SELECT id
+    FROM user_system_entitlements
+    WHERE user_id = ${userId}
+      AND tenant_id = ${tenantId}
+      AND system_key = 'platform'
+      AND status = 'active'
+    LIMIT 1
+  `) as QueryResultRows<QueryIdRow>)
+
+  if (!entitlement) {
+    await db.execute(sql`
+      INSERT INTO user_system_entitlements (id, user_id, tenant_id, system_key, access_level, status, created_at, updated_at)
+      VALUES (${generateId()}, ${userId}, ${tenantId}, 'platform', 'owner', 'active', NOW(), NOW())
+    `)
+  }
+
+  if (branchId) {
+    const branchMembership = firstRow(await db.execute(sql`
+      SELECT id
+      FROM user_branch_memberships
+      WHERE user_id = ${userId}
+        AND tenant_id = ${tenantId}
+        AND branch_id = ${branchId}
+        AND status = 'active'
+      LIMIT 1
+    `) as QueryResultRows<QueryIdRow>)
+
+    if (!branchMembership) {
+      await db.execute(sql`
+        INSERT INTO user_branch_memberships (id, user_id, tenant_id, branch_id, branch_role, status, created_at, updated_at)
+        VALUES (${generateId()}, ${userId}, ${tenantId}, ${branchId}, 'owner', 'active', NOW(), NOW())
+      `)
+    }
+  }
+
+  const tenantMembership = firstRow(await db.execute(sql`
+    SELECT id
+    FROM user_tenant_memberships
+    WHERE user_id = ${userId}
+      AND tenant_id = ${tenantId}
+      AND status = 'active'
+    LIMIT 1
+  `) as QueryResultRows<QueryIdRow>)
+
+  if (!tenantMembership) {
+    await db.execute(sql`
+      INSERT INTO user_tenant_memberships (id, user_id, tenant_id, membership_role, status, primary_branch_id, created_at, updated_at)
+      VALUES (${generateId()}, ${userId}, ${tenantId}, 'owner', 'active', ${branchId ?? null}, NOW(), NOW())
+    `)
+  }
+}
+
+async function recordSessionEvent(sessionId: string, userId: string, tenantId: string | null, eventType: string, ipAddress?: string | null, userAgent?: string | null): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO auth_session_events (id, session_id, user_id, tenant_id, event_type, ip_address, user_agent, details, created_at)
+    VALUES (${generateId()}, ${sessionId}, ${userId}, ${tenantId}, ${eventType}, ${ipAddress ?? null}, ${userAgent ?? null}, '{}'::jsonb, NOW())
+  `)
+}
+
+async function persistSession(c: import('hono').Context, userId: string, tenantId: string, refreshToken: string, branchId?: string | null, eventType = 'platform_login'): Promise<void> {
+  const sessionId = generateId()
+  const ipAddress = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? null
+  const userAgent = c.req.header('user-agent') ?? null
+
+  await db.execute(sql`
+    INSERT INTO auth_sessions (id, user_id, tenant_id, branch_id, refresh_token_hash, ip_address, user_agent, last_seen_at, expires_at, created_at, updated_at)
+    VALUES (${sessionId}, ${userId}, ${tenantId}, ${branchId ?? null}, ${hashSessionToken(refreshToken)}, ${ipAddress}, ${userAgent}, NOW(), ${getRefreshTokenExpiryDate()}, NOW(), NOW())
+  `)
+
+  await recordSessionEvent(sessionId, userId, tenantId, eventType, ipAddress, userAgent)
+}
+
+async function revokeSessionsByRefreshToken(refreshToken: string | null, eventType: string): Promise<void> {
+  if (!refreshToken) return
+
+  const sessions = await db.execute(sql`
+    UPDATE auth_sessions
+    SET revoked_at = NOW(), updated_at = NOW()
+    WHERE refresh_token_hash = ${hashSessionToken(refreshToken)}
+      AND revoked_at IS NULL
+    RETURNING id, user_id, tenant_id
+  `) as QueryResultRows<{ id: string; user_id: string; tenant_id: string | null }>
+
+  const rows = Array.isArray(sessions) ? sessions : sessions.rows ?? []
+  for (const session of rows) {
+    await recordSessionEvent(session.id, session.user_id, session.tenant_id, eventType)
+  }
+}
+
+async function setAuthTokens(c: import('hono').Context, accessToken: string, userId: string, tenantId: string, branchId?: string | null, eventType = 'platform_login') {
   setAuthCookie(c, accessToken)
   const refreshToken = await signRefreshToken({ userId, tenantId })
   setRefreshCookie(c, refreshToken)
+  await ensureIdentityRecords(userId, tenantId, branchId)
+  await persistSession(c, userId, tenantId, refreshToken, branchId, eventType)
 }
 
 // ===== Validation Schema =====
@@ -168,7 +268,7 @@ platformAuthRoutes.post('/login', zValidator('json', platformLoginSchema), async
     db.execute(sql`UPDATE users SET last_login_at = NOW() WHERE id = ${dbUser.id}`)
       .catch(() => { /* non-critical */ })
 
-    await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id)
+    await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id, dbUser.branch_id ?? undefined, 'platform_login')
     return success(c, {
       token: jwt,
       user: {
@@ -255,7 +355,7 @@ platformAuthRoutes.post('/google', async (c) => {
     db.execute(sql`UPDATE users SET last_login_at = NOW() WHERE id = ${dbUser.id}`)
       .catch(() => {})
 
-    await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id)
+    await setAuthTokens(c, jwt, dbUser.id, dbUser.tenant_id, dbUser.branch_id ?? undefined, 'platform_google_login')
     return success(c, {
       token: jwt,
       user: {
@@ -276,6 +376,7 @@ platformAuthRoutes.post('/google', async (c) => {
 // POST /logout - Clear auth cookie
 // ========================================================================
 platformAuthRoutes.post('/logout', async (c) => {
+  await revokeSessionsByRefreshToken(extractRefreshToken(c), 'platform_logout')
   clearAuthCookie(c)
   return success(c, { message: '已登出' })
 })

@@ -19,3 +19,22 @@
 - [x] 帳務前端改為左班級右學生繳費狀態與設定介面
 - [x] 支援每位學生月繳/堂繳個別設定與金額記憶
 - [x] 完成前後端 typecheck 與 demo flow 對接
+
+# 2026-03-07 四系統合體與安全 SSO
+
+- [x] 盤點四站共用 users / tenants / auth helper 現況
+- [x] 補完四系統合體與企業級 SSO 規劃文件
+- [x] 收斂 manage / inclass 前端本地登入實作為 backend auth 代理
+- [x] 修正 dashboard proxy 未轉發 Set-Cookie 導致的 session 漏洞
+- [x] 補齊 manage / inclass 缺少的 auth google 代理 route
+- [x] 執行 typecheck 驗證本輪 auth 收斂修改
+- [x] 硬化 Portal middleware / proxy / admin header 為共享 cookie 優先模式
+- [x] 建立中央 auth issuer 與 session store 資料模型
+- [x] 導入跨子網域正式 cookie 名稱與相容遷移層
+- [x] 落地第一階段 systems claim enforcement（manage / inclass / stock）
+- [x] 將 manage / inclass / stock auth route 改為 session-backed，登入/refresh/logout 會寫入或撤銷 auth_sessions
+- [x] 補上 manage auth 的 session 查詢、手動 revoke、tenant switch 基礎流程
+- [x] 補上 platform auth 的 session 落庫與 logout revoke
+- [x] 將 middleware / authMiddleware 改為直接查 user_system_entitlements，而不只信任 token systems claim
+- [x] 對齊 94BOT channel binding 與中央 user identity（manage telegram login + bot bind code 寫入 user_channel_bindings）
+- [ ] 在已配置且確認非生產風險的 DATABASE_URL 環境執行 auth foundation migration

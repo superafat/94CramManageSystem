@@ -1,148 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
-import * as jose from 'jose'
-import pg from 'pg'
-import bcrypt from 'bcryptjs'
 
-// Simple in-memory rate limiter for login attempts
-const loginAttempts = new Map<string, { count: number; resetAt: number }>()
-const MAX_LOGIN_ATTEMPTS = 10
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
-
-function checkLoginRateLimit(ip: string): boolean {
-  const now = Date.now()
-  const entry = loginAttempts.get(ip)
-  if (!entry || now >= entry.resetAt) {
-    loginAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
-    return true
-  }
-  entry.count++
-  return entry.count <= MAX_LOGIN_ATTEMPTS
-}
-
-const ROLE_PERMISSIONS: Record<string, string[]> = {
-  superadmin: ['manage_users', 'manage_settings', 'view_reports', 'manage_billing', 'manage_schedules', 'manage_students', 'view_attendance', 'manage_grades'],
-  admin: ['manage_users', 'manage_settings', 'view_reports', 'manage_billing', 'manage_schedules', 'manage_students', 'view_attendance', 'manage_grades'],
-  staff: ['manage_students', 'manage_billing', 'manage_schedules', 'view_attendance', 'manage_grades'],
-  teacher: ['view_attendance', 'manage_grades', 'view_schedules'],
-  parent: ['view_attendance', 'view_grades', 'view_schedules'],
-  student: ['view_attendance', 'view_grades', 'view_schedules'],
-}
-
-let pool: pg.Pool | null = null
-function getPool() {
-  if (!pool) {
-    pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 3 })
-  }
-  return pool
-}
+const GCP_PROJECT_NUMBER = process.env.GCP_PROJECT_NUMBER || '1015149159553'
+const MANAGE_BACKEND_URL =
+  process.env.MANAGE_BACKEND_URL ||
+  `https://cram94-manage-backend-${GCP_PROJECT_NUMBER}.asia-east1.run.app`
 
 export async function POST(request: NextRequest) {
-  // Rate limiting
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-  if (!checkLoginRateLimit(ip)) {
-    return NextResponse.json(
-      { success: false, error: { code: 'RATE_LIMITED', message: '登入嘗試次數過多，請 15 分鐘後再試' } },
-      { status: 429 }
-    )
-  }
-
-  const jwtSecret = process.env.JWT_SECRET
-  const dbUrl = process.env.DATABASE_URL
-  if (!jwtSecret || !dbUrl) {
-    return NextResponse.json(
-      { success: false, error: { code: 'SERVER_ERROR', message: 'Missing server configuration' } },
-      { status: 500 }
-    )
-  }
-
   try {
-    const body = await request.json().catch(() => ({}))
-    const username = (body as { username?: string }).username?.trim()
-    const password = (body as { password?: string }).password
-
-    if (!username || !password) {
-      return NextResponse.json(
-        { success: false, error: { code: 'BAD_REQUEST', message: '請輸入帳號和密碼' } },
-        { status: 400 }
-      )
-    }
-
-    const db = getPool()
-    // Look up by username or email
-    const result = await db.query(
-      `SELECT id, username, email, name, password_hash, role, tenant_id, branch_id, is_active, deleted_at
-       FROM users
-       WHERE (username = $1 OR email = $1) AND deleted_at IS NULL
-       LIMIT 1`,
-      [username]
-    )
-
-    const user = result.rows[0]
-    if (!user || user.is_active === false) {
-      return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: '帳號或密碼錯誤' } },
-        { status: 401 }
-      )
-    }
-
-    // Verify password (supports bcrypt $2a$/$2b$)
-    const valid = await bcrypt.compare(password, user.password_hash)
-    if (!valid) {
-      return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: '帳號或密碼錯誤' } },
-        { status: 401 }
-      )
-    }
-
-    // Update last login
-    await db.query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]).catch(() => {})
-
-    const permissions = ROLE_PERMISSIONS[user.role] || []
-    const secret = new TextEncoder().encode(jwtSecret)
-    const jwt = await new jose.SignJWT({
-      sub: user.id,
-      userId: user.id,
-      name: user.name,
-      email: user.email || user.username,
-      role: user.role,
-      tenantId: user.tenant_id,
-      branchId: user.branch_id,
+    const body = await request.arrayBuffer()
+    const res = await fetch(`${MANAGE_BACKEND_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
     })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt()
-      .setExpirationTime('1h')
-      .sign(secret)
-
-    const response = NextResponse.json({
-      success: true,
-      data: {
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email || user.username,
-          role: user.role,
-          tenant_id: user.tenant_id,
-          branch_id: user.branch_id,
-          permissions,
-        },
-      },
-      timestamp: Date.now(),
+    const data = await res.arrayBuffer()
+    const response = new NextResponse(data, {
+      status: res.status,
+      headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' },
     })
 
-    response.cookies.set('token', jwt, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60,
+    res.headers.forEach((value, key) => {
+      if (key.toLowerCase() === 'set-cookie') {
+        response.headers.append('Set-Cookie', value)
+      }
     })
 
     return response
-  } catch (error) {
-    console.error('Login error:', error)
-    return NextResponse.json(
-      { success: false, error: { code: 'SERVER_ERROR', message: 'Internal server error' } },
-      { status: 500 }
-    )
+  } catch {
+    return NextResponse.json({ error: '無法連接後端服務' }, { status: 502 })
   }
 }

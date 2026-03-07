@@ -24,6 +24,246 @@ const CLASSES = [
   { id: 'c3', name: '國小先修班', grade: '國小', room: '101', capacity: 10, feeMonthly: 2800, feeQuarterly: 7800, feeSemester: 14000, feeYearly: 25000 },
 ]
 
+type DemoContactBookScore = {
+  id: string
+  subject: string
+  score: number
+  classAvg?: number
+  fullScore?: number
+}
+
+type DemoContactBookPhoto = {
+  id: string
+  url: string
+  caption?: string
+  sortOrder?: number
+}
+
+type DemoContactBookFeedback = {
+  id: string
+  parentUserId: string
+  rating: number
+  comment?: string
+  createdAt: string
+}
+
+type DemoContactBookAiAnalysis = {
+  id: string
+  weaknessSummary: string
+  recommendedCourseName?: string
+  recommendedCourseDesc?: string
+}
+
+type DemoContactBookEntry = {
+  id: string
+  studentId: string
+  courseId: string
+  entryDate: string
+  status: 'draft' | 'sent' | 'read' | 'pending'
+  groupProgress: string | null
+  groupHomework: string | null
+  individualNote: string | null
+  individualHomework: string | null
+  teacherTip: string | null
+  sentAt: string | null
+  readAt: string | null
+  createdAt: string
+  updatedAt: string
+  scores: DemoContactBookScore[]
+  photos: DemoContactBookPhoto[]
+  feedback: DemoContactBookFeedback[]
+  aiAnalysis: DemoContactBookAiAnalysis | null
+}
+
+let CONTACT_BOOK_ENTRIES: DemoContactBookEntry[] = [
+  {
+    id: 'cbe1',
+    studentId: 's1',
+    courseId: 'c1',
+    entryDate: '2026-03-07',
+    status: 'sent',
+    groupProgress: '今天完成一元一次方程式應用題，學生能掌握列式與驗算。',
+    groupHomework: '講義第 12 到 14 頁，完成後拍照上傳。',
+    individualNote: '陳小利今天主動發言，解題步驟清楚。',
+    individualHomework: '加強第 5 題與第 8 題的文字轉換。',
+    teacherTip: '建議晚上複習錯題本 15 分鐘。',
+    sentAt: '2026-03-07T10:20:00.000Z',
+    readAt: '2026-03-07T12:05:00.000Z',
+    createdAt: '2026-03-07T09:50:00.000Z',
+    updatedAt: '2026-03-07T10:20:00.000Z',
+    scores: [{ id: 'cbes1', subject: '數學隨堂測驗', score: 88, classAvg: 76, fullScore: 100 }],
+    photos: [{ id: 'cbep1', url: 'https://placehold.co/320x240/e9e2d8/5c4b3b?text=%E8%AA%B2%E5%A0%82%E7%B4%80%E9%8C%84', caption: '課堂解題練習', sortOrder: 1 }],
+    feedback: [{ id: 'cbef1', parentUserId: 'parent-1', rating: 5, comment: '收到，今晚會陪孩子複習。', createdAt: '2026-03-07T12:05:00.000Z' }],
+    aiAnalysis: { id: 'cbea1', weaknessSummary: '計算穩定，但遇到文字題時仍需多一步拆解條件。', recommendedCourseName: '數學應用題加強', recommendedCourseDesc: '每天練 2 題關鍵字判斷；整理題意再列式；週末複習錯題本' },
+  },
+  {
+    id: 'cbe2',
+    studentId: 's2',
+    courseId: 'c1',
+    entryDate: '2026-03-07',
+    status: 'draft',
+    groupProgress: '今天完成一元一次方程式應用題，學生能掌握列式與驗算。',
+    groupHomework: '講義第 12 到 14 頁，完成後拍照上傳。',
+    individualNote: '王大明基礎穩定，但計算速度較慢。',
+    individualHomework: '請特別完成第 9 題到第 11 題。',
+    teacherTip: '先求穩定正確，再練速度。',
+    sentAt: null,
+    readAt: null,
+    createdAt: '2026-03-07T09:55:00.000Z',
+    updatedAt: '2026-03-07T09:55:00.000Z',
+    scores: [{ id: 'cbes2', subject: '數學隨堂測驗', score: 72, classAvg: 76, fullScore: 100 }],
+    photos: [],
+    feedback: [],
+    aiAnalysis: null,
+  },
+  {
+    id: 'cbe3',
+    studentId: 's3',
+    courseId: 'c2',
+    entryDate: '2026-03-07',
+    status: 'read',
+    groupProgress: '本日完成閱讀測驗與句型改寫。',
+    groupHomework: '完成文法講義 Unit 3。',
+    individualNote: '林美琪表現積極，口說練習完整。',
+    individualHomework: '複習被動語態與片語整理。',
+    teacherTip: '可開始挑戰進階閱讀題型。',
+    sentAt: '2026-03-07T10:30:00.000Z',
+    readAt: '2026-03-07T11:40:00.000Z',
+    createdAt: '2026-03-07T10:00:00.000Z',
+    updatedAt: '2026-03-07T10:30:00.000Z',
+    scores: [{ id: 'cbes3', subject: '英文小考', score: 95, classAvg: 84, fullScore: 100 }],
+    photos: [],
+    feedback: [{ id: 'cbef3', parentUserId: 'parent-3', rating: 4, comment: '謝謝老師，會加強文法複習。', createdAt: '2026-03-07T11:40:00.000Z' }],
+    aiAnalysis: { id: 'cbea3', weaknessSummary: '閱讀理解佳，但文法細節仍會遺漏冠詞。', recommendedCourseName: '英文文法整合班', recommendedCourseDesc: '冠詞與時態對照；句型改寫練習；每週文法小測' },
+  },
+]
+
+function nowIso(): string {
+  return new Date().toISOString()
+}
+
+function getStudentName(studentId: string): string {
+  return STUDENTS.find((student) => student.id === studentId)?.name ?? ''
+}
+
+function getContactBookEntries(courseId: string, date: string) {
+  const entries = CONTACT_BOOK_ENTRIES
+    .filter((entry) => entry.courseId === courseId && entry.entryDate === date)
+    .map((entry) => ({
+      ...entry,
+      studentName: getStudentName(entry.studentId),
+    }))
+
+  const studentsWithoutEntry = STUDENTS
+    .filter((student) => student.classId === courseId && !entries.some((entry) => entry.studentId === student.id))
+    .map((student) => ({
+      studentId: student.id,
+      studentName: student.name,
+      studentGrade: student.grade,
+    }))
+
+  return { entries, studentsWithoutEntry }
+}
+
+function ensureContactBookEntries(
+  courseId: string,
+  entryDate: string,
+  studentIds: string[],
+  groupProgress?: string,
+  groupHomework?: string,
+) {
+  const createdIds: string[] = []
+  for (const studentId of studentIds) {
+    const existing = CONTACT_BOOK_ENTRIES.find((entry) => entry.studentId === studentId && entry.courseId === courseId && entry.entryDate === entryDate)
+    if (existing) {
+      existing.groupProgress = groupProgress ?? existing.groupProgress
+      existing.groupHomework = groupHomework ?? existing.groupHomework
+      existing.updatedAt = nowIso()
+      createdIds.push(existing.id)
+      continue
+    }
+
+    const id = `cbe-${studentId}-${entryDate}`
+    CONTACT_BOOK_ENTRIES.push({
+      id,
+      studentId,
+      courseId,
+      entryDate,
+      status: 'draft',
+      groupProgress: groupProgress ?? '',
+      groupHomework: groupHomework ?? '',
+      individualNote: '',
+      individualHomework: '',
+      teacherTip: '',
+      sentAt: null,
+      readAt: null,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+      scores: [],
+      photos: [],
+      feedback: [],
+      aiAnalysis: null,
+    })
+    createdIds.push(id)
+  }
+  return createdIds
+}
+
+function updateContactBookEntry(
+  entryId: string,
+  updates: Partial<Pick<DemoContactBookEntry, 'groupProgress' | 'groupHomework' | 'individualNote' | 'individualHomework' | 'teacherTip' | 'scores'>>,
+) {
+  const entry = CONTACT_BOOK_ENTRIES.find((item) => item.id === entryId)
+  if (!entry) return null
+  entry.groupProgress = updates.groupProgress ?? entry.groupProgress
+  entry.groupHomework = updates.groupHomework ?? entry.groupHomework
+  entry.individualNote = updates.individualNote ?? entry.individualNote
+  entry.individualHomework = updates.individualHomework ?? entry.individualHomework
+  entry.teacherTip = updates.teacherTip ?? entry.teacherTip
+  entry.scores = updates.scores ?? entry.scores
+  entry.updatedAt = nowIso()
+  return entry
+}
+
+function sendContactBookEntry(entryId: string) {
+  const entry = CONTACT_BOOK_ENTRIES.find((item) => item.id === entryId)
+  if (!entry) return null
+  entry.status = 'sent'
+  entry.sentAt = nowIso()
+  entry.updatedAt = nowIso()
+  return entry
+}
+
+function appendPhotoToEntry(entryId: string | null, caption = 'Demo 上傳照片') {
+  const photoId = `photo-${Date.now()}`
+  const photo = {
+    id: photoId,
+    url: `https://placehold.co/320x240/d9d2c6/5c4b3b?text=${photoId}`,
+    caption,
+    sortOrder: 1,
+  }
+  if (entryId) {
+    const entry = CONTACT_BOOK_ENTRIES.find((item) => item.id === entryId)
+    if (entry) {
+      entry.photos.push(photo)
+      entry.updatedAt = nowIso()
+    }
+  }
+  return photo
+}
+
+function deleteContactBookPhoto(photoId: string) {
+  for (const entry of CONTACT_BOOK_ENTRIES) {
+    const nextPhotos = entry.photos.filter((photo) => photo.id !== photoId)
+    if (nextPhotos.length !== entry.photos.length) {
+      entry.photos = nextPhotos
+      entry.updatedAt = nowIso()
+      return true
+    }
+  }
+  return false
+}
+
 // ===== 今日出勤 =====
 function getTodayAttendance() {
   const now = new Date()
@@ -153,7 +393,12 @@ const PENDING_USERS: Array<{ id: string; email: string; name: string; role: stri
 
 export const DEMO_TENANT = DEMO_TENANT_ID
 
-export function getDemoResponse(method: string, path: string, searchParams: URLSearchParams): { status: number; body: unknown } | null {
+export function getDemoResponse(
+  method: string,
+  path: string,
+  searchParams: URLSearchParams,
+  body?: Record<string, unknown>,
+): { status: number; body: unknown } | null {
   // GET endpoints
   if (method === 'GET') {
     // AuthContext expects { user: {...}, school: {...} }
@@ -163,6 +408,7 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     } }
     if (path === '/api/students') return { status: 200, body: { students: STUDENTS } }
     if (path === '/api/classes') return { status: 200, body: { classes: CLASSES } }
+    if (path === '/api/w8/courses') return { status: 200, body: { success: true, data: { courses: CLASSES.map(({ id, name }) => ({ id, name })) } } }
     if (path === '/api/attendance/today') return { status: 200, body: getTodayAttendance() }
     if (path === '/api/exams') return { status: 200, body: { exams: EXAMS } }
     if (path === '/api/alerts') return { status: 200, body: { alerts: ALERTS } }
@@ -172,6 +418,12 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     if (path === '/api/schedules') return { status: 200, body: { schedules: [] } }
     if (path === '/api/payments') return { status: 200, body: { payments: PAYMENT_RECORDS } }
     if (path === '/api/admin/pending-users') return { status: 200, body: { users: PENDING_USERS } }
+
+    if (path === '/api/contact-book/entries') {
+      const courseId = searchParams.get('courseId') || 'c1'
+      const date = searchParams.get('date') || '2026-03-07'
+      return { status: 200, body: { success: true, data: getContactBookEntries(courseId, date) } }
+    }
 
     // Dynamic routes
     const examScoresMatch = path.match(/^\/api\/exams\/(\w+)\/scores$/)
@@ -225,18 +477,82 @@ export function getDemoResponse(method: string, path: string, searchParams: URLS
     if (path === '/api/attendance/checkin') return { status: 200, body: { success: true, message: 'Demo 打卡成功' } }
     if (path === '/api/payment-records/batch') return { status: 200, body: { success: true, message: 'Demo 繳費紀錄已建立' } }
     if (path === '/api/notify/absence') return { status: 200, body: { success: true, message: 'Demo 通知已發送' } }
+    if (path === '/api/contact-book/templates') return { status: 200, body: { success: true, data: { applied: true } } }
+    if (path === '/api/contact-book/ai-analysis') return {
+      status: 200,
+      body: {
+        success: true,
+        data: {
+          weaknessSummary: '目前基礎概念已建立，建議加強題意拆解與計算穩定度。',
+          recommendedCourseName: 'AI 個別化加強計畫',
+          recommendedCourseDesc: '每天複習錯題；每週一次重點觀念整理；建立解題檢查習慣',
+        },
+      },
+    }
+    if (path === '/api/contact-book/ai-writing') return {
+      status: 200,
+      body: {
+        success: true,
+        data: {
+          text: '孩子今天在課堂上投入度不錯，已能跟上主要進度。建議家長回家後協助複習錯題與重點講義，持續建立穩定的學習節奏。',
+        },
+      },
+    }
+    if (path === '/api/contact-book/upload') {
+      const entryId = typeof body?.entryId === 'string' ? body.entryId : null
+      const photo = appendPhotoToEntry(entryId)
+      return {
+        status: 200,
+        body: {
+          success: true,
+          data: photo,
+        },
+      }
+    }
+    if (path === '/api/contact-book/entries') {
+      const courseId = typeof body?.courseId === 'string' ? body.courseId : 'c1'
+      const entryDate = typeof body?.entryDate === 'string' ? body.entryDate : '2026-03-07'
+      const groupProgress = typeof body?.groupProgress === 'string' ? body.groupProgress : undefined
+      const groupHomework = typeof body?.groupHomework === 'string' ? body.groupHomework : undefined
+      const studentIds = Array.isArray(body?.studentIds)
+        ? body.studentIds.filter((studentId): studentId is string => typeof studentId === 'string')
+        : []
+      const ids = ensureContactBookEntries(courseId, entryDate, studentIds, groupProgress, groupHomework)
+      return { status: 200, body: { success: true, data: { ids } } }
+    }
     if (path.match(/^\/api\/exams\/\w+\/scores$/)) return { status: 201, body: { id: `sc${Date.now()}`, score: 0 } }
     if (path.match(/^\/api\/admin\/users\/\w+\/(approve|reject)$/)) return { status: 200, body: { success: true } }
+    const contactBookSendMatch = path.match(/^\/api\/contact-book\/entries\/(.+)\/send$/)
+    if (contactBookSendMatch) {
+      const entry = sendContactBookEntry(contactBookSendMatch[1])
+      return { status: entry ? 200 : 404, body: entry ? { success: true, data: { id: entry.id, status: entry.status } } : { success: false, message: '找不到聯絡簿資料' } }
+    }
   }
 
   if (method === 'PUT') {
     if (path.match(/^\/api\/students\/\w+$/)) return { status: 200, body: { success: true } }
     if (path.match(/^\/api\/classes\/\w+$/)) return { status: 200, body: { success: true } }
+    const contactBookEntryMatch = path.match(/^\/api\/contact-book\/entries\/(.+)$/)
+    if (contactBookEntryMatch) {
+      const entry = updateContactBookEntry(contactBookEntryMatch[1], {
+        groupProgress: typeof body?.groupProgress === 'string' ? body.groupProgress : undefined,
+        groupHomework: typeof body?.groupHomework === 'string' ? body.groupHomework : undefined,
+        individualNote: typeof body?.individualNote === 'string' ? body.individualNote : undefined,
+        individualHomework: typeof body?.individualHomework === 'string' ? body.individualHomework : undefined,
+        teacherTip: typeof body?.teacherTip === 'string' ? body.teacherTip : undefined,
+        scores: Array.isArray(body?.scores) ? body.scores.filter((score): score is DemoContactBookScore => typeof score === 'object' && score !== null) : undefined,
+      })
+      return { status: entry ? 200 : 404, body: entry ? { success: true, data: { id: entry.id } } : { success: false, message: '找不到聯絡簿資料' } }
+    }
   }
 
   if (method === 'DELETE') {
     if (path.match(/^\/api\/students\/\w+$/)) return { status: 200, body: { success: true } }
     if (path.match(/^\/api\/classes\/\w+$/)) return { status: 200, body: { success: true } }
+    const contactBookPhotoMatch = path.match(/^\/api\/contact-book\/photos\/(.+)$/)
+    if (contactBookPhotoMatch) {
+      return { status: 200, body: { success: deleteContactBookPhoto(contactBookPhotoMatch[1]) } }
+    }
   }
 
   return null

@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { getToken, parseToken, removeToken, type PlatformUser } from '@/lib/auth'
+import { removeToken, type PlatformUser } from '@/lib/auth'
 
 const pageTitles: Record<string, string> = {
   '/admin': '總覽',
@@ -38,13 +38,36 @@ export function AdminHeader() {
   const [user, setUser] = useState<PlatformUser | null>(null)
 
   useEffect(() => {
-    const token = getToken()
-    if (token) {
-      setUser(parseToken(token))
+    let cancelled = false
+
+    const loadUser = async () => {
+      try {
+        const res = await fetch('/api/platform/auth/me', { credentials: 'include' })
+        if (!res.ok) return
+        const data = await res.json()
+        const payload = data.data?.user || data.user
+        if (!payload || cancelled) return
+        setUser({
+          userId: payload.id,
+          email: payload.email,
+          name: payload.name,
+          role: payload.role,
+          tenantId: payload.tenant_id,
+        })
+      } catch {
+        // ignore header load failures; route protection handles the hard guard
+      }
+    }
+
+    loadUser()
+
+    return () => {
+      cancelled = true
     }
   }, [])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await fetch('/api/platform/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => undefined)
     removeToken()
     router.push('/admin/login')
   }
