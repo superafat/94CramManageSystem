@@ -46,7 +46,7 @@ export async function handleGroupIntent(
   // 1. Parse intent via AI
   let ai: IntentResult;
   try {
-    ai = await parseGroupIntent(userMessage, groupCtx);
+    ai = await parseGroupIntent(userMessage, groupCtx, tenantId);
   } catch (err) {
     logger.warn({ err: err instanceof Error ? err : new Error(String(err)) }, '[GroupRouter] AI parsing failed');
     // Fallback: try knowledge base

@@ -7,6 +7,7 @@ import { parseParentIntent as parseParentIntentKeyword, executeParentIntent, try
 import { parseParentIntent as parseParentIntentAI, type ParentContext } from '../modules/ai-engine';
 import { createCrossBotRequest, notifyAdminOfParentRequest, notifyAdminOfParentMessage } from '../modules/cross-bot-bridge';
 import { saveConversation } from '../firestore/parent-conversations';
+import { saveBotConversation } from '../firestore/bot-conversations';
 import { callParentApi } from '../modules/parent-api-client';
 import { sendMessage } from '../utils/telegram';
 import { checkRateLimit } from '../utils/rate-limit';
@@ -17,6 +18,7 @@ import type { ParentBinding, ParentChild } from '../firestore/parent-bindings';
 import { getDemoSession, handleDemoStart, handleDemoExit, handleDemoMessage } from '../demo/index.js';
 import { getMemoryContext, recordTurn } from '../memory/index.js';
 import type { MemoryContext } from '../memory/types.js';
+import { recordBotEvent } from '../firestore/bot-health';
 // Group mode imports
 import { getGroupBinding, createGroupBinding, deleteGroupBinding } from '../firestore/group-bindings';
 import { getBinding } from '../firestore/bindings';
@@ -83,7 +85,7 @@ async function smartParseIntent(
   // Try AI first
   try {
     const parentCtx = buildParentContext(binding);
-    const ai = await parseParentIntentAI(text, parentCtx, memoryCtx ?? null);
+    const ai = await parseParentIntentAI(text, parentCtx, memoryCtx ?? null, binding.tenant_id);
 
     if (ai.need_clarification) {
       return {
@@ -256,6 +258,21 @@ telegramParentWebhook.post('/', async (c) => {
         bot_response: botReply,
         intent,
       });
+      // Dual-write to unified collection
+      saveBotConversation({
+        tenantId: binding.tenant_id,
+        botType: 'windear',
+        platform: 'telegram',
+        userId: msg.userId,
+        userName: msg.userName,
+        userRole: 'parent',
+        userMessage: text,
+        botReply: botReply,
+        intent,
+        model: 'gemini-2.5-flash-lite',
+        latencyMs: 0,
+        createdAt: new Date(),
+      }).catch(() => {});
     };
 
     // AI asked for clarification
@@ -342,8 +359,10 @@ telegramParentWebhook.post('/', async (c) => {
     await sendMessage(msg.chatId, reply, undefined, 'parent');
     recordTurn('parent', msg.userId, binding.tenant_id, text, reply, intentResult.intent);
     logConversation(reply, intentResult.intent);
+    recordBotEvent(binding.tenant_id, 'windear', 'telegram', true).catch(() => {});
   } catch (error) {
     logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[ParentBot] Error processing message')
+    recordBotEvent(binding.tenant_id, 'windear', 'telegram', false, undefined, error instanceof Error ? error.message : String(error)).catch(() => {});
     await sendMessage(
       msg.chatId,
       '不好意思，我剛剛沒接住 😅 可以再說一次嗎？\n\n您可以試試：「查出勤」「查學費」「查課表」',

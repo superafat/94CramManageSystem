@@ -12,6 +12,9 @@ import { logger } from '../utils/logger';
 import type { LineEvent, LineWebhookBody } from '../services/line';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config';
+import { getPromptSettings, type BotPromptSettings } from '../firestore/bot-prompt-settings';
+import { saveBotConversation } from '../firestore/bot-conversations';
+import { recordBotEvent } from '../firestore/bot-health';
 
 // ===== 聞仲老師 System Prompts =====
 
@@ -79,12 +82,20 @@ interface ConversationRow {
 async function generateLineReply(
   userMessage: string,
   systemPrompt: string,
-  history: ConversationTurn[]
+  history: ConversationTurn[],
+  modelConfig?: BotPromptSettings['model']
 ): Promise<string> {
   try {
+    const modelName = modelConfig?.name ?? 'gemini-2.5-flash-lite';
+    const temperature = modelConfig?.temperature ?? 0.7;
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash-lite',
-      generationConfig: { temperature: 0.7 },
+      model: modelName,
+      generationConfig: {
+        temperature,
+        ...(modelConfig?.maxOutputTokens ? { maxOutputTokens: modelConfig.maxOutputTokens } : {}),
+        ...(modelConfig?.topP != null ? { topP: modelConfig.topP } : {}),
+        ...(modelConfig?.topK != null ? { topK: modelConfig.topK } : {}),
+      },
     });
 
     const contents: ConversationTurn[] = [
@@ -216,6 +227,7 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
     return;
   }
 
+  let tenantIdForHealth: string | undefined;
   try {
     // ===== 綁定指令 =====
     // 格式: 綁定 學生姓名 手機末4碼
@@ -275,12 +287,35 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
       userRole = 'guest';
     } else {
       userName = user.username ?? '';
+      tenantIdForHealth = user.tenant_id as string | undefined;
       const rawRole = user.role ?? '';
       if (rawRole === 'parent' || rawRole === 'student') {
         userRole = rawRole;
       }
       if (userRole === 'parent') systemPrompt = WENZHONG_PARENT_PROMPT;
       else if (userRole === 'student') systemPrompt = WENZHONG_STUDENT_PROMPT;
+    }
+
+    // Load custom prompt settings from Dashboard (if configured)
+    let modelConfig: BotPromptSettings['model'] | undefined;
+    const tenantId = user?.tenant_id;
+    if (tenantId) {
+      try {
+        const customSettings = await getPromptSettings(tenantId, 'wentaishi');
+        if (customSettings) {
+          modelConfig = customSettings.model;
+          // Use sub-prompt based on user role if available
+          const subKey = userRole === 'parent' ? 'parent' : userRole === 'student' ? 'student' : undefined;
+          if (subKey && customSettings.subPrompts?.[subKey]) {
+            const sub = customSettings.subPrompts[subKey];
+            systemPrompt = sub.mode === 'advanced' ? sub.fullPrompt : systemPrompt;
+          } else if (customSettings.mode === 'advanced' && customSettings.fullPrompt) {
+            systemPrompt = customSettings.fullPrompt;
+          }
+        }
+      } catch {
+        // Custom settings load failure is non-fatal, use hardcoded defaults
+      }
     }
 
     // 2. 取對話歷史（最近 6 輪）
@@ -307,7 +342,7 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
 
     // 3. AI 生成回覆
     const startMs = Date.now();
-    const reply = await generateLineReply(messageText, systemPrompt, history);
+    const reply = await generateLineReply(messageText, systemPrompt, history, modelConfig);
     const latencyMs = Date.now() - startMs;
 
     // 4. 回覆用戶
@@ -327,8 +362,34 @@ async function handleMessageEvent(event: LineEvent): Promise<void> {
       logger.error({ err: err instanceof Error ? err : new Error(String(err)) }, '[LINE] Failed to save conversation');
     });
 
+    // Record bot health (fire-and-forget)
+    if (user?.tenant_id) {
+      recordBotEvent(user.tenant_id as string, 'wentaishi', 'line', true, latencyMs).catch(() => {});
+    }
+
+    // Dual-write to unified bot-conversations collection
+    if (user?.tenant_id) {
+      saveBotConversation({
+        tenantId: user.tenant_id as string,
+        botType: 'wentaishi',
+        platform: 'line',
+        userId: lineUserId,
+        userName: userName || 'Unknown',
+        userRole: userRole as 'admin' | 'parent' | 'student' | 'guest',
+        userMessage: messageText,
+        botReply: reply,
+        intent: 'chat',
+        model: 'gemini',
+        latencyMs: latencyMs,
+        createdAt: new Date(),
+      }).catch(() => {});
+    }
+
   } catch (error) {
     logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[LINE] handleMessageEvent error');
+    if (tenantIdForHealth) {
+      recordBotEvent(tenantIdForHealth, 'wentaishi', 'line', false, undefined, error instanceof Error ? error.message : String(error)).catch(() => {});
+    }
     try {
       await sendLineReplyMessage(replyToken, [{ type: 'text', text: '不好意思，系統有點忙，稍等一下再試試～' }]);
     } catch (sendErr) {

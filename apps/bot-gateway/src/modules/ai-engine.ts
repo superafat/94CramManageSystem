@@ -4,9 +4,54 @@ import type { TenantCache } from '../firestore/cache';
 import { getTutorSettings } from '../firestore/ai-tutor-settings';
 import type { AiTutorSettings } from '../firestore/ai-tutor-settings';
 import { searchKnowledge } from '../firestore/knowledge-base';
+import { getPromptSettings, type BotPromptSettings, type BotType, type ModelConfig } from '../firestore/bot-prompt-settings';
 import type { MemoryContext } from '../memory/types.js';
 
 const genAI = new GoogleGenerativeAI(config.GEMINI_API_KEY);
+
+// ── Dynamic Prompt Helpers ──
+
+function composeStructuredPrompt(s: BotPromptSettings['structured']): string {
+  let prompt = `你是「${s.roleName}」。\n\n${s.roleDescription}`;
+  if (s.toneRules?.length > 0) {
+    prompt += `\n\n## 語氣規則\n${s.toneRules.map((r) => `- ${r}`).join('\n')}`;
+  }
+  if (s.capabilities?.length > 0) {
+    prompt += `\n\n## 能力範圍\n${s.capabilities.map((c) => `- ${c}`).join('\n')}`;
+  }
+  if (s.forbiddenActions?.length > 0) {
+    prompt += `\n\n## 禁止行為\n${s.forbiddenActions.map((f) => `- ${f}`).join('\n')}`;
+  }
+  if (s.knowledgeScope) {
+    prompt += `\n\n## 知識範圍\n${s.knowledgeScope}`;
+  }
+  if (s.customRules?.length > 0) {
+    prompt += `\n\n## 自訂規則\n${s.customRules.map((r) => `- ${r}`).join('\n')}`;
+  }
+  return prompt;
+}
+
+async function loadCustomPrompt(
+  tenantId: string,
+  botType: BotType,
+  subKey?: string,
+): Promise<{ prompt: string | null; model: ModelConfig | null }> {
+  try {
+    const settings = await getPromptSettings(tenantId, botType);
+    if (!settings) return { prompt: null, model: null };
+
+    if (subKey && settings.subPrompts?.[subKey]) {
+      const sub = settings.subPrompts[subKey];
+      const prompt = sub.mode === 'advanced' ? sub.fullPrompt : composeStructuredPrompt(sub.structured);
+      return { prompt: prompt || null, model: settings.model };
+    }
+
+    const prompt = settings.mode === 'advanced' ? settings.fullPrompt : composeStructuredPrompt(settings.structured);
+    return { prompt: prompt || null, model: settings.model };
+  } catch {
+    return { prompt: null, model: null };
+  }
+}
 
 export interface IntentResult {
   intent: string;
@@ -330,6 +375,25 @@ ai_response 依意圖類型的寫法：
   }
 
   return prompt;
+}
+
+// ── Dynamic cache section for custom prompts ──
+
+function buildAdminDynamicSection(cache: TenantCache): string {
+  let section = '';
+  if (cache.students.length > 0) {
+    section += `\n\n## 你認識的人\n\n學生名單：\n${cache.students.map((s) => `- ${s.name}（${s.class_name}，ID: ${s.id}）`).join('\n')}`;
+  }
+  if (cache.classes.length > 0) {
+    section += `\n\n班級列表：${cache.classes.join('、')}`;
+  }
+  if (cache.items.length > 0) {
+    section += `\n\n教材品項：\n${cache.items.map((i) => `- ${i.name}（庫存: ${i.stock}，ID: ${i.id}）`).join('\n')}`;
+  }
+  if (cache.warehouses.length > 0) {
+    section += `\n\n倉庫/分校：\n${cache.warehouses.map((w) => `- ${w.name}（ID: ${w.id}）`).join('\n')}`;
+  }
+  return section;
 }
 
 // ── 順風耳 System Prompt（完整版 — BOT_PERSONA_順風耳.md 第六章）──
@@ -773,17 +837,29 @@ export const PARENT_BOT_SYSTEM_PROMPT = buildParentSystemPrompt(null);
 export async function parseIntent(
   userMessage: string,
   cache: TenantCache | null,
-  memoryCtx?: MemoryContext | null
+  memoryCtx?: MemoryContext | null,
+  tenantId?: string,
 ): Promise<IntentResult> {
+  // Load custom prompt & model config from Dashboard settings
+  const custom = tenantId ? await loadCustomPrompt(tenantId, 'clairvoyant') : { prompt: null, model: null };
+  const modelName = custom.model?.name ?? 'gemini-2.5-flash-lite';
+  const temperature = custom.model?.temperature ?? 0;
+
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash-lite',
+    model: modelName,
     generationConfig: {
-      temperature: 0,
+      temperature,
+      ...(custom.model?.maxOutputTokens ? { maxOutputTokens: custom.model.maxOutputTokens } : {}),
+      ...(custom.model?.topP != null ? { topP: custom.model.topP } : {}),
+      ...(custom.model?.topK != null ? { topK: custom.model.topK } : {}),
       responseMimeType: 'application/json',
     },
   });
 
-  const systemPrompt = buildAdminSystemPrompt(cache) + (memoryCtx?.memoryPromptSection ?? '');
+  const basePrompt = custom.prompt ?? buildAdminSystemPrompt(cache);
+  // If using custom prompt, still inject dynamic cache data
+  const dynamicSection = custom.prompt && cache ? buildAdminDynamicSection(cache) : '';
+  const systemPrompt = (custom.prompt ? basePrompt + dynamicSection : buildAdminSystemPrompt(cache)) + (memoryCtx?.memoryPromptSection ?? '');
 
   const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [
     ...(memoryCtx?.conversationHistory ?? []),
@@ -815,17 +891,26 @@ export async function parseIntent(
 export async function parseParentIntent(
   userMessage: string,
   parentCtx: ParentContext | null,
-  memoryCtx?: MemoryContext | null
+  memoryCtx?: MemoryContext | null,
+  tenantId?: string,
 ): Promise<IntentResult> {
+  const custom = tenantId ? await loadCustomPrompt(tenantId, 'windear', 'private') : { prompt: null, model: null };
+  const modelName = custom.model?.name ?? 'gemini-2.5-flash-lite';
+  const temperature = custom.model?.temperature ?? 0;
+
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash-lite',
+    model: modelName,
     generationConfig: {
-      temperature: 0,
+      temperature,
+      ...(custom.model?.maxOutputTokens ? { maxOutputTokens: custom.model.maxOutputTokens } : {}),
+      ...(custom.model?.topP != null ? { topP: custom.model.topP } : {}),
+      ...(custom.model?.topK != null ? { topK: custom.model.topK } : {}),
       responseMimeType: 'application/json',
     },
   });
 
-  const systemPrompt = buildParentSystemPrompt(parentCtx) + (memoryCtx?.memoryPromptSection ?? '');
+  const basePrompt = custom.prompt ?? buildParentSystemPrompt(parentCtx);
+  const systemPrompt = basePrompt + (memoryCtx?.memoryPromptSection ?? '');
 
   const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [
     ...(memoryCtx?.conversationHistory ?? []),
@@ -946,16 +1031,25 @@ export async function parseStudentIntent(
     }
   }
 
+  // Load custom prompt & model config from Dashboard
+  const custom = await loadCustomPrompt(tenantId, 'ai-tutor');
+  const basePrompt = custom.prompt ?? buildStudentSystemPrompt(studentCtx.tenantName, settings);
   const systemPrompt =
-    buildStudentSystemPrompt(studentCtx.tenantName, settings) +
+    basePrompt +
     (kbContext ? `\n\n## 補習班知識庫\n\n${kbContext}` : '') +
     `\n\n## 你在跟誰說話\n\n學生：${studentCtx.studentName}（${studentCtx.className}）` +
     (memoryCtx?.memoryPromptSection ? `\n\n${memoryCtx.memoryPromptSection}` : '');
 
+  const modelName = custom.model?.name ?? 'gemini-2.5-flash-lite';
+  const temperature = custom.model?.temperature ?? 0.7;
+
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash-lite',
+    model: modelName,
     generationConfig: {
-      temperature: 0.7,
+      temperature,
+      ...(custom.model?.maxOutputTokens ? { maxOutputTokens: custom.model.maxOutputTokens } : {}),
+      ...(custom.model?.topP != null ? { topP: custom.model.topP } : {}),
+      ...(custom.model?.topK != null ? { topK: custom.model.topK } : {}),
       responseMimeType: 'application/json',
     },
   });
@@ -1014,17 +1108,25 @@ export async function parseStudentIntent(
 
 export async function parseGroupIntent(
   userMessage: string,
-  groupCtx: GroupContext
+  groupCtx: GroupContext,
+  tenantId?: string,
 ): Promise<IntentResult> {
+  const custom = tenantId ? await loadCustomPrompt(tenantId, 'windear', 'group') : { prompt: null, model: null };
+  const modelName = custom.model?.name ?? 'gemini-2.5-flash-lite';
+  const temperature = custom.model?.temperature ?? 0.7;
+
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash-lite',
+    model: modelName,
     generationConfig: {
-      temperature: 0.7,
+      temperature,
+      ...(custom.model?.maxOutputTokens ? { maxOutputTokens: custom.model.maxOutputTokens } : {}),
+      ...(custom.model?.topP != null ? { topP: custom.model.topP } : {}),
+      ...(custom.model?.topK != null ? { topK: custom.model.topK } : {}),
       responseMimeType: 'application/json',
     },
   });
 
-  const systemPrompt = buildGroupSystemPrompt(groupCtx);
+  const systemPrompt = custom.prompt ?? buildGroupSystemPrompt(groupCtx);
 
   const result = await model.generateContent({
     contents: [{ role: 'user', parts: [{ text: userMessage }] }],

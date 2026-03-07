@@ -5,6 +5,8 @@ import { handleStudentBind } from '../commands/student-bind';
 import { sendMessage } from '../utils/telegram';
 import { checkRateLimit } from '../utils/rate-limit';
 import { logger } from '../utils/logger';
+import { saveBotConversation } from '../firestore/bot-conversations';
+import { recordBotEvent } from '../firestore/bot-health';
 import type { TelegramUpdate } from '../utils/telegram';
 
 export const telegramStudentWebhook = new Hono();
@@ -93,8 +95,24 @@ telegramStudentWebhook.post('/', async (c) => {
       : `🤖 ${binding.studentName} 同學，我是神算子 AI 助教，正在思考您的問題...\n\n（AI 助教課業回覆功能即將完整上線）`;
 
     await sendMessage(msg.chatId, reply, undefined, 'student');
+    recordBotEvent(binding.tenantId, 'ai-tutor', 'telegram', true).catch(() => {});
+    saveBotConversation({
+      tenantId: binding.tenantId,
+      botType: 'ai-tutor',
+      platform: 'telegram',
+      userId: String(msg.userId),
+      userName: binding.studentName,
+      userRole: 'student',
+      userMessage: text,
+      botReply: reply,
+      intent: 'tutor.answer',
+      model: 'gemini-2.5-flash-lite',
+      latencyMs: 0,
+      createdAt: new Date(),
+    }).catch(() => {});
   } catch (error) {
     logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[StudentBot] Error processing message');
+    recordBotEvent(binding.tenantId, 'ai-tutor', 'telegram', false, undefined, error instanceof Error ? error.message : String(error)).catch(() => {});
     await sendMessage(
       msg.chatId,
       '不好意思，我剛剛沒接住 😅 可以再說一次嗎？',

@@ -18,6 +18,8 @@ import { logger } from '../utils/logger';
 import type { TelegramUpdate } from '../utils/telegram';
 import { getDemoSession, handleDemoStart, handleDemoExit, handleDemoMessage, handleDemoCallback } from '../demo/index.js';
 import { getMemoryContext, recordTurn } from '../memory/index.js';
+import { recordBotEvent } from '../firestore/bot-health';
+import { saveBotConversation } from '../firestore/bot-conversations';
 
 export const telegramWebhook = new Hono();
 
@@ -149,17 +151,39 @@ telegramWebhook.post('/', async (c) => {
       getCache(auth.tenantId),
       getMemoryContext('admin', msg.userId, auth.tenantId),
     ]);
-    const intent = await parseIntent(text, cache, memoryCtx);
+    const intent = await parseIntent(text, cache, memoryCtx, auth.tenantId);
+
+    // Unified conversation logger (fire-and-forget dual-write)
+    const logUnified = (reply: string, intentStr: string) => {
+      saveBotConversation({
+        tenantId: auth.tenantId,
+        botType: 'clairvoyant',
+        platform: 'telegram',
+        userId: msg.userId,
+        userName: '',
+        userRole: 'admin',
+        userMessage: text,
+        botReply: reply,
+        intent: intentStr,
+        model: 'gemini-2.5-flash-lite',
+        latencyMs: 0,
+        createdAt: new Date(),
+      }).catch(() => {});
+    };
 
     // Track AI usage (fire-and-forget)
     incrementUsage(auth.tenantId, 'ai_calls').catch((err: unknown) => {
       logger.error({ err: err instanceof Error ? err : new Error(String(err)) }, '[Webhook] Failed to increment ai_calls usage')
     });
 
+    // Record bot health (fire-and-forget)
+    recordBotEvent(auth.tenantId, 'clairvoyant', 'telegram', true).catch(() => {});
+
     if (intent.need_clarification) {
       const reply = intent.ai_response ?? intent.clarification_question ?? '沒聽懂，可以再說一次嗎？';
       await sendMessage(msg.chatId, `🤔 ${reply}`);
       recordTurn('admin', msg.userId, auth.tenantId, text, reply, intent.intent);
+      logUnified(reply, intent.intent);
       return c.json({ ok: true });
     }
 
@@ -168,6 +192,7 @@ telegramWebhook.post('/', async (c) => {
       const reply = intent.ai_response ?? '👋 你好！有什麼行政事務需要幫忙嗎？';
       await sendMessage(msg.chatId, reply);
       recordTurn('admin', msg.userId, auth.tenantId, text, reply, intent.intent);
+      logUnified(reply, intent.intent);
       return c.json({ ok: true });
     }
 
@@ -176,6 +201,7 @@ telegramWebhook.post('/', async (c) => {
       const reply = intent.ai_response ?? '🤔 可以再跟我多說一點嗎？例如什麼科目、幾年級、目前狀況，我才能給更具體的建議。';
       await sendMessage(msg.chatId, `💡 ${reply}`);
       recordTurn('admin', msg.userId, auth.tenantId, text, reply, intent.intent);
+      logUnified(reply, intent.intent);
       return c.json({ ok: true });
     }
 
@@ -183,6 +209,7 @@ telegramWebhook.post('/', async (c) => {
       const reply = intent.ai_response ?? '🤔 我沒聽懂，可以換個方式說嗎？\n輸入 /help 查看使用說明';
       await sendMessage(msg.chatId, reply);
       recordTurn('admin', msg.userId, auth.tenantId, text, reply, intent.intent);
+      logUnified(reply, intent.intent);
       return c.json({ ok: true });
     }
 
@@ -213,6 +240,7 @@ telegramWebhook.post('/', async (c) => {
       const reply = intent.ai_response ? `${intent.ai_response}\n\n${formatted}` : formatted;
       await sendMessage(msg.chatId, reply);
       recordTurn('admin', msg.userId, auth.tenantId, text, reply, intent.intent);
+      logUnified(reply, intent.intent);
       return c.json({ ok: true });
     }
 
@@ -225,6 +253,7 @@ telegramWebhook.post('/', async (c) => {
     await sendMessage(msg.chatId, '🤔 我不確定要怎麼處理這個指令');
   } catch (error) {
     logger.error({ err: error instanceof Error ? error : new Error(String(error)) }, '[Webhook] Error processing message')
+    recordBotEvent(auth.tenantId, 'clairvoyant', 'telegram', false, undefined, error instanceof Error ? error.message : String(error)).catch(() => {});
     await sendMessage(msg.chatId, '⚠️ 系統發生錯誤，請稍後再試');
   }
 
