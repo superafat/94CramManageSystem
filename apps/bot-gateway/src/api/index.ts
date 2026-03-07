@@ -10,6 +10,15 @@ import { getUsage } from '../firestore/usage';
 import { getParentBinding, listParentBindings, deleteParentBinding } from '../firestore/parent-bindings';
 import { createParentInvite, listParentInvites, generateInviteCode } from '../firestore/parent-invites';
 import { firestore } from '../firestore/client';
+import { getTutorSettings, updateTutorSettings } from '../firestore/ai-tutor-settings';
+import {
+  createStudentInvite,
+  listStudentInvites,
+  deleteStudentInvite,
+  generateStudentInviteCode,
+} from '../firestore/student-invites';
+import { listStudentBindings } from '../firestore/student-bindings';
+import { getRecentConversations } from '../firestore/parent-conversations';
 
 type Env = { Variables: { user: DashboardUser } };
 
@@ -246,4 +255,164 @@ apiRouter.put('/settings', async (c) => {
   await upsertSettings(user.tenantId, updates);
   const settings = await getSettings(user.tenantId);
   return c.json(settings);
+});
+
+// === AI Tutor Settings ===
+apiRouter.get('/ai-tutor/settings', async (c) => {
+  const user = c.get('user');
+  const settings = await getTutorSettings(user.tenantId);
+  return c.json(settings);
+});
+
+apiRouter.put('/ai-tutor/settings', async (c) => {
+  const user = c.get('user');
+  const body = await c.req.json() as Record<string, unknown>;
+  const allowed = [
+    'enabled', 'allowedSubjects', 'responseStyle', 'dailyQuota', 'restrictToKnowledgeBase',
+  ] as const;
+  const updates: Record<string, unknown> = {};
+  for (const key of allowed) {
+    if (body[key] !== undefined) {
+      updates[key] = body[key];
+    }
+  }
+  await updateTutorSettings(user.tenantId, updates as Parameters<typeof updateTutorSettings>[1]);
+  const settings = await getTutorSettings(user.tenantId);
+  return c.json(settings);
+});
+
+// === Student Invites ===
+apiRouter.post('/ai-tutor/invites', async (c) => {
+  const user = c.get('user');
+  const body = await c.req.json() as Record<string, unknown>;
+  const { studentId, studentName } = body as { studentId?: string; studentName?: string };
+
+  if (!studentId || !studentName) {
+    return c.json({ error: 'studentId and studentName are required' }, 400);
+  }
+
+  const code = generateStudentInviteCode();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+  await createStudentInvite({
+    tenantId: user.tenantId,
+    code,
+    studentId,
+    studentName,
+    createdBy: user.userId,
+    expiresAt,
+  });
+
+  return c.json({ code, expires_at: expiresAt.toISOString() }, 201);
+});
+
+apiRouter.get('/ai-tutor/invites', async (c) => {
+  const user = c.get('user');
+  const invites = await listStudentInvites(user.tenantId);
+  return c.json(invites);
+});
+
+apiRouter.delete('/ai-tutor/invites/:id', async (c) => {
+  const code = c.req.param('id');
+  await deleteStudentInvite(code);
+  return c.json({ success: true });
+});
+
+// === Student Bindings ===
+apiRouter.get('/ai-tutor/bindings', async (c) => {
+  const user = c.get('user');
+  const bindings = await listStudentBindings(user.tenantId);
+  return c.json(bindings);
+});
+
+apiRouter.delete('/ai-tutor/bindings/:id', async (c) => {
+  const docId = c.req.param('id');
+  const col = firestore.collection('student-bindings');
+  const doc = await col.doc(docId).get();
+
+  if (!doc.exists) {
+    return c.json({ error: 'Binding not found' }, 404);
+  }
+
+  await col.doc(docId).delete();
+  return c.json({ success: true });
+});
+
+// === Conversations (read-only) ===
+apiRouter.get('/ai-tutor/conversations', async (c) => {
+  const user = c.get('user');
+  const limitParam = c.req.query('limit');
+  const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 50, 200) : 50;
+
+  // Use the student-conversations collection if it exists, fall back to parent conversations
+  const studentId = c.req.query('studentId');
+
+  let query = firestore
+    .collection('student-conversations')
+    .where('tenantId', '==', user.tenantId)
+    .orderBy('createdAt', 'desc')
+    .limit(limit);
+
+  if (studentId) {
+    query = firestore
+      .collection('student-conversations')
+      .where('tenantId', '==', user.tenantId)
+      .where('studentId', '==', studentId)
+      .orderBy('createdAt', 'desc')
+      .limit(limit);
+  }
+
+  const snapshot = await query.get();
+  const conversations = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  return c.json(conversations);
+});
+
+// === Analytics ===
+apiRouter.get('/ai-tutor/analytics', async (c) => {
+  const user = c.get('user');
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const col = firestore.collection('student-conversations');
+
+  const [todaySnap, monthSnap, bindingsSnap] = await Promise.all([
+    col
+      .where('tenantId', '==', user.tenantId)
+      .where('createdAt', '>=', todayStart)
+      .get(),
+    col
+      .where('tenantId', '==', user.tenantId)
+      .where('createdAt', '>=', monthStart)
+      .get(),
+    listStudentBindings(user.tenantId),
+  ]);
+
+  // Count unique students from month conversations
+  const activeStudentIds = new Set<string>();
+  const questionCounts = new Map<string, number>();
+
+  for (const doc of monthSnap.docs) {
+    const data = doc.data() as Record<string, unknown>;
+    if (typeof data['studentId'] === 'string') {
+      activeStudentIds.add(data['studentId']);
+    }
+    if (typeof data['userMessage'] === 'string') {
+      const msg = (data['userMessage'] as string).slice(0, 50);
+      questionCounts.set(msg, (questionCounts.get(msg) ?? 0) + 1);
+    }
+  }
+
+  const topQuestions = Array.from(questionCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([question, count]) => ({ question, count }));
+
+  return c.json({
+    todayCount: todaySnap.size,
+    monthCount: monthSnap.size,
+    activeStudents: activeStudentIds.size,
+    totalBoundStudents: bindingsSnap.length,
+    topQuestions,
+  });
 });
