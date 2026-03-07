@@ -129,6 +129,57 @@ describe('POST /api/auth/demo', () => {
   })
 })
 
+describe('POST /api/auth/sessions/revoke - validation', () => {
+  it('returns 400 when body is invalid before auth runs', async () => {
+    const res = await testRequest('POST', '/api/auth/sessions/revoke', {
+      body: { sessionId: '11111111-1111-1111-1111-111111111111' },
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when revokeAll is false and sessionId is missing', async () => {
+    const token = await generateTestToken({ systems: ['manage'] })
+    const res = await testRequest('POST', '/api/auth/sessions/revoke', {
+      token,
+      body: {},
+    })
+    expect(res.status).toBe(400)
+  })
+})
+
+describe('POST /api/auth/switch-tenant - validation', () => {
+  it('returns 400 when body is invalid before auth runs', async () => {
+    const res = await testRequest('POST', '/api/auth/switch-tenant', {
+      body: { tenantId: '11111111-1111-1111-1111-111111111111' },
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when tenantId is missing', async () => {
+    const token = await generateTestToken({ systems: ['manage'] })
+    const res = await testRequest('POST', '/api/auth/switch-tenant', {
+      token,
+      body: {},
+    })
+    expect(res.status).toBe(400)
+  })
+})
+
+describe('GET /api/auth/sessions', () => {
+  it('returns 401 when no token provided', async () => {
+    const res = await testRequest('GET', '/api/auth/sessions')
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 200 with a valid token even when no sessions are stored in mocked DB', async () => {
+    const token = await generateTestToken({ systems: ['manage'] })
+    const res = await testRequest('GET', '/api/auth/sessions', { token })
+    expect(res.status).toBe(200)
+    const body = res.json as Record<string, unknown>
+    expect(body).toHaveProperty('data')
+  })
+})
+
 describe('Protected routes - auth middleware', () => {
   it('GET /api/admin/students returns 401 without token', async () => {
     const res = await testRequest('GET', '/api/admin/students')

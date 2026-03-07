@@ -10,6 +10,7 @@
     "start": "node dist/index.js",
     "test": "vitest",
     "db:migrate": "psql $DATABASE_URL -f src/db/migrate.sql",
+    "db:migrate:auth-foundation": "tsx src/scripts/run-auth-foundation-migration.ts",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],

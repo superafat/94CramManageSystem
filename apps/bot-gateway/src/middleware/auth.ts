@@ -1,5 +1,5 @@
 import { createMiddleware } from 'hono/factory';
-import { verify } from '@94cram/shared/auth';
+import { verify, hasSystemAccess } from '@94cram/shared/auth';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 
@@ -30,6 +30,10 @@ export const dashboardAuth = createMiddleware<Env>(async (c, next) => {
   const token = authHeader.slice(7);
   try {
     const payload = await verify(token, jwtSecret);
+
+    if (!hasSystemAccess(payload, 'bot', { allowLegacyNoSystems: false }) && payload.role !== 'superadmin') {
+      return c.json({ error: 'Forbidden: Missing bot system access' }, 403);
+    }
 
     c.set('user', {
       userId: payload.userId,
