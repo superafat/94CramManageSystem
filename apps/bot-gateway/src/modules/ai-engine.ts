@@ -1,6 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config';
 import type { TenantCache } from '../firestore/cache';
+import { getTutorSettings } from '../firestore/ai-tutor-settings';
+import type { AiTutorSettings } from '../firestore/ai-tutor-settings';
+import { searchKnowledge } from '../firestore/knowledge-base';
 import type { MemoryContext } from '../memory/types.js';
 
 const genAI = new GoogleGenerativeAI(config.GEMINI_API_KEY);
@@ -847,6 +850,164 @@ export async function parseParentIntent(
       need_clarification: true,
       clarification_question: '我沒聽清楚，可以再說一次嗎？',
       ai_response: null,
+    };
+  }
+}
+
+// ── 神算子 System Prompt（AI 課業助教）──
+
+export interface StudentContext {
+  tenantName: string;
+  studentName: string;
+  studentId: string;
+  className: string;
+  knowledgeBase?: string;
+  imageUrl?: string;
+}
+
+function buildStudentSystemPrompt(tenantName: string, settings: AiTutorSettings): string {
+  const styleDesc =
+    settings.responseStyle === 'socratic'
+      ? '蘇格拉底式提問引導'
+      : settings.responseStyle === 'concise'
+        ? '簡潔扼要'
+        : '詳細解說';
+
+  let prompt = `你是「神算子」，${tenantName} 補習班的 AI 課業助教。
+
+角色定位：
+- 你是學生的學習夥伴，幫助理解課業內容
+- 用清楚易懂的方式解釋概念，適合國中/高中程度
+- 引導學生思考，不直接給完整答案
+- 不確定的內容誠實說「這個我不太確定，建議問老師」
+
+回答風格：${styleDesc}`;
+
+  if (settings.allowedSubjects && settings.allowedSubjects.length > 0) {
+    prompt += `
+
+允許回答的科目：${settings.allowedSubjects.join('、')}。其他科目請回覆「這個科目目前還沒開放 AI 助教，請直接問老師喔！」`;
+  }
+
+  prompt += `
+
+重要規則：
+- 絕對不能提供考試答案或幫寫作業
+- 提供解題思路和方法，讓學生自己完成
+- 遇到不適當的問題，禮貌拒絕並引導回學習
+- 每次回答結尾可以問「還有哪裡不懂嗎？」
+
+你怎麼說話：
+- 繁體中文，用語親切，適合高中/國中生
+- 不要太正式，像學長姐在幫忙解題
+- 每則回應不超過 300 字`;
+
+  return prompt;
+}
+
+export async function parseStudentIntent(
+  userMessage: string,
+  studentCtx: StudentContext,
+  tenantId: string,
+  memoryCtx?: MemoryContext | null
+): Promise<IntentResult> {
+  // Load tutor settings and check if enabled
+  const settings = await getTutorSettings(tenantId);
+  if (!settings.enabled) {
+    return {
+      intent: 'tutor.disabled',
+      confidence: 1,
+      params: {},
+      need_clarification: false,
+      clarification_question: null,
+      ai_response: 'AI 助教功能目前未開放，有問題請直接問老師喔！',
+    };
+  }
+
+  // RAG: search knowledge base for relevant context
+  const keywords = userMessage
+    .split(/[\s，。！？、,.!?]+/)
+    .filter((w) => w.length >= 2)
+    .slice(0, 8);
+
+  let kbContext = studentCtx.knowledgeBase ?? '';
+  if (keywords.length > 0) {
+    try {
+      const kbResults = await searchKnowledge(tenantId, keywords);
+      if (kbResults.length > 0) {
+        const kbSnippet = kbResults
+          .slice(0, 3)
+          .map((e) => `【${e.title}】${e.content}`)
+          .join('\n\n');
+        kbContext = kbContext ? `${kbContext}\n\n${kbSnippet}` : kbSnippet;
+      }
+    } catch {
+      // KB search is non-fatal
+    }
+  }
+
+  const systemPrompt =
+    buildStudentSystemPrompt(studentCtx.tenantName, settings) +
+    (kbContext ? `\n\n## 補習班知識庫\n\n${kbContext}` : '') +
+    `\n\n## 你在跟誰說話\n\n學生：${studentCtx.studentName}（${studentCtx.className}）` +
+    (memoryCtx?.memoryPromptSection ? `\n\n${memoryCtx.memoryPromptSection}` : '');
+
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash-lite',
+    generationConfig: {
+      temperature: 0.7,
+      responseMimeType: 'application/json',
+    },
+  });
+
+  // Build user message parts — support image for homework help
+  const userParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } } | { fileData: { mimeType: string; fileUri: string } }> = [];
+
+  if (studentCtx.imageUrl) {
+    userParts.push({ text: '這是學生拍的作業/考卷照片。請辨識題目內容，然後提供解題思路和提示，但不要直接給出最終答案。引導學生自己思考。\n\n學生提問：' + userMessage });
+    userParts.push({ fileData: { mimeType: 'image/jpeg', fileUri: studentCtx.imageUrl } });
+  } else {
+    userParts.push({ text: userMessage });
+  }
+
+  const contents: Array<{ role: 'user' | 'model'; parts: typeof userParts }> = [
+    ...(memoryCtx?.conversationHistory ?? []).map((h) => ({
+      role: h.role,
+      parts: h.parts as typeof userParts,
+    })),
+    { role: 'user', parts: userParts },
+  ];
+
+  try {
+    const result = await model.generateContent({
+      contents,
+      systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
+    });
+
+    const text = result.response.text();
+    try {
+      const parsed = JSON.parse(text) as IntentResult;
+      parsed.ai_response = parsed.ai_response ?? null;
+      return parsed;
+    } catch {
+      // Model returned plain text instead of JSON — wrap it
+      return {
+        intent: 'tutor.answer',
+        confidence: 1,
+        params: {},
+        need_clarification: false,
+        clarification_question: null,
+        ai_response: text,
+      };
+    }
+  } catch {
+    return {
+      intent: 'tutor.error',
+      confidence: 0,
+      params: {},
+      need_clarification: false,
+      clarification_question: null,
+      ai_response: '抱歉，我現在有點問題，請稍後再試，或直接問老師喔！',
     };
   }
 }

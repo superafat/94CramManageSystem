@@ -34,7 +34,7 @@ export interface TenantMemoryDoc {
 }
 
 // Layer 3: User Memory
-export type BotType = 'admin' | 'parent';
+export type BotType = 'admin' | 'parent' | 'student';
 
 export interface UserMemoryMessage {
   role: 'user' | 'model';
