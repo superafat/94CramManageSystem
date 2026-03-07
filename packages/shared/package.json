@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./db": "./src/db/index.ts",
     "./auth": "./src/auth/index.ts",
+    "./auth/jwt": "./src/auth/jwt.ts",
     "./types": "./src/types/index.ts",
     "./utils": "./src/utils/index.ts",
     "./middleware": {

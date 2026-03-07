@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDemoResponse, DEMO_SUPERADMIN_ID } from '@/lib/demo-data'
-import { verify } from '@94cram/shared/auth'
+import { verify } from '@94cram/shared/auth/jwt'
 
 const BACKEND_URL = process.env.PORTAL_BACKEND_URL || 'http://localhost:3100'
 

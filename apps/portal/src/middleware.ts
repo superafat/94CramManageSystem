@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { verify } from '@94cram/shared/auth'
+import { verify } from '@94cram/shared/auth/jwt'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
